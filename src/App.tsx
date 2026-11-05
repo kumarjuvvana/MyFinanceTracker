@@ -997,7 +997,7 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
     <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Bank transfer</option><option>UPI</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Online portal</option><option>Other</option></Select></Field>
     <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
     <Field className="full" label="Notes"><Input maxLength={500} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
-  </div>{maxAmount === null ? <p className="section-description" style={{ marginTop: 12 }}>Enter fee amounts on the education record before adding a payment so it can be validated against the total due.</p> : <p className="section-description" style={{ marginTop: 12 }}>Remaining fees available for payment: {new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.</p>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
+  </div>{maxAmount === null ? <div className="alert" style={{ marginTop: 12 }} role="status">Add the tuition, admission, school van / transport, or other fee charges to this education record before recording a payment.</div> : <div className={`alert${maxAmount <= 0 && !initial ? " alert-error" : ""}`} style={{ marginTop: 12 }} role="status">{maxAmount <= 0 && !initial ? "No balance is available. Review the fee charges and existing payments before adding another payment." : `Remaining fees available for payment: ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.`}</div>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)} title={!initial && (maxAmount === null || maxAmount <= 0) ? "Set fee charges and a positive remaining balance first" : undefined}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
 
 function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
@@ -2224,7 +2224,7 @@ export default function App() {
       setRevision(nextRevision);
       if (latestDataRef.current === snapshot) {
         setSyncStatus("saved");
-        setSyncMessage("All changes committed to GitHub.");
+        setSyncMessage("All changes saved to Supabase.");
       }
     }).catch((caught: unknown) => {
       const message = caught instanceof Error ? caught.message : "Your changes could not be saved.";
@@ -2280,7 +2280,7 @@ export default function App() {
       return;
     }
     setSyncStatus("saving");
-    setSyncMessage("Changes waiting to commit to GitHub.");
+    setSyncMessage("Changes waiting to save to Supabase.");
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       saveTimer.current = null;
@@ -2306,7 +2306,7 @@ export default function App() {
       skipNextSave.current = saved.initialized;
       setSetupRequired(!saved.initialized);
       setSyncStatus("saved");
-      setSyncMessage(saved.initialized ? "Connected to GitHub data storage." : "Choose how to initialize shared data.");
+      setSyncMessage(saved.initialized ? "Connected to Supabase cloud storage." : "Choose how to initialize shared data.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load shared Daybook data.");
       throw caught;
@@ -2329,8 +2329,8 @@ export default function App() {
       setData(initialData);
       setSetupRequired(false);
       setSyncStatus("saved");
-      setSyncMessage("All changes committed to GitHub.");
-      setNotice(legacy ? "Your browser data has been committed to the private GitHub repository." : "Your Git seed data is now stored in the private GitHub repository.");
+      setSyncMessage("All changes saved to Supabase.");
+      setNotice(legacy ? "Your browser data has been saved to Supabase." : "Your seed data is now stored in Supabase.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not initialize shared Daybook data.");
     } finally {
@@ -2424,7 +2424,7 @@ export default function App() {
         setData(normalizeTrackerData(saved.data));
         setSetupRequired(!saved.initialized);
         setSyncStatus("saved");
-        setSyncMessage("Updated from GitHub.");
+        setSyncMessage("Updated from Supabase.");
         if (manual) setNotice("Latest shared data loaded.");
       } else if (manual) {
         setNotice("This device already has the latest shared data.");
