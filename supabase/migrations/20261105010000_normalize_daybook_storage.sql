@@ -164,27 +164,27 @@ begin
       revision = excluded.revision,
       updated_at = excluded.updated_at;
 
-  delete from public.shopping_trip_purchases;
-  delete from public.stock_quotes;
-  delete from public.education_subjects;
-  delete from public.education_exams;
-  delete from public.education_payments;
-  delete from public.vehicle_journeys;
-  delete from public.vehicle_maintenance;
-  delete from public.shopping_items;
-  delete from public.purchases;
-  delete from public.shopping_trips;
-  delete from public.stores;
-  delete from public.products;
-  delete from public.reminders;
-  delete from public.brokers;
-  delete from public.stocks;
-  delete from public.assets;
-  delete from public.learning_records;
-  delete from public.education_records;
-  delete from public.vehicles;
-  delete from public.personal_records;
-  delete from public.credential_vault;
+  delete from public.shopping_trip_purchases where trip_id is not null;
+  delete from public.stock_quotes where id is not null;
+  delete from public.education_subjects where id is not null;
+  delete from public.education_exams where id is not null;
+  delete from public.education_payments where id is not null;
+  delete from public.vehicle_journeys where id is not null;
+  delete from public.vehicle_maintenance where id is not null;
+  delete from public.shopping_items where id is not null;
+  delete from public.purchases where id is not null;
+  delete from public.shopping_trips where id is not null;
+  delete from public.stores where id is not null;
+  delete from public.products where id is not null;
+  delete from public.reminders where id is not null;
+  delete from public.brokers where name is not null;
+  delete from public.stocks where id is not null;
+  delete from public.assets where id is not null;
+  delete from public.learning_records where id is not null;
+  delete from public.education_records where id is not null;
+  delete from public.vehicles where id is not null;
+  delete from public.personal_records where id is not null;
+  delete from public.credential_vault where id is not null;
 
   insert into public.shopping_items (id, position, record)
   select entry ->> 'id', position::integer, entry
