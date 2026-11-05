@@ -3,7 +3,6 @@ import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { normalizeTrackerData, validateData } from "../src/lib/data.js";
 import type { TrackerData } from "../src/types";
 
-const DATA_ROW_ID = "shared";
 const MAX_DATA_BYTES = 2 * 1024 * 1024;
 const seedData = seedFile as TrackerData;
 
@@ -99,9 +98,10 @@ async function supabaseRequest(path: string, init?: RequestInit): Promise<Respon
 }
 
 async function loadStoredData(): Promise<StoredData | null> {
-  const response = await supabaseRequest(
-    `daybook_data?id=eq.${DATA_ROW_ID}&select=data,revision`,
-  );
+  const response = await supabaseRequest("rpc/load_daybook_data", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
   const result: unknown = await response.json();
   if (!Array.isArray(result)) {
     throw new Error("Supabase returned an invalid response for the shared Daybook data.");

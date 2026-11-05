@@ -39,11 +39,24 @@ function secret(): string | null {
   return configured && configured.length >= 16 ? configured : null;
 }
 
+function isLocalDevelopmentBypass(request: ApiRequest): boolean {
+  if (process.env.NODE_ENV === "production" || process.env.LOCAL_AUTH_BYPASS !== "true") return false;
+  const host = header(request, "host");
+  if (!host) return false;
+  try {
+    const hostname = new URL(`http://${host}`).hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
+  }
+}
+
 function sign(expiry: string, key: string): string {
   return createHmac("sha256", key).update(expiry).digest("hex");
 }
 
 export function isAuthenticated(request: ApiRequest): boolean {
+  if (isLocalDevelopmentBypass(request)) return true;
   const key = secret();
   if (!key) return false;
   const cookies = header(request, "cookie").split(";").map((part) => part.trim());
@@ -80,17 +93,18 @@ function requestBody(request: ApiRequest): unknown {
 }
 
 export default function dataAuthHandler(request: ApiRequest, response: ApiResponse) {
+  const localBypass = isLocalDevelopmentBypass(request);
   const password = secret();
-  if (!password) {
+  if (!password && !localBypass) {
     respond(response, 503, { error: "Set DATA_ACCESS_PASSWORD to a strong passphrase of at least 16 characters in Vercel Project Settings." });
     return;
   }
   if (request.method === "GET") {
-    if (!isAuthenticated(request)) {
+    if (!localBypass && !isAuthenticated(request)) {
       respond(response, 401, { error: "Enter the Daybook access password to continue." });
       return;
     }
-    respond(response, 200, { authenticated: true });
+    respond(response, 200, { authenticated: true, ...(localBypass ? { localBypass: true } : {}) });
     return;
   }
 
@@ -109,6 +123,16 @@ export default function dataAuthHandler(request: ApiRequest, response: ApiRespon
   if (request.method !== "POST") {
     response.setHeader("Allow", "GET, POST, DELETE");
     respond(response, 405, { error: "Only GET, POST, and DELETE requests are supported." });
+    return;
+  }
+
+  if (localBypass) {
+    respond(response, 403, { error: "Password sign-in is disabled while the local preview bypass is enabled." });
+    return;
+  }
+
+  if (!password) {
+    respond(response, 503, { error: "Set DATA_ACCESS_PASSWORD to a strong passphrase of at least 16 characters in Vercel Project Settings." });
     return;
   }
 
