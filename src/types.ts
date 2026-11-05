@@ -139,6 +139,9 @@ export interface AssetRecord {
 }
 
 export const EDUCATION_LEVELS = [
+  "Nursery / Pre-KG",
+  "LKG",
+  "UKG",
   "Primary (Grades 1–5)",
   "Middle (Grades 6–8)",
   "Secondary (Grades 9–10)",

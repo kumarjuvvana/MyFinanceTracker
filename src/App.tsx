@@ -1054,9 +1054,61 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   const [levelFilter, setLevelFilter] = useState("All levels");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [selectedStudent, setSelectedStudent] = useState("All students");
+  const [sortBy, setSortBy] = useState("student-year");
   const students = [...new Set(records.map((record) => record.studentName.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
   const query = search.trim().toLocaleLowerCase();
+  function academicYearValue(value: string) {
+    const year = value.match(/\b(?:19|20|21)\d{2}\b/);
+    return year ? Number(year[0]) : null;
+  }
+
+  function compareAcademicYears(a: EducationRecord, b: EducationRecord, direction: "ascending" | "descending") {
+    const yearA = academicYearValue(a.academicYear);
+    const yearB = academicYearValue(b.academicYear);
+    if (yearA === null && yearB !== null) return 1;
+    if (yearA !== null && yearB === null) return -1;
+    if (yearA !== null && yearB !== null && yearA !== yearB) {
+      return direction === "descending" ? yearB - yearA : yearA - yearB;
+    }
+    return direction === "descending"
+      ? b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true })
+      : a.academicYear.localeCompare(b.academicYear, undefined, { numeric: true });
+  }
+
+  function latestPaymentDate(record: EducationRecord) {
+    return (record.payments ?? []).reduce((latest, payment) => payment.date > latest ? payment.date : latest, "");
+  }
+
+  function totalFeesPaid(record: EducationRecord) {
+    return (record.paidFee ?? 0) + (record.payments ?? []).reduce((total, payment) => total + payment.amount, 0);
+  }
+
+  function compareEducationRecords(a: EducationRecord, b: EducationRecord) {
+    let comparison = 0;
+    if (sortBy === "academic-newest") comparison = compareAcademicYears(a, b, "descending");
+    else if (sortBy === "academic-oldest") comparison = compareAcademicYears(a, b, "ascending");
+    else if (sortBy === "payment-recent") comparison = latestPaymentDate(b).localeCompare(latestPaymentDate(a));
+    else if (sortBy === "paid-highest") {
+      comparison = a.currency.localeCompare(b.currency) || totalFeesPaid(b) - totalFeesPaid(a);
+    }
+    else if (sortBy === "balance-highest") {
+      const balanceA = a.annualFee === null ? null : Math.max(0, a.annualFee - totalFeesPaid(a));
+      const balanceB = b.annualFee === null ? null : Math.max(0, b.annualFee - totalFeesPaid(b));
+      comparison = balanceA === null ? (balanceB === null ? 0 : 1)
+        : balanceB === null ? -1
+          : a.currency.localeCompare(b.currency) || balanceB - balanceA;
+    } else if (sortBy === "institution") comparison = a.institution.localeCompare(b.institution);
+
+    if (comparison) return comparison;
+    if (sortBy === "student-year") {
+      comparison = a.studentName.localeCompare(b.studentName) || compareAcademicYears(a, b, "descending");
+    } else if (sortBy !== "academic-newest" && sortBy !== "academic-oldest") {
+      comparison = a.studentName.localeCompare(b.studentName) || compareAcademicYears(a, b, "descending");
+    }
+    return comparison || a.institution.localeCompare(b.institution) || a.id.localeCompare(b.id);
+  }
+
   const visible = records.filter((record) =>
     (selectedStudent === "All students" || record.studentName.trim() === selectedStudent) &&
     (levelFilter === "All levels" || record.level === levelFilter) &&
@@ -1067,8 +1119,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.grade, exam.notes]),
       ...(record.payments ?? []).flatMap((payment) => [payment.period, payment.method, payment.reference, payment.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.studentName.localeCompare(b.studentName) ||
-      b.academicYear.localeCompare(a.academicYear) || a.institution.localeCompare(b.institution));
+    .sort(compareEducationRecords);
 
   function deleteRecord(record: EducationRecord) {
     if (window.confirm(`Delete the ${record.academicYear || record.level} record for ${record.studentName} at ${record.institution}?`)) onDelete(record);
@@ -1095,7 +1146,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   return <>
     <PageHeading eyebrow="Growing and learning" title="School & college records" subtitle="Select a student to review their academic years, subjects, results, and term payments." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
     <div className="alert"><GraduationCap size={15} style={{ flex: "none", marginTop: 1 }} /><span>Each record represents one academic year at a school, college, or university. Add flexible terms, quarters, semesters, or installments as separate payments; assessment types and grading systems can vary by institution. Records are readable in the private GitHub repository by collaborators and remain in its history; avoid storing student ID numbers or sensitive health information.</span></div>
-    <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, payment..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
+    <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, payment..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
     <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
     {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={records.length ? "No matching records" : "No education records yet"} description={records.length ? "Try another search or filter." : "Add a school or college record to start an education timeline."} /></Card>}
     {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
