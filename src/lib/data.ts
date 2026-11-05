@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_LEVELS, type AssetRecord, type Category, type Currency, type EducationRecord, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationRecord, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -71,6 +71,10 @@ export function validateData(value: unknown): value is TrackerData {
     typeof reminder.date === "string" && !Number.isNaN(Date.parse(reminder.date)) &&
     typeof reminder.details === "string" && typeof reminder.completed === "boolean" &&
     (reminder.category === undefined || typeof reminder.category === "string")));
+  const reminderCategoriesOk = value.reminderCategories === undefined ||
+    (Array.isArray(value.reminderCategories) && value.reminderCategories.every((category) =>
+      typeof category === "string" && category.trim().length > 0 && category.trim().length <= 80) &&
+      new Set((value.reminderCategories as string[]).map((category) => category.trim().toLocaleLowerCase())).size === value.reminderCategories.length);
   const brokersOk = value.brokers === undefined || (Array.isArray(value.brokers) && value.brokers.every((broker) =>
     typeof broker === "string" && broker.trim().length > 0));
   const stocksOk = value.stocks === undefined || (Array.isArray(value.stocks) && value.stocks.every((stock) => {
@@ -234,7 +238,7 @@ export function validateData(value: unknown): value is TrackerData {
     !Number.isNaN(Date.parse(trip.date)) && typeof trip.store === "string" &&
     typeof trip.notes === "string" && Array.isArray(trip.purchaseIds) &&
     trip.purchaseIds.every((id) => typeof id === "string"));
-  if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk ||
+  if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !personalRecordsOk ||
@@ -297,6 +301,11 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       ...reminder,
       category: reminder.category?.trim() || "General",
     })),
+    reminderCategories: [...new Set([
+      ...(data.reminderCategories ?? []),
+      ...(data.reminders ?? []).map((reminder) => reminder.category?.trim() || "General")
+        .filter((category) => !REMINDER_CATEGORIES.some((builtIn) => builtIn.toLocaleLowerCase() === category.toLocaleLowerCase())),
+    ])],
     brokers: data.brokers ?? [],
     stocks,
     stockQuotes,

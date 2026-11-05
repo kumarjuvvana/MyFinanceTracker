@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -241,10 +241,9 @@ function Reports({ data }: { data: TrackerData }) {
   </>;
 }
 
-const REMINDER_CATEGORIES = ["General", "Personal", "Health", "Finance", "Work", "Education", "Home"] as const;
-
-function ReminderCard({ reminder, onSave, onDelete, onToggle }: {
+function ReminderCard({ reminder, categories, onSave, onDelete, onToggle }: {
   reminder: Reminder;
+  categories: string[];
   onSave: (reminder: Omit<Reminder, "id">, id?: string) => void;
   onDelete: (id: string) => void;
   onToggle: (reminder: Reminder) => void;
@@ -279,8 +278,7 @@ function ReminderCard({ reminder, onSave, onDelete, onToggle }: {
     <form className="reminder-inline-form" onSubmit={submit}>
       <Field label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><Input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
-      <Field label="Category"><Input list={`reminder-categories-${reminder.id}`} maxLength={80} required value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
-      <datalist id={`reminder-categories-${reminder.id}`}>{REMINDER_CATEGORIES.map((entry) => <option key={entry} value={entry} />)}</datalist>
+      <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
       <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={1000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
       <div className="reminder-form-actions full"><Button type="submit"><Check size={14} />Save changes</Button><Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button></div>
@@ -290,13 +288,13 @@ function ReminderCard({ reminder, onSave, onDelete, onToggle }: {
   return <Card className={`reminder-card ${reminder.completed ? "completed" : ""}`}>
     <button className={`check-button ${reminder.completed ? "checked" : ""}`} aria-label={reminder.completed ? `Mark ${reminder.title} as incomplete` : `Mark ${reminder.title} as complete`} onClick={() => onToggle(reminder)}>{reminder.completed && <Check size={12} />}</button>
     <div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{dateLabel(reminder.date)}{reminder.details ? ` · ${reminder.details}` : ""}</div></div>
-    <Badge>{reminder.category || "General"}</Badge>
-    <Badge tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
+    <Badge className="reminder-category-badge">{reminder.category || "General"}</Badge>
+    <Badge className="reminder-status-badge" tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
     <div className="table-actions"><button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={startEditing}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${reminder.title}`} onClick={() => { if (window.confirm(`Delete "${reminder.title}"?`)) onDelete(reminder.id); }}><Trash2 size={14} /></button></div>
   </Card>;
 }
 
-function ReminderPage({ reminders, onSave, onDelete, onToggle }: { reminders: Reminder[]; onSave: (reminder: Omit<Reminder, "id">, id?: string) => void; onDelete: (id: string) => void; onToggle: (reminder: Reminder) => void }) {
+function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete, onToggle }: { reminders: Reminder[]; categories: string[]; onSave: (reminder: Omit<Reminder, "id">, id?: string) => void; onDelete: (id: string) => void; onToggle: (reminder: Reminder) => void }) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [category, setCategory] = useState("General");
@@ -311,7 +309,7 @@ function ReminderPage({ reminders, onSave, onDelete, onToggle }: { reminders: Re
     onSave({ title: title.trim(), date, category: category.trim(), details: details.trim(), completed: false });
     setTitle(""); setDate(today()); setCategory("General"); setDetails(""); setError("");
   }
-  const categories = [...new Set(reminders.map((reminder) => reminder.category?.trim() || "General"))]
+  const categories = [...new Set([...REMINDER_CATEGORIES, ...savedCategories, ...reminders.map((reminder) => reminder.category?.trim() || "General")])]
     .sort((a, b) => a.localeCompare(b));
   const query = search.trim().toLocaleLowerCase();
   const visible = reminders
@@ -324,17 +322,18 @@ function ReminderPage({ reminders, onSave, onDelete, onToggle }: { reminders: Re
     <Card className="reminder-form-card"><h2 className="section-title">Add a note or reminder</h2><form className="form-grid reminder-form" onSubmit={submit}>
       <Field label="Title"><Input autoFocus maxLength={120} required placeholder="e.g. Pick up a prescription" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><Input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
-      <Field label="Category"><Input list="new-reminder-categories" maxLength={80} required value={category} onChange={(event) => setCategory(event.target.value)} /><datalist id="new-reminder-categories">{[...new Set([...REMINDER_CATEGORIES, ...categories])].map((entry) => <option key={entry} value={entry} />)}</datalist></Field>
+      <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
       <Field className="full" label="Details (optional)"><textarea className="field textarea" rows={3} maxLength={1000} placeholder="Add any useful details..." value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
       <div className="reminder-form-actions full"><Button type="submit"><Plus size={14} />Add reminder</Button></div>
     </form></Card>
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter reminders by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select><Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge></div>
-    <div className="reminder-page-list">{visible.length ? visible.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />) : <Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or category filter." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card>}</div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select><Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge></div>
+    <div className="reminder-group-picker" role="group" aria-label="Filter reminders by category">{["All categories", ...categories].map((entry) => <button key={entry} type="button" className={`category-choice ${categoryFilter === entry ? "selected" : ""}`} aria-pressed={categoryFilter === entry} onClick={() => setCategoryFilter(entry)}>{entry}{entry === "All categories" && <span>{reminders.length}</span>}</button>)}</div>
+    <div className="reminder-page-list">{visible.length ? visible.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} categories={categories} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />) : <Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or category filter." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card>}</div>
   </>;
 }
 
-function MasterData({ stores, products, onAddStore, onDeleteStore, onAddProduct, onDeleteProduct }: { stores: Store[]; products: Product[]; onAddStore: (store: Omit<Store, "id">) => void; onDeleteStore: (id: string) => void; onAddProduct: (product: Omit<Product, "id">) => void; onDeleteProduct: (id: string) => void }) {
+function MasterData({ stores, products, reminders, reminderCategories, onAddStore, onDeleteStore, onAddProduct, onDeleteProduct, onAddReminderCategory, onDeleteReminderCategory }: { stores: Store[]; products: Product[]; reminders: Reminder[]; reminderCategories: string[]; onAddStore: (store: Omit<Store, "id">) => void; onDeleteStore: (id: string) => void; onAddProduct: (product: Omit<Product, "id">) => void; onDeleteProduct: (id: string) => void; onAddReminderCategory: (category: string) => void; onDeleteReminderCategory: (category: string) => void }) {
   const currency = useContext(CurrencyContext);
   const [storeName, setStoreName] = useState("");
   const [location, setLocation] = useState("");
@@ -342,6 +341,7 @@ function MasterData({ stores, products, onAddStore, onDeleteStore, onAddProduct,
   const [category, setCategory] = useState<Category>("Groceries");
   const [unit, setUnit] = useState("pcs");
   const [price, setPrice] = useState(0);
+  const [reminderCategoryName, setReminderCategoryName] = useState("");
   const [error, setError] = useState("");
   function addStore(event: FormEvent) {
     event.preventDefault();
@@ -356,10 +356,24 @@ function MasterData({ stores, products, onAddStore, onDeleteStore, onAddProduct,
     onAddProduct({ name: productName.trim(), category, unit: unit.trim(), estimatedPrice: price });
     setProductName(""); setUnit("pcs"); setPrice(0); setError("");
   }
+  function addReminderCategory(event: FormEvent) {
+    event.preventDefault();
+    const name = reminderCategoryName.trim();
+    if (!name) { setError("Enter a reminder category name."); return; }
+    if (REMINDER_CATEGORIES.some((entry) => entry.toLocaleLowerCase() === name.toLocaleLowerCase()) ||
+      reminderCategories.some((entry) => entry.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError("That reminder category already exists.");
+      return;
+    }
+    onAddReminderCategory(name);
+    setReminderCategoryName("");
+    setError("");
+  }
   return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Save your common products and stores, including plain-text store locations." />
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <div className="master-grid"><Card><div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><ShoppingBasket size={16} /></div><form className="form-grid master-form" onSubmit={addProduct}><Field className="full" label="Product name"><Input required maxLength={100} placeholder="e.g. Basmati rice" value={productName} onChange={(event) => setProductName(event.target.value)} /></Field><Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as Category)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field><Field label="Unit"><Input list="master-item-units" required value={unit} onChange={(event) => setUnit(event.target.value)} /><datalist id="master-item-units">{ITEM_UNITS.map((entry) => <option key={entry} value={entry} />)}</datalist></Field><Field className="full" label={`Price per ${unit || "unit"} (${currency})`}><Input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field><div className="full"><Button type="submit"><Plus size={14} />Add product</Button></div></form><div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Delete ${product.name}`} onClick={() => { if (window.confirm(`Delete "${product.name}" from product master data? Existing shopping list entries will be kept.`)) onDeleteProduct(product.id); }}><Trash2 size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div></Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Database size={16} /></div><form className="form-grid master-form" onSubmit={addStore}><Field className="full" label="Store name"><Input required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field><Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field><div className="full"><Button type="submit"><Plus size={14} />Add store</Button></div></form><div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Delete ${store.name}`} onClick={() => { if (window.confirm(`Delete "${store.name}"? Previously recorded trip history will be kept.`)) onDeleteStore(store.id); }}><Trash2 size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div></Card></div>
+      <Card><div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Database size={16} /></div><form className="form-grid master-form" onSubmit={addStore}><Field className="full" label="Store name"><Input required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field><Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field><div className="full"><Button type="submit"><Plus size={14} />Add store</Button></div></form><div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Delete ${store.name}`} onClick={() => { if (window.confirm(`Delete "${store.name}"? Previously recorded trip history will be kept.`)) onDeleteStore(store.id); }}><Trash2 size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div></Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Bell size={16} /></div><form className="master-form reminder-category-master-form" onSubmit={addReminderCategory}><Field label="New category"><Input required maxLength={80} placeholder="e.g. Travel, Family" value={reminderCategoryName} onChange={(event) => setReminderCategoryName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add category</Button></form><div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Delete ${entry} reminder category`} title={uses ? "Category is used by reminders" : "Delete category"} disabled={uses > 0} onClick={() => { if (window.confirm(`Delete the "${entry}" reminder category?`)) onDeleteReminderCategory(entry); }}><Trash2 size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div></Card></div>
   </>;
 }
 
@@ -2403,6 +2417,7 @@ export default function App() {
   function saveReminder(reminder: Omit<Reminder, "id">, id?: string) {
     update((previous) => ({
       ...previous,
+      reminderCategories: previous.reminderCategories ?? [],
       reminders: id
         ? (previous.reminders ?? []).map((entry) => entry.id === id ? { ...entry, ...reminder } : entry)
         : [{ ...reminder, id: createId() }, ...(previous.reminders ?? [])],
@@ -2416,6 +2431,15 @@ export default function App() {
   }
   function addProduct(product: Omit<Product, "id">) {
     update((previous) => ({ ...previous, products: [...(previous.products ?? []), { ...product, id: createId() }] }));
+  }
+  function addReminderCategory(category: string) {
+    update((previous) => ({ ...previous, reminderCategories: [...(previous.reminderCategories ?? []), category] }));
+  }
+  function deleteReminderCategory(category: string) {
+    update((previous) => ({
+      ...previous,
+      reminderCategories: (previous.reminderCategories ?? []).filter((entry) => entry !== category),
+    }));
   }
   function addBroker(name: string) {
     update((previous) => ({ ...previous, brokers: [...(previous.brokers ?? []), name] }));
@@ -2599,8 +2623,8 @@ export default function App() {
     "Purchase history": <PurchaseHistory data={data} />,
     "Price history": <PriceHistory data={data} />,
     Reports: <Reports data={data} />,
-    "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} onSave={saveReminder} onDelete={(id) => update((previous) => ({ ...previous, reminders: (previous.reminders ?? []).filter((entry) => entry.id !== id) }))} onToggle={toggleReminder} />,
-    "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} onAddStore={addStore} onDeleteStore={(id) => update((previous) => ({ ...previous, stores: (previous.stores ?? []).filter((entry) => entry.id !== id) }))} onAddProduct={addProduct} onDeleteProduct={(id) => update((previous) => ({ ...previous, products: (previous.products ?? []).filter((entry) => entry.id !== id) }))} />,
+    "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={(id) => update((previous) => ({ ...previous, reminders: (previous.reminders ?? []).filter((entry) => entry.id !== id) }))} onToggle={toggleReminder} />,
+    "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onDeleteStore={(id) => update((previous) => ({ ...previous, stores: (previous.stores ?? []).filter((entry) => entry.id !== id) }))} onAddProduct={addProduct} onDeleteProduct={(id) => update((previous) => ({ ...previous, products: (previous.products ?? []).filter((entry) => entry.id !== id) }))} onAddReminderCategory={addReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,

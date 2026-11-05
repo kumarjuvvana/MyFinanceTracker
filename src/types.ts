@@ -6,6 +6,7 @@ export const CATEGORIES = [
   "Personal Care",
   "Others",
 ] as const;
+export const REMINDER_CATEGORIES = ["General", "Personal", "Health", "Finance", "Work", "Education", "Home"] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 export const CURRENCIES = ["INR", "USD", "EUR", "GBP"] as const;
@@ -316,6 +317,7 @@ export interface TrackerData {
   stores?: Store[];
   products?: Product[];
   reminders?: Reminder[];
+  reminderCategories?: string[];
   brokers?: string[];
   stocks?: TrackedStock[];
   stockQuotes?: StockQuoteSnapshot[];

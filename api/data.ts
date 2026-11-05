@@ -113,7 +113,29 @@ async function loadStoredData(): Promise<StoredData | null> {
     !("revision" in row) || typeof row.revision !== "string" || !validateData(row.data)) {
     throw new Error("The shared Daybook data in Supabase is invalid. Restore a valid JSON backup before saving.");
   }
-  return { data: normalizeTrackerData(row.data), revision: row.revision };
+  const reminderCategories = await loadReminderCategories();
+  return {
+    data: normalizeTrackerData({ ...row.data, reminderCategories }),
+    revision: row.revision,
+  };
+}
+
+async function loadReminderCategories(): Promise<string[]> {
+  const response = await supabaseRequest("rpc/load_reminder_categories", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  const result: unknown = await response.json();
+  if (!Array.isArray(result) || result.length !== 1) {
+    throw new Error("Supabase returned an invalid response for reminder categories.");
+  }
+  const row: unknown = result[0];
+  if (typeof row !== "object" || row === null || !("categories" in row) ||
+    !Array.isArray(row.categories) || !row.categories.every((category) =>
+      typeof category === "string" && category.trim().length > 0 && category.trim().length <= 80)) {
+    throw new Error("Reminder categories in Supabase are invalid.");
+  }
+  return row.categories;
 }
 
 async function saveData(data: TrackerData, expectedRevision: string | null): Promise<string | null> {
@@ -132,6 +154,18 @@ async function saveData(data: TrackerData, expectedRevision: string | null): Pro
     throw new Error("Supabase returned an invalid saved Daybook data revision.");
   }
   return saved.revision;
+}
+
+async function saveReminderCategories(categories: string[], expectedRevision: string): Promise<boolean> {
+  const response = await supabaseRequest("rpc/save_reminder_categories", {
+    method: "POST",
+    body: JSON.stringify({ p_categories: categories, p_expected_revision: expectedRevision }),
+  });
+  const result: unknown = await response.json();
+  if (typeof result !== "boolean") {
+    throw new Error("Supabase did not confirm the saved reminder categories.");
+  }
+  return result;
 }
 
 export default async function dataHandler(request: ApiRequest, response: ApiResponse) {
@@ -175,6 +209,11 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
 
     const revision = await saveData(data, body.revision);
     if (revision === null) {
+      respond(response, 409, { error: "The shared data changed on another device. Refresh before saving to avoid overwriting it." });
+      return;
+    }
+    const categoriesSaved = await saveReminderCategories(data.reminderCategories ?? [], revision);
+    if (!categoriesSaved) {
       respond(response, 409, { error: "The shared data changed on another device. Refresh before saving to avoid overwriting it." });
       return;
     }

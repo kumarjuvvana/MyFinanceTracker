@@ -38,6 +38,6 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
   );
 }
 
-export function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "green" | "amber" | "blue" }) {
-  return <span className={`badge badge-${tone}`}>{children}</span>;
+export function Badge({ children, tone = "neutral", className = "" }: { children: ReactNode; tone?: "neutral" | "green" | "amber" | "blue"; className?: string }) {
+  return <span className={`badge badge-${tone} ${className}`}>{children}</span>;
 }
