@@ -30,7 +30,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Stocks", icon: TrendingUp },
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
-  { name: "School & college records", icon: GraduationCap },
+  { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Personal documents", icon: FileText },
   { name: "Account credentials", icon: KeyRound },
@@ -1212,7 +1212,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   }
 
   return <>
-    <PageHeading eyebrow="Growing and learning" title="School & college records" subtitle="Select a student to review their academic years, subjects, results, and term payments." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
+    <PageHeading eyebrow="Growing and learning" title="Schools & Colleges" subtitle="Select a student to review their academic years, subjects, results, and term payments." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
     <div className="alert"><GraduationCap size={15} style={{ flex: "none", marginTop: 1 }} /><span>Each record represents one academic year at a school, college, or university. Add flexible terms, quarters, semesters, or installments as separate payments; assessment types and grading systems can vary by institution. Records are readable in the private GitHub repository by collaborators and remain in its history; avoid storing student ID numbers or sensitive health information.</span></div>
     <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, payment..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
     <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
@@ -2747,7 +2747,7 @@ export default function App() {
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
-    "School & college records": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
+    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,

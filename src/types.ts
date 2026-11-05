@@ -23,7 +23,7 @@ export type Page =
   | "Stocks"
   | "Asset manager"
   | "Learning"
-  | "School & college records"
+  | "Schools & Colleges"
   | "Vehicles"
   | "Personal documents"
   | "Account credentials"
