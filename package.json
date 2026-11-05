@@ -6,7 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:test": "node scripts/db.mjs test",
+    "db:tables": "node scripts/db.mjs tables",
+    "db:select": "node scripts/db.mjs select",
+    "db:insert": "node scripts/db.mjs insert",
+    "db:insert-many": "node scripts/db.mjs insert-many",
+    "db:update": "node scripts/db.mjs update",
+    "db:delete": "node scripts/db.mjs delete",
+    "db:create-table": "node scripts/db.mjs create-table"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -15,10 +23,13 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^18.0.9",
+    "pg": "^8.23.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
     "typescript": "~5.6.2",
