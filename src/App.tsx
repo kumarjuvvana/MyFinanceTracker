@@ -1861,9 +1861,29 @@ function TestConnectors() {
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("Daybook test reminder");
   const [content, setContent] = useState("This is a test email from your Daybook shopping tracker.");
+  const [accessPassword, setAccessPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordValid, setPasswordValid] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  async function testAccessPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordBusy(true);
+    setPasswordError("");
+    setPasswordValid(false);
+    try {
+      await validateAccessPassword(accessPassword);
+      setPasswordValid(true);
+    } catch (caught) {
+      setPasswordError(caught instanceof Error ? caught.message : "Could not validate the Daybook access password.");
+    } finally {
+      setAccessPassword("");
+      setPasswordBusy(false);
+    }
+  }
 
   async function sendTestEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1907,7 +1927,15 @@ function TestConnectors() {
     }
   }
 
-  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Try Gmail email delivery before building scheduled reminders." />
+  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Test the Daybook password or try Gmail email delivery." />
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Daybook access password test</h2><p className="section-description">Verify the Vercel password setting without signing out or loading data again.</p></div><Badge tone="neutral">No data access</Badge></div>
+      <form className="connector-form" onSubmit={(event) => void testAccessPassword(event)}>
+        <Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => { setAccessPassword(event.target.value); setPasswordValid(false); setPasswordError(""); }} /></Field>
+        {passwordError && <div className="alert alert-error full" role="alert">{passwordError}</div>}
+        {passwordValid && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No new session was created and no Daybook data was accessed.</div>}
+        <div className="full"><Button type="submit" disabled={passwordBusy}>{passwordBusy ? "Checking..." : "Validate password"}</Button></div>
+      </form>
+    </Card>
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail test reminder</h2><p className="section-description">Connect Gmail only when you want to send a test email.</p></div><Badge tone={session ? "green" : "neutral"}>{session ? `Connected: ${session.email}` : "Not connected"}</Badge></div>
       <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>Gmail authorization is optional and requested only here. The access token stays in memory and is discarded when you leave this page or reload. The email is sent from the Google account you authorize.</span></div>
       {!session && <GmailAuthorization onSignIn={(connected) => { setSession(connected); setRecipient(connected.email); setError(""); setNotice(""); }} />}
