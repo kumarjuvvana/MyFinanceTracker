@@ -144,6 +144,8 @@ export default function dataAuthHandler(request: ApiRequest, response: ApiRespon
   const body = requestBody(request);
   const supplied = typeof body === "object" && body !== null && "password" in body &&
     typeof body.password === "string" ? body.password : "";
+  const validateOnly = typeof body === "object" && body !== null &&
+    "validateOnly" in body && body.validateOnly === true;
   if (supplied.length > 256) {
     respond(response, 400, { error: "The Daybook passphrase must be 256 characters or fewer." });
     return;
@@ -152,6 +154,11 @@ export default function dataAuthHandler(request: ApiRequest, response: ApiRespon
   const suppliedHash = createHash("sha256").update(supplied).digest();
   if (!timingSafeEqual(expectedHash, suppliedHash)) {
     respond(response, 401, { error: "That access password is incorrect." });
+    return;
+  }
+
+  if (validateOnly) {
+    respond(response, 200, { valid: true });
     return;
   }
 

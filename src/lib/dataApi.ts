@@ -57,6 +57,13 @@ export async function signIn(password: string): Promise<void> {
   await request("/api/data-auth", { method: "POST", body: JSON.stringify({ password }) });
 }
 
+export async function validateAccessPassword(password: string): Promise<void> {
+  await request("/api/data-auth", {
+    method: "POST",
+    body: JSON.stringify({ password, validateOnly: true }),
+  });
+}
+
 export async function signOut(): Promise<void> {
   await request("/api/data-auth", { method: "DELETE" });
 }

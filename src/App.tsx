@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
-import { checkSession, loadSharedData, saveSharedData, signIn, signOut } from "./lib/dataApi";
+import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType } from "./types";
 
@@ -2002,6 +2002,11 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [accessPassword, setAccessPassword] = useState("");
+  const [authTestMode, setAuthTestMode] = useState(false);
+  const [authTestPassword, setAuthTestPassword] = useState("");
+  const [authTestLoading, setAuthTestLoading] = useState(false);
+  const [authTestError, setAuthTestError] = useState("");
+  const [authTestPassed, setAuthTestPassed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -2171,6 +2176,22 @@ export default function App() {
       setError(caught instanceof Error ? caught.message : "Could not sign in to Daybook.");
     } finally {
       setAuthLoading(false);
+    }
+  }
+
+  async function handleTestAccessPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAuthTestLoading(true);
+    setAuthTestError("");
+    setAuthTestPassed(false);
+    try {
+      await validateAccessPassword(authTestPassword);
+      setAuthTestPassed(true);
+    } catch (caught) {
+      setAuthTestError(caught instanceof Error ? caught.message : "Could not validate the Daybook access password.");
+    } finally {
+      setAuthTestPassword("");
+      setAuthTestLoading(false);
     }
   }
 
@@ -2522,7 +2543,7 @@ export default function App() {
   }
 
   if (authLoading) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Checking your Daybook session...</div></div>;
-  if (!authenticated) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="Your data, wherever you go" title="Open your Daybook" subtitle="Enter your Daybook access password to securely load your shared records." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleSignIn(event)}><Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => setAccessPassword(event.target.value)} /></Field>{error && <div className="alert alert-error full" role="alert">{error}</div>}<div className="full"><Button type="submit" disabled={authLoading}>{authLoading ? "Signing in..." : "Open Daybook"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This password is configured by the site owner in Vercel. No Google account or external sign-in is needed.</p></Card></div></main></div>;
+  if (!authenticated) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content">{authTestMode ? <><PageHeading eyebrow="Temporary verification" title="Test access password" subtitle="Check the configured Daybook password without opening or changing shared data." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleTestAccessPassword(event)}><Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={authTestPassword} onChange={(event) => { setAuthTestPassword(event.target.value); setAuthTestPassed(false); setAuthTestError(""); }} /></Field>{authTestError && <div className="alert alert-error full" role="alert">{authTestError}</div>}{authTestPassed && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No session was created and no Daybook data was accessed.</div>}<div className="full"><Button type="submit" disabled={authTestLoading}>{authTestLoading ? "Checking..." : "Validate password"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This checks the server-side DATA_ACCESS_PASSWORD setting. It does not create a sign-in session or make a database request.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(false); setAuthTestPassed(false); setAuthTestError(""); setAuthTestPassword(""); }}>Back to sign in</Button></Card></> : <><PageHeading eyebrow="Your data, wherever you go" title="Open your Daybook" subtitle="Enter your Daybook access password to securely load your shared records." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleSignIn(event)}><Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => setAccessPassword(event.target.value)} /></Field>{error && <div className="alert alert-error full" role="alert">{error}</div>}<div className="full"><Button type="submit" disabled={authLoading}>{authLoading ? "Signing in..." : "Open Daybook"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This password is configured by the site owner in Vercel. No Google account or external sign-in is needed.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(true); setError(""); }}>Test access password configuration</Button></Card></>}</div></main></div>;
   if (dataLoading && !data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Loading your shared Daybook data...</div></div>;
   if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Daybook records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Daybook data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
