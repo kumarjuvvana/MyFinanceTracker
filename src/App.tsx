@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type F
 import {
   ArrowDownToLine, ArrowLeftRight, Bell, BarChart3, BookOpen, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
-  Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Pencil,
+  Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X,
 } from "lucide-react";
@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -1722,10 +1722,21 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through the private GitHub repository and can be backed up or moved whenever you like." />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to the private GitHub repository. Account credentials are encrypted separately; other records remain readable to repository collaborators and prior values remain in Git history. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
+    <Card className="settings-card theme-picker-card">
+      <div className="card-head"><div><h2 className="section-title">Choose your look</h2><p className="section-description">Preview a visual style across every page. Your choice is saved on this browser.</p></div><Palette size={18} /></div>
+      <div className="theme-picker" role="group" aria-label="Visual theme">
+        {VISUAL_THEMES.map((theme) => <button key={theme} type="button" className={`theme-option ${visualTheme === theme ? "selected" : ""}`} aria-pressed={visualTheme === theme} onClick={() => onVisualThemeChange(theme)}>
+          <span className={`theme-preview theme-preview-${theme}`} aria-hidden="true"><span className="theme-preview-rail" /><span className="theme-preview-content"><i /><i /><i /></span><span className="theme-preview-accent" /></span>
+          <span className="theme-option-label">{theme === "sage" ? "Sage studio" : theme === "cloud" ? "Cloud canvas" : "Warm sand"}</span>
+          <span className="theme-option-description">{theme === "sage" ? "Fresh, balanced greens" : theme === "cloud" ? "Cool, crisp neutrals" : "Soft, warm neutrals"}</span>
+          {visualTheme === theme && <Check size={15} className="theme-option-check" aria-label="Selected" />}
+        </button>)}
+      </div>
+    </Card>
     <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose your font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern sans</option><option value="editorial">Editorial serif</option><option value="rounded">Friendly rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="small">Small</option><option value="medium">Default</option><option value="large">Large</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>GitHub sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a backup</h3><p>Save your shopping data, product and store master data, and reminders as versioned JSON.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download JSON backup</Button></Card>
@@ -1967,6 +1978,9 @@ function isAccentColor(value: unknown): value is AccentColor {
 function isDarkTheme(value: unknown): value is DarkTheme {
   return DARK_THEMES.some((theme) => theme === value);
 }
+function isVisualTheme(value: unknown): value is VisualTheme {
+  return VISUAL_THEMES.some((theme) => theme === value);
+}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -2048,6 +2062,7 @@ export default function App() {
   const [fontStyle, setFontStyle] = useState<FontStyle>("modern");
   const [accentColor, setAccentColor] = useState<AccentColor>("green");
   const [darkTheme, setDarkTheme] = useState<DarkTheme>("forest");
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>("sage");
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [modal, setModal] = useState<"add" | "trip" | null>(null);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
@@ -2097,7 +2112,8 @@ export default function App() {
           ("fontSize" in parsed && !isFontSize(parsed.fontSize)) ||
           ("fontStyle" in parsed && !isFontStyle(parsed.fontStyle)) ||
           ("accentColor" in parsed && !isAccentColor(parsed.accentColor)) ||
-          ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme))) {
+          ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
+          ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme))) {
           throw new Error("Saved preferences are invalid. Default appearance and currency settings will be used.");
         }
         setCurrency(parsed.currency);
@@ -2106,6 +2122,7 @@ export default function App() {
         if ("fontStyle" in parsed && isFontStyle(parsed.fontStyle)) setFontStyle(parsed.fontStyle);
         if ("accentColor" in parsed && isAccentColor(parsed.accentColor)) setAccentColor(parsed.accentColor);
         if ("darkTheme" in parsed && isDarkTheme(parsed.darkTheme)) setDarkTheme(parsed.darkTheme);
+        if ("visualTheme" in parsed && isVisualTheme(parsed.visualTheme)) setVisualTheme(parsed.visualTheme);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read saved preferences from this browser.");
@@ -2117,11 +2134,11 @@ export default function App() {
   useEffect(() => {
     if (!preferencesReady) return;
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, accentColor, darkTheme }));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme }));
     } catch {
       setError("Your preferences could not be saved in this browser.");
     }
-  }, [currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, preferencesReady]);
+  }, [currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, preferencesReady]);
 
   useEffect(() => {
     if (!data || !authenticated || setupRequired) return;
@@ -2591,10 +2608,10 @@ export default function App() {
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
-  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} accent-${accentColor} theme-${darkTheme}`}>
+  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
     <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
       <div className="nav-label">YOUR SPACE</div><nav className="nav-list" aria-label="Main navigation">{navigation.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}</nav>

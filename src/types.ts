@@ -338,5 +338,7 @@ export const ACCENT_COLORS = ["green", "blue", "purple", "rose", "teal"] as cons
 export type AccentColor = (typeof ACCENT_COLORS)[number];
 export const DARK_THEMES = ["forest", "slate", "midnight"] as const;
 export type DarkTheme = (typeof DARK_THEMES)[number];
+export const VISUAL_THEMES = ["sage", "cloud", "sand"] as const;
+export type VisualTheme = (typeof VISUAL_THEMES)[number];
 export type FontSize = "small" | "medium" | "large";
 export type FontStyle = "modern" | "editorial" | "rounded";
