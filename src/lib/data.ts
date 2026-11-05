@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationFeeType, type EducationRecord, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -209,6 +209,22 @@ export function validateData(value: unknown): value is TrackerData {
     (entry.nextDueOdometer === null || (typeof entry.nextDueOdometer === "number" &&
       Number.isFinite(entry.nextDueOdometer) && entry.nextDueOdometer >= 0)) &&
     typeof entry.notes === "string"));
+  const electricityReadingsOk = value.electricityReadings === undefined ||
+    (Array.isArray(value.electricityReadings) && value.electricityReadings.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.meterName === "string" && entry.meterName.trim().length > 0 &&
+      typeof entry.location === "string" &&
+      typeof entry.readingDate === "string" && !Number.isNaN(Date.parse(entry.readingDate)) &&
+      typeof entry.meterReading === "number" && Number.isFinite(entry.meterReading) && entry.meterReading >= 0 &&
+      typeof entry.periodStart === "string" && (entry.periodStart === "" || !Number.isNaN(Date.parse(entry.periodStart))) &&
+      typeof entry.periodEnd === "string" && (entry.periodEnd === "" || !Number.isNaN(Date.parse(entry.periodEnd))) &&
+      (!entry.periodStart || !entry.periodEnd || entry.periodEnd >= entry.periodStart) &&
+      (entry.ratePerUnit === null || (typeof entry.ratePerUnit === "number" && Number.isFinite(entry.ratePerUnit) && entry.ratePerUnit >= 0)) &&
+      (entry.billAmount === null || (typeof entry.billAmount === "number" && Number.isFinite(entry.billAmount) && entry.billAmount >= 0)) &&
+      typeof entry.paid === "boolean" &&
+      typeof entry.paidDate === "string" && (entry.paidDate === "" || !Number.isNaN(Date.parse(entry.paidDate))) &&
+      (!entry.paid || entry.paidDate !== "") &&
+      typeof entry.notes === "string"));
   const personalRecordsOk = value.personalRecords === undefined || (Array.isArray(value.personalRecords) && value.personalRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.title === "string" &&
     (entry.type === "Identity" || entry.type === "Insurance" || entry.type === "License" ||
@@ -253,7 +269,7 @@ export function validateData(value: unknown): value is TrackerData {
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
-    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !personalRecordsOk ||
+    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !personalRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -273,6 +289,23 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.vehicles) && new Set((value.vehicles as Vehicle[]).map((vehicle) => vehicle.id)).size !== value.vehicles.length) return false;
   if (Array.isArray(value.vehicleJourneys) && new Set((value.vehicleJourneys as VehicleJourney[]).map((journey) => journey.id)).size !== value.vehicleJourneys.length) return false;
   if (Array.isArray(value.vehicleMaintenance) && new Set((value.vehicleMaintenance as VehicleMaintenance[]).map((entry) => entry.id)).size !== value.vehicleMaintenance.length) return false;
+  if (Array.isArray(value.electricityReadings) &&
+    new Set((value.electricityReadings as { id: string }[]).map((entry) => entry.id)).size !== value.electricityReadings.length) return false;
+  if (Array.isArray(value.electricityReadings)) {
+    const readings = value.electricityReadings as ElectricityReading[];
+    const readingKeys = readings.map((entry) =>
+      `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}\u0000${entry.readingDate}`);
+    if (new Set(readingKeys).size !== readingKeys.length) return false;
+    const byMeter = new Map<string, typeof readings>();
+    for (const entry of readings) {
+      const key = `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
+      byMeter.set(key, [...(byMeter.get(key) ?? []), entry]);
+    }
+    for (const meterReadings of byMeter.values()) {
+      const sorted = [...meterReadings].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
+      if (sorted.some((entry, index) => index > 0 && entry.meterReading < sorted[index - 1].meterReading)) return false;
+    }
+  }
   if (Array.isArray(value.personalRecords) && new Set((value.personalRecords as PersonalRecord[]).map((entry) => entry.id)).size !== value.personalRecords.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
@@ -339,6 +372,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     vehicles: data.vehicles ?? [],
     vehicleJourneys: data.vehicleJourneys ?? [],
     vehicleMaintenance: data.vehicleMaintenance ?? [],
+    electricityReadings: data.electricityReadings ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],

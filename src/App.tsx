@@ -4,13 +4,13 @@ import {
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
-  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X,
+  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -32,6 +32,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Learning", icon: BookOpen },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
+  { name: "Electricity", icon: Zap },
   { name: "Personal documents", icon: FileText },
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
@@ -1497,6 +1498,166 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onD
   </>;
 }
 
+function ElectricityReadingModal({ initial, readings, onClose, onSave }: {
+  initial: ElectricityReading | null;
+  readings: ElectricityReading[];
+  onClose: () => void;
+  onSave: (reading: Omit<ElectricityReading, "id">) => void;
+}) {
+  const [meterName, setMeterName] = useState(initial?.meterName ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [readingDate, setReadingDate] = useState(initial?.readingDate ?? today());
+  const [meterReading, setMeterReading] = useState(initial ? String(initial.meterReading) : "");
+  const [periodStart, setPeriodStart] = useState(initial?.periodStart ?? "");
+  const [periodEnd, setPeriodEnd] = useState(initial?.periodEnd ?? "");
+  const [ratePerUnit, setRatePerUnit] = useState(initial?.ratePerUnit == null ? "" : String(initial.ratePerUnit));
+  const [billAmount, setBillAmount] = useState(initial?.billAmount == null ? "" : String(initial.billAmount));
+  const [paid, setPaid] = useState(initial?.paid ?? false);
+  const [paidDate, setPaidDate] = useState(initial?.paidDate ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const meterValue = Number(meterReading);
+    const rateValue = ratePerUnit.trim() ? Number(ratePerUnit) : null;
+    const billValue = billAmount.trim() ? Number(billAmount) : null;
+    if (!meterName.trim() || !readingDate || meterReading.trim() === "" ||
+      !Number.isFinite(meterValue) || meterValue < 0) {
+      setError("Enter a meter name, reading date, and a non-negative meter reading.");
+      return;
+    }
+    if (periodStart && periodEnd && periodEnd < periodStart) {
+      setError("The billing period end must be on or after its start.");
+      return;
+    }
+    if ((rateValue !== null && (!Number.isFinite(rateValue) || rateValue < 0)) ||
+      (billValue !== null && (!Number.isFinite(billValue) || billValue < 0))) {
+      setError("Rate per unit and bill amount must be zero or greater.");
+      return;
+    }
+    if (paid && !paidDate) {
+      setError("Enter the payment date for a paid bill.");
+      return;
+    }
+
+    const normalizedName = meterName.trim().toLocaleLowerCase();
+    const normalizedLocation = location.trim().toLocaleLowerCase();
+    const sameMeter = readings.filter((entry) => entry.id !== initial?.id &&
+      entry.meterName.trim().toLocaleLowerCase() === normalizedName &&
+      entry.location.trim().toLocaleLowerCase() === normalizedLocation);
+    if (sameMeter.some((entry) => entry.readingDate === readingDate)) {
+      setError("This meter already has a reading for that date.");
+      return;
+    }
+    const previous = sameMeter.filter((entry) => entry.readingDate < readingDate)
+      .sort((a, b) => b.readingDate.localeCompare(a.readingDate))[0];
+    const next = sameMeter.filter((entry) => entry.readingDate > readingDate)
+      .sort((a, b) => a.readingDate.localeCompare(b.readingDate))[0];
+    if (previous && meterValue < previous.meterReading) {
+      setError(`Reading cannot be lower than the previous reading (${previous.meterReading}).`);
+      return;
+    }
+    if (next && meterValue > next.meterReading) {
+      setError(`Reading cannot be higher than the next reading (${next.meterReading}).`);
+      return;
+    }
+
+    onSave({
+      meterName: meterName.trim(),
+      location: location.trim(),
+      readingDate,
+      meterReading: meterValue,
+      periodStart,
+      periodEnd,
+      ratePerUnit: rateValue,
+      billAmount: billValue,
+      paid,
+      paidDate: paid ? paidDate : "",
+      notes: notes.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit electricity reading" : "Add electricity reading"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Meter name"><Input autoFocus required maxLength={100} list="electricity-meter-names" placeholder="e.g. Main meter" value={meterName} onChange={(event) => setMeterName(event.target.value)} /><datalist id="electricity-meter-names">{[...new Set(readings.map((entry) => entry.meterName))].map((name) => <option key={name} value={name} />)}</datalist></Field>
+      <Field label="Location"><Input maxLength={120} placeholder="Home, rental, or building" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+      <Field label="Reading date"><Input type="date" required value={readingDate} onChange={(event) => setReadingDate(event.target.value)} /></Field>
+      <Field label="Cumulative meter reading (kWh)"><Input type="number" min="0" step="any" required value={meterReading} onChange={(event) => setMeterReading(event.target.value)} /></Field>
+      <Field label="Billing period start"><Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} /></Field>
+      <Field label="Billing period end"><Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></Field>
+      <Field label="Rate per unit"><Input type="number" min="0" step="any" placeholder="Optional" value={ratePerUnit} onChange={(event) => setRatePerUnit(event.target.value)} /></Field>
+      <Field label="Bill amount"><Input type="number" min="0" step="0.01" placeholder="Optional" value={billAmount} onChange={(event) => setBillAmount(event.target.value)} /></Field>
+      <Field label="Payment status"><Select value={paid ? "paid" : "unpaid"} onChange={(event) => {
+        const isPaid = event.target.value === "paid";
+        setPaid(isPaid);
+        if (isPaid && !paidDate) setPaidDate(today());
+        if (!isPaid) setPaidDate("");
+      }}><option value="unpaid">Unpaid</option><option value="paid">Paid</option></Select></Field>
+      <Field label="Payment date"><Input type="date" disabled={!paid} required={paid} value={paidDate} onChange={(event) => setPaidDate(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add reading"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function ElectricityPage({ readings, onSave, onDelete }: {
+  readings: ElectricityReading[];
+  onSave: (reading: Omit<ElectricityReading, "id">, id?: string) => void;
+  onDelete: (reading: ElectricityReading) => void;
+}) {
+  const formatCurrency = useCurrencyFormatter();
+  const [editor, setEditor] = useState<ElectricityReading | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All bills");
+  const query = search.trim().toLocaleLowerCase();
+  const visible = readings.filter((entry) =>
+    (!query || [entry.meterName, entry.location, entry.notes].some((value) => value.toLocaleLowerCase().includes(query))) &&
+    (statusFilter === "All bills" || (statusFilter === "Paid" ? entry.paid : !entry.paid)));
+  const meterKey = (entry: ElectricityReading) =>
+    `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
+  const grouped = new Map<string, ElectricityReading[]>();
+  for (const entry of visible) grouped.set(meterKey(entry), [...(grouped.get(meterKey(entry)) ?? []), entry]);
+
+  function deleteReading(reading: ElectricityReading) {
+    if (window.confirm(`Delete the ${dateLabel(reading.readingDate)} reading for ${reading.meterName}?`)) onDelete(reading);
+  }
+
+  return <>
+    <PageHeading eyebrow="Home utilities" title="Electricity readings" subtitle="Track multiple meters, compare usage between readings, and keep bills and payment dates together." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add reading</Button>} />
+    <div className="electricity-summary">
+      <Card><span>Meters</span><strong>{new Set(readings.map(meterKey)).size}</strong></Card>
+      <Card><span>Readings</span><strong>{readings.length}</strong></Card>
+      <Card><span>Unpaid bills</span><strong>{formatCurrency(readings.filter((entry) => !entry.paid).reduce((sum, entry) => sum + (entry.billAmount ?? 0), 0))}</strong></Card>
+    </div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter electricity bills" style={{ width: 150 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
+    {grouped.size ? <div className="electricity-list">{[...grouped.entries()].sort((a, b) => a[1][0].meterName.localeCompare(b[1][0].meterName)).map(([key, entries]) => {
+      const sorted = [...entries].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
+      const allForMeter = readings.filter((entry) => meterKey(entry) === key).sort((a, b) => a.readingDate.localeCompare(b.readingDate));
+      const latest = allForMeter[allForMeter.length - 1];
+      return <Card className="electricity-card" key={key}>
+        <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><Zap size={17} /></div><div><h2 className="section-title">{latest.meterName}</h2><p className="section-description">{latest.location || "Location not specified"}</p></div></div><div className="electricity-meter-latest"><span>Latest reading</span><strong>{latest.meterReading.toLocaleString()} kWh</strong></div></div>
+        <div className="electricity-record-list">{[...sorted].reverse().map((entry) => {
+          const index = allForMeter.findIndex((candidate) => candidate.id === entry.id);
+          const previous = index > 0 ? allForMeter[index - 1] : null;
+          const used = previous ? entry.meterReading - previous.meterReading : null;
+          const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
+          return <div className="electricity-record" key={entry.id}>
+            <div className="electricity-record-main">
+              <strong>{dateLabel(entry.readingDate)} <Badge tone={entry.paid ? "green" : "amber"}>{entry.paid ? "Paid" : "Unpaid"}</Badge></strong>
+              <span>{entry.meterReading.toLocaleString()} kWh{used !== null ? ` · ${used.toLocaleString()} kWh used since previous reading` : " · First recorded reading"}{entry.billAmount !== null ? ` · Bill ${formatCurrency(entry.billAmount)}` : ""}</span>
+              <small>{[period ? `Period ${period}` : "", entry.ratePerUnit !== null ? `${formatCurrency(entry.ratePerUnit)} / unit` : "", entry.paidDate ? `Paid ${dateLabel(entry.paidDate)}` : "", entry.notes].filter(Boolean).join(" · ") || "No billing details"}</small>
+            </div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Trash2 size={13} /></button></div>
+          </div>;
+        })}</div>
+      </Card>;
+    })}</div> : <Card><EmptyState icon={<Zap size={18} />} title={readings.length ? "No matching electricity readings" : "No electricity readings yet"} description={readings.length ? "Try another search or bill filter." : "Add a meter reading to start tracking usage and bills."} /></Card>}
+    {editor !== undefined && <ElectricityReadingModal key={editor?.id ?? "new-electricity-reading"} initial={editor} readings={readings} onClose={() => setEditor(undefined)} onSave={(reading) => { onSave(reading, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -2687,6 +2848,20 @@ export default function App() {
       vehicleMaintenance: (previous.vehicleMaintenance ?? []).filter((record) => record.id !== entry.id),
     }));
   }
+  function saveElectricityReading(reading: Omit<ElectricityReading, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      electricityReadings: id
+        ? (previous.electricityReadings ?? []).map((entry) => entry.id === id ? { ...reading, id } : entry)
+        : [{ ...reading, id: createId() }, ...(previous.electricityReadings ?? [])],
+    }));
+  }
+  function deleteElectricityReading(reading: ElectricityReading) {
+    update((previous) => ({
+      ...previous,
+      electricityReadings: (previous.electricityReadings ?? []).filter((entry) => entry.id !== reading.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -2749,6 +2924,7 @@ export default function App() {
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
+    Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,

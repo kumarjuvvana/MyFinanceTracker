@@ -439,6 +439,24 @@ body{background:#f3f5ef}
 .app-shell.dark .asset-card-title h2,.app-shell.dark .asset-details strong,.app-shell.dark .asset-total-card strong{color:#e3e8e2}
 .app-shell.dark .asset-card-title p,.app-shell.dark .asset-details span,.app-shell.dark .asset-total-card span{color:#a7b0a7}
 .app-shell.dark .asset-details>div{border-color:#343d35}
+.electricity-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
+.electricity-summary .card{display:grid;gap:6px;padding:14px}
+.electricity-summary span,.electricity-meter-latest span{font-size:10px;color:#92998f}
+.electricity-summary strong,.electricity-meter-latest strong{font:700 14px Manrope,sans-serif;color:#414a42;overflow-wrap:anywhere}
+.electricity-list{display:grid;gap:14px}
+.electricity-card{min-width:0;padding:16px}
+.electricity-icon{width:36px;height:36px;flex:none;border-radius:11px;background:#fff3d8;color:#a87919;display:grid;place-items:center}
+.electricity-meter-latest{display:grid;gap:4px;text-align:right}
+.electricity-record-list{display:grid;margin-top:12px}
+.electricity-record{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #eef0ec}
+.electricity-record-main{display:grid;gap:4px;min-width:0}
+.electricity-record-main>strong{font-size:11px;color:#414a42}
+.electricity-record-main>span,.electricity-record-main>small{font-size:10px;color:#858d83;line-height:1.45;overflow-wrap:anywhere}
+.electricity-record-main .badge{margin-left:5px;vertical-align:1px}
+.app-shell.dark .electricity-icon{background:#463c27;color:#e3c36f}
+.app-shell.dark .electricity-summary strong,.app-shell.dark .electricity-meter-latest strong,.app-shell.dark .electricity-record-main>strong{color:#e3e8e2}
+.app-shell.dark .electricity-summary span,.app-shell.dark .electricity-meter-latest span,.app-shell.dark .electricity-record-main>span,.app-shell.dark .electricity-record-main>small{color:#a7b0a7}
+.app-shell.dark .electricity-record{border-color:#343d35}
 .education-list{display:grid;gap:14px}
 .education-card{min-width:0;padding:12px 16px}
 .education-card-head,.education-card-title,.education-card-actions{display:flex;align-items:center;gap:10px}
@@ -507,6 +525,10 @@ body{background:#f3f5ef}
   .vehicle-section-head>.button{height:auto;min-height:32px;padding:6px 8px;white-space:normal}
   .vehicle-record{align-items:flex-start}
   .vehicle-record>.table-actions{flex:none}
+  .electricity-card{padding:14px}
+  .electricity-record{align-items:flex-start}
+  .electricity-record>.table-actions{flex:none}
+  .electricity-meter-latest{max-width:38%;overflow-wrap:anywhere}
   .asset-card{padding:14px}
   .asset-details{grid-template-columns:minmax(0,1fr)}
   .asset-total-card{grid-template-columns:1fr}

@@ -25,6 +25,7 @@ export type Page =
   | "Learning"
   | "Schools & Colleges"
   | "Vehicles"
+  | "Electricity"
   | "Personal documents"
   | "Account credentials"
   | "Data management"
@@ -269,6 +270,21 @@ export interface VehicleMaintenance {
   notes: string;
 }
 
+export interface ElectricityReading {
+  id: string;
+  meterName: string;
+  location: string;
+  readingDate: string;
+  meterReading: number;
+  periodStart: string;
+  periodEnd: string;
+  ratePerUnit: number | null;
+  billAmount: number | null;
+  paid: boolean;
+  paidDate: string;
+  notes: string;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -337,6 +353,7 @@ export interface TrackerData {
   vehicles?: Vehicle[];
   vehicleJourneys?: VehicleJourney[];
   vehicleMaintenance?: VehicleMaintenance[];
+  electricityReadings?: ElectricityReading[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }
