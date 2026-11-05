@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationRecord, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationFeeType, type EducationRecord, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -50,6 +50,14 @@ export function makeSeedData(): TrackerData {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function inferLegacyEducationFeeType(period: string): EducationFeeType {
+  const normalized = period.toLocaleLowerCase();
+  if (/\badmission\b|\bapplication\b|\benrollment\b/.test(normalized)) return "Admission";
+  if (/\bvan\b|\bbus\b|\btransport\b/.test(normalized)) return "School van / transport";
+  if (/\bother\b|\bmisc(?:ellaneous)?\b/.test(normalized)) return "Other";
+  return "Tuition";
 }
 
 function isCategory(value: unknown): value is Category {
@@ -128,6 +136,9 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.startDate === "string" && (entry.startDate === "" || !Number.isNaN(Date.parse(entry.startDate))) &&
     typeof entry.endDate === "string" && (entry.endDate === "" || !Number.isNaN(Date.parse(entry.endDate))) &&
     (entry.annualFee === null || (typeof entry.annualFee === "number" && Number.isFinite(entry.annualFee) && entry.annualFee >= 0)) &&
+    (entry.admissionFee === undefined || entry.admissionFee === null || (typeof entry.admissionFee === "number" && Number.isFinite(entry.admissionFee) && entry.admissionFee >= 0)) &&
+    (entry.schoolVanFee === undefined || entry.schoolVanFee === null || (typeof entry.schoolVanFee === "number" && Number.isFinite(entry.schoolVanFee) && entry.schoolVanFee >= 0)) &&
+    (entry.otherFee === undefined || entry.otherFee === null || (typeof entry.otherFee === "number" && Number.isFinite(entry.otherFee) && entry.otherFee >= 0)) &&
     (entry.paidFee === null || (typeof entry.paidFee === "number" && Number.isFinite(entry.paidFee) && entry.paidFee >= 0)) &&
     typeof entry.currency === "string" && CURRENCIES.some((currency) => currency === entry.currency) &&
     typeof entry.contactName === "string" && typeof entry.contact === "string" &&
@@ -157,6 +168,7 @@ export function validateData(value: unknown): value is TrackerData {
       typeof payment.amount === "number" && Number.isFinite(payment.amount) && payment.amount > 0 &&
       typeof payment.date === "string" && !Number.isNaN(Date.parse(payment.date)) &&
       typeof payment.method === "string" && typeof payment.reference === "string" &&
+      (payment.feeType === undefined || EDUCATION_FEE_TYPES.some((feeType) => feeType === payment.feeType)) &&
       typeof payment.notes === "string")))));
   const learningRecordsOk = value.learningRecords === undefined || (Array.isArray(value.learningRecords) && value.learningRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -314,9 +326,15 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     learningRecords: data.learningRecords ?? [],
     educationRecords: (data.educationRecords ?? []).map((record) => ({
       ...record,
+      admissionFee: record.admissionFee ?? null,
+      schoolVanFee: record.schoolVanFee ?? null,
+      otherFee: record.otherFee ?? null,
       subjects: record.subjects ?? [],
       exams: record.exams ?? [],
-      payments: record.payments ?? [],
+      payments: (record.payments ?? []).map((payment) => ({
+        ...payment,
+        feeType: payment.feeType ?? inferLegacyEducationFeeType(payment.period),
+      })),
     })),
     vehicles: data.vehicles ?? [],
     vehicleJourneys: data.vehicleJourneys ?? [],

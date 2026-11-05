@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -732,6 +732,24 @@ function AssetManager({ assets, onSave, onDelete }: {
   </>;
 }
 
+function educationTotalDue(record: Pick<EducationRecord, "annualFee" | "admissionFee" | "schoolVanFee" | "otherFee">) {
+  const amounts = [record.annualFee, record.admissionFee ?? null, record.schoolVanFee ?? null, record.otherFee ?? null]
+    .filter((amount): amount is number => amount !== null);
+  return amounts.length ? amounts.reduce((total, amount) => total + amount, 0) : null;
+}
+
+function educationTotalPaid(record: Pick<EducationRecord, "paidFee" | "payments">) {
+  return (record.paidFee ?? 0) + (record.payments ?? []).reduce((total, payment) => total + payment.amount, 0);
+}
+
+function inferPaymentFeeType(period: string): EducationFeeType {
+  const normalized = period.toLocaleLowerCase();
+  if (/\badmission\b|\bapplication\b|\benrollment\b/.test(normalized)) return "Admission";
+  if (/\bvan\b|\bbus\b|\btransport\b/.test(normalized)) return "School van / transport";
+  if (/\bother\b|\bmisc(?:ellaneous)?\b/.test(normalized)) return "Other";
+  return "Tuition";
+}
+
 const emptyEducationRecord = (): Omit<EducationRecord, "id"> => ({
   studentName: "",
   institution: "",
@@ -743,6 +761,9 @@ const emptyEducationRecord = (): Omit<EducationRecord, "id"> => ({
   startDate: "",
   endDate: "",
   annualFee: null,
+  admissionFee: null,
+  schoolVanFee: null,
+  otherFee: null,
   paidFee: null,
   currency: "INR",
   contactName: "",
@@ -759,6 +780,9 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
 }) {
   const [record, setRecord] = useState<Omit<EducationRecord, "id">>(initial ?? emptyEducationRecord());
   const [annualFee, setAnnualFee] = useState(initial?.annualFee == null ? "" : String(initial.annualFee));
+  const [admissionFee, setAdmissionFee] = useState(initial?.admissionFee == null ? "" : String(initial.admissionFee));
+  const [schoolVanFee, setSchoolVanFee] = useState(initial?.schoolVanFee == null ? "" : String(initial.schoolVanFee));
+  const [otherFee, setOtherFee] = useState(initial?.otherFee == null ? "" : String(initial.otherFee));
   const [paidFee, setPaidFee] = useState(initial?.paidFee == null ? "" : String(initial.paidFee));
   const [error, setError] = useState("");
 
@@ -782,9 +806,28 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
     };
     const parsedAnnualFee = parseFee(annualFee);
+    const parsedAdmissionFee = parseFee(admissionFee);
+    const parsedSchoolVanFee = parseFee(schoolVanFee);
+    const parsedOtherFee = parseFee(otherFee);
     const parsedPaidFee = parseFee(paidFee);
-    if ((annualFee.trim() && parsedAnnualFee === null) || (paidFee.trim() && parsedPaidFee === null)) {
+    const feeInputs = [annualFee, admissionFee, schoolVanFee, otherFee, paidFee];
+    const parsedFeeInputs = [parsedAnnualFee, parsedAdmissionFee, parsedSchoolVanFee, parsedOtherFee, parsedPaidFee];
+    if (feeInputs.some((value, index) => value.trim() !== "" && parsedFeeInputs[index] === null)) {
       setError("Fees must be valid non-negative amounts, or left blank.");
+      return;
+    }
+    const proposedTotalDue = [parsedAnnualFee, parsedAdmissionFee, parsedSchoolVanFee, parsedOtherFee]
+      .filter((amount): amount is number => amount !== null)
+      .reduce((total, amount) => total + amount, 0);
+    const hasFeeAmounts = [annualFee, admissionFee, schoolVanFee, otherFee].some((value) => value.trim() !== "");
+    const proposedPaid = (parsedPaidFee ?? 0) +
+      (initial?.payments ?? []).reduce((total, payment) => total + payment.amount, 0);
+    const previousDue = initial ? educationTotalDue(initial) : null;
+    const feeTotalChanged = previousDue !== (hasFeeAmounts ? proposedTotalDue : null);
+    const legacyPaidChanged = parsedPaidFee !== (initial?.paidFee ?? null);
+    if ((!initial || feeTotalChanged || legacyPaidChanged) &&
+      (hasFeeAmounts ? proposedPaid > proposedTotalDue + 0.005 : proposedPaid > 0)) {
+      setError(`Total fees must cover the ${new Intl.NumberFormat(undefined, { style: "currency", currency: record.currency }).format(proposedPaid)} already recorded as paid.`);
       return;
     }
     if (record.startDate && record.endDate && record.endDate < record.startDate) {
@@ -799,6 +842,9 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       academicYear: record.academicYear.trim(),
       boardUniversity: record.boardUniversity.trim(),
       annualFee: parsedAnnualFee,
+      admissionFee: parsedAdmissionFee,
+      schoolVanFee: parsedSchoolVanFee,
+      otherFee: parsedOtherFee,
       paidFee: parsedPaidFee,
       contactName: record.contactName.trim(),
       contact: record.contact.trim(),
@@ -819,14 +865,17 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="Currency"><Select value={record.currency} onChange={(event) => setRecord((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
       <Field label="Start date"><Input type="date" value={record.startDate} onChange={(event) => setRecord((current) => ({ ...current, startDate: event.target.value }))} /></Field>
       <Field label="End / completion date"><Input type="date" value={record.endDate} onChange={(event) => setRecord((current) => ({ ...current, endDate: event.target.value }))} /></Field>
-      <Field label="Annual tuition / fee"><Input type="number" min="0" step="0.01" placeholder="Optional" value={annualFee} onChange={(event) => setAnnualFee(event.target.value)} /></Field>
-      <Field label="Fee paid"><Input type="number" min="0" step="0.01" placeholder="Optional" value={paidFee} onChange={(event) => setPaidFee(event.target.value)} /></Field>
+      <Field label="Annual tuition"><Input type="number" min="0" step="0.01" placeholder="Optional; tuition only" value={annualFee} onChange={(event) => setAnnualFee(event.target.value)} /></Field>
+      <Field label="Admission fee"><Input type="number" min="0" step="0.01" placeholder="Optional one-time charge" value={admissionFee} onChange={(event) => setAdmissionFee(event.target.value)} /></Field>
+      <Field label="School van / transport fee (year total)"><Input type="number" min="0" step="0.01" placeholder="Optional" value={schoolVanFee} onChange={(event) => setSchoolVanFee(event.target.value)} /></Field>
+      <Field label="Other fees"><Input type="number" min="0" step="0.01" placeholder="Optional" value={otherFee} onChange={(event) => setOtherFee(event.target.value)} /></Field>
+      <Field label="Previously paid fee (legacy)"><Input type="number" min="0" step="0.01" placeholder="Optional; avoid duplicate entries" value={paidFee} onChange={(event) => setPaidFee(event.target.value)} /></Field>
       <Field label="School contact name"><Input maxLength={120} placeholder="Optional" value={record.contactName} onChange={(event) => setRecord((current) => ({ ...current, contactName: event.target.value }))} /></Field>
       <Field label="Contact details"><Input maxLength={160} placeholder="Optional phone or email" value={record.contact} onChange={(event) => setRecord((current) => ({ ...current, contact: event.target.value }))} /></Field>
       <Field className="full" label="Portal / document link"><Input type="url" maxLength={2000} placeholder="Optional HTTPS link" value={record.link} onChange={(event) => setRecord((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional academic notes, achievements, or reminders" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
-    <p className="section-description" style={{ marginTop: 12 }}>Only student name and school/college are required. Avoid storing student ID numbers or sensitive health information.</p>
+    <p className="section-description" style={{ marginTop: 12 }}>Enter tuition, admission, school van / transport, and other charges separately. For older records whose tuition amount included admission or transport, adjust it to tuition-only before adding separate charges. Payments are checked against combined fees. Only student name and school/college are required.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{copyMode ? "Save as new record" : initial ? "Save changes" : "Add record"}</Button></div></form>
   </Modal>;
@@ -907,12 +956,14 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
   </div><p className="section-description" style={{ marginTop: 12 }}>Record numeric marks with a maximum, or use grade/GPA for college grading systems.</p>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save result" : "Add result"}</Button></div></form></Modal>;
 }
 
-function EducationPaymentModal({ initial, currency, onClose, onSave }: {
+function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }: {
   initial: EducationPayment | null;
   currency: Currency;
+  maxAmount: number | null;
   onClose: () => void;
   onSave: (payment: Omit<EducationPayment, "id">) => void;
 }) {
+  const [feeType, setFeeType] = useState<EducationFeeType>(initial?.feeType ?? inferPaymentFeeType(initial?.period ?? ""));
   const [period, setPeriod] = useState(initial?.period ?? "");
   const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
   const [date, setDate] = useState(initial?.date ?? today());
@@ -927,17 +978,26 @@ function EducationPaymentModal({ initial, currency, onClose, onSave }: {
     if (!period.trim() || !date || !Number.isFinite(paid) || paid <= 0) {
       setError("Enter a term/period, payment date, and amount greater than zero."); return;
     }
-    onSave({ period: period.trim(), amount: paid, date, method, reference: reference.trim(), notes: notes.trim() });
+    if (maxAmount === null && paid > (initial?.amount ?? 0) + 0.005) {
+      setError("Enter the tuition, admission, van / transport, or other fee charges on the education record before recording this payment.");
+      return;
+    }
+    if (maxAmount !== null && paid > maxAmount + 0.005 && paid > (initial?.amount ?? 0) + 0.005) {
+      setError(`This payment would exceed the remaining total fees of ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}.`);
+      return;
+    }
+    onSave({ feeType, period: period.trim(), amount: paid, date, method, reference: reference.trim(), notes: notes.trim() });
   }
 
   return <Modal title={initial ? "Edit fee payment" : "Record fee payment"} onClose={onClose}><form onSubmit={submit}><div className="form-grid">
+    <Field label="Fee type"><Select value={feeType} onChange={(event) => setFeeType(event.target.value as EducationFeeType)}>{EDUCATION_FEE_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field>
     <Field className="full" label="Term / installment (required)"><Input autoFocus required maxLength={100} placeholder="e.g. Term 1, Semester 2, Admission fee" value={period} onChange={(event) => setPeriod(event.target.value)} /></Field>
-    <Field label={`Amount paid (${currency})`}><Input required type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
+    <Field label={`Amount paid (${currency})`}><Input required type="number" min="0.01" max={maxAmount === null ? undefined : Math.max(maxAmount, initial?.amount ?? 0)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
     <Field label="Payment date"><Input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
     <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Bank transfer</option><option>UPI</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Online portal</option><option>Other</option></Select></Field>
     <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
     <Field className="full" label="Notes"><Input maxLength={500} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
-  </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
+  </div>{maxAmount === null ? <p className="section-description" style={{ marginTop: 12 }}>Enter fee amounts on the education record before adding a payment so it can be validated against the total due.</p> : <p className="section-description" style={{ marginTop: 12 }}>Remaining fees available for payment: {new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.</p>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
 
 function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
@@ -958,9 +1018,10 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   const exams = record.exams ?? [];
   const payments = record.payments ?? [];
   const loggedPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalPaid = loggedPaid + (record.paidFee ?? 0);
-  const balance = record.annualFee === null ? null : Math.max(0, record.annualFee - totalPaid);
-  const remainingOwing = record.annualFee === null ? null : record.annualFee - totalPaid;
+  const totalPaid = educationTotalPaid(record);
+  const totalDue = educationTotalDue(record);
+  const balance = totalDue === null ? null : Math.max(0, totalDue - totalPaid);
+  const remainingOwing = totalDue === null ? null : totalDue - totalPaid;
 
   function formatAmount(amount: number) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: record.currency, maximumFractionDigits: 2 }).format(amount);
@@ -1001,10 +1062,15 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {record.boardUniversity && <div><span>Board / university</span><strong>{record.boardUniversity}</strong></div>}
       {record.startDate && <div><span>Start date</span><strong>{dateLabel(record.startDate)}</strong></div>}
       {record.endDate && <div><span>End / completion</span><strong>{dateLabel(record.endDate)}</strong></div>}
-      {record.annualFee !== null && <div><span>Annual tuition / fee</span><strong>{formatAmount(record.annualFee)}</strong></div>}
+      {record.annualFee !== null && <div><span>Annual tuition</span><strong>{formatAmount(record.annualFee)}</strong></div>}
+      {record.admissionFee != null && <div><span>Admission fee</span><strong>{formatAmount(record.admissionFee)}</strong></div>}
+      {record.schoolVanFee != null && <div><span>School van / transport (year total)</span><strong>{formatAmount(record.schoolVanFee)}</strong></div>}
+      {record.otherFee != null && <div><span>Other fees</span><strong>{formatAmount(record.otherFee)}</strong></div>}
+      {totalDue !== null && <div><span>Total fees due</span><strong>{formatAmount(totalDue)}</strong></div>}
       {record.paidFee !== null && <div><span>Previously recorded paid fee</span><strong>{formatAmount(record.paidFee)}</strong></div>}
-      {record.annualFee !== null && <div><span>Logged term payments</span><strong>{formatAmount(loggedPaid)}</strong></div>}
-      {balance !== null && <div><span>{remainingOwing !== null && remainingOwing < 0 ? "Overpaid (annual fee)" : "Remaining annual fee"}</span><strong>{formatAmount(Math.abs(remainingOwing ?? balance))}</strong></div>}
+      {payments.length > 0 && <div><span>Logged payments (all fee types)</span><strong>{formatAmount(loggedPaid)}</strong></div>}
+      {totalPaid > 0 && <div><span>Total paid (legacy + logged)</span><strong>{formatAmount(totalPaid)}</strong></div>}
+      {(totalDue !== null || totalPaid > 0) && <div><span>{remainingOwing !== null && remainingOwing < 0 ? "Overpaid (total fees)" : "Remaining total fees"}</span><strong>{totalDue === null ? "Add fee amounts to calculate" : formatAmount(Math.abs(remainingOwing ?? balance ?? 0))}</strong></div>}
       {record.contactName && <div><span>School contact</span><strong>{record.contactName}</strong></div>}
       {record.contact && <div><span>Contact details</span><strong>{record.contact}</strong></div>}
     </div>
@@ -1017,8 +1083,8 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span><small>{exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : ""}{exam.grade ? `${exam.marksObtained !== null ? " · " : ""}Grade / GPA: ${exam.grade}` : ""}{exam.notes ? `${exam.marksObtained !== null || exam.grade ? " · " : ""}${exam.notes}` : ""}</small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${exam.name}`} onClick={() => removeExam(exam)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
     </section>
     <section className="education-section">
-      <div className="education-section-head"><div><h3><Wallet size={14} />Term & fee payments</h3><p>{payments.length} logged · {formatAmount(loggedPaid)} paid</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record payment</Button></div>
-      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}</span>{payment.notes && <small>{payment.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${payment.period} payment`} onClick={() => removePayment(payment)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Record payments separately for terms, quarters, semesters, or installments.</p>}
+      <div className="education-section-head"><div><h3><Wallet size={14} />Fee payments</h3><p>{payments.length} logged · {formatAmount(loggedPaid)} paid across all fee types</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record payment</Button></div>
+      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}</span>{payment.notes && <small>{payment.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${payment.period} payment`} onClick={() => removePayment(payment)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
     </section>
     {record.link && <a className="personal-document-link" href={record.link} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
     {record.notes && <p className="personal-record-notes">{record.notes}</p>}
@@ -1033,7 +1099,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       onUpdate({ ...record, exams: current ? exams.map((entry) => entry.id === current.id ? { ...exam, id: current.id } : entry) : [{ ...exam, id: createId() }, ...exams] });
       setEditor(null);
     }} />}
-    {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} onClose={() => setEditor(null)} onSave={(payment) => {
+    {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} maxAmount={totalDue === null ? null : Math.max(0, totalDue - (totalPaid - (editor.initial?.amount ?? 0)))} onClose={() => setEditor(null)} onSave={(payment) => {
       const current = editor.initial;
       onUpdate({ ...record, payments: current ? payments.map((entry) => entry.id === current.id ? { ...payment, id: current.id } : entry) : [{ ...payment, id: createId() }, ...payments] });
       setEditor(null);
@@ -1081,7 +1147,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   }
 
   function totalFeesPaid(record: EducationRecord) {
-    return (record.paidFee ?? 0) + (record.payments ?? []).reduce((total, payment) => total + payment.amount, 0);
+    return educationTotalPaid(record);
   }
 
   function compareEducationRecords(a: EducationRecord, b: EducationRecord) {
@@ -1093,8 +1159,10 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       comparison = a.currency.localeCompare(b.currency) || totalFeesPaid(b) - totalFeesPaid(a);
     }
     else if (sortBy === "balance-highest") {
-      const balanceA = a.annualFee === null ? null : Math.max(0, a.annualFee - totalFeesPaid(a));
-      const balanceB = b.annualFee === null ? null : Math.max(0, b.annualFee - totalFeesPaid(b));
+      const dueA = educationTotalDue(a);
+      const dueB = educationTotalDue(b);
+      const balanceA = dueA === null ? null : Math.max(0, dueA - totalFeesPaid(a));
+      const balanceB = dueB === null ? null : Math.max(0, dueB - totalFeesPaid(b));
       comparison = balanceA === null ? (balanceB === null ? 0 : 1)
         : balanceB === null ? -1
           : a.currency.localeCompare(b.currency) || balanceB - balanceA;
@@ -1117,7 +1185,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       record.academicYear, record.boardUniversity, record.contactName, record.contact, record.notes,
       ...(record.subjects ?? []).flatMap((subject) => [subject.name, subject.code, subject.notes]),
       ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.grade, exam.notes]),
-      ...(record.payments ?? []).flatMap((payment) => [payment.period, payment.method, payment.reference, payment.notes])]
+      ...(record.payments ?? []).flatMap((payment) => [payment.feeType ?? "", payment.period, payment.method, payment.reference, payment.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort(compareEducationRecords);
 

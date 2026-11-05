@@ -152,6 +152,8 @@ export const EDUCATION_LEVELS = [
 
 export type EducationLevel = (typeof EDUCATION_LEVELS)[number];
 export type EducationStatus = "Current" | "Completed" | "On hold";
+export const EDUCATION_FEE_TYPES = ["Tuition", "Admission", "School van / transport", "Other"] as const;
+export type EducationFeeType = (typeof EDUCATION_FEE_TYPES)[number];
 
 export interface EducationSubject {
   id: string;
@@ -175,6 +177,7 @@ export interface EducationExam {
 
 export interface EducationPayment {
   id: string;
+  feeType?: EducationFeeType;
   period: string;
   amount: number;
   date: string;
@@ -195,6 +198,9 @@ export interface EducationRecord {
   startDate: string;
   endDate: string;
   annualFee: number | null;
+  admissionFee?: number | null;
+  schoolVanFee?: number | null;
+  otherFee?: number | null;
   paidFee: number | null;
   currency: Currency;
   contactName: string;
