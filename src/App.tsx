@@ -788,6 +788,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   onSaveQuote: (quote: Omit<StockQuoteSnapshot, "id">) => void;
 }) {
   const [brokerName, setBrokerName] = useState("");
+  const [editingBroker, setEditingBroker] = useState<{ original: string; value: string } | null>(null);
   const [symbol, setSymbol] = useState("");
   const [name, setName] = useState("");
   const [exchange, setExchange] = useState<StockExchange>("NSE");
@@ -869,6 +870,20 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     }
     onAddBroker(normalized); setBrokerName(""); setError(""); setNotice("Broker added.");
   }
+  function submitBrokerRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingBroker) return;
+    const renamed = editingBroker.value.trim();
+    if (!renamed || renamed.length > 80 ||
+      brokers.some((entry) => entry.toLocaleLowerCase() === renamed.toLocaleLowerCase() && entry !== editingBroker.original)) {
+      setError("Choose a non-empty broker name (up to 80 characters) that is not already in use.");
+      return;
+    }
+    if (renamed !== editingBroker.original) onRenameBroker(editingBroker.original, renamed);
+    setEditingBroker(null);
+    setError("");
+    setNotice("Broker name updated.");
+  }
   async function fetchStockQuote(stock: TrackedStock): Promise<Omit<StockQuoteSnapshot, "id" | "stockId">> {
     const params = new URLSearchParams({ symbol: stock.symbol, exchange: stock.exchange });
     const response = await fetch(`/api/stock-price?${params.toString()}`);
@@ -928,7 +943,15 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     <div className="stock-admin-grid">
       <Card><div className="card-head"><div><h2 className="section-title">Broker names</h2><p className="section-description">Labels for grouping your saved stocks only; no broker account is connected.</p></div></div>
         <form className="broker-form" onSubmit={submitBroker}><Field label="Add a broker"><Input maxLength={60} placeholder="e.g. Zerodha" value={brokerName} onChange={(event) => setBrokerName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add broker</Button></form>
-        <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { const name = window.prompt(`Rename broker "${entry}"`, entry)?.trim(); if (name && name !== entry) onRenameBroker(entry, name); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button></div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
+        <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}>
+          {editingBroker?.original === entry
+            ? <form className="stock-broker-edit" onSubmit={submitBrokerRename}>
+              <Input aria-label={`Broker name for ${entry}`} autoFocus required maxLength={80} value={editingBroker.value} onChange={(event) => setEditingBroker({ ...editingBroker, value: event.target.value })} />
+              <button className="icon-button" type="submit" aria-label={`Save broker name ${editingBroker.value}`} title="Save"><Check size={14} /></button>
+              <button className="icon-button" type="button" aria-label="Cancel broker name edit" title="Cancel" onClick={() => { setEditingBroker(null); setError(""); }}><X size={14} /></button>
+            </form>
+            : <><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { setEditingBroker({ original: entry, value: entry }); setError(""); setNotice(""); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button></>}
+        </div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
       </Card>
       <Card><div className="card-head"><div><h2 className="section-title">{editingId ? "Edit tracked stock" : "Add a stock"}</h2><p className="section-description">Use the exchange-listed code (without .NS or .BO).</p></div></div>
       <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => { setSymbol(event.target.value); setError(""); }} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>

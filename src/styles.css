@@ -174,6 +174,8 @@ button{cursor:pointer}
 .stock-admin-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .broker-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
 .stock-broker-list{margin-top:16px;border-top:1px solid #eef0ec}
+.stock-broker-edit{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.stock-broker-edit .field{flex:1;min-width:0;height:34px}
 .stock-form{gap:12px}
 .stock-form-actions{display:flex;justify-content:flex-end;gap:8px}
 .stock-table-card{overflow:hidden}
