@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type IssueRecord, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -267,6 +267,22 @@ export function validateData(value: unknown): value is TrackerData {
         typeof dish.name === "string" && dish.name.trim().length > 0) &&
       (entry.rating === null || (typeof entry.rating === "number" && Number.isInteger(entry.rating) && entry.rating >= 1 && entry.rating <= 5)) &&
       typeof entry.learning === "string" && typeof entry.notes === "string"));
+  const issueRecordsOk = value.issueRecords === undefined ||
+    (Array.isArray(value.issueRecords) && value.issueRecords.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.title === "string" && entry.title.trim().length > 0 &&
+      (entry.area === "Personal" || entry.area === "Professional" || entry.area === "Home" || entry.area === "Vehicle" || entry.area === "Other") &&
+      typeof entry.customArea === "string" &&
+      (entry.kind === "Issue" || entry.kind === "Repair" || entry.kind === "Maintenance" || entry.kind === "Task") &&
+      (entry.status === "Open" || entry.status === "In progress" || entry.status === "Waiting" || entry.status === "Resolved" || entry.status === "Closed") &&
+      (entry.priority === "Low" || entry.priority === "Medium" || entry.priority === "High" || entry.priority === "Urgent") &&
+      typeof entry.dateReported === "string" && !Number.isNaN(Date.parse(entry.dateReported)) &&
+      typeof entry.dueDate === "string" && (entry.dueDate === "" || !Number.isNaN(Date.parse(entry.dueDate))) &&
+      typeof entry.assetName === "string" && typeof entry.location === "string" &&
+      typeof entry.assignedTo === "string" && typeof entry.provider === "string" &&
+      typeof entry.description === "string" && typeof entry.updates === "string" &&
+      (entry.estimatedCost === null || (typeof entry.estimatedCost === "number" && Number.isFinite(entry.estimatedCost) && entry.estimatedCost >= 0)) &&
+      (entry.actualCost === null || (typeof entry.actualCost === "number" && Number.isFinite(entry.actualCost) && entry.actualCost >= 0))));
   const personalRecordsOk = value.personalRecords === undefined || (Array.isArray(value.personalRecords) && value.personalRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.title === "string" &&
     (entry.type === "Identity" || entry.type === "Insurance" || entry.type === "License" ||
@@ -312,7 +328,7 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
-    !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !personalRecordsOk ||
+    !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk || !personalRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -344,19 +360,21 @@ export function validateData(value: unknown): value is TrackerData {
       const key = `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
       byMeter.set(key, [...(byMeter.get(key) ?? []), entry]);
     }
-    if (Array.isArray(value.devotionalEntries) &&
-      new Set((value.devotionalEntries as DevotionalEntry[]).map((entry) => entry.id)).size !== value.devotionalEntries.length) return false;
-    if (Array.isArray(value.prayerRequests) &&
-      new Set((value.prayerRequests as PrayerRequest[]).map((entry) => entry.id)).size !== value.prayerRequests.length) return false;
-    if (Array.isArray(value.cookingRecipes) &&
-      new Set((value.cookingRecipes as CookingRecipe[]).map((entry) => entry.id)).size !== value.cookingRecipes.length) return false;
-    if (Array.isArray(value.cookingLogs) &&
-      new Set((value.cookingLogs as CookingLog[]).map((entry) => entry.id)).size !== value.cookingLogs.length) return false;
     for (const meterReadings of byMeter.values()) {
       const sorted = [...meterReadings].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
       if (sorted.some((entry, index) => index > 0 && entry.meterReading < sorted[index - 1].meterReading)) return false;
     }
   }
+  if (Array.isArray(value.devotionalEntries) &&
+    new Set((value.devotionalEntries as DevotionalEntry[]).map((entry) => entry.id)).size !== value.devotionalEntries.length) return false;
+  if (Array.isArray(value.prayerRequests) &&
+    new Set((value.prayerRequests as PrayerRequest[]).map((entry) => entry.id)).size !== value.prayerRequests.length) return false;
+  if (Array.isArray(value.cookingRecipes) &&
+    new Set((value.cookingRecipes as CookingRecipe[]).map((entry) => entry.id)).size !== value.cookingRecipes.length) return false;
+  if (Array.isArray(value.cookingLogs) &&
+    new Set((value.cookingLogs as CookingLog[]).map((entry) => entry.id)).size !== value.cookingLogs.length) return false;
+  if (Array.isArray(value.issueRecords) &&
+    new Set((value.issueRecords as IssueRecord[]).map((entry) => entry.id)).size !== value.issueRecords.length) return false;
   if (Array.isArray(value.personalRecords) && new Set((value.personalRecords as PersonalRecord[]).map((entry) => entry.id)).size !== value.personalRecords.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
@@ -428,6 +446,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     prayerRequests: data.prayerRequests ?? [],
     cookingRecipes: data.cookingRecipes ?? [],
     cookingLogs: data.cookingLogs ?? [],
+    issueRecords: data.issueRecords ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],

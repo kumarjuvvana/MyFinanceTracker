@@ -498,6 +498,27 @@ body{background:#f3f5ef}
 .app-shell.dark .cooking-summary strong,.app-shell.dark .cooking-card h3,.app-shell.dark .cooking-card p strong,.app-shell.dark .cooking-selected-dishes>strong{color:#e3e8e2}
 .app-shell.dark .cooking-summary span,.app-shell.dark .cooking-card p{color:#a7b0a7}
 .app-shell.dark .cooking-selected-dishes>div{border-color:#343d35;color:#c2cbc2}
+.issues-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-bottom:14px}
+.issues-summary .card{display:grid;gap:6px;padding:14px}
+.issues-summary span{font-size:10px;color:#92998f}
+.issues-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
+.issues-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(130px,190px) minmax(130px,190px);gap:10px;margin-bottom:14px}
+.issues-list{display:grid;gap:12px}
+.issue-card{min-width:0;padding:16px}
+.issue-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.issue-card-title{min-width:0}
+.issue-badges{display:flex;flex-wrap:wrap;gap:4px}
+.issue-card h2{margin:7px 0 0;font:700 14px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
+.issue-card-meta{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:10px;color:#858d83}
+.issue-overdue{color:#aa6825!important;font-weight:700}
+.issue-card-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px}
+.issue-card-controls>.field{width:auto;min-width:125px}
+.issue-card-controls>span{font-size:10px;color:#667066;overflow-wrap:anywhere}
+.issue-card>p{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
+.issue-card>p strong{color:#414a42}
+.app-shell.dark .issues-summary strong,.app-shell.dark .issue-card h2,.app-shell.dark .issue-card>p strong{color:#e3e8e2}
+.app-shell.dark .issues-summary span,.app-shell.dark .issue-card-meta,.app-shell.dark .issue-card-controls>span,.app-shell.dark .issue-card>p{color:#a7b0a7}
+.app-shell.dark .issue-overdue{color:#e0b875!important}
 .education-list{display:grid;gap:14px}
 .education-card{min-width:0;padding:12px 16px}
 .education-card-head,.education-card-title,.education-card-actions{display:flex;align-items:center;gap:10px}
@@ -577,6 +598,9 @@ body{background:#f3f5ef}
   .cooking-card{padding:12px}
   .cooking-add-dish{align-items:stretch}
   .cooking-add-dish>.button{flex:none}
+  .issues-toolbar{grid-template-columns:minmax(0,1fr)}
+  .issue-card{padding:12px}
+  .issue-card-controls{align-items:stretch}
   .asset-card{padding:14px}
   .asset-details{grid-template-columns:minmax(0,1fr)}
   .asset-total-card{grid-template-columns:1fr}

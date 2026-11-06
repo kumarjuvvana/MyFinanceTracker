@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -32,6 +32,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Learning", icon: BookOpen },
   { name: "Devotional", icon: Heart },
   { name: "Cooking", icon: CookingPot },
+  { name: "Issues & maintenance", icon: Wrench },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
@@ -2001,6 +2002,167 @@ function CookingPage({ recipes, logs, onSaveRecipe, onDeleteRecipe, onSaveLog, o
   </>;
 }
 
+function IssueRecordModal({ initial, onClose, onSave }: {
+  initial: IssueRecord | null;
+  onClose: () => void;
+  onSave: (record: Omit<IssueRecord, "id">) => void;
+}) {
+  const currency = useContext(CurrencyContext);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [area, setArea] = useState<IssueArea>(initial?.area ?? "Personal");
+  const [customArea, setCustomArea] = useState(initial?.customArea ?? "");
+  const [kind, setKind] = useState<IssueKind>(initial?.kind ?? "Issue");
+  const [status, setStatus] = useState<IssueStatus>(initial?.status ?? "Open");
+  const [priority, setPriority] = useState<IssuePriority>(initial?.priority ?? "Medium");
+  const [dateReported, setDateReported] = useState(initial?.dateReported ?? today());
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
+  const [assetName, setAssetName] = useState(initial?.assetName ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [assignedTo, setAssignedTo] = useState(initial?.assignedTo ?? "");
+  const [provider, setProvider] = useState(initial?.provider ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [updates, setUpdates] = useState(initial?.updates ?? "");
+  const [estimatedCost, setEstimatedCost] = useState(initial?.estimatedCost?.toString() ?? "");
+  const [actualCost, setActualCost] = useState(initial?.actualCost?.toString() ?? "");
+  const [error, setError] = useState("");
+
+  function parseCost(value: string) {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle || !dateReported) {
+      setError("Enter a title and the date the issue was reported or identified.");
+      return;
+    }
+    if (area === "Other" && !customArea.trim()) {
+      setError("Describe the area when you select Other.");
+      return;
+    }
+    const parsedEstimate = parseCost(estimatedCost);
+    const parsedActual = parseCost(actualCost);
+    if ((estimatedCost.trim() && parsedEstimate === null) || (actualCost.trim() && parsedActual === null)) {
+      setError("Costs must be valid amounts greater than or equal to zero.");
+      return;
+    }
+    onSave({
+      title: normalizedTitle,
+      area,
+      customArea: customArea.trim(),
+      kind,
+      status,
+      priority,
+      dateReported,
+      dueDate,
+      assetName: assetName.trim(),
+      location: location.trim(),
+      assignedTo: assignedTo.trim(),
+      provider: provider.trim(),
+      description: description.trim(),
+      updates: updates.trim(),
+      estimatedCost: parsedEstimate,
+      actualCost: parsedActual,
+    });
+  }
+
+  return <Modal title={initial ? "Edit issue or repair" : "Add issue or repair"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="e.g. Leaking kitchen tap, laptop issue, or project follow-up" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Area"><Select value={area} onChange={(event) => setArea(event.target.value as IssueArea)}><option>Personal</option><option>Professional</option><option>Home</option><option>Vehicle</option><option>Other</option></Select></Field>
+      {area === "Other" && <Field label="Describe the area"><Input required maxLength={80} placeholder="e.g. Community, travel" value={customArea} onChange={(event) => setCustomArea(event.target.value)} /></Field>}
+      <Field label="Record type"><Select value={kind} onChange={(event) => setKind(event.target.value as IssueKind)}><option>Issue</option><option>Repair</option><option>Maintenance</option><option>Task</option></Select></Field>
+      <Field label="Priority"><Select value={priority} onChange={(event) => setPriority(event.target.value as IssuePriority)}><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></Select></Field>
+      <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as IssueStatus)}><option>Open</option><option>In progress</option><option>Waiting</option><option>Resolved</option><option>Closed</option></Select></Field>
+      <Field label="Date reported / identified"><Input required type="date" value={dateReported} onChange={(event) => setDateReported(event.target.value)} /></Field>
+      <Field label="Due date (optional)"><Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></Field>
+      <Field label="Vehicle, appliance, room, or project"><Input maxLength={120} placeholder="e.g. Honda City, washing machine, kitchen" value={assetName} onChange={(event) => setAssetName(event.target.value)} /></Field>
+      <Field label="Location"><Input maxLength={160} placeholder="Address, room, office, or remote" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+      <Field label="Assigned to"><Input maxLength={120} placeholder="Person responsible" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} /></Field>
+      <Field label="Repair provider / contact"><Input maxLength={120} placeholder="Mechanic, electrician, service center..." value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
+      <Field label={`Estimated cost (${currency})`}><Input type="number" min="0" step="0.01" value={estimatedCost} onChange={(event) => setEstimatedCost(event.target.value)} /></Field>
+      <Field label={`Actual cost (${currency})`}><Input type="number" min="0" step="0.01" value={actualCost} onChange={(event) => setActualCost(event.target.value)} /></Field>
+      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Describe the problem, task, or work needed" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+      <Field className="full" label="Updates / resolution notes"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Record progress, work performed, parts used, or how it was resolved" value={updates} onChange={(event) => setUpdates(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add record"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function IssuesMaintenancePage({ records, onSave, onDelete }: {
+  records: IssueRecord[];
+  onSave: (record: Omit<IssueRecord, "id">, id?: string) => void;
+  onDelete: (record: IssueRecord) => void;
+}) {
+  const [editor, setEditor] = useState<IssueRecord | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [areaFilter, setAreaFilter] = useState("All areas");
+  const [statusFilter, setStatusFilter] = useState("All statuses");
+  const formatCurrency = useCurrencyFormatter();
+  const query = search.trim().toLocaleLowerCase();
+  const activeCount = records.filter((record) => record.status !== "Resolved" && record.status !== "Closed").length;
+  const urgentCount = records.filter((record) => record.priority === "Urgent" && record.status !== "Resolved" && record.status !== "Closed").length;
+  const maintenanceCount = records.filter((record) => record.kind === "Repair" || record.kind === "Maintenance").length;
+  const visibleRecords = [...records].filter((record) =>
+    (areaFilter === "All areas" || record.area === areaFilter) &&
+    (statusFilter === "All statuses" || record.status === statusFilter) &&
+    (!query || [
+      record.title, record.area, record.customArea, record.kind, record.assetName, record.location,
+      record.assignedTo, record.provider, record.description, record.updates,
+    ].some((value) => value.toLocaleLowerCase().includes(query))))
+    .sort((a, b) => {
+      const aOpen = a.status === "Resolved" || a.status === "Closed" ? 1 : 0;
+      const bOpen = b.status === "Resolved" || b.status === "Closed" ? 1 : 0;
+      return aOpen - bOpen || (a.dueDate || "9999-12-31").localeCompare(b.dueDate || "9999-12-31") || b.dateReported.localeCompare(a.dateReported);
+    });
+
+  function deleteRecord(record: IssueRecord) {
+    if (window.confirm(`Delete "${record.title}" from Issues & maintenance?`)) onDelete(record);
+  }
+
+  return <>
+    <PageHeading eyebrow="Life admin" title="Issues & maintenance" subtitle="Keep personal and work issues, household fixes, vehicle repairs, and other tasks in one place." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add issue / repair</Button>} />
+    <div className="issues-summary">
+      <Card><span>Total records</span><strong>{records.length}</strong></Card>
+      <Card><span>Open / in progress</span><strong>{activeCount}</strong></Card>
+      <Card><span>Urgent and unresolved</span><strong>{urgentCount}</strong></Card>
+      <Card><span>Repairs / maintenance</span><strong>{maintenanceCount}</strong></Card>
+    </div>
+    <div className="issues-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search issues and repairs" placeholder="Search title, asset, provider, or notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <Select aria-label="Filter by area" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)}><option>All areas</option><option>Personal</option><option>Professional</option><option>Home</option><option>Vehicle</option><option>Other</option></Select>
+      <Select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Open</option><option>In progress</option><option>Waiting</option><option>Resolved</option><option>Closed</option></Select>
+    </div>
+    {visibleRecords.length ? <div className="issues-list">{visibleRecords.map((record) => {
+      const resolved = record.status === "Resolved" || record.status === "Closed";
+      const overdue = Boolean(record.dueDate && record.dueDate < today() && !resolved);
+      return <Card className="issue-card" key={record.id}>
+        <div className="issue-card-head">
+          <div className="issue-card-title"><div className="issue-badges"><Badge>{record.area === "Other" ? record.customArea : record.area}</Badge><Badge tone={record.kind === "Repair" || record.kind === "Maintenance" ? "blue" : "neutral"}>{record.kind}</Badge><Badge tone={record.priority === "Urgent" || record.priority === "High" ? "amber" : "neutral"}>{record.priority} priority</Badge></div><h2>{record.title}</h2></div>
+          <div className="table-actions"><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${record.title}`} onClick={() => deleteRecord(record)}><Trash2 size={13} /></button></div>
+        </div>
+        <div className="issue-card-meta">
+          <span>Reported {dateLabel(record.dateReported)}</span>
+          {record.dueDate && <span className={overdue ? "issue-overdue" : ""}>{overdue ? "Overdue · " : "Due · "}{dateLabel(record.dueDate)}</span>}
+          {record.assetName && <span>{record.assetName}</span>}
+          {record.location && <span>{record.location}</span>}
+        </div>
+        <div className="issue-card-controls"><Select aria-label={`Status for ${record.title}`} value={record.status} onChange={(event) => onSave({ ...record, status: event.target.value as IssueStatus }, record.id)}><option>Open</option><option>In progress</option><option>Waiting</option><option>Resolved</option><option>Closed</option></Select>
+          {(record.assignedTo || record.provider) && <span>{[record.assignedTo ? `Assigned: ${record.assignedTo}` : "", record.provider ? `Provider: ${record.provider}` : ""].filter(Boolean).join(" · ")}</span>}
+          {(record.estimatedCost !== null || record.actualCost !== null) && <span>{record.estimatedCost !== null ? `Estimate ${formatCurrency(record.estimatedCost)}` : ""}{record.estimatedCost !== null && record.actualCost !== null ? " · " : ""}{record.actualCost !== null ? `Actual ${formatCurrency(record.actualCost)}` : ""}</span>}
+        </div>
+        {record.description && <p><strong>Details:</strong> {record.description}</p>}
+        {record.updates && <p><strong>Updates:</strong> {record.updates}</p>}
+      </Card>;
+    })}</div> : <Card><EmptyState icon={<Wrench size={18} />} title={records.length ? "No matching records" : "Nothing to track yet"} description={records.length ? "Try changing the search or filters." : "Add a personal or work issue, household repair, vehicle service, or any task you want to follow."} /></Card>}
+    {editor !== undefined && <IssueRecordModal key={editor?.id ?? "new-issue-record"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -2650,6 +2812,7 @@ function emptyTrackerData(): TrackerData {
     educationRecords: [],
     cookingRecipes: [],
     cookingLogs: [],
+    issueRecords: [],
   };
 }
 
@@ -3263,6 +3426,20 @@ export default function App() {
       cookingLogs: (previous.cookingLogs ?? []).filter((current) => current.id !== log.id),
     }));
   }
+  function saveIssueRecord(record: Omit<IssueRecord, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      issueRecords: id
+        ? (previous.issueRecords ?? []).map((current) => current.id === id ? { ...record, id } : current)
+        : [{ ...record, id: createId() }, ...(previous.issueRecords ?? [])],
+    }));
+  }
+  function deleteIssueRecord(record: IssueRecord) {
+    update((previous) => ({
+      ...previous,
+      issueRecords: (previous.issueRecords ?? []).filter((current) => current.id !== record.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -3295,7 +3472,7 @@ export default function App() {
     setNotice("Your backup is ready to save.");
   }
   function clearData() {
-    if (!window.confirm("Clear all shopping, stock, asset, learning, education, vehicle, electricity, devotional, cooking, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
+    if (!window.confirm("Clear all shopping, stock, asset, learning, education, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
     setData(emptyTrackerData());
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
@@ -3325,6 +3502,7 @@ export default function App() {
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
+    "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,

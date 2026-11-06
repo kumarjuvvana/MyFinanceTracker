@@ -25,6 +25,7 @@ export type Page =
   | "Learning"
   | "Devotional"
   | "Cooking"
+  | "Issues & maintenance"
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
@@ -340,6 +341,31 @@ export interface CookingLog {
   notes: string;
 }
 
+export type IssueArea = "Personal" | "Professional" | "Home" | "Vehicle" | "Other";
+export type IssueKind = "Issue" | "Repair" | "Maintenance" | "Task";
+export type IssueStatus = "Open" | "In progress" | "Waiting" | "Resolved" | "Closed";
+export type IssuePriority = "Low" | "Medium" | "High" | "Urgent";
+
+export interface IssueRecord {
+  id: string;
+  title: string;
+  area: IssueArea;
+  customArea: string;
+  kind: IssueKind;
+  status: IssueStatus;
+  priority: IssuePriority;
+  dateReported: string;
+  dueDate: string;
+  assetName: string;
+  location: string;
+  assignedTo: string;
+  provider: string;
+  description: string;
+  updates: string;
+  estimatedCost: number | null;
+  actualCost: number | null;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -413,6 +439,7 @@ export interface TrackerData {
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];
   cookingLogs?: CookingLog[];
+  issueRecords?: IssueRecord[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }
