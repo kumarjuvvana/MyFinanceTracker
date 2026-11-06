@@ -77,7 +77,9 @@ export default async function stockPriceHandler(request: StockPriceRequest, resp
       price: meta.regularMarketPrice,
       currency: "currency" in meta && typeof meta.currency === "string" ? meta.currency : "INR",
       timestamp: quoteTime,
-      marketState: "marketState" in meta && typeof meta.marketState === "string" ? meta.marketState : "UNKNOWN",
+      marketState: "marketState" in meta && typeof meta.marketState === "string" && meta.marketState.trim()
+        ? meta.marketState
+        : "STATUS_UNAVAILABLE",
       previousClose: "previousClose" in meta && typeof meta.previousClose === "number" &&
         Number.isFinite(meta.previousClose) ? meta.previousClose : null,
     });

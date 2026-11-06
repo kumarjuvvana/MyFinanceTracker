@@ -107,6 +107,20 @@ const defaultItem = (): Omit<ShoppingItem, "id"> => ({
 });
 const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const copyLabel = (value: string, maxLength: number) => `${value.slice(0, Math.max(0, maxLength - 7))} (copy)`;
+const marketStateLabel = (state: string) => {
+  const normalized = state.trim().toUpperCase();
+  const labels: Record<string, string> = {
+    REGULAR: "Open",
+    PRE: "Pre-market",
+    PREPRE: "Pre-market",
+    POST: "After-hours",
+    POSTPOST: "After-hours",
+    CLOSED: "Closed",
+    UNKNOWN: "Status unavailable",
+    STATUS_UNAVAILABLE: "Status unavailable",
+  };
+  return labels[normalized] ?? (normalized ? normalized.replace(/_/g, " ").toLocaleLowerCase().replace(/^./, (letter) => letter.toLocaleUpperCase()) : "Status unavailable");
+};
 const monthYearLabel = (date: string) => /^\d{4}-\d{2}$/.test(date)
   ? new Date(`${date}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
   : date ? dateLabel(date) : "";
@@ -927,7 +941,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         return <div className="stock-row" key={stock.id}>
           <div className="stock-summary">
             <div className="stock-identity"><span className="stock-code">{stock.symbol}</span><span className="stock-exchange">{stock.exchange}</span><span className="stock-name">{stock.name}</span></div>
-            <div className="stock-current"><strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong><small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${latest.marketState}` : "No price yet — refresh"}</small></div>
+            <div className="stock-current"><strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong><small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price yet — refresh"}</small></div>
             <div className="stock-position">
               <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} avg · ${stock.quantity} shares` : "Add avg price & shares"}</span>
               {latest && stock.averageBuyPrice && stock.quantity ? latest.currency === "INR" ? <>
@@ -945,7 +959,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           </div>
           <details className="stock-history">
             <summary>Price history ({history.length} snapshots)</summary>
-            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{quote.marketState}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">Refresh this stock to save its first price snapshot.</p>}
+            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">Refresh this stock to save its first price snapshot.</p>}
           </details>
         </div>;
       })}</div> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
