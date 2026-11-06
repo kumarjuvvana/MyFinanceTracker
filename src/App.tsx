@@ -62,10 +62,10 @@ function useCurrencyFormatter() {
   const currency = useContext(CurrencyContext);
   return (amount: number) => formatMoney(amount, currency);
 }
-type NavigationGroup = "Overview" | "Shopping" | "Finance" | "Personal growth" | "Home & family" | "Data & tools";
+type NavigationGroup = "Overview" | "Shopping" | "Finance" | "Personal growth" | "Cooking" | "Home & family" | "Data & tools";
 type NavigationItem = { name: Page; icon: typeof LayoutDashboard; group: NavigationGroup };
 type MenuSortOrder = "current" | "ascending";
-const NAVIGATION_GROUP_ORDER: NavigationGroup[] = ["Overview", "Shopping", "Finance", "Personal growth", "Home & family", "Data & tools"];
+const NAVIGATION_GROUP_ORDER: NavigationGroup[] = ["Overview", "Shopping", "Finance", "Personal growth", "Cooking", "Home & family", "Data & tools"];
 const navigation: NavigationItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, group: "Overview" },
   { name: "Global search", icon: Search, group: "Overview" },
@@ -83,7 +83,7 @@ const navigation: NavigationItem[] = [
   { name: "AI Prompts", icon: Sparkles, group: "Personal growth" },
   { name: "Training & classes", icon: CalendarDays, group: "Personal growth" },
   { name: "Devotional", icon: Heart, group: "Personal growth" },
-  { name: "Cooking", icon: CookingPot, group: "Home & family" },
+  { name: "Cooking", icon: CookingPot, group: "Cooking" },
   { name: "Issues & maintenance", icon: Wrench, group: "Home & family" },
   { name: "Education & career", icon: Briefcase, group: "Home & family" },
   { name: "Family", icon: UsersRound, group: "Home & family" },
