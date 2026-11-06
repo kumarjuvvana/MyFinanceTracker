@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -242,6 +242,33 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.paidDate === "string" && (entry.paidDate === "" || !Number.isNaN(Date.parse(entry.paidDate))) &&
       (!entry.paid || entry.paidDate !== "") &&
       typeof entry.notes === "string"));
+  const subscriptionsOk = value.subscriptions === undefined ||
+    (Array.isArray(value.subscriptions) && value.subscriptions.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.name === "string" && entry.name.trim().length > 0 && entry.name.length <= 120 &&
+      (entry.category === "Mobile" || entry.category === "Electricity" || entry.category === "Gas" ||
+        entry.category === "Internet" || entry.category === "Streaming" || entry.category === "Tickets" || entry.category === "Other") &&
+      typeof entry.provider === "string" && entry.provider.length <= 120 &&
+      (entry.billingType === "Prepaid" || entry.billingType === "Postpaid" ||
+        entry.billingType === "Recurring" || entry.billingType === "One-time") &&
+      CURRENCIES.some((currency) => currency === entry.currency) &&
+      typeof entry.accountReference === "string" && entry.accountReference.length <= 160 &&
+      typeof entry.notes === "string" && entry.notes.length <= 2000 &&
+      Array.isArray(entry.transactions) && entry.transactions.every((transaction) =>
+        isRecord(transaction) && typeof transaction.id === "string" && transaction.id.length > 0 &&
+        (transaction.type === "Recharge" || transaction.type === "Bill" || transaction.type === "Booking" ||
+          transaction.type === "Renewal" || transaction.type === "Other") &&
+        typeof transaction.transactionDate === "string" && !Number.isNaN(Date.parse(transaction.transactionDate)) &&
+        typeof transaction.periodStart === "string" && (transaction.periodStart === "" || !Number.isNaN(Date.parse(transaction.periodStart))) &&
+        typeof transaction.periodEnd === "string" && (transaction.periodEnd === "" || !Number.isNaN(Date.parse(transaction.periodEnd))) &&
+        (!transaction.periodStart || !transaction.periodEnd || transaction.periodEnd >= transaction.periodStart) &&
+        typeof transaction.dueDate === "string" && (transaction.dueDate === "" || !Number.isNaN(Date.parse(transaction.dueDate))) &&
+        (transaction.amount === null || (typeof transaction.amount === "number" && Number.isFinite(transaction.amount) && transaction.amount >= 0)) &&
+        typeof transaction.paid === "boolean" &&
+        typeof transaction.paymentDate === "string" && (transaction.paymentDate === "" || !Number.isNaN(Date.parse(transaction.paymentDate))) &&
+        (!transaction.paid || transaction.paymentDate !== "") &&
+        typeof transaction.reference === "string" && transaction.reference.length <= 160 &&
+        typeof transaction.notes === "string" && transaction.notes.length <= 2000)));
   const devotionalEntriesOk = value.devotionalEntries === undefined ||
     (Array.isArray(value.devotionalEntries) && value.devotionalEntries.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -413,7 +440,7 @@ export function validateData(value: unknown): value is TrackerData {
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
-    "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings",
+    "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings", "subscriptions",
     "devotionalEntries", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
@@ -459,7 +486,7 @@ export function validateData(value: unknown): value is TrackerData {
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk || !trainingSessionsOk ||
-    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
+    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
     !devotionalEntriesOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
     !archivedRecordsOk ||
@@ -485,6 +512,11 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.vehicleMaintenance) && new Set((value.vehicleMaintenance as VehicleMaintenance[]).map((entry) => entry.id)).size !== value.vehicleMaintenance.length) return false;
   if (Array.isArray(value.electricityReadings) &&
     new Set((value.electricityReadings as { id: string }[]).map((entry) => entry.id)).size !== value.electricityReadings.length) return false;
+  if (Array.isArray(value.subscriptions)) {
+    const subscriptions = value.subscriptions as SubscriptionAccount[];
+    if (new Set(subscriptions.map((entry) => entry.id)).size !== subscriptions.length ||
+      subscriptions.some((entry) => new Set(entry.transactions.map((transaction) => transaction.id)).size !== entry.transactions.length)) return false;
+  }
   if (Array.isArray(value.electricityReadings)) {
     const readings = value.electricityReadings as ElectricityReading[];
     const readingKeys = readings.map((entry) =>
@@ -594,6 +626,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     vehicleJourneys: data.vehicleJourneys ?? [],
     vehicleMaintenance: data.vehicleMaintenance ?? [],
     electricityReadings: data.electricityReadings ?? [],
+    subscriptions: data.subscriptions ?? [],
     devotionalEntries: data.devotionalEntries ?? [],
     devotionalResources: data.devotionalResources ?? [],
     prayerRequests: data.prayerRequests ?? [],

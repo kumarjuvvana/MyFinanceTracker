@@ -14,7 +14,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -77,6 +77,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
+  { name: "Subscriptions & bills", icon: CalendarDays },
   { name: "Personal documents", icon: FileText },
   { name: "Documents", icon: FileDown },
   { name: "Database manager", icon: Database },
@@ -622,6 +623,22 @@ function mergeArchivedRows<T extends { id: string }>(current: T[] | undefined, a
   return merged;
 }
 
+function mergeArchivedSubscriptions(current: SubscriptionAccount[] | undefined, archived: SubscriptionAccount[] | undefined): SubscriptionAccount[] {
+  const merged = [...(current ?? [])];
+  for (const account of archived ?? []) {
+    const existing = merged.findIndex((entry) => entry.id === account.id);
+    if (existing < 0) merged.push(account);
+    else {
+      const active = merged[existing];
+      merged[existing] = {
+        ...active,
+        transactions: mergeArchivedRows(active.transactions, account.transactions),
+      };
+    }
+  }
+  return merged;
+}
+
 function restoreEducationRecords(current: EducationRecord[] | undefined, archived: EducationRecord[] | undefined): EducationRecord[] {
   const restored = [...(current ?? [])];
   for (const record of archived ?? []) {
@@ -712,6 +729,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         vehicleJourneys: mergeArchivedRows(previous.vehicleJourneys, snapshot.vehicleJourneys),
         vehicleMaintenance: mergeArchivedRows(previous.vehicleMaintenance, snapshot.vehicleMaintenance),
         electricityReadings: mergeArchivedRows(previous.electricityReadings, snapshot.electricityReadings),
+        subscriptions: mergeArchivedSubscriptions(previous.subscriptions, snapshot.subscriptions),
         devotionalEntries: mergeArchivedRows(previous.devotionalEntries, snapshot.devotionalEntries),
         devotionalResources: mergeArchivedRows(previous.devotionalResources, snapshot.devotionalResources),
         prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
@@ -2552,6 +2570,174 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   </>;
 }
 
+function SubscriptionAccountModal({ initial, onClose, onSave }: {
+  initial: SubscriptionAccount | null;
+  onClose: () => void;
+  onSave: (account: Omit<SubscriptionAccount, "id" | "transactions">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [category, setCategory] = useState<SubscriptionCategory>(initial?.category ?? "Other");
+  const [provider, setProvider] = useState(initial?.provider ?? "");
+  const [billingType, setBillingType] = useState<SubscriptionBillingType>(initial?.billingType ?? "Recurring");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "INR");
+  const [accountReference, setAccountReference] = useState(initial?.accountReference ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) return;
+    onSave({ name: name.trim(), category, provider: provider.trim(), billingType, currency, accountReference: accountReference.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit service" : "Add subscription or bill"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Name"><Input autoFocus required maxLength={120} placeholder="e.g. Home electricity or Netflix" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as SubscriptionCategory)}>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
+      <Field label="Provider"><Input maxLength={120} placeholder="Optional company or provider" value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
+      <Field label="Billing type"><Select value={billingType} onChange={(event) => setBillingType(event.target.value as SubscriptionBillingType)}>{(["Prepaid", "Postpaid", "Recurring", "One-time"] as SubscriptionBillingType[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
+      <Field label="Currency"><Select value={currency} onChange={(event) => setCurrency(event.target.value as Currency)}>{CURRENCIES.map((value) => <option key={value}>{value}</option>)}</Select></Field>
+      <Field label="Account, phone, or booking reference"><Input maxLength={160} placeholder="Optional reference" value={accountReference} onChange={(event) => setAccountReference(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={2000} placeholder="Optional account details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div><div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add service"}</Button></div></form>
+  </Modal>;
+}
+
+function SubscriptionTransactionModal({ initial, currency, onClose, onSave }: {
+  initial: SubscriptionTransaction | null;
+  currency: Currency;
+  onClose: () => void;
+  onSave: (transaction: Omit<SubscriptionTransaction, "id">) => void;
+}) {
+  const [type, setType] = useState<SubscriptionTransactionType>(initial?.type ?? "Other");
+  const [transactionDate, setTransactionDate] = useState(initial?.transactionDate ?? today());
+  const [periodStart, setPeriodStart] = useState(initial?.periodStart ?? "");
+  const [periodEnd, setPeriodEnd] = useState(initial?.periodEnd ?? "");
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
+  const [amount, setAmount] = useState(initial?.amount == null ? "" : String(initial.amount));
+  const [paid, setPaid] = useState(initial?.paid ?? false);
+  const [paymentDate, setPaymentDate] = useState(initial?.paymentDate ?? "");
+  const [reference, setReference] = useState(initial?.reference ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const amountValue = amount.trim() ? Number(amount) : null;
+    if (!transactionDate) {
+      setError("Enter the booking, bill, or transaction date.");
+      return;
+    }
+    if (periodStart && periodEnd && periodEnd < periodStart) {
+      setError("The period end must be on or after the period start.");
+      return;
+    }
+    if (amountValue !== null && (!Number.isFinite(amountValue) || amountValue < 0)) {
+      setError("Amount must be zero or greater.");
+      return;
+    }
+    if (paid && !paymentDate) {
+      setError("Enter the payment date for a paid transaction.");
+      return;
+    }
+    onSave({ type, transactionDate, periodStart, periodEnd, dueDate, amount: amountValue, paid, paymentDate: paid ? paymentDate : "", reference: reference.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit transaction" : "Add transaction"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Transaction type"><Select value={type} onChange={(event) => setType(event.target.value as SubscriptionTransactionType)}>{(["Recharge", "Bill", "Booking", "Renewal", "Other"] as SubscriptionTransactionType[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
+      <Field label="Booking, bill, or transaction date"><DateInput required value={transactionDate} onValueChange={setTransactionDate} /></Field>
+      <Field label="Coverage or service starts"><DateInput value={periodStart} onValueChange={setPeriodStart} /></Field>
+      <Field label="Coverage or service ends / renews"><DateInput value={periodEnd} onValueChange={setPeriodEnd} /></Field>
+      <Field label="Due or reminder date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
+      <Field label={`Amount (${currency})`}><Input inputMode="decimal" placeholder="Optional" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
+      <Field label="Payment status"><Select value={paid ? "paid" : "pending"} onChange={(event) => {
+        const isPaid = event.target.value === "paid";
+        setPaid(isPaid);
+        if (isPaid && !paymentDate) setPaymentDate(today());
+        if (!isPaid) setPaymentDate("");
+      }}><option value="pending">Pending</option><option value="paid">Paid</option></Select></Field>
+      <Field label="Payment date"><DateInput disabled={!paid} required={paid} value={paymentDate} onValueChange={setPaymentDate} /></Field>
+      <Field label="Receipt or booking reference"><Input maxLength={160} placeholder="Optional reference" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={2000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add transaction"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTransaction, onArchiveTransaction }: {
+  accounts: SubscriptionAccount[];
+  onSaveAccount: (account: Omit<SubscriptionAccount, "id" | "transactions">, id?: string) => void;
+  onArchiveAccount: (account: SubscriptionAccount) => void;
+  onSaveTransaction: (accountId: string, transaction: Omit<SubscriptionTransaction, "id">, id?: string) => void;
+  onArchiveTransaction: (accountId: string, transaction: SubscriptionTransaction) => void;
+}) {
+  const [accountEditor, setAccountEditor] = useState<SubscriptionAccount | null | undefined>(undefined);
+  const [transactionEditor, setTransactionEditor] = useState<{ account: SubscriptionAccount; transaction: SubscriptionTransaction | null } | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All categories");
+  const [statusFilter, setStatusFilter] = useState("All records");
+  const query = search.trim().toLocaleLowerCase();
+  const currentDate = today();
+  const upcomingDate = dateAfterDays(30);
+  const transactions = accounts.flatMap((account) => account.transactions.map((transaction) => ({ account, transaction })));
+  const pending = transactions.filter(({ transaction }) => !transaction.paid);
+  const overdue = pending.filter(({ transaction }) => transaction.dueDate && transaction.dueDate < currentDate);
+  const dueSoon = pending.filter(({ transaction }) => transaction.dueDate && transaction.dueDate >= currentDate && transaction.dueDate <= upcomingDate);
+  const visible = accounts.filter((account) => {
+    const matchesText = !query || [account.name, account.category, account.provider, account.accountReference, account.notes,
+      ...account.transactions.flatMap((entry) => [entry.type, entry.reference, entry.notes])]
+      .some((value) => value.toLocaleLowerCase().includes(query));
+    const matchesCategory = categoryFilter === "All categories" || account.category === categoryFilter;
+    const matchesStatus = statusFilter === "All records" || account.transactions.some((entry) => {
+      if (statusFilter === "Paid") return entry.paid;
+      if (statusFilter === "Pending") return !entry.paid;
+      if (statusFilter === "Overdue") return !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
+      return !entry.paid && Boolean(entry.dueDate) && entry.dueDate >= currentDate && entry.dueDate <= upcomingDate;
+    });
+    return matchesText && matchesCategory && matchesStatus;
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  function archiveAccount(account: SubscriptionAccount) {
+    if (window.confirm(`Move "${account.name}" and its transaction history to the archive?`)) onArchiveAccount(account);
+  }
+  function archiveTransaction(account: SubscriptionAccount, transaction: SubscriptionTransaction) {
+    if (window.confirm(`Move this ${transaction.type.toLocaleLowerCase()} dated ${dateLabel(transaction.transactionDate)} for "${account.name}" to the archive?`)) onArchiveTransaction(account.id, transaction);
+  }
+
+  return <>
+    <PageHeading eyebrow="Recurring services & payments" title="Subscriptions & bills" subtitle="Keep mobile recharges, household bills, memberships, bookings, and renewals together with their dates and payment history." action={<Button onClick={() => setAccountEditor(null)}><Plus size={15} /> Add service</Button>} />
+    <div className="electricity-summary">
+      <Card><span>Services</span><strong>{accounts.length}</strong></Card>
+      <Card><span>Pending transactions</span><strong>{pending.length}</strong></Card>
+      <Card><span>Overdue</span><strong>{overdue.length}</strong></Card>
+      <Card><span>Due in 30 days</span><strong>{dueSoon.length}</strong></Card>
+    </div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search subscriptions and bills" placeholder="Search service, provider, or reference..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter by service category" style={{ width: 160 }} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select><Select aria-label="Filter by payment status" style={{ width: 150 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select><Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge></div>
+    {visible.length ? <div className="electricity-list">{visible.map((account) => {
+      const sorted = [...account.transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+      const nextDue = account.transactions.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+      return <Card className="electricity-card" key={account.id}>
+        <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="table-actions"><Button variant="outline" onClick={() => setTransactionEditor({ account, transaction: null })}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={() => setAccountEditor(account)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={() => archiveAccount(account)}><Archive size={13} /></button></div></div>
+        <div className="electricity-meter-latest"><span>{nextDue ? `${nextDue.dueDate < currentDate ? "Overdue since" : "Next due"} · ${dateLabel(nextDue.dueDate)}` : "Next due"}{account.notes ? ` · ${account.notes}` : ""}</span></div>
+        {sorted.length ? <div className="electricity-record-list">{sorted.map((entry) => {
+          const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
+          const isOverdue = !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
+          return <div className="electricity-record" key={entry.id}>
+            <div className="electricity-record-main">
+              <strong>{entry.type} · {dateLabel(entry.transactionDate)} <Badge tone={entry.paid ? "green" : isOverdue ? "amber" : "blue"}>{entry.paid ? "Paid" : isOverdue ? "Overdue" : "Pending"}</Badge></strong>
+              <span>{entry.amount !== null ? formatMoney(entry.amount, account.currency) : "Amount not recorded"}{entry.dueDate ? ` · Due ${dateLabel(entry.dueDate)}` : ""}{period ? ` · Period ${period}` : ""}</span>
+              <small><LinkifiedText>{[entry.paymentDate ? `Paid ${dateLabel(entry.paymentDate)}` : "", entry.reference, entry.notes].filter(Boolean).join(" · ") || "No additional details"}</LinkifiedText></small></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
+          </div>;
+        })}</div> : <p className="vehicle-empty">No transactions recorded yet.</p>}
+      </Card>;
+    })}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title={accounts.length ? "No matching services or bills" : "No subscriptions or bills yet"} description={accounts.length ? "Try another search or filter." : "Add a service first, then record its bills, recharges, bookings, and renewal dates."} /></Card>}
+    {accountEditor !== undefined && <SubscriptionAccountModal key={accountEditor?.id ?? "new-subscription"} initial={accountEditor} onClose={() => setAccountEditor(undefined)} onSave={(account) => { onSaveAccount(account, accountEditor?.id); setAccountEditor(undefined); }} />}
+    {transactionEditor && <SubscriptionTransactionModal key={transactionEditor.transaction?.id ?? `new-transaction-${transactionEditor.account.id}`} initial={transactionEditor.transaction} currency={transactionEditor.account.currency} onClose={() => setTransactionEditor(null)} onSave={(transaction) => { onSaveTransaction(transactionEditor.account.id, transaction, transactionEditor.transaction?.id); setTransactionEditor(null); }} />}
+  </>;
+}
+
 function DevotionalEntryModal({ initial, onClose, onSave }: {
   initial: DevotionalEntry | null;
   onClose: () => void;
@@ -4245,6 +4431,7 @@ function emptyTrackerData(): TrackerData {
     vehicles: [],
     vehicleJourneys: [],
     vehicleMaintenance: [],
+    subscriptions: [],
     devotionalResources: [],
     learningRecords: [],
     trainingSessions: [],
@@ -5090,6 +5277,45 @@ export default function App() {
       electricityReadings: (previous.electricityReadings ?? []).filter((entry) => entry.id !== reading.id),
     }));
   }
+  function saveSubscriptionAccount(account: Omit<SubscriptionAccount, "id" | "transactions">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      subscriptions: id
+        ? (previous.subscriptions ?? []).map((entry) => entry.id === id ? { ...entry, ...account } : entry)
+        : [{ ...account, id: createId(), transactions: [] }, ...(previous.subscriptions ?? [])],
+    }));
+  }
+  function archiveSubscriptionAccount(account: SubscriptionAccount) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Subscription or bill · ${account.name}`, { subscriptions: [account] }),
+      subscriptions: (previous.subscriptions ?? []).filter((entry) => entry.id !== account.id),
+    }));
+  }
+  function saveSubscriptionTransaction(accountId: string, transaction: Omit<SubscriptionTransaction, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      subscriptions: (previous.subscriptions ?? []).map((account) => account.id !== accountId ? account : {
+        ...account,
+        transactions: id
+          ? account.transactions.map((entry) => entry.id === id ? { ...transaction, id } : entry)
+          : [{ ...transaction, id: createId() }, ...account.transactions],
+      }),
+    }));
+  }
+  function archiveSubscriptionTransaction(accountId: string, transaction: SubscriptionTransaction) {
+    update((previous) => {
+      const account = (previous.subscriptions ?? []).find((entry) => entry.id === accountId);
+      if (!account) return previous;
+      return {
+        ...withArchivedRecord(previous, `${account.name} · ${transaction.type} · ${transaction.transactionDate}`, {
+          subscriptions: [{ ...account, transactions: [transaction] }],
+        }),
+        subscriptions: (previous.subscriptions ?? []).map((entry) => entry.id === accountId
+          ? { ...entry, transactions: entry.transactions.filter((item) => item.id !== transaction.id) }
+          : entry),
+      };
+    });
+  }
   function saveDevotionalEntry(entry: Omit<DevotionalEntry, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -5364,6 +5590,7 @@ export default function App() {
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
+    "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={allDocuments.reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onArchive={archiveDocument} />,
     "Database manager": <DatabaseManagerPage />,

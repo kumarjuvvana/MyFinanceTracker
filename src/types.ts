@@ -33,6 +33,7 @@ export type Page =
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
+  | "Subscriptions & bills"
   | "Personal documents"
   | "Documents"
   | "AI Prompts"
@@ -346,6 +347,36 @@ export interface ElectricityReading {
   notes: string;
 }
 
+export type SubscriptionCategory = "Mobile" | "Electricity" | "Gas" | "Internet" | "Streaming" | "Tickets" | "Other";
+export type SubscriptionBillingType = "Prepaid" | "Postpaid" | "Recurring" | "One-time";
+export type SubscriptionTransactionType = "Recharge" | "Bill" | "Booking" | "Renewal" | "Other";
+
+export interface SubscriptionTransaction {
+  id: string;
+  type: SubscriptionTransactionType;
+  transactionDate: string;
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
+  amount: number | null;
+  paid: boolean;
+  paymentDate: string;
+  reference: string;
+  notes: string;
+}
+
+export interface SubscriptionAccount {
+  id: string;
+  name: string;
+  category: SubscriptionCategory;
+  provider: string;
+  billingType: SubscriptionBillingType;
+  currency: Currency;
+  accountReference: string;
+  notes: string;
+  transactions: SubscriptionTransaction[];
+}
+
 export interface DevotionalEntry {
   id: string;
   date: string;
@@ -591,6 +622,7 @@ export interface TrackerData {
   vehicleJourneys?: VehicleJourney[];
   vehicleMaintenance?: VehicleMaintenance[];
   electricityReadings?: ElectricityReading[];
+  subscriptions?: SubscriptionAccount[];
   devotionalEntries?: DevotionalEntry[];
   devotionalResources?: DevotionalResource[];
   prayerRequests?: PrayerRequest[];
