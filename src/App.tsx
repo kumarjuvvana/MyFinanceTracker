@@ -834,6 +834,99 @@ function parseStockImportText(text: string): StockImportDraft[] {
   return rows;
 }
 
+function parseStockImportTsv(tsv: string, imageWidth: number): StockImportDraft[] {
+  const words = tsv.split(/\r?\n/).slice(1).flatMap((line) => {
+    const columns = line.split("\t");
+    if (columns.length < 12 || columns[0] !== "5" || !columns[11].trim()) return [];
+    const [block, paragraph, lineNumber] = columns.slice(2, 5);
+    const left = Number(columns[6]);
+    const top = Number(columns[7]);
+    const width = Number(columns[8]);
+    const confidence = Number(columns[10]);
+    if (![left, top, width, confidence].every(Number.isFinite)) return [];
+    return [{
+      key: `${block}:${paragraph}:${lineNumber}`,
+      text: columns[11].trim(),
+      left,
+      top,
+      center: left + width / 2,
+      confidence,
+    }];
+  });
+  if (!words.length) return [];
+
+  const headerLines = new Map<string, typeof words>();
+  for (const word of words) {
+    if (!headerLines.has(word.key)) headerLines.set(word.key, []);
+    headerLines.get(word.key)!.push(word);
+  }
+  const columnHeader = [...headerLines.values()].find((line) =>
+    line.some((word) => /^(?:QU|QUY|QTY|QUAN|QUANT|QUANTY|QUANTITY)$/i.test(word.text.replace(/[^A-Z]/gi, ""))) &&
+    line.some((word) => /^(?:AVG|AWG|AVER|AVGP|AWGP|AVERAGE)/i.test(word.text.replace(/[^A-Z]/gi, ""))));
+  const quantityHeader = columnHeader?.find((word) => /^(?:QU|QUY|QTY|QUAN|QUANT|QUANTY|QUANTITY)$/i.test(word.text.replace(/[^A-Z]/gi, "")));
+  const averageHeader = columnHeader?.find((word) => /^(?:AVG|AWG|AVER|AVGP|AWGP|AVERAGE)/i.test(word.text.replace(/[^A-Z]/gi, "")));
+  const quantityCenter = quantityHeader?.center ?? imageWidth * 0.265;
+  const averageCenter = averageHeader?.center ?? Math.max(quantityCenter + imageWidth * 0.035, imageWidth * 0.3);
+  const columnBoundary = (quantityCenter + averageCenter) / 2;
+  const tickerBoundary = quantityCenter - imageWidth * 0.07;
+  const tableTop = columnHeader ? Math.max(...columnHeader.map((word) => word.top)) : 0;
+  const rowsByLine = new Map<string, typeof words>();
+  for (const word of words) {
+    if (word.top <= tableTop) continue;
+    if (!rowsByLine.has(word.key)) rowsByLine.set(word.key, []);
+    rowsByLine.get(word.key)!.push(word);
+  }
+
+  const rows: StockImportDraft[] = [];
+  const seen = new Set<string>();
+  for (const line of rowsByLine.values()) {
+    const symbolWord = line.find((word) => {
+      if (word.left >= tickerBoundary || word.confidence < 15) return false;
+      const letters = word.text.match(/[A-Za-z]/g) ?? [];
+      const uppercaseLetters = word.text.match(/[A-Z]/g) ?? [];
+      const symbol = word.text.toUpperCase();
+      return letters.length >= 2 && uppercaseLetters.length / letters.length >= 0.65 &&
+        /^[A-Z0-9][A-Z0-9&._-]{1,14}$/.test(symbol) && !STOCK_IMPORT_LABELS.has(symbol);
+    });
+    if (!symbolWord) continue;
+
+    const quantity = line
+      .filter((word) => word.center < columnBoundary && word.center > tickerBoundary && word.confidence >= 15)
+      .map((word) => parseStockImportNumber(word.text, true))
+      .find((value): value is string => value !== "");
+    const averageBuyPrice = line
+      .filter((word) => word.center >= columnBoundary && word.center < averageCenter + imageWidth * 0.06 && word.confidence >= 15)
+      .map((word) => parseStockImportNumber(word.text, false))
+      .find((value): value is string => value !== "");
+    if (!quantity && !averageBuyPrice) continue;
+
+    const symbol = symbolWord.text.toUpperCase();
+    const key = `${symbol}:${symbolWord.top}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      id: createId(),
+      symbol,
+      name: symbol,
+      exchange: line.some((word) => /\bBSE\b/i.test(word.text)) ? "BSE" : "NSE",
+      broker: "",
+      averageBuyPrice: averageBuyPrice ?? "",
+      quantity: quantity ?? "",
+    });
+    if (rows.length >= 100) break;
+  }
+  return rows;
+}
+
+function parseStockImportNumber(text: string, integerOnly: boolean): string {
+  const ocrText = integerOnly ? text.replace(/%/g, "5") : text;
+  const normalized = ocrText.replace(/[Oo]/g, "0").replace(/[Il|]/g, "1").replace(/,/g, "").trim();
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return "";
+  const value = Number(normalized);
+  if (!Number.isFinite(value) || value <= 0 || value > 100_000_000 || integerOnly && !Number.isInteger(value)) return "";
+  return normalized;
+}
+
 function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onRenameBroker, onDeleteBroker, onSaveQuote }: {
   stocks: TrackedStock[];
   brokers: string[];
@@ -865,6 +958,9 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [importText, setImportText] = useState("");
   const [importRows, setImportRows] = useState<StockImportDraft[]>([]);
   const [importError, setImportError] = useState("");
+  const [importBroker, setImportBroker] = useState("");
+  const [importBrokerDraft, setImportBrokerDraft] = useState("");
+  const [addingImportBroker, setAddingImportBroker] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const latestQuotes = new Map<string, StockQuoteSnapshot>();
@@ -953,6 +1049,26 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   function updateImportRow(id: string, updates: Partial<StockImportDraft>) {
     setImportRows((rows) => rows.map((row) => row.id === id ? { ...row, ...updates } : row));
   }
+  function addImportBroker(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const newBroker = importBrokerDraft.trim();
+    if (!newBroker || newBroker.length > 60) {
+      setImportError("Enter a broker name up to 60 characters.");
+      return;
+    }
+    const existing = brokers.find((entry) => entry.toLocaleLowerCase() === newBroker.toLocaleLowerCase());
+    if (existing) {
+      setImportBroker(existing);
+      setImportRows((rows) => rows.map((row) => ({ ...row, broker: existing })));
+    } else {
+      onAddBroker(newBroker);
+      setImportBroker(newBroker);
+      setImportRows((rows) => rows.map((row) => ({ ...row, broker: newBroker })));
+    }
+    setImportBrokerDraft("");
+    setAddingImportBroker(false);
+    setImportError("");
+  }
   async function recognizeStockScreenshot(file: File) {
     setError("");
     setNotice("");
@@ -998,17 +1114,22 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         },
       });
       let text: string;
+      let tsv: string;
       try {
         await worker.setParameters({
           tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
           user_defined_dpi: "300",
           preserve_interword_spaces: "1",
         });
-        ({ data: { text } } = await worker.recognize(canvas));
+        const { data } = await worker.recognize(canvas, {}, { text: true, tsv: true });
+        text = data.text;
+        tsv = data.tsv ?? "";
       } finally {
         await worker.terminate();
       }
-      const parsedRows = parseStockImportText(text);
+      const parsedRows = parseStockImportTsv(tsv, canvas.width);
+      if (!parsedRows.length) parsedRows.push(...parseStockImportText(text));
+      if (importBroker) parsedRows.forEach((row) => { row.broker = importBroker; });
       setImportText(text);
       setImportRows(parsedRows);
       setImportOpen(true);
@@ -1168,9 +1289,16 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       })}</div> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
     </Card>
     {importOpen && <Modal title="Review stock screenshot" onClose={() => { if (!importBusy) { setImportOpen(false); setImportError(""); } }} wide>
-      <p className="section-description stock-import-intro">OCR runs in this browser and improves contrast before reading. Small text can still be misread, so check every field. For best results, upload a clear, zoomed-in image of the holdings table. {importFileName && <strong>{importFileName}</strong>}</p>
+      <p className="section-description stock-import-intro">OCR reads the ticker, quantity, and average price from their table columns. It runs in this browser; check and correct the results before saving. Choose one broker for all rows, or override it per stock. Current quotes can be fetched after import. {importFileName && <strong>{importFileName}</strong>}</p>
       <Field className="full" label="Recognized text (editable)"><textarea className="field textarea" rows={4} value={importText} onChange={(event) => setImportText(event.target.value)} /></Field>
-      <div className="stock-import-tools"><Button type="button" variant="outline" onClick={() => { setImportRows(parseStockImportText(importText)); setImportError(""); }}>Parse text again</Button><Button type="button" variant="outline" onClick={() => { setImportRows((rows) => [...rows, { id: createId(), symbol: "", name: "", exchange: "NSE", broker: "", averageBuyPrice: "", quantity: "" }]); setImportError(""); }}><Plus size={14} />Add row</Button></div>
+      <div className="stock-import-tools"><Button type="button" variant="outline" onClick={() => { const rows = parseStockImportText(importText); setImportRows(rows.map((row) => ({ ...row, broker: importBroker }))); setImportError(""); }}>Parse text again</Button><Button type="button" variant="outline" onClick={() => { setImportRows((rows) => [...rows, { id: createId(), symbol: "", name: "", exchange: "NSE", broker: importBroker, averageBuyPrice: "", quantity: "" }]); setImportError(""); }}><Plus size={14} />Add row</Button></div>
+      <div className="stock-import-bulk-broker">
+        <Field label="Broker for all imported stocks"><Select value={importBroker} onChange={(event) => { const selectedBroker = event.target.value; setImportBroker(selectedBroker); setImportRows((rows) => rows.map((row) => ({ ...row, broker: selectedBroker }))); }}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field>
+        <span className="section-description">Applies to every row. You can still change individual rows below.</span>
+        {addingImportBroker
+          ? <form className="stock-import-broker-add" onSubmit={addImportBroker}><Input autoFocus maxLength={60} aria-label="New broker name" placeholder="New broker name" value={importBrokerDraft} onChange={(event) => setImportBrokerDraft(event.target.value)} /><Button type="submit"><Plus size={14} />Add and apply</Button><Button type="button" variant="outline" onClick={() => { setAddingImportBroker(false); setImportBrokerDraft(""); }}>Cancel</Button></form>
+          : <Button type="button" variant="outline" onClick={() => setAddingImportBroker(true)}><Plus size={14} />Add a broker</Button>}
+      </div>
       {importBusy && <div className="alert"><LoaderCircle size={14} className="spin" />Reading screenshot… {importProgress}%</div>}
       {importRows.length > 0 && <div className="stock-import-list">{importRows.map((row, index) => <div className="stock-import-row" key={row.id}>
         <div className="stock-import-row-head"><strong>Stock {index + 1}</strong><button className="icon-button" type="button" aria-label={`Remove stock row ${index + 1}`} onClick={() => setImportRows((rows) => rows.filter((entry) => entry.id !== row.id))}><X size={14} /></button></div>

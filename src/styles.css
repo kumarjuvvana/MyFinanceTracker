@@ -181,6 +181,10 @@ button{cursor:pointer}
 .stock-heading-actions,.stock-import-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .stock-import-intro{line-height:1.6;margin-bottom:12px}
 .stock-import-tools{justify-content:flex-end;margin:10px 0}
+.stock-import-bulk-broker{display:grid;gap:8px;margin:12px 0;padding:12px;border:1px solid #e8ebe6;border-radius:9px}
+.stock-import-broker-add{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stock-import-broker-add .field{flex:1;min-width:150px}
+.stock-import-bulk-broker .section-description{line-height:1.4}
 .stock-import-list{display:grid;gap:10px;max-height:42vh;overflow:auto;padding-right:2px}
 .stock-import-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px;border:1px solid #e8ebe6;border-radius:9px}
 .stock-import-row-head{display:flex;align-items:center;justify-content:space-between;grid-column:1/-1;color:#586358;font-size:11px}
@@ -213,6 +217,7 @@ button{cursor:pointer}
 .app-shell.dark .stock-exchange{background:#2b382d;color:#a8d1ad}
 .app-shell.dark .stock-history>summary{color:#a8d1ad}
 .app-shell.dark .stock-import-row{border-color:#343d35}
+.app-shell.dark .stock-import-bulk-broker{border-color:#343d35}
 .app-shell.dark .stock-import-row-head{color:#e3e8e2}
 .app-shell.dark.theme-slate .stock-row,.app-shell.dark.theme-slate .stock-history-row,.app-shell.dark.theme-slate .stock-broker-list{border-color:#3a4655}
 .app-shell.dark.theme-midnight .stock-row,.app-shell.dark.theme-midnight .stock-history-row,.app-shell.dark.theme-midnight .stock-broker-list{border-color:#3a394d}
