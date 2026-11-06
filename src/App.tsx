@@ -3,7 +3,7 @@ import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
-  ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
+  ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree,
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
@@ -62,39 +62,46 @@ function useCurrencyFormatter() {
   const currency = useContext(CurrencyContext);
   return (amount: number) => formatMoney(amount, currency);
 }
-const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
-  { name: "Dashboard", icon: LayoutDashboard },
-  { name: "Global search", icon: Search },
-  { name: "Shopping list", icon: ListChecks },
-  { name: "Shopping trips", icon: ShoppingBag },
-  { name: "Purchase history", icon: Clock3 },
-  { name: "Price history", icon: ArrowLeftRight },
-  { name: "Reports", icon: BarChart3 },
-  { name: "Notes & reminders", icon: Bell },
-  { name: "Master data", icon: Database },
-  { name: "Stocks", icon: TrendingUp },
-  { name: "Asset manager", icon: Wallet },
-  { name: "Learning", icon: BookOpen },
-  { name: "Mind & habits", icon: Heart },
-  { name: "AI Prompts", icon: Sparkles },
-  { name: "Training & classes", icon: CalendarDays },
-  { name: "Devotional", icon: Heart },
-  { name: "Cooking", icon: CookingPot },
-  { name: "Issues & maintenance", icon: Wrench },
-  { name: "Education & career", icon: Briefcase },
-  { name: "Family", icon: UsersRound },
-  { name: "Schools & Colleges", icon: GraduationCap },
-  { name: "Vehicles", icon: Car },
-  { name: "Electricity", icon: Zap },
-  { name: "Subscriptions & bills", icon: CalendarDays },
-  { name: "Personal documents", icon: FileText },
-  { name: "Documents", icon: FileDown },
-  { name: "Database manager", icon: Database },
-  { name: "Hosting & storage", icon: HardDrive },
-  { name: "Archive", icon: Archive },
-  { name: "Account credentials", icon: KeyRound },
-  { name: "R&D / Test Connectors", icon: Mail },
+type NavigationGroup = "Overview" | "Shopping" | "Finance" | "Personal growth" | "Home & family" | "Data & tools";
+type NavigationItem = { name: Page; icon: typeof LayoutDashboard; group: NavigationGroup };
+type MenuSortOrder = "current" | "ascending";
+const NAVIGATION_GROUP_ORDER: NavigationGroup[] = ["Overview", "Shopping", "Finance", "Personal growth", "Home & family", "Data & tools"];
+const navigation: NavigationItem[] = [
+  { name: "Dashboard", icon: LayoutDashboard, group: "Overview" },
+  { name: "Global search", icon: Search, group: "Overview" },
+  { name: "Shopping list", icon: ListChecks, group: "Shopping" },
+  { name: "Shopping trips", icon: ShoppingBag, group: "Shopping" },
+  { name: "Purchase history", icon: Clock3, group: "Shopping" },
+  { name: "Price history", icon: ArrowLeftRight, group: "Shopping" },
+  { name: "Reports", icon: BarChart3, group: "Shopping" },
+  { name: "Notes & reminders", icon: Bell, group: "Shopping" },
+  { name: "Master data", icon: Database, group: "Shopping" },
+  { name: "Stocks", icon: TrendingUp, group: "Finance" },
+  { name: "Asset manager", icon: Wallet, group: "Finance" },
+  { name: "Learning", icon: BookOpen, group: "Personal growth" },
+  { name: "Mind & habits", icon: Heart, group: "Personal growth" },
+  { name: "AI Prompts", icon: Sparkles, group: "Personal growth" },
+  { name: "Training & classes", icon: CalendarDays, group: "Personal growth" },
+  { name: "Devotional", icon: Heart, group: "Personal growth" },
+  { name: "Cooking", icon: CookingPot, group: "Home & family" },
+  { name: "Issues & maintenance", icon: Wrench, group: "Home & family" },
+  { name: "Education & career", icon: Briefcase, group: "Home & family" },
+  { name: "Family", icon: UsersRound, group: "Home & family" },
+  { name: "Schools & Colleges", icon: GraduationCap, group: "Home & family" },
+  { name: "Vehicles", icon: Car, group: "Home & family" },
+  { name: "Electricity", icon: Zap, group: "Home & family" },
+  { name: "Subscriptions & bills", icon: CalendarDays, group: "Finance" },
+  { name: "Personal documents", icon: FileText, group: "Data & tools" },
+  { name: "Documents", icon: FileDown, group: "Data & tools" },
+  { name: "Database manager", icon: Database, group: "Data & tools" },
+  { name: "Hosting & storage", icon: HardDrive, group: "Data & tools" },
+  { name: "Archive", icon: Archive, group: "Data & tools" },
+  { name: "Account credentials", icon: KeyRound, group: "Data & tools" },
+  { name: "R&D / Test Connectors", icon: Mail, group: "Data & tools" },
 ];
+function orderedNavigation(items: NavigationItem[], order: MenuSortOrder) {
+  return order === "ascending" ? [...items].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })) : items;
+}
 function readAppRoute() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("page") as Page | null;
@@ -4687,7 +4694,7 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onGroupMenusChange, onMenuSortOrderChange, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through Supabase and can be backed up or moved whenever you like." />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to Supabase. Account credentials are encrypted separately; other records remain readable to people with the Daybook password or Supabase service-role access. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
@@ -4702,6 +4709,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
         </button>)}
       </div>
     </Card>
+    <Card className="settings-card"><div className="card-head"><div><h2 className="section-title">Navigation menu</h2><p className="section-description">Reduce sidebar clutter by grouping screens. Choose the menu order used within groups, or across the flat menu.</p></div><ListTree size={17} /></div><div className="settings-grid navigation-settings-grid"><label className="dashboard-widget-option"><input type="checkbox" checked={groupMenus} onChange={(event) => onGroupMenusChange(event.target.checked)} /><span><strong>Group menus by category</strong><small>{groupMenus ? "Groups start collapsed; the active section opens automatically." : "Show every screen in one flat list."}</small></span></label><Field label="Menu order"><Select value={menuSortOrder} onChange={(event) => onMenuSortOrderChange(event.target.value as MenuSortOrder)}><option value="current">Current order</option><option value="ascending">Ascending (A–Z)</option></Select></Field></div></Card>
     <Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card>
     <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
@@ -5059,10 +5067,13 @@ export default function App() {
   const [darkTheme, setDarkTheme] = useState<DarkTheme>("forest");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("sage");
   const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(DEFAULT_DASHBOARD_WIDGETS);
+  const [groupMenus, setGroupMenus] = useState(true);
+  const [menuSortOrder, setMenuSortOrder] = useState<MenuSortOrder>("current");
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [modal, setModal] = useState<"add" | "trip" | null>(null);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [collapsedNavGroups, setCollapsedNavGroups] = useState<Set<NavigationGroup>>(() => new Set(NAVIGATION_GROUP_ORDER.filter((group) => group !== "Overview")));
   const latestDataRef = useRef(data);
   const revisionRef = useRef(revision);
   const authenticatedRef = useRef(authenticated);
@@ -5126,7 +5137,9 @@ export default function App() {
           ("accentColor" in parsed && !isAccentColor(parsed.accentColor)) ||
           ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
           ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme)) ||
-          ("dashboardWidgets" in parsed && !isDashboardWidgetList(parsed.dashboardWidgets))) {
+          ("dashboardWidgets" in parsed && !isDashboardWidgetList(parsed.dashboardWidgets)) ||
+          ("groupMenus" in parsed && typeof parsed.groupMenus !== "boolean") ||
+          ("menuSortOrder" in parsed && parsed.menuSortOrder !== "current" && parsed.menuSortOrder !== "ascending")) {
           throw new Error("Saved preferences are invalid. Default appearance and currency settings will be used.");
         }
         setCurrency(parsed.currency);
@@ -5138,6 +5151,8 @@ export default function App() {
         if ("darkTheme" in parsed && isDarkTheme(parsed.darkTheme)) setDarkTheme(parsed.darkTheme);
         if ("visualTheme" in parsed && isVisualTheme(parsed.visualTheme)) setVisualTheme(parsed.visualTheme);
         if ("dashboardWidgets" in parsed && isDashboardWidgetList(parsed.dashboardWidgets)) setDashboardWidgets([...new Set(parsed.dashboardWidgets)]);
+        if ("groupMenus" in parsed && typeof parsed.groupMenus === "boolean") setGroupMenus(parsed.groupMenus);
+        if ("menuSortOrder" in parsed && (parsed.menuSortOrder === "current" || parsed.menuSortOrder === "ascending")) setMenuSortOrder(parsed.menuSortOrder);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read saved preferences from this browser.");
@@ -5149,11 +5164,18 @@ export default function App() {
   useEffect(() => {
     if (!preferencesReady) return;
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets }));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, groupMenus, menuSortOrder }));
     } catch {
       setError("Your preferences could not be saved in this browser.");
     }
-  }, [currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, preferencesReady]);
+  }, [currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, groupMenus, menuSortOrder, preferencesReady]);
+
+  useEffect(() => {
+    const activeGroup = navigation.find((entry) => entry.name === page)?.group;
+    if (activeGroup) setCollapsedNavGroups((current) => current.has(activeGroup)
+      ? new Set([...current].filter((group) => group !== activeGroup))
+      : current);
+  }, [page]);
 
   useEffect(() => {
     if (!data || !authenticated || setupRequired) return;
@@ -6191,6 +6213,16 @@ export default function App() {
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
   const archivedDocuments = (data.archivedRecords ?? []).flatMap((record) => record.snapshot.documents ?? []);
   const allDocuments = [...(data.documents ?? []), ...archivedDocuments];
+  const menuGroups = (() => {
+    if (!groupMenus) return [{ group: null, entries: orderedNavigation(navigation, menuSortOrder) }];
+    const groups = menuSortOrder === "ascending"
+      ? [...NAVIGATION_GROUP_ORDER].sort((a, b) => a.localeCompare(b))
+      : NAVIGATION_GROUP_ORDER;
+    return groups.map((group) => ({
+      group,
+      entries: orderedNavigation(navigation.filter((entry) => entry.group === group), menuSortOrder),
+    }));
+  })();
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
     "Global search": <GlobalSearchPage data={data} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
@@ -6230,16 +6262,26 @@ export default function App() {
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onGroupMenusChange={setGroupMenus} onMenuSortOrderChange={setMenuSortOrder} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
     <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
-      <div className="nav-label">YOUR SPACE</div><nav className="nav-list" aria-label="Main navigation">{navigation.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}</nav>
+      <div className="nav-label">YOUR SPACE</div><nav className={`nav-list ${groupMenus ? "nav-list-grouped" : ""}`} aria-label="Main navigation">{menuGroups.map(({ group, entries }) => {
+        const collapsed = group !== null && collapsedNavGroups.has(group);
+        return <div className="nav-section" key={group ?? "all"}>
+          {group && <button className="nav-section-heading" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedNavGroups((current) => {
+            const next = new Set(current);
+            if (next.has(group)) next.delete(group); else next.add(group);
+            return next;
+          })}><ChevronRight size={13} className={`nav-section-chevron ${collapsed ? "" : "expanded"}`} /><span>{group}</span><small>{entries.length}</small></button>}
+          {!collapsed && entries.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}
+        </div>;
+      })}</nav>
       <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday shopping, gently organized in one place.</div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
+    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => setGroupMenus((enabled) => !enabled)}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
       <div className="main-content">{error && <div className="alert alert-error" role="alert"><X size={15} style={{ flex: "none", marginTop: 1 }} /><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}><X size={14} /></button></div>}{notice && <div className="alert alert-success" role="status"><CheckCircle2 size={15} /><span>{notice}</span><button className="icon-button" aria-label="Dismiss message" onClick={() => setNotice("")}><X size={14} /></button></div>}{pageContent[page]}</div>
     </main>
     <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.filter(({ name }) => ["Dashboard", "Shopping list", "Shopping trips", "Purchase history"].includes(name)).map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
