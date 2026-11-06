@@ -799,4 +799,28 @@ body{background:#f3f5ef}
   .electricity-record-list{margin-top:7px}
   .electricity-record{padding:7px 0}
   .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
+  .vehicle-list{gap:0}
+  .vehicle-card{border:0;border-bottom:1px solid var(--panel-line,#e8ece6);border-radius:0;box-shadow:none;padding:12px 0;background:transparent}
+  .vehicle-card:hover{transform:none;box-shadow:none}
+  .vehicle-card-head{align-items:flex-start;gap:6px}
+  .vehicle-heading{gap:8px}
+  .vehicle-icon{width:32px;height:32px;border-radius:9px}
+  .vehicle-notes{margin-top:7px}
+  .vehicle-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;margin-top:8px}
+  .vehicle-stats>div{grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:5px;border:0;border-bottom:1px solid var(--panel-line,#e8ece6);border-radius:0;padding:6px 0}
+  .vehicle-stats strong{text-align:right}
+  .vehicle-section{margin-top:9px;padding-top:8px}
+  .vehicle-section-head{align-items:center}
+  .vehicle-section-head h3{font-size:11px}
+  .vehicle-section-head>div p{font-size:9px}
+  .vehicle-section-head>.button{min-height:30px}
+  .vehicle-record-list{margin-top:4px}
+  .vehicle-record{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 8px;padding:8px 0}
+  .vehicle-record-main{gap:3px}
+  .vehicle-record-main>strong{font-size:10px}
+  .vehicle-record-main>span,.vehicle-record-main>small{font-size:9px}
+  .vehicle-record>.table-actions{gap:0}
+  .vehicle-record>.table-actions .icon-button{width:28px;height:28px}
+  .app-shell.dark .vehicle-card{border-bottom-color:var(--line,#343d35);background:transparent}
+  .app-shell.dark .vehicle-stats>div{border-bottom-color:var(--line,#343d35)}
 }
