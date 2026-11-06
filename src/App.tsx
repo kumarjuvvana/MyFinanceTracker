@@ -789,36 +789,41 @@ type StockImportDraft = {
 const STOCK_IMPORT_LABELS = new Set([
   "ACCOUNT", "AMOUNT", "AVG", "AVERAGE", "BALANCE", "BSE", "BUY", "CHANGE", "CLOSE", "COST", "CURRENT",
   "DESCRIPTION", "EQUITY", "HIGH", "HOLDING", "HOLDINGS", "INVESTED", "INVESTMENT", "LOW", "LTP", "MARKET",
-  "NAME", "NSE", "OPEN", "PERCENT", "PORTFOLIO", "PRICE", "QTY", "QUANTITY", "SECURITY", "SHARES", "SCRIP",
-  "STOCK", "STOCKS", "SYMBOL", "TOTAL", "VALUE",
+  "NAME", "NSE", "OPEN", "OVERALL", "PERCENT", "PORTFOLIO", "PRICE", "QTY", "QUANTITY", "SECURITY", "SHARES",
+  "SCRIP", "STOCK", "STOCKS", "SYMBOL", "TOTAL", "VALUE",
 ]);
 
 function parseStockImportText(text: string): StockImportDraft[] {
   const rows: StockImportDraft[] = [];
   const seen = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
-    const tokens = line.match(/[A-Za-z][A-Za-z0-9.&_-]{1,29}/g) ?? [];
-    const symbolToken = tokens.find((token) => !STOCK_IMPORT_LABELS.has(token.toUpperCase()));
+    const tokens = line.match(/\b[A-Za-z0-9][A-Za-z0-9&._-]{1,14}\b/g) ?? [];
+    const symbolToken = tokens.find((token) => {
+      const letters = token.match(/[A-Za-z]/g) ?? [];
+      const uppercaseLetters = token.match(/[A-Z]/g) ?? [];
+      return letters.length >= 2 && uppercaseLetters.length / letters.length >= 0.65 &&
+        !STOCK_IMPORT_LABELS.has(token.toUpperCase());
+    });
     if (!symbolToken) continue;
     const symbol = symbolToken.replace(/[.,]+$/, "").toUpperCase();
     if (!/^[A-Z0-9][A-Z0-9.&_-]{0,29}$/.test(symbol) || STOCK_IMPORT_LABELS.has(symbol)) continue;
+    const quantityMatch = line.match(/\b(?:qty|quantity|shares?)\s*[:=-]?\s*([\d,]+)/i);
+    const priceMatch = line.match(/\b(?:avg\.?\s*(?:(?:buy|average)\s*)?(?:price|cost)|average(?:\s+buy)?(?:\s+(?:price|cost))?|buy\s+price)\s*[:=₹\s]*([\d,]+(?:\.\d+)?)/i);
+    const rowValues = [...line.slice(line.indexOf(symbolToken) + symbolToken.length).matchAll(/\d[\d,]*(?:\.\d+)?%?/g)]
+      .slice(0, 2)
+      .map((match) => Number(match[0].replace(/[,%]/g, "")));
+    if (!quantityMatch && !priceMatch &&
+      (!rowValues.length || rowValues.some((value) => !Number.isFinite(value) || value > 1_000_000) ||
+        (rowValues.length === 1 && symbol.length < 3))) continue;
     const exchange = /\bBSE\b/i.test(line) ? "BSE" : "NSE";
     const key = `${exchange}:${symbol}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    const name = line.replace(symbolToken, " ")
-      .replace(/\b(?:NSE|BSE|INR|RS|QTY|QUANTITY|SHARES|AVG|AVERAGE|BUY|PRICE|COST|LTP|VALUE|HOLDINGS?)\b/gi, " ")
-      .replace(/[₹,$\d][\d,.]*/g, " ")
-      .replace(/[^A-Za-z&()./' -]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const quantityMatch = line.match(/\b(?:qty|quantity|shares?)\s*[:=-]?\s*([\d,]+)/i);
-    const priceMatch = line.match(/\b(?:avg\.?\s*(?:(?:buy|average)\s*)?(?:price|cost)|average(?:\s+buy)?(?:\s+(?:price|cost))?|buy\s+price)\s*[:=₹\s]*([\d,]+(?:\.\d+)?)/i);
 
     rows.push({
       id: createId(),
       symbol,
-      name: name || symbol,
+      name: symbol,
       exchange,
       broker: "",
       averageBuyPrice: priceMatch ? priceMatch[1].replace(/,/g, "") : "",
@@ -963,8 +968,30 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setImportBusy(true);
     setImportProgress(0);
     setImportFileName(file.name);
+    let bitmap: ImageBitmap | undefined;
     try {
-      const { createWorker } = await import("tesseract.js");
+      bitmap = await createImageBitmap(file);
+      const scale = Math.min(3.5, 3000 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Image processing is unavailable in this browser.");
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      bitmap = undefined;
+
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      for (let index = 0; index < pixels.data.length; index += 4) {
+        const gray = 0.299 * pixels.data[index] + 0.587 * pixels.data[index + 1] + 0.114 * pixels.data[index + 2];
+        const contrast = Math.max(0, Math.min(255, (255 - gray - 128) * 1.8 + 128));
+        pixels.data[index] = contrast;
+        pixels.data[index + 1] = contrast;
+        pixels.data[index + 2] = contrast;
+      }
+      context.putImageData(pixels, 0, 0);
+
+      const { createWorker, PSM } = await import("tesseract.js");
       const worker = await createWorker("eng", undefined, {
         logger: (message) => {
           if (message.status === "recognizing text") setImportProgress(Math.round(message.progress * 100));
@@ -972,7 +999,12 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       });
       let text: string;
       try {
-        ({ data: { text } } = await worker.recognize(file));
+        await worker.setParameters({
+          tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+          user_defined_dpi: "300",
+          preserve_interword_spaces: "1",
+        });
+        ({ data: { text } } = await worker.recognize(canvas));
       } finally {
         await worker.terminate();
       }
@@ -980,10 +1012,11 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       setImportText(text);
       setImportRows(parsedRows);
       setImportOpen(true);
-      if (!parsedRows.length) setImportError("No stock rows were recognized. You can edit the OCR text and try parsing it again, or add a row manually.");
+      if (!parsedRows.length) setImportError("No reliable stock rows were recognized. Try a higher-resolution screenshot focused on the holdings table, or add rows manually.");
     } catch (caught) {
       setError(`Could not read the image. ${caught instanceof Error ? caught.message : "Try a clearer screenshot."}`);
     } finally {
+      bitmap?.close();
       setImportBusy(false);
       setImportProgress(0);
     }
@@ -1135,7 +1168,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       })}</div> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
     </Card>
     {importOpen && <Modal title="Review stock screenshot" onClose={() => { if (!importBusy) { setImportOpen(false); setImportError(""); } }} wide>
-      <p className="section-description stock-import-intro">OCR runs in this browser. Check every field—the image may be read incorrectly. {importFileName && <strong>{importFileName}</strong>}</p>
+      <p className="section-description stock-import-intro">OCR runs in this browser and improves contrast before reading. Small text can still be misread, so check every field. For best results, upload a clear, zoomed-in image of the holdings table. {importFileName && <strong>{importFileName}</strong>}</p>
       <Field className="full" label="Recognized text (editable)"><textarea className="field textarea" rows={4} value={importText} onChange={(event) => setImportText(event.target.value)} /></Field>
       <div className="stock-import-tools"><Button type="button" variant="outline" onClick={() => { setImportRows(parseStockImportText(importText)); setImportError(""); }}>Parse text again</Button><Button type="button" variant="outline" onClick={() => { setImportRows((rows) => [...rows, { id: createId(), symbol: "", name: "", exchange: "NSE", broker: "", averageBuyPrice: "", quantity: "" }]); setImportError(""); }}><Plus size={14} />Add row</Button></div>
       {importBusy && <div className="alert"><LoaderCircle size={14} className="spin" />Reading screenshot… {importProgress}%</div>}
