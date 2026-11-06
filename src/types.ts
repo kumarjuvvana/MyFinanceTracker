@@ -27,6 +27,7 @@ export type Page =
   | "Cooking"
   | "Issues & maintenance"
   | "Education & career"
+  | "Family"
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
@@ -414,6 +415,36 @@ export interface ProfessionalSkill {
   notes: string;
 }
 
+export type FamilyRelationship =
+  | "Self"
+  | "Spouse"
+  | "Child"
+  | "Parent"
+  | "Sibling"
+  | "Grandparent"
+  | "Grandchild"
+  | "Aunt / Uncle"
+  | "Cousin"
+  | "In-law"
+  | "Other";
+
+export interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: FamilyRelationship;
+  relationshipDetail: string;
+  birthYear: number | null;
+  birthPlace: string;
+  currentResidence: string;
+  phone: string;
+  email: string;
+  education: string;
+  institution: string;
+  occupation: string;
+  organization: string;
+  notes: string;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -492,6 +523,7 @@ export interface TrackerData {
   professionalQualifications?: ProfessionalQualification[];
   workExperiences?: WorkExperience[];
   professionalSkills?: ProfessionalSkill[];
+  familyMembers?: FamilyMember[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }

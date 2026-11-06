@@ -4,13 +4,13 @@ import {
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
-  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils,
+  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -34,6 +34,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Cooking", icon: CookingPot },
   { name: "Issues & maintenance", icon: Wrench },
   { name: "Education & career", icon: Briefcase },
+  { name: "Family", icon: UsersRound },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
@@ -2432,6 +2433,124 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   </>;
 }
 
+function FamilyMemberModal({ initial, onClose, onSave }: {
+  initial: FamilyMember | null;
+  onClose: () => void;
+  onSave: (member: Omit<FamilyMember, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [relationship, setRelationship] = useState<FamilyRelationship>(initial?.relationship ?? "Spouse");
+  const [relationshipDetail, setRelationshipDetail] = useState(initial?.relationshipDetail ?? "");
+  const [birthYear, setBirthYear] = useState(initial?.birthYear?.toString() ?? "");
+  const [birthPlace, setBirthPlace] = useState(initial?.birthPlace ?? "");
+  const [currentResidence, setCurrentResidence] = useState(initial?.currentResidence ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
+  const [education, setEducation] = useState(initial?.education ?? "");
+  const [institution, setInstitution] = useState(initial?.institution ?? "");
+  const [occupation, setOccupation] = useState(initial?.occupation ?? "");
+  const [organization, setOrganization] = useState(initial?.organization ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError("Enter the family member's name.");
+      return;
+    }
+    if (relationship === "Other" && !relationshipDetail.trim()) {
+      setError("Describe the relationship when you select Other.");
+      return;
+    }
+    const parsedBirthYear = birthYear.trim() ? Number(birthYear) : null;
+    if (parsedBirthYear !== null && (!Number.isInteger(parsedBirthYear) || parsedBirthYear < 1800 || parsedBirthYear > new Date().getFullYear())) {
+      setError(`Enter a birth year from 1800 to ${new Date().getFullYear()}, or leave it blank.`);
+      return;
+    }
+    onSave({
+      name: name.trim(),
+      relationship,
+      relationshipDetail: relationshipDetail.trim(),
+      birthYear: parsedBirthYear,
+      birthPlace: birthPlace.trim(),
+      currentResidence: currentResidence.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      education: education.trim(),
+      institution: institution.trim(),
+      occupation: occupation.trim(),
+      organization: organization.trim(),
+      notes: notes.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit family member" : "Add family member"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Name"><Input autoFocus required maxLength={140} placeholder="Full name" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Relationship to you"><Select value={relationship} onChange={(event) => setRelationship(event.target.value as FamilyRelationship)}><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field>
+      <Field className="full" label={relationship === "Other" ? "Describe relationship" : "Relationship details (optional)"}><Input maxLength={120} required={relationship === "Other"} placeholder="e.g. Maternal aunt, nephew" value={relationshipDetail} onChange={(event) => setRelationshipDetail(event.target.value)} /></Field>
+      <Field label="Birth year (optional)"><Input type="number" min="1800" max={new Date().getFullYear()} step="1" value={birthYear} onChange={(event) => setBirthYear(event.target.value)} /></Field>
+      <Field label="Place of birth (optional)"><Input maxLength={160} placeholder="City, region, country" value={birthPlace} onChange={(event) => setBirthPlace(event.target.value)} /></Field>
+      <Field className="full" label="Current residence (optional)"><Input maxLength={200} placeholder="City, region, country (avoid a street address)" value={currentResidence} onChange={(event) => setCurrentResidence(event.target.value)} /></Field>
+      <Field label="Phone (optional)"><Input type="tel" maxLength={40} autoComplete="off" value={phone} onChange={(event) => setPhone(event.target.value)} /></Field>
+      <Field label="Email (optional)"><Input type="email" maxLength={254} autoComplete="off" value={email} onChange={(event) => setEmail(event.target.value)} /></Field>
+      <Field label="Education / qualification (optional)"><Input maxLength={160} placeholder="Highest or current education" value={education} onChange={(event) => setEducation(event.target.value)} /></Field>
+      <Field label="School / institution (optional)"><Input maxLength={160} value={institution} onChange={(event) => setInstitution(event.target.value)} /></Field>
+      <Field label="Occupation (optional)"><Input maxLength={140} placeholder="Current profession or role" value={occupation} onChange={(event) => setOccupation(event.target.value)} /></Field>
+      <Field label="Employer / organization (optional)"><Input maxLength={160} value={organization} onChange={(event) => setOrganization(event.target.value)} /></Field>
+      <Field className="full" label="Other notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add family member"}</Button></div></form>
+  </Modal>;
+}
+
+function FamilyPage({ members, onSave, onDelete }: {
+  members: FamilyMember[];
+  onSave: (member: Omit<FamilyMember, "id">, id?: string) => void;
+  onDelete: (member: FamilyMember) => void;
+}) {
+  const [editor, setEditor] = useState<FamilyMember | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [relationshipFilter, setRelationshipFilter] = useState("All relationships");
+  const query = search.trim().toLocaleLowerCase();
+  const childrenCount = members.filter((member) => member.relationship === "Child").length;
+  const relativesCount = members.filter((member) => !["Self", "Spouse", "Child"].includes(member.relationship)).length;
+  const visibleMembers = [...members].filter((member) =>
+    (relationshipFilter === "All relationships" || member.relationship === relationshipFilter) &&
+    (!query || [
+      member.name, member.relationship, member.relationshipDetail, member.birthPlace, member.currentResidence,
+      member.education, member.institution, member.occupation, member.organization, member.notes,
+    ].some((value) => value.toLocaleLowerCase().includes(query))))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  function confirmDelete(member: FamilyMember) {
+    if (window.confirm(`Delete "${member.name}" from the family directory?`)) onDelete(member);
+  }
+
+  return <>
+    <PageHeading eyebrow="Family directory" title="Family" subtitle="Keep a simple directory for your household and relatives, with family relationships, places, education, and work details." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add family member</Button>} />
+    <div className="family-summary">
+      <Card><span>Family members</span><strong>{members.length}</strong></Card>
+      <Card><span>Children</span><strong>{childrenCount}</strong></Card>
+      <Card><span>Other relatives</span><strong>{relativesCount}</strong></Card>
+    </div>
+    <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Daybook data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
+    <div className="family-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}>
+        <option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option>
+      </Select>
+    </div>
+    {visibleMembers.length ? <div className="family-list">{visibleMembers.map((member) => <Card className="family-card" key={member.id}>
+      <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${member.name}`} onClick={() => confirmDelete(member)}><Trash2 size={13} /></button></div></div>
+      <div className="family-details">{member.birthPlace && <div><span>Place of birth</span><strong>{member.birthPlace}</strong></div>}{member.currentResidence && <div><span>Current residence</span><strong>{member.currentResidence}</strong></div>}{member.education && <div><span>Education</span><strong>{member.education}{member.institution ? ` · ${member.institution}` : ""}</strong></div>}{member.occupation && <div><span>Occupation</span><strong>{member.occupation}{member.organization ? ` · ${member.organization}` : ""}</strong></div>}</div>
+      {(member.phone || member.email) && <div className="family-contact">{member.phone && <span>Phone: {member.phone}</span>}{member.email && <a href={`mailto:${member.email}`}>Email: {member.email}</a>}</div>}
+      {member.notes && <p className="family-notes">{member.notes}</p>}
+    </Card>)}</div> : <Card><EmptyState icon={<UsersRound size={18} />} title={members.length ? "No matching family members" : "Your family directory is empty"} description={members.length ? "Try another search or relationship filter." : "Add yourself, your spouse, children, and other relatives to start the family directory."} /></Card>}
+    {editor !== undefined && <FamilyMemberModal key={editor?.id ?? "new-family-member"} initial={editor} onClose={() => setEditor(undefined)} onSave={(member) => { onSave(member, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -3086,6 +3205,7 @@ function emptyTrackerData(): TrackerData {
     professionalQualifications: [],
     workExperiences: [],
     professionalSkills: [],
+    familyMembers: [],
   };
 }
 
@@ -3769,6 +3889,20 @@ export default function App() {
       professionalSkills: (previous.professionalSkills ?? []).filter((current) => current.id !== record.id),
     }));
   }
+  function saveFamilyMember(member: Omit<FamilyMember, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      familyMembers: id
+        ? (previous.familyMembers ?? []).map((current) => current.id === id ? { ...member, id } : current)
+        : [{ ...member, id: createId() }, ...(previous.familyMembers ?? [])],
+    }));
+  }
+  function deleteFamilyMember(member: FamilyMember) {
+    update((previous) => ({
+      ...previous,
+      familyMembers: (previous.familyMembers ?? []).filter((current) => current.id !== member.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -3801,7 +3935,7 @@ export default function App() {
     setNotice("Your backup is ready to save.");
   }
   function clearData() {
-    if (!window.confirm("Clear all shopping, stock, asset, learning, education, career profile, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
+    if (!window.confirm("Clear all shopping, stock, asset, learning, education, career profile, family, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
     setData(emptyTrackerData());
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
@@ -3833,6 +3967,7 @@ export default function App() {
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
+    Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,

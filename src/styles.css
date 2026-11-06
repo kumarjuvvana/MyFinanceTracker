@@ -543,6 +543,32 @@ body{background:#f3f5ef}
 .app-shell.dark .career-summary strong,.app-shell.dark .career-section-head h2,.app-shell.dark .career-card h3{color:#e3e8e2}
 .app-shell.dark .career-summary span,.app-shell.dark .career-section-head p,.app-shell.dark .career-card-head p,.app-shell.dark .career-card-details,.app-shell.dark .career-card-description{color:#a7b0a7}
 .app-shell.dark .career-card-link{color:#a6c1a8}
+.family-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:12px;margin-bottom:14px}
+.family-summary .card{display:grid;gap:6px;padding:14px}
+.family-summary span{font-size:10px;color:#92998f}
+.family-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
+.family-toolbar{display:grid;grid-template-columns:minmax(180px,1fr) minmax(160px,230px);gap:10px;margin-bottom:14px}
+.family-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px}
+.family-card{min-width:0;padding:16px}
+.family-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.family-card-title{display:flex;align-items:center;gap:10px;min-width:0}
+.family-avatar{width:38px;height:38px;flex:none;border-radius:12px;background:#edf4ee;color:#4e7e57;display:grid;place-items:center}
+.family-card-title>div:last-child{min-width:0}
+.family-card-title h2{margin:0;font:700 14px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
+.family-card-title p{margin:4px 0 0;font-size:10px;color:#858d83;overflow-wrap:anywhere}
+.family-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.family-details>div{display:grid;gap:4px;min-width:0;padding:9px;border:1px solid #eef0ec;border-radius:9px}
+.family-details span{font-size:9px;color:#92998f}
+.family-details strong{font-size:10px;color:#414a42;overflow-wrap:anywhere}
+.family-contact{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:11px;font-size:10px;color:#667066;overflow-wrap:anywhere}
+.family-contact a{color:#4e7e57;text-decoration:none}
+.family-contact a:hover{text-decoration:underline}
+.family-notes{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
+.app-shell.dark .family-summary strong,.app-shell.dark .family-card-title h2,.app-shell.dark .family-details strong{color:#e3e8e2}
+.app-shell.dark .family-summary span,.app-shell.dark .family-card-title p,.app-shell.dark .family-details span,.app-shell.dark .family-contact,.app-shell.dark .family-notes{color:#a7b0a7}
+.app-shell.dark .family-avatar{background:#2b3d30;color:#a6c1a8}
+.app-shell.dark .family-details>div{border-color:#343d35}
+.app-shell.dark .family-contact a{color:#a6c1a8}
 .education-list{display:grid;gap:14px}
 .education-card{min-width:0;padding:12px 16px}
 .education-card-head,.education-card-title,.education-card-actions{display:flex;align-items:center;gap:10px}
@@ -628,6 +654,8 @@ body{background:#f3f5ef}
   .career-section-head{align-items:flex-start}
   .career-section-head>.button{height:auto;min-height:32px;padding:6px 8px;white-space:normal}
   .career-card{padding:12px}
+  .family-toolbar{grid-template-columns:minmax(0,1fr)}
+  .family-card{padding:12px}
   .asset-card{padding:14px}
   .asset-details{grid-template-columns:minmax(0,1fr)}
   .asset-total-card{grid-template-columns:1fr}
