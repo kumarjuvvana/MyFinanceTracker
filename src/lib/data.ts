@@ -409,11 +409,14 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
     typeof entry.personName === "string" && entry.personName.length <= 120 &&
     typeof entry.notes === "string" && entry.notes.length <= 2000 &&
-    typeof entry.fileName === "string" && entry.fileName.length > 0 && entry.fileName.length <= 255 &&
-    typeof entry.contentType === "string" && Object.values(DOCUMENT_FILE_TYPES).some((type) => type === entry.contentType) &&
-    typeof entry.sizeBytes === "number" && Number.isInteger(entry.sizeBytes) && entry.sizeBytes > 0 && entry.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
-    typeof entry.storagePath === "string" && isDocumentStoragePath(entry.storagePath) &&
-    typeof entry.uploadedAt === "string" && !Number.isNaN(Date.parse(entry.uploadedAt))));
+    typeof entry.fileName === "string" && entry.fileName.length <= 255 &&
+    typeof entry.contentType === "string" && (entry.contentType === "" || Object.values(DOCUMENT_FILE_TYPES).some((type) => type === entry.contentType)) &&
+    typeof entry.sizeBytes === "number" && Number.isInteger(entry.sizeBytes) && entry.sizeBytes >= 0 && entry.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
+    typeof entry.storagePath === "string" && (entry.storagePath === "" || isDocumentStoragePath(entry.storagePath)) &&
+    typeof entry.uploadedAt === "string" && !Number.isNaN(Date.parse(entry.uploadedAt)) &&
+    (entry.externalLink === undefined || (typeof entry.externalLink === "string" && entry.externalLink.length <= 2048 && isSafeExternalLink(entry.externalLink))) &&
+    ((entry.storagePath !== "" && entry.fileName.length > 0 && entry.contentType !== "" && entry.sizeBytes > 0) ||
+      (typeof entry.externalLink === "string" && entry.externalLink.length > 0))));
   const promptRecordsOk = value.promptRecords === undefined || (Array.isArray(value.promptRecords) && value.promptRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
@@ -650,7 +653,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
   };
 }
 
-function isSafeExternalLink(value: string): boolean {
+export function isSafeExternalLink(value: string): boolean {
   if (!value) return true;
   try {
     const url = new URL(value);

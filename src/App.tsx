@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
-import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
+import { createId, exportCsv, formatCurrency as formatMoney, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
@@ -3824,7 +3824,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
   </>;
 }
 
-type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes">;
+type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes"> & { externalLink: string };
 
 function formatFileSize(sizeBytes: number): string {
   if (sizeBytes <= 0) return "0 B";
@@ -3840,6 +3840,7 @@ function DocumentModal({ initial, onClose, onSave }: {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [personName, setPersonName] = useState(initial?.personName ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [externalLink, setExternalLink] = useState(initial?.externalLink ?? "");
   const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -3848,12 +3849,16 @@ function DocumentModal({ initial, onClose, onSave }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (!initial && !file) {
-      setError("Choose a document to upload.");
-      return;
-    }
     if (!title.trim()) {
       setError("Enter a document name.");
+      return;
+    }
+    if (!file && !(initial?.storagePath) && !externalLink.trim()) {
+      setError("Attach a file or enter an external document link.");
+      return;
+    }
+    if (externalLink.trim() && (externalLink.trim().length > 2048 || !isSafeExternalLink(externalLink.trim()))) {
+      setError("Enter a valid HTTPS link to the document.");
       return;
     }
     if (file && !getDocumentFileType(file.name)) {
@@ -3866,7 +3871,7 @@ function DocumentModal({ initial, onClose, onSave }: {
     }
     setBusy(true);
     try {
-      await onSave({ title: title.trim(), personName: personName.trim(), notes: notes.trim() }, file, initial?.id);
+      await onSave({ title: title.trim(), personName: personName.trim(), notes: notes.trim(), externalLink: externalLink.trim() }, file, initial?.id);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The document could not be saved.");
@@ -3879,9 +3884,11 @@ function DocumentModal({ initial, onClose, onSave }: {
     <form onSubmit={(event) => void submit(event)}><div className="form-grid">
       <Field className="full" label="Document name"><Input autoFocus required maxLength={120} placeholder="e.g. Aadhaar card, PAN card" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field className="full" label="Belongs to (person's name)"><Input maxLength={120} placeholder="Optional" value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>
-      {!initial ? <Field className="full" label="File (PDF, image, Word, spreadsheet, presentation, text)"><input className="field document-file-input" required type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">Maximum 10 MB per file. Keep identity-document scans clear and legible.</span></Field> : <div className="alert full"><FileText size={14} /> Editing these details does not replace the uploaded file. To replace it, add the new file and archive the old record.</div>}
+      {!initial || !initial.storagePath ? <Field className="full" label="Attach a file (optional)"><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">Files are stored privately in Supabase Storage. Maximum 10 MB per file.</span></Field> : null}
+      {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details.</div>}
+      <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="https://…" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">Use a direct HTTPS link. You can add a link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
-    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Uploading..." : initial ? "Save details" : "Upload document"}</Button></div></form>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
   </Modal>;
 }
 
@@ -3906,19 +3913,23 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
   const [search, setSearch] = useState("");
   const percentUsed = totalStoredBytes / (1024 * 1024 * 1024) * 100;
   const visible = documents.filter((document) =>
-    `${document.title} ${document.personName} ${document.fileName} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 
-  return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together, with a simple name, person, and optional note." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Files are kept in a private Supabase bucket and opened through your signed-in Daybook session. Anyone with the shared Daybook password can access them. They are protected by access controls, not end-to-end encrypted. Upload only files you are comfortable storing under this shared-access model.</span></div>
+  return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
     <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan file storage; each document can be up to 10 MB.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
     {visible.length ? <div className="document-list">{visible.map((document) => {
-      const canPreview = document.contentType === "application/pdf" || document.contentType.startsWith("image/");
-      const downloadUrl = `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`;
-      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{document.fileName} · {formatFileSize(document.sizeBytes)}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
+      const hasFile = Boolean(document.storagePath);
+      const canPreview = hasFile && (document.contentType === "application/pdf" || document.contentType.startsWith("image/"));
+      const downloadUrl = hasFile
+        ? `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`
+        : "";
+      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : "External link"}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
         {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
-        <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>
+        {hasFile && <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>}
+        {document.externalLink && <a className="button button-outline document-download" href={document.externalLink} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create another record referencing the same file" onClick={() => onCopy(document)}><Copy size={14} /></button>
         <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
@@ -4544,7 +4555,7 @@ export default function App() {
   const authenticatedRef = useRef(authenticated);
   const syncStatusRef = useRef(syncStatus);
   const skipNextSave = useRef(false);
-  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveQueue = useRef<Promise<string | null>>(Promise.resolve(null));
   const saveTimer = useRef<number | null>(null);
   const refreshInProgress = useRef(false);
 
@@ -4565,10 +4576,10 @@ export default function App() {
     return () => window.removeEventListener("popstate", syncRouteFromLocation);
   }, []);
 
-  function queueSave(snapshot: TrackerData) {
+  function queueSave(snapshot: TrackerData): Promise<string | null> {
     setSyncStatus("saving");
     setSyncMessage("");
-    const save = saveQueue.current.catch(() => undefined).then(async () => {
+    const save = saveQueue.current.then(async () => {
       if (!authenticatedRef.current) throw new Error("Sign in to Daybook before saving.");
       const nextRevision = await saveSharedData(snapshot, revisionRef.current);
       revisionRef.current = nextRevision;
@@ -4577,13 +4588,16 @@ export default function App() {
         setSyncStatus("saved");
         setSyncMessage("All changes saved to Supabase.");
       }
+      return null;
     }).catch((caught: unknown) => {
       const message = caught instanceof Error ? caught.message : "Your changes could not be saved.";
       setSyncStatus("error");
       setSyncMessage(message);
       setError(message);
+      return message;
     });
     saveQueue.current = save;
+    return save;
   }
 
   useEffect(() => {
@@ -4849,6 +4863,23 @@ export default function App() {
     setData((previous) => previous ? mutator(previous) : previous);
     setNotice("");
   }
+  async function persistUpdate(mutator: (previous: TrackerData) => TrackerData): Promise<void> {
+    const previous = latestDataRef.current;
+    if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving documents.");
+    const next = mutator(previous);
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const saveError = await queueSave(next);
+    if (saveError) throw new Error(saveError);
+    latestDataRef.current = next;
+    skipNextSave.current = true;
+    setData(next);
+    setSyncStatus("saved");
+    setSyncMessage("Document details saved to Supabase.");
+    setNotice("");
+  }
   function restoreArchivedRecord(id: string) {
     update((previous) => {
       const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
@@ -4869,11 +4900,11 @@ export default function App() {
   async function permanentlyDeleteArchivedRecord(id: string) {
     const archived = data?.archivedRecords?.find((entry) => entry.id === id);
     if (!archived) return;
-    const archivedPaths = (archived.snapshot.documents ?? []).map((document) => document.storagePath);
+    const archivedPaths = (archived.snapshot.documents ?? []).map((document) => document.storagePath).filter(Boolean);
     const referencedPaths = new Set([
-      ...(data?.documents ?? []).map((document) => document.storagePath),
+      ...(data?.documents ?? []).map((document) => document.storagePath).filter(Boolean),
       ...(data?.archivedRecords ?? []).filter((entry) => entry.id !== id)
-        .flatMap((entry) => entry.snapshot.documents ?? []).map((document) => document.storagePath),
+        .flatMap((entry) => entry.snapshot.documents ?? []).map((document) => document.storagePath).filter(Boolean),
     ]);
     try {
       for (const path of new Set(archivedPaths.filter((entry) => !referencedPaths.has(entry)))) {
@@ -5509,43 +5540,78 @@ export default function App() {
     }));
   }
   async function saveDocument(details: DocumentDetails, file: File | undefined, id?: string): Promise<void> {
-    if (id) {
-      update((previous) => ({
-        ...previous,
-        documents: (previous.documents ?? []).map((document) => document.id === id ? { ...document, ...details } : document),
-      }));
-      return;
-    }
-    if (!file) throw new Error("Choose a document file to upload.");
-    const uploaded = await uploadDocumentFile(file);
-    const document: DocumentAttachment = {
-      ...details,
-      id: createId(),
-      fileName: file.name,
-      contentType: uploaded.contentType,
-      sizeBytes: file.size,
-      storagePath: uploaded.storagePath,
-      uploadedAt: new Date().toISOString(),
-    };
-    update((previous) => ({ ...previous, documents: [document, ...(previous.documents ?? [])] }));
-  }
-  function archiveDocument(document: DocumentAttachment) {
-    if (!window.confirm(`Move "${document.title}" to the archive? Its file will remain stored until you permanently delete the archived record.`)) return;
-    update((previous) => ({
-      ...withArchivedRecord(previous, document.title, { documents: [document] }),
-      documents: (previous.documents ?? []).filter((entry) => entry.id !== document.id),
-    }));
-  }
-  function copyDocument(document: DocumentAttachment) {
-    update((previous) => ({
-      ...previous,
-      documents: [{
-        ...document,
+    let uploadedPath = "";
+    try {
+      if (id) {
+        const uploaded = file ? await uploadDocumentFile(file) : null;
+        uploadedPath = uploaded?.storagePath ?? "";
+        await persistUpdate((previous) => ({
+          ...previous,
+          documents: (previous.documents ?? []).map((document) => document.id === id
+            ? {
+              ...document,
+              ...details,
+              ...(file && uploaded ? {
+                fileName: file.name,
+                contentType: uploaded.contentType,
+                sizeBytes: file.size,
+                storagePath: uploaded.storagePath,
+              } : {}),
+            }
+            : document),
+        }));
+        return;
+      }
+      const uploaded = file ? await uploadDocumentFile(file) : null;
+      uploadedPath = uploaded?.storagePath ?? "";
+      const document: DocumentAttachment = {
+        ...details,
         id: createId(),
-        title: copyLabel(document.title, 160),
+        fileName: file?.name ?? "",
+        contentType: uploaded?.contentType ?? "",
+        sizeBytes: file?.size ?? 0,
+        storagePath: uploadedPath,
         uploadedAt: new Date().toISOString(),
-      }, ...(previous.documents ?? [])],
-    }));
+      };
+      await persistUpdate((previous) => ({ ...previous, documents: [document, ...(previous.documents ?? [])] }));
+    } catch (caught) {
+      if (uploadedPath) {
+        try {
+          await deleteDocumentFile(uploadedPath);
+        } catch (cleanupError) {
+          const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
+          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : "The uploaded file could not be removed.";
+          throw new Error(`${saveMessage} Cleanup also failed: ${cleanupMessage}`);
+        }
+      }
+      throw caught;
+    }
+  }
+  async function archiveDocument(document: DocumentAttachment) {
+    if (!window.confirm(`Move "${document.title}" to the archive? Its file will remain stored until you permanently delete the archived record.`)) return;
+    try {
+      await persistUpdate((previous) => ({
+        ...withArchivedRecord(previous, document.title, { documents: [document] }),
+        documents: (previous.documents ?? []).filter((entry) => entry.id !== document.id),
+      }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The document could not be archived.");
+    }
+  }
+  async function copyDocument(document: DocumentAttachment) {
+    try {
+      await persistUpdate((previous) => ({
+        ...previous,
+        documents: [{
+          ...document,
+          id: createId(),
+          title: copyLabel(document.title, 160),
+          uploadedAt: new Date().toISOString(),
+        }, ...(previous.documents ?? [])],
+      }));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The document record could not be copied.");
+    }
   }
   async function importBackup(file: File) {
     try {

@@ -578,6 +578,7 @@ export interface DocumentAttachment {
   sizeBytes: number;
   storagePath: string;
   uploadedAt: string;
+  externalLink?: string;
 }
 
 export interface CredentialRecord {
