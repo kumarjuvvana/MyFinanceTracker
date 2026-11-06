@@ -766,3 +766,37 @@ body{background:#f3f5ef}
   .credential-card{padding:14px}
   .credential-page-actions{align-items:flex-start;justify-content:flex-end}
 }
+
+@media(max-width:600px){
+  .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.personal-record-list{gap:0}
+  .trip-card,.asset-list>.asset-card,.electricity-list>.electricity-card,.devotional-list>.devotional-card,.cooking-list>.cooking-card,.issues-list>.issue-card,.career-list>.career-card,.family-list>.family-card,.education-list>.education-card,.learning-list>.learning-card,.personal-record-list>.personal-record-card{
+    border:0;
+    border-bottom:1px solid var(--panel-line,#e8ece6);
+    border-radius:0;
+    box-shadow:none;
+    padding:11px 2px;
+    background:transparent;
+  }
+  .trip-card:hover,.asset-list>.asset-card:hover,.electricity-list>.electricity-card:hover,.devotional-list>.devotional-card:hover,.cooking-list>.cooking-card:hover,.issues-list>.issue-card:hover,.career-list>.career-card:hover,.family-list>.family-card:hover,.education-list>.education-card:hover,.learning-list>.learning-card:hover,.personal-record-list>.personal-record-card:hover{transform:none;box-shadow:none}
+  .trip-card-top{align-items:center;gap:8px}
+  .trip-note{margin:6px 0;font-size:10px}
+  .trip-items{padding-top:7px}
+  .asset-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin-top:8px}
+  .asset-details>div,.personal-record-details>div{border:0;border-radius:0;padding:3px 0}
+  .personal-record-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px;margin-top:8px}
+  .personal-record-notes,.devotional-card p,.cooking-card p,.issue-card>p{margin-top:6px;font-size:10px}
+  .issue-card-meta{margin-top:5px;gap:4px 10px}
+  .issue-card-controls{margin-top:7px}
+  .issue-card-controls>.field{min-height:34px}
+  .family-details{gap:6px 12px}
+  .education-card-head,.asset-card-head,.personal-record-head{gap:6px}
+  .vehicle-list{gap:8px}
+  .vehicle-card{border-radius:10px;padding:12px}
+  .vehicle-stats{gap:6px;margin-top:9px}
+  .vehicle-stats>div{padding:7px}
+  .vehicle-section{margin-top:11px;padding-top:10px}
+  .vehicle-record{padding:7px 0}
+  .electricity-record-list{margin-top:7px}
+  .electricity-record{padding:7px 0}
+  .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
+}
