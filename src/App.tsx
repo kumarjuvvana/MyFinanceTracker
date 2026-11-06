@@ -94,6 +94,7 @@ const defaultItem = (): Omit<ShoppingItem, "id"> => ({
   name: "", quantity: 1, unit: "pcs", category: "Groceries", estimatedPrice: 0, purchased: false,
 });
 const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const copyLabel = (value: string, maxLength: number) => `${value.slice(0, Math.max(0, maxLength - 7))} (copy)`;
 const monthYearLabel = (date: string) => /^\d{4}-\d{2}$/.test(date)
   ? new Date(`${date}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
   : date ? dateLabel(date) : "";
@@ -339,7 +340,7 @@ function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: Tracke
     {trips.length ? <div className="trip-grid">{trips.map((trip) => {
       const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
       const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
-      return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store}`} title="Copy trip and its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
+      return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} title="Copy trip without its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
     })}</div> : <Card><EmptyState icon={<ShoppingBag size={18} />} title="No trips planned just yet" description="Create a trip, choose a store and add items from your shopping list." /></Card>}
     {editing && <TripEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(trip) => { onSave(trip); setEditing(null); }} />}
   </>;
@@ -803,6 +804,17 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setQuantity(stock.quantity ? String(stock.quantity) : "");
     setError(""); setNotice("");
   }
+  function copyStock(stock: TrackedStock) {
+    setEditingId(null);
+    setSymbol(stock.symbol);
+    setName(copyLabel(stock.name, 100));
+    setExchange(stock.exchange);
+    setBroker(stock.broker);
+    setAverageBuyPrice(stock.averageBuyPrice == null ? "" : String(stock.averageBuyPrice));
+    setQuantity(stock.quantity ? String(stock.quantity) : "");
+    setError(`Change the stock code or exchange before saving; ${stock.symbol} on ${stock.exchange} is already tracked.`);
+    setNotice("");
+  }
   function submitStock(event: FormEvent) {
     event.preventDefault();
     const normalizedSymbol = symbol.trim().toUpperCase();
@@ -893,7 +905,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { const name = window.prompt(`Rename broker "${entry}"`, entry)?.trim(); if (name && name !== entry) onRenameBroker(entry, name); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button></div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
       </Card>
       <Card><div className="card-head"><div><h2 className="section-title">{editingId ? "Edit tracked stock" : "Add a stock"}</h2><p className="section-description">Use the exchange-listed code (without .NS or .BO).</p></div></div>
-        <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => setSymbol(event.target.value)} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>
+      <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => { setSymbol(event.target.value); setError(""); }} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>
       </Card>
     </div>
     <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">{stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
@@ -915,7 +927,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             <div className="table-actions">
               <button className="icon-button" aria-label={`Refresh ${stock.symbol}`} disabled={busy} onClick={() => refreshStock(stock)}><RefreshCw size={14} /></button>
               <button className="icon-button" aria-label={`Edit ${stock.symbol}`} onClick={() => editStock(stock)}><Pencil size={14} /></button>
-              <button className="icon-button" aria-label={`Copy ${stock.symbol}`} onClick={() => { const { id, ...copy } = stock; void id; onSaveStock({ ...copy, name: `${stock.name} (copy)` }); }}><Copy size={14} /></button>
+              <button className="icon-button" aria-label={`Copy ${stock.symbol} as a new stock`} onClick={() => copyStock(stock)}><Copy size={14} /></button>
               <button className="icon-button" aria-label={`Archive ${stock.symbol}`} onClick={() => { if (window.confirm(`Move ${stock.symbol} and its saved price history to the archive?`)) onDeleteStock(stock.id); }}><Archive size={14} /></button>
             </div>
           </div>
@@ -1426,7 +1438,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
         <button className="education-toggle" aria-expanded={expanded} aria-controls={`education-details-${record.id}`} onClick={() => setExpanded((value) => !value)}><ChevronRight size={14} /><span>{expanded ? "Hide" : "Show"}</span><span className="sr-only">details for {record.studentName} {record.academicYear}</span></button>
         <Badge tone={record.status === "Current" ? "green" : "neutral"}>{record.status}</Badge>
         <button className="icon-button" aria-label={`Edit ${record.studentName} education record`} onClick={onEdit}><Pencil size={14} /></button>
-        <button className="icon-button" aria-label={`Copy ${record.studentName} education record`} title="Copy as a new record" onClick={onCopy}><Copy size={14} /></button>
+        <button className="icon-button" aria-label={`Copy ${record.studentName} education record without its subjects, assessments, or payments`} title="Copy as a new record without subjects, assessments, or payment history" onClick={onCopy}><Copy size={14} /></button>
         <button className="icon-button" aria-label={`Archive ${record.studentName} education record`} onClick={onDelete}><Archive size={14} /></button>
       </div>
     </div>
@@ -1578,9 +1590,10 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       record: {
         ...record,
         id: createId(),
-        subjects: (record.subjects ?? []).map((subject) => ({ ...subject, id: createId() })),
-        exams: (record.exams ?? []).map((exam) => ({ ...exam, id: createId() })),
-        payments: (record.payments ?? []).map((payment) => ({ ...payment, id: createId() })),
+        paidFee: null,
+        subjects: [],
+        exams: [],
+        payments: [],
       },
     });
   }
@@ -2390,7 +2403,7 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
         const travelCost = vehicleJourneys.reduce((total, journey) => total + journey.cost, 0);
         return <Card className="vehicle-card" key={vehicle.id}>
           <div className="vehicle-card-head"><div className="vehicle-heading"><div className="vehicle-icon"><Car size={18} /></div><div><h2 className="section-title">{vehicle.name}</h2><p className="section-description">{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}{vehicle.fuelType ? ` · ${vehicle.fuelType}` : ""}</p></div></div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={() => setVehicleEditor({ initial: vehicle })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${vehicle.name} with its logs`} onClick={() => onCopyVehicle(vehicle)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${vehicle.name}`} onClick={() => onDeleteVehicle(vehicle)}><Archive size={14} /></button></div></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={() => setVehicleEditor({ initial: vehicle })}><Pencil size={14} /></button>            <button className="icon-button" aria-label={`Copy ${vehicle.name} without its logs`} title="Copy vehicle details without travel or service history" onClick={() => onCopyVehicle(vehicle)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${vehicle.name}`} onClick={() => onDeleteVehicle(vehicle)}><Archive size={14} /></button></div></div>
           {vehicle.notes && <p className="vehicle-notes"><LinkifiedText>{vehicle.notes}</LinkifiedText></p>}
           <div className="vehicle-stats"><div><span>Travel logs</span><strong>{vehicleJourneys.length}</strong></div><div><span>Recorded distance</span><strong>{recordedDistance.toLocaleString()} km</strong></div><div><span>Travel costs</span><strong>{formatCurrency(travelCost)}</strong></div><div><span>Service & repair cost</span><strong>{formatCurrency(maintenanceCost)}</strong></div></div>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><MapPin size={14} /></span>Travel log</h3><p>{vehicleJourneys.length} recorded {vehicleJourneys.length === 1 ? "journey" : "journeys"}</p></div><Button variant="outline" onClick={() => setJourneyEditor({ vehicle, initial: null })}><Plus size={13} /> Log travel</Button></div>
@@ -2410,8 +2423,9 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
   </>;
 }
 
-function ElectricityReadingModal({ initial, readings, onClose, onSave }: {
+function ElectricityReadingModal({ initial, copyMode = false, readings, onClose, onSave }: {
   initial: ElectricityReading | null;
+  copyMode?: boolean;
   readings: ElectricityReading[];
   onClose: () => void;
   onSave: (reading: Omit<ElectricityReading, "id">) => void;
@@ -2490,7 +2504,7 @@ function ElectricityReadingModal({ initial, readings, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit electricity reading" : "Add electricity reading"} onClose={onClose} wide>
+  return <Modal title={copyMode ? "Copy electricity reading" : initial ? "Edit electricity reading" : "Add electricity reading"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Meter name"><Input autoFocus required maxLength={100} list="electricity-meter-names" placeholder="e.g. Main meter" value={meterName} onChange={(event) => setMeterName(event.target.value)} /><datalist id="electricity-meter-names">{[...new Set(readings.map((entry) => entry.meterName))].map((name) => <option key={name} value={name} />)}</datalist></Field>
       <Field label="Location"><Input maxLength={120} placeholder="Home, rental, or building" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
@@ -2561,12 +2575,12 @@ function ElectricityPage({ readings, onSave, onDelete }: {
               <span>{entry.meterReading.toLocaleString()} kWh{used !== null ? ` · ${used.toLocaleString()} kWh used since previous reading` : " · First recorded reading"}{entry.billAmount !== null ? ` · Bill ${formatCurrency(entry.billAmount)}` : ""}</span>
               <small><LinkifiedText>{[period ? `Period ${period}` : "", entry.ratePerUnit !== null ? `${formatCurrency(entry.ratePerUnit)} / unit` : "", entry.paidDate ? `Paid ${dateLabel(entry.paidDate)}` : "", entry.notes].filter(Boolean).join(" · ") || "No billing details"}</LinkifiedText></small>
             </div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => { const { id, ...copy } = entry; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Archive size={13} /></button></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.meterName} reading on ${entry.readingDate}`} title="Copy as a new reading; choose a different date" onClick={() => setEditor({ ...entry, id: "" })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Archive size={13} /></button></div>
           </div>;
         })}</div>
       </Card>;
     })}</div> : <Card><EmptyState icon={<Zap size={18} />} title={readings.length ? "No matching electricity readings" : "No electricity readings yet"} description={readings.length ? "Try another search or bill filter." : "Add a meter reading to start tracking usage and bills."} /></Card>}
-    {editor !== undefined && <ElectricityReadingModal key={editor?.id ?? "new-electricity-reading"} initial={editor} readings={readings} onClose={() => setEditor(undefined)} onSave={(reading) => { onSave(reading, editor?.id); setEditor(undefined); }} />}
+    {editor !== undefined && <ElectricityReadingModal key={editor?.id ?? "new-electricity-reading"} initial={editor} copyMode={editor?.id === ""} readings={readings} onClose={() => setEditor(undefined)} onSave={(reading) => { onSave(reading, editor?.id || undefined); setEditor(undefined); }} />}
   </>;
 }
 
@@ -2718,7 +2732,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       const sorted = [...account.transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
       const nextDue = account.transactions.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
       return <Card className="electricity-card" key={account.id}>
-        <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="table-actions"><Button variant="outline" onClick={() => setTransactionEditor({ account, transaction: null })}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={() => setAccountEditor(account)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={() => archiveAccount(account)}><Archive size={13} /></button></div></div>
+        <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div>        <div className="table-actions"><Button variant="outline" onClick={() => setTransactionEditor({ account, transaction: null })}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={() => setAccountEditor(account)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={() => onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={() => archiveAccount(account)}><Archive size={13} /></button></div></div>
         <div className="electricity-meter-latest"><span>{nextDue ? `${nextDue.dueDate < currentDate ? "Overdue since" : "Next due"} · ${dateLabel(nextDue.dueDate)}` : "Next due"}{account.notes ? ` · ${account.notes}` : ""}</span></div>
         {sorted.length ? <div className="electricity-record-list">{sorted.map((entry) => {
           const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
@@ -2728,7 +2742,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
               <strong>{entry.type} · {dateLabel(entry.transactionDate)} <Badge tone={entry.paid ? "green" : isOverdue ? "amber" : "blue"}>{entry.paid ? "Paid" : isOverdue ? "Overdue" : "Pending"}</Badge></strong>
               <span>{entry.amount !== null ? formatMoney(entry.amount, account.currency) : "Amount not recorded"}{entry.dueDate ? ` · Due ${dateLabel(entry.dueDate)}` : ""}{period ? ` · Period ${period}` : ""}</span>
               <small><LinkifiedText>{[entry.paymentDate ? `Paid ${dateLabel(entry.paymentDate)}` : "", entry.reference, entry.notes].filter(Boolean).join(" · ") || "No additional details"}</LinkifiedText></small></div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.type} for ${account.name}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveTransaction(account.id, copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
           </div>;
         })}</div> : <p className="vehicle-empty">No transactions recorded yet.</p>}
       </Card>;
@@ -3867,11 +3881,12 @@ function DocumentViewer({ document, onClose }: { document: DocumentAttachment; o
   </div></Modal>;
 }
 
-function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onArchive }: {
+function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onCopy, onArchive }: {
   documents: DocumentAttachment[];
   archivedDocumentCount: number;
   totalStoredBytes: number;
   onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
+  onCopy: (document: DocumentAttachment) => void;
   onArchive: (document: DocumentAttachment) => void;
 }) {
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
@@ -3893,6 +3908,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
         {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
         <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
+        <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create another record referencing the same file" onClick={() => onCopy(document)}><Copy size={14} /></button>
         <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
       </div></Card>;
     })}</div> : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search." : "Upload an important document and optionally note whose it is."} /></Card>}
@@ -4116,7 +4132,7 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{records.length} {records.length === 1 ? "account" : "accounts"}</Badge></div>
     <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
-      <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p>{record.category}{record.username ? ` · ${record.username}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider}`} onClick={() => { if (window.confirm(`Delete the ${record.provider} account from the vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
+      <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p>{record.category}{record.username ? ` · ${record.username}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.provider} credential`} title="Duplicate encrypted credential" onClick={() => { if (window.confirm(`Create a second encrypted copy of the ${record.provider} credential?`)) void saveRecords([{ ...record, id: createId(), provider: copyLabel(record.provider, 120), tags: [...record.tags], additionalFields: record.additionalFields.map((field) => ({ ...field })) }, ...unlocked.records]).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not duplicate the credential.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider}`} onClick={() => { if (window.confirm(`Delete the ${record.provider} account from the vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
       {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer">{record.website}</a>}
       {record.password && <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password : "••••••••••••"}</code><button className="icon-button" type="button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>}
       {record.recoveryInfo && <p className="credential-secondary"><strong>Recovery:</strong> {record.recoveryInfo}</p>}
@@ -4892,22 +4908,10 @@ export default function App() {
     setModal(null);
   }
   function copyTrip(trip: ShoppingTrip) {
-    update((previous) => {
-      const newTripId = createId();
-      const originalPurchases = trip.purchaseIds
-        .map((id) => previous.purchases.find((purchase) => purchase.id === id))
-        .filter((purchase): purchase is Purchase => Boolean(purchase));
-      const copiedPurchases = originalPurchases.map((purchase) => ({
-        ...purchase,
-        id: createId(),
-        tripId: newTripId,
-      }));
-      return {
-        ...previous,
-        purchases: [...copiedPurchases, ...previous.purchases],
-        trips: [{ ...trip, id: newTripId, purchaseIds: copiedPurchases.map((purchase) => purchase.id) }, ...previous.trips],
-      };
-    });
+    update((previous) => ({
+      ...previous,
+      trips: [{ ...trip, id: createId(), purchaseIds: [] }, ...previous.trips],
+    }));
   }
   function saveTripEdits(trip: ShoppingTrip) {
     update((previous) => ({
@@ -5207,16 +5211,9 @@ export default function App() {
   }
   function copyVehicle(vehicle: Vehicle) {
     update((previous) => {
-      const newVehicleId = createId();
-      const journeys = (previous.vehicleJourneys ?? []).filter((entry) => entry.vehicleId === vehicle.id)
-        .map((entry) => ({ ...entry, id: createId(), vehicleId: newVehicleId }));
-      const maintenance = (previous.vehicleMaintenance ?? []).filter((entry) => entry.vehicleId === vehicle.id)
-        .map((entry) => ({ ...entry, id: createId(), vehicleId: newVehicleId }));
       return {
         ...previous,
-        vehicles: [{ ...vehicle, id: newVehicleId, name: `${vehicle.name} (copy)` }, ...(previous.vehicles ?? [])],
-        vehicleJourneys: [...journeys, ...(previous.vehicleJourneys ?? [])],
-        vehicleMaintenance: [...maintenance, ...(previous.vehicleMaintenance ?? [])],
+        vehicles: [{ ...vehicle, id: createId(), name: copyLabel(vehicle.name, 100) }, ...(previous.vehicles ?? [])],
       };
     });
   }
@@ -5513,6 +5510,17 @@ export default function App() {
       documents: (previous.documents ?? []).filter((entry) => entry.id !== document.id),
     }));
   }
+  function copyDocument(document: DocumentAttachment) {
+    update((previous) => ({
+      ...previous,
+      documents: [{
+        ...document,
+        id: createId(),
+        title: copyLabel(document.title, 160),
+        uploadedAt: new Date().toISOString(),
+      }, ...(previous.documents ?? [])],
+    }));
+  }
   async function importBackup(file: File) {
     try {
       const parsed: unknown = JSON.parse(await file.text());
@@ -5592,7 +5600,7 @@ export default function App() {
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
-    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={allDocuments.reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onArchive={archiveDocument} />,
+    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={[...new Map(allDocuments.map((document) => [document.storagePath, document])).values()].reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onCopy={copyDocument} onArchive={archiveDocument} />,
     "Database manager": <DatabaseManagerPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
