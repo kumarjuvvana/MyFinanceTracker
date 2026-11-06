@@ -710,6 +710,8 @@ body{background:#f3f5ef}
 .personal-record-details strong{font-size:11px;color:#414a42;overflow-wrap:anywhere;word-break:break-word}
 .personal-record-notes{font-size:11px;line-height:1.55;color:#747d73;white-space:pre-wrap;overflow-wrap:anywhere;margin:13px 0 0}
 .personal-document-link{display:inline-flex;align-items:center;gap:7px;margin-top:13px;color:var(--user-accent);font-size:11px;font-weight:600;overflow-wrap:anywhere}
+.external-link-preview{display:inline-block;margin-top:6px;color:var(--user-accent);font-size:11px;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.external-link-preview:hover{opacity:.8}
 .personal-due-summary{display:flex;align-items:flex-start;gap:10px;margin:0 0 16px;padding:12px 14px;border:1px solid #f1dfbf;border-radius:11px;background:#fff8ec;color:#886736;font-size:11px;line-height:1.5}
 .personal-due-summary svg{flex:none}
 .personal-fields{display:grid;gap:10px}

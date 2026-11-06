@@ -15,6 +15,22 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
   return <input className={`field ${className}`} {...props} />;
 }
 
+type ExternalLinkInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value"> & { value: string };
+
+export function ExternalLinkInput({ value, ...props }: ExternalLinkInputProps) {
+  let safeLink = false;
+  try {
+    safeLink = new URL(value).protocol === "https:";
+  } catch {
+    safeLink = false;
+  }
+
+  return <>
+    <Input {...props} type="url" value={value} />
+    {safeLink && <a className="external-link-preview" href={value} target="_blank" rel="noopener noreferrer">Open link in new tab</a>}
+  </>;
+}
+
 type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & {
   value: string;
   onValueChange: (value: string) => void;
