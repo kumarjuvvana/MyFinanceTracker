@@ -56,7 +56,7 @@ begin
         when 'familyMembers' then 'family_members'
       end;
 
-      execute pg_catalog.format('delete from public.%I', table_name);
+      execute pg_catalog.format('delete from public.%I where id is not null', table_name);
       execute pg_catalog.format(
         'insert into public.%I (id, position, record)
          select entry ->> ''id'', entry_position::integer, entry
