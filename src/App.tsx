@@ -4,7 +4,7 @@ import {
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
-  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound,
+  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
@@ -12,6 +12,7 @@ import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validate
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
+import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
@@ -66,6 +67,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Personal documents", icon: FileText },
   { name: "Documents", icon: FileDown },
   { name: "Database manager", icon: Database },
+  { name: "Hosting & storage", icon: HardDrive },
   { name: "Archive", icon: Archive },
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
@@ -1897,6 +1899,94 @@ function formatDatabaseValue(value: unknown): string {
   if (typeof value === "string") return value;
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+const FREE_DATABASE_LIMIT_BYTES = 500_000_000;
+const FREE_STORAGE_LIMIT_BYTES = 1_000_000_000;
+
+function formatCapacity(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = -1;
+  do {
+    value /= 1000;
+    unitIndex += 1;
+  } while (value >= 1000 && unitIndex < units.length - 1);
+  return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[unitIndex]}`;
+}
+
+function CapacityCard({ title, usedBytes, limitBytes, detail }: {
+  title: string;
+  usedBytes: number;
+  limitBytes: number;
+  detail?: string;
+}) {
+  const remainingBytes = Math.max(0, limitBytes - usedBytes);
+  const percentage = Math.min(100, usedBytes / limitBytes * 100);
+  return <Card className="capacity-card">
+    <h2 className="section-title">{title}</h2>
+    <div className="capacity-values"><div><span>Used</span><strong>{formatCapacity(usedBytes)}</strong></div><div><span>Free-plan reference limit</span><strong>{formatCapacity(limitBytes)}</strong></div></div>
+    <div className="capacity-track" role="progressbar" aria-label={`${title} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percentage)}><div style={{ width: `${percentage}%` }} /></div>
+    <div className="capacity-remaining"><span>{usedBytes > limitBytes ? "Over reference limit" : "Remaining"}</span><strong>{usedBytes > limitBytes ? formatCapacity(usedBytes - limitBytes) : formatCapacity(remainingBytes)}</strong></div>
+    {detail && <p className="capacity-detail">{detail}</p>}
+  </Card>;
+}
+
+function HostingStoragePage() {
+  const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
+  const [deploymentUsage, setDeploymentUsage] = useState<DeploymentUsage | null>(null);
+  const [cloudError, setCloudError] = useState("");
+  const [deploymentError, setDeploymentError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function refreshUsage() {
+    setLoading(true);
+    setCloudError("");
+    setDeploymentError("");
+    setCloudUsage(null);
+    setDeploymentUsage(null);
+    const [cloudResult, deploymentResult] = await Promise.allSettled([
+      loadCloudUsage(),
+      loadDeploymentUsage(),
+    ]);
+    if (cloudResult.status === "fulfilled") setCloudUsage(cloudResult.value);
+    else setCloudError(cloudResult.reason instanceof Error ? cloudResult.reason.message : "Could not measure Supabase usage.");
+    if (deploymentResult.status === "fulfilled") setDeploymentUsage(deploymentResult.value);
+    else setDeploymentError(deploymentResult.reason instanceof Error ? deploymentResult.reason.message : "Could not read the deployment output report.");
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    void refreshUsage();
+  }, []);
+
+  function measuredTime(value: string) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  return <>
+    <PageHeading eyebrow="Infrastructure overview" title="Hosting & storage" subtitle="Review measured Supabase usage and the size of this Vercel deployment build." action={<Button variant="outline" onClick={() => void refreshUsage()} disabled={loading}><RefreshCw size={14} />{loading ? "Measuring..." : "Refresh usage"}</Button>} />
+    <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>Supabase usage is measured from the connected project. Quotas shown are Free-plan reference limits, not live billing data. Vercel reports this build’s output size; account-wide hosting usage and remaining quota are not available from this metric.</span></div>
+    {cloudError && <div className="alert alert-error" role="alert">{cloudError}</div>}
+    {deploymentError && <div className="alert alert-warning" role="status">{deploymentError}</div>}
+    {loading && !cloudUsage && !deploymentUsage && <Card><p className="section-description">Measuring project usage...</p></Card>}
+    <div className="hosting-usage-grid">
+      {cloudUsage && <>
+        <CapacityCard title="Supabase database" usedBytes={cloudUsage.databaseBytes} limitBytes={FREE_DATABASE_LIMIT_BYTES} detail="Total PostgreSQL database size, including tables, indexes, and system data." />
+        <CapacityCard title="Supabase Storage" usedBytes={cloudUsage.storageBytes} limitBytes={FREE_STORAGE_LIMIT_BYTES} detail={`${cloudUsage.storageObjects.toLocaleString()} stored object(s), across all buckets in this project.`} />
+      </>}
+      {deploymentUsage && <Card className="capacity-card hosting-output-card">
+        <h2 className="section-title">Vercel deployment output</h2>
+        <div className="deployment-size">{formatCapacity(deploymentUsage.deploymentOutputBytes)}</div>
+        <p className="capacity-detail">Generated files for this build · {deploymentUsage.fileCount.toLocaleString()} file(s)</p>
+        <p className="capacity-detail">This is not cumulative Vercel project storage and does not indicate remaining account quota.</p>
+      </Card>}
+    </div>
+    {cloudUsage && <p className="usage-measured-at">Supabase measured {measuredTime(cloudUsage.measuredAt)}.</p>}
+    {deploymentUsage && <p className="usage-measured-at">Build output measured {measuredTime(deploymentUsage.measuredAt)}.</p>}
+  </>;
 }
 
 function DatabaseManagerPage() {
@@ -5184,6 +5274,7 @@ export default function App() {
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={allDocuments.reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onArchive={archiveDocument} />,
     "Database manager": <DatabaseManagerPage />,
+    "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,

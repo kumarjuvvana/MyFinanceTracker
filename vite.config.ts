@@ -1,11 +1,15 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { readdir, stat, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import stockPriceHandler from "./api/stock-price";
 import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
 import databaseHandler from "./api/database";
+import usageHandler from "./api/usage";
 import dataAuthHandler from "./src/lib/dataAuth";
+import type { ResolvedConfig } from "vite";
 
 type ApiRequest = {
   method?: string;
@@ -16,6 +20,39 @@ type ApiRequest = {
 type ApiResponse = Pick<ServerResponse, "statusCode" | "setHeader" | "end">;
 type ApiHandler = (request: ApiRequest, response: ApiResponse) => void | Promise<void>;
 
+function hostingUsagePlugin() {
+  let config: ResolvedConfig;
+  return {
+    name: "daybook-hosting-usage",
+    apply: "build" as const,
+    configResolved(resolved: ResolvedConfig) {
+      config = resolved;
+    },
+    async closeBundle() {
+      const outputDirectory = resolve(config.root, config.build.outDir);
+      let totalBytes = 0;
+      let fileCount = 0;
+      async function measure(directory: string) {
+        for (const entry of await readdir(directory, { withFileTypes: true })) {
+          const path = resolve(directory, entry.name);
+          if (entry.isDirectory()) {
+            await measure(path);
+          } else if (entry.isFile() && entry.name !== "hosting-usage.json") {
+            totalBytes += (await stat(path)).size;
+            fileCount += 1;
+          }
+        }
+      }
+      await measure(outputDirectory);
+      await writeFile(resolve(outputDirectory, "hosting-usage.json"), JSON.stringify({
+        deploymentOutputBytes: totalBytes,
+        fileCount,
+        measuredAt: new Date().toISOString(),
+      }));
+    },
+  };
+}
+
 export default defineConfig(({ command, mode }) => {
   if (command === "serve") {
     const env = loadEnv(mode, process.cwd(), "");
@@ -24,7 +61,7 @@ export default defineConfig(({ command, mode }) => {
     }
   }
   return {
-    plugins: [react(), {
+    plugins: [react(), hostingUsagePlugin(), {
       name: "daybook-api",
       configureServer(server) {
         const routes: [string, ApiHandler][] = [
@@ -33,6 +70,7 @@ export default defineConfig(({ command, mode }) => {
           ["/api/data", dataHandler],
           ["/api/documents", documentsHandler],
           ["/api/database", databaseHandler],
+          ["/api/usage", usageHandler],
         ];
         for (const [path, handler] of routes) {
           server.middlewares.use(path, (request, response, next) => {

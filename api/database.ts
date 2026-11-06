@@ -79,7 +79,7 @@ function projectRefFromDatabaseUrl(value: string): string | null {
   }
 }
 
-function getPool(): pg.Pool {
+export function getPool(): pg.Pool {
   const databaseUrl = process.env.SUPABASE_DB_URL;
   const projectUrl = process.env.SUPABASE_URL;
   if (!databaseUrl || !projectUrl) {

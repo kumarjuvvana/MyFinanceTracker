@@ -1029,3 +1029,21 @@ body{background:#f3f5ef}
   .mindful-habit-row>.table-actions{gap:1px;flex:none}
   .mindful-habit-row>.table-actions .icon-button{width:28px;height:28px}
 }
+
+.hosting-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
+.capacity-card{min-width:0}
+.capacity-values{display:grid;gap:10px;margin:18px 0 12px}
+.capacity-values>div,.capacity-remaining{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.capacity-values span,.capacity-remaining span{font-size:11px;color:#818a80}
+.capacity-values strong,.capacity-remaining strong{font:700 15px Manrope,sans-serif;color:#3e6747;text-align:right}
+.capacity-track{height:9px;overflow:hidden;border-radius:8px;background:#edf0eb}
+.capacity-track>div{height:100%;border-radius:inherit;background:#5b8b65;transition:width .2s}
+.capacity-remaining{margin-top:10px}
+.capacity-detail{margin:12px 0 0;color:#848d83;font-size:10px;line-height:1.55}
+.hosting-output-card .deployment-size{margin-top:18px;font:700 27px Manrope,sans-serif;letter-spacing:-.7px;color:#3e6747}
+.usage-measured-at{margin:10px 0 0;color:#92998f;font-size:10px}
+.app-shell.dark .capacity-values span,.app-shell.dark .capacity-remaining span,.app-shell.dark .capacity-detail,.app-shell.dark .usage-measured-at{color:#a7b0a7}
+.app-shell.dark .capacity-values strong,.app-shell.dark .capacity-remaining strong,.app-shell.dark .hosting-output-card .deployment-size{color:#a6c1a8}
+.app-shell.dark .capacity-track{background:#343d35}
+@media(max-width:900px){.hosting-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.hosting-usage-grid{grid-template-columns:1fr;gap:9px}.capacity-card{padding:15px}}

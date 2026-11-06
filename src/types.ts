@@ -37,6 +37,7 @@ export type Page =
   | "Documents"
   | "AI Prompts"
   | "Database manager"
+  | "Hosting & storage"
   | "Archive"
   | "Account credentials"
   | "Data management"
