@@ -56,7 +56,7 @@ function hostingUsagePlugin() {
 export default defineConfig(({ command, mode }) => {
   if (command === "serve") {
     const env = loadEnv(mode, process.cwd(), "");
-    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS"]) {
+    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS", "TWELVE_DATA_API_KEY"]) {
       if (!process.env[key] && env[key]) process.env[key] = env[key];
     }
   }

@@ -198,6 +198,14 @@ button{cursor:pointer}
 .stock-exchange{font-size:9px;font-weight:700;letter-spacing:.3px;border-radius:20px;padding:4px 7px;background:#edf4ee;color:#4e7e57}
 .stock-name{font-size:11px;color:#7f887e}
 .stock-current{display:grid;gap:3px}
+.stock-manual-quote-trigger{display:inline-flex;align-items:center;gap:4px;width:max-content;border:0;padding:2px 0;background:transparent;color:#55785a;font-family:inherit;font-size:10px;font-weight:600;cursor:pointer}
+.stock-manual-quote{display:grid;gap:6px;margin-top:5px}
+.stock-manual-quote .field-wrap{gap:4px}
+.stock-manual-quote .field-label{font-size:10px}
+.stock-manual-quote .field{height:32px}
+.stock-manual-quote-actions{display:flex;gap:5px;flex-wrap:wrap}
+.stock-manual-quote-actions .button{height:29px;font-size:10px}
+.stock-manual-quote-error{font-size:10px;color:#a74e43}
 .stock-current strong{font-size:14px;color:#3e6847}
 .stock-current small{font-size:9px;color:#92998f}
 .stock-broker{font-size:10px;color:#747d74}
@@ -216,6 +224,7 @@ button{cursor:pointer}
 .app-shell.dark .stock-name,.app-shell.dark .stock-current small,.app-shell.dark .stock-broker,.app-shell.dark .stock-history-row,.app-shell.dark .stock-history-row small{color:#a7b0a7}
 .app-shell.dark .stock-exchange{background:#2b382d;color:#a8d1ad}
 .app-shell.dark .stock-history>summary{color:#a8d1ad}
+.app-shell.dark .stock-manual-quote-trigger{color:#a8d1ad}
 .app-shell.dark .stock-import-row{border-color:#343d35}
 .app-shell.dark .stock-import-bulk-broker{border-color:#343d35}
 .app-shell.dark .stock-import-row-head{color:#e3e8e2}

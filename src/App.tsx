@@ -116,6 +116,8 @@ const marketStateLabel = (state: string) => {
     POST: "After-hours",
     POSTPOST: "After-hours",
     CLOSED: "Closed",
+    PROVIDER_QUOTE: "Provider quote",
+    MANUAL: "Manual price",
     UNKNOWN: "Status unavailable",
     STATUS_UNAVAILABLE: "Status unavailable",
   };
@@ -951,6 +953,8 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshErrors, setRefreshErrors] = useState<string[]>([]);
+  const [manualQuoteDraft, setManualQuoteDraft] = useState<{ stockId: string; price: string } | null>(null);
+  const [manualQuoteError, setManualQuoteError] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -1220,6 +1224,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         updated++;
       } catch (caught) {
         failures.push(`${stock.symbol} (${stock.exchange}): ${caught instanceof Error ? caught.message : "Could not load quote."}`);
+        setManualQuoteDraft((current) => current ?? { stockId: stock.id, price: "" });
       }
     }
     setBusy(false);
@@ -1229,6 +1234,28 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   }
   async function refreshStock(stock: TrackedStock) {
     await refreshStocks([stock]);
+  }
+  function saveManualQuote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!manualQuoteDraft) return;
+    const stock = stocks.find((entry) => entry.id === manualQuoteDraft.stockId);
+    const price = Number(manualQuoteDraft.price);
+    if (!stock || !Number.isFinite(price) || price <= 0) {
+      setManualQuoteError("Enter a valid price greater than zero.");
+      return;
+    }
+    onSaveQuote({
+      stockId: stock.id,
+      price,
+      currency: "INR",
+      timestamp: new Date().toISOString(),
+      marketState: "MANUAL",
+      previousClose: null,
+    });
+    setManualQuoteDraft(null);
+    setManualQuoteError("");
+    setNotice(`Saved your manual price for ${stock.symbol}.`);
+    setRefreshErrors((failures) => failures.filter((failure) => !failure.startsWith(`${stock.symbol} (${stock.exchange}):`)));
   }
   function formatQuote(price: number, currency: string) {
     try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(price); }
@@ -1265,7 +1292,17 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         return <div className="stock-row" key={stock.id}>
           <div className="stock-summary">
             <div className="stock-identity"><span className="stock-code">{stock.symbol}</span><span className="stock-exchange">{stock.exchange}</span><span className="stock-name">{stock.name}</span></div>
-            <div className="stock-current"><strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong><small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price yet — refresh"}</small></div>
+            <div className="stock-current">
+              <strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
+              <small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price yet — refresh"}</small>
+              {manualQuoteDraft?.stockId === stock.id
+                ? <form className="stock-manual-quote" onSubmit={saveManualQuote}>
+                  <Field label={`Latest price for ${stock.symbol} (INR)`}><Input autoFocus required type="number" min="0.01" step="0.01" value={manualQuoteDraft.price} onChange={(event) => { setManualQuoteDraft({ ...manualQuoteDraft, price: event.target.value }); setManualQuoteError(""); }} /></Field>
+                  {manualQuoteError && <span className="stock-manual-quote-error" role="alert">{manualQuoteError}</span>}
+                  <div className="stock-manual-quote-actions"><Button type="submit" size="sm"><Check size={13} />Save price</Button><Button type="button" size="sm" variant="outline" onClick={() => { setManualQuoteDraft(null); setManualQuoteError(""); }}>Cancel</Button></div>
+                </form>
+                : <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>}
+            </div>
             <div className="stock-position">
               <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} avg · ${stock.quantity} shares` : "Add avg price & shares"}</span>
               {latest && stock.averageBuyPrice && stock.quantity ? latest.currency === "INR" ? <>
