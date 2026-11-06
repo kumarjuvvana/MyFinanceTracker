@@ -4373,10 +4373,6 @@ function DocumentModal({ initial, onClose, onSave }: {
       setError("Enter a document name.");
       return;
     }
-    if (!file && !(initial?.storagePath) && !externalLink.trim()) {
-      setError("Attach a file or enter an external document link.");
-      return;
-    }
     if (externalLink.trim() && (externalLink.trim().length > 2048 || !isSafeExternalLink(externalLink.trim()))) {
       setError("Enter a valid HTTPS link to the document.");
       return;
@@ -4409,8 +4405,8 @@ function DocumentModal({ initial, onClose, onSave }: {
     <form onSubmit={(event) => void submit(event)}><div className="form-grid">
       <Field className="full" label="Document name"><Input autoFocus required maxLength={120} placeholder="e.g. Aadhaar card, PAN card" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field className="full" label="Belongs to (person's name)"><Input maxLength={120} placeholder="Optional" value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>
-      {!initial || !initial.storagePath ? <Field className="full" label="Attach a file (optional)"><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">Files are stored privately in Supabase Storage. Maximum 10 MB per file.</span></Field> : null}
-      {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details.</div>}
+      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 10 MB per file."}</span></Field>
+      {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="https://…" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">Use a direct HTTPS link. You can add a link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
@@ -4443,7 +4439,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
     <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan file storage; each document can be up to 10 MB.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
     {visible.length ? <div className="document-list">{visible.map((document) => {
@@ -4461,7 +4457,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
         <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => onCopy(document)}><Copy size={14} /></button>
         <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
       </div></Card>;
-    })}</div> : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search." : "Upload an important document and optionally note whose it is."} /></Card>}
+    })}</div> : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search." : "Add a document record now and attach a file later if you prefer."} /></Card>}
     {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} onClose={() => setEditor(null)} onSave={onSave} />}
     {viewer && <DocumentViewer document={viewer} onClose={() => setViewer(null)} />}
   </>;
@@ -6087,6 +6083,7 @@ export default function App() {
       if (id) {
         const uploaded = file ? await uploadDocumentFile(file) : null;
         uploadedPath = uploaded?.storagePath ?? "";
+        const existingDocument = (latestDataRef.current?.documents ?? []).find((document) => document.id === id);
         await persistUpdate((previous) => ({
           ...previous,
           documents: (previous.documents ?? []).map((document) => document.id === id
@@ -6102,6 +6099,19 @@ export default function App() {
             }
             : document),
         }));
+        const oldPath = existingDocument?.storagePath;
+        const oldPathStillUsed = oldPath && oldPath !== uploadedPath && [
+          ...(latestDataRef.current?.documents ?? []).filter((document) => document.id !== id).map((document) => document.storagePath),
+          ...(latestDataRef.current?.archivedRecords ?? []).flatMap((record) => record.snapshot.documents ?? []).map((document) => document.storagePath),
+        ].includes(oldPath);
+        if (oldPath && oldPath !== uploadedPath && !oldPathStillUsed) {
+          try {
+            await deleteDocumentFile(oldPath);
+          } catch (caught) {
+            const message = caught instanceof Error ? caught.message : "The previous file could not be removed from storage.";
+            setError(`The new file was saved, but the previous uploaded file could not be deleted. ${message}`);
+          }
+        }
         return;
       }
       const uploaded = file ? await uploadDocumentFile(file) : null;

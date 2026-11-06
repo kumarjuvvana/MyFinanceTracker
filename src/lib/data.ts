@@ -416,7 +416,7 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.uploadedAt === "string" && !Number.isNaN(Date.parse(entry.uploadedAt)) &&
     (entry.externalLink === undefined || (typeof entry.externalLink === "string" && entry.externalLink.length <= 2048 && isSafeExternalLink(entry.externalLink))) &&
     ((entry.storagePath !== "" && entry.fileName.length > 0 && entry.contentType !== "" && entry.sizeBytes > 0) ||
-      (typeof entry.externalLink === "string" && entry.externalLink.length > 0))));
+      (entry.storagePath === "" && entry.fileName === "" && entry.contentType === "" && entry.sizeBytes === 0))));
   const promptRecordsOk = value.promptRecords === undefined || (Array.isArray(value.promptRecords) && value.promptRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
