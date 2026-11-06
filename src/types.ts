@@ -32,6 +32,7 @@ export type Page =
   | "Vehicles"
   | "Electricity"
   | "Personal documents"
+  | "Archive"
   | "Account credentials"
   | "Data management"
   | "R&D / Test Connectors";
@@ -524,8 +525,18 @@ export interface TrackerData {
   workExperiences?: WorkExperience[];
   professionalSkills?: ProfessionalSkill[];
   familyMembers?: FamilyMember[];
+  archivedRecords?: ArchivedRecord[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
+}
+
+export type ArchiveSnapshot = Partial<Omit<TrackerData, "version" | "archivedRecords" | "credentialVault">>;
+
+export interface ArchivedRecord {
+  id: string;
+  label: string;
+  archivedAt: string;
+  snapshot: ArchiveSnapshot;
 }
 
 export const ITEM_UNITS = [

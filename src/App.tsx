@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
+  Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -39,6 +39,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
   { name: "Personal documents", icon: FileText },
+  { name: "Archive", icon: Archive },
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
 ];
@@ -165,14 +166,14 @@ function ItemModal({ initial, products, onClose, onSave }: { initial?: ShoppingI
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add item"}</Button></div></form></Modal>;
 }
 
-function ShoppingList({ data, onToggle, onAdd, onEdit, onDelete }: { data: TrackerData; onToggle: (item: ShoppingItem) => void; onAdd: () => void; onEdit: (item: ShoppingItem) => void; onDelete: (item: ShoppingItem) => void }) {
+function ShoppingList({ data, onToggle, onAdd, onEdit, onCopy, onDelete }: { data: TrackerData; onToggle: (item: ShoppingItem) => void; onAdd: () => void; onEdit: (item: ShoppingItem) => void; onCopy: (item: ShoppingItem) => void; onDelete: (item: ShoppingItem) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const [filter, setFilter] = useState("All items");
   const [search, setSearch] = useState("");
   const items = data.items.filter((item) => (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) && item.name.toLowerCase().includes(search.toLowerCase()));
   return <><PageHeading eyebrow="Plan a little ahead" title="Shopping list" subtitle={`${data.items.filter((item) => !item.purchased).length} things waiting patiently for their turn.`} action={<Button onClick={onAdd}><Plus size={15} /> Add an item</Button>} />
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><Select aria-label="Filter list" style={{ width: 145 }} value={filter} onChange={(e) => setFilter(e.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select><Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge></div>
-    <Card className="table-card"><table className="data-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${item.name}`} onClick={() => onDelete(item)}><Trash2 size={14} /></button></div></td></tr>)}</tbody></table>
+    <Card className="table-card"><table className="data-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table>
       {items.length === 0 && <EmptyState icon={<ClipboardList size={18} />} title={search ? "No items found" : "A fresh start"} description={search ? "Try another search or clear the filter." : "Add a few things you need and they will be right here."} />}</Card>
   </>;
 }
@@ -200,30 +201,71 @@ function TripModal({ data, onClose, onSave }: { data: TrackerData; onClose: () =
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit"><ShoppingBag size={14} /> Save trip</Button></div></form></Modal>;
 }
 
-function ShoppingTrips({ data, onAdd }: { data: TrackerData; onAdd: () => void }) {
+function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: TrackerData; onAdd: () => void; onSave: (trip: ShoppingTrip) => void; onCopy: (trip: ShoppingTrip) => void; onDelete: (trip: ShoppingTrip) => void }) {
   const formatCurrency = useCurrencyFormatter();
+  const [editing, setEditing] = useState<ShoppingTrip | null>(null);
   const trips = [...data.trips].sort((a, b) => b.date.localeCompare(a.date));
   return <><PageHeading eyebrow="Make a little plan" title="Shopping trips" subtitle="Your errands, saved in one easy place." action={<Button onClick={onAdd}><Plus size={15} /> Plan a trip</Button>} />
     {trips.length ? <div className="trip-grid">{trips.map((trip) => {
       const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
       const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
-      return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div></div><p className="trip-note">{trip.notes || "A little shopping, all in one place."}</p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
+      return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store}`} title="Copy trip and its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note">{trip.notes || "A little shopping, all in one place."}</p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
     })}</div> : <Card><EmptyState icon={<ShoppingBag size={18} />} title="No trips planned just yet" description="Create a trip, choose a store and add items from your shopping list." /></Card>}
+    {editing && <TripEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(trip) => { onSave(trip); setEditing(null); }} />}
   </>;
 }
 
-function PurchaseHistory({ data }: { data: TrackerData }) {
+function TripEditor({ initial, onClose, onSave }: { initial: ShoppingTrip; onClose: () => void; onSave: (trip: ShoppingTrip) => void }) {
+  const [date, setDate] = useState(initial.date);
+  const [store, setStore] = useState(initial.store);
+  const [notes, setNotes] = useState(initial.notes);
+  return <Modal title={`Edit shopping trip · ${initial.store}`} onClose={onClose}><form onSubmit={(event) => { event.preventDefault(); onSave({ ...initial, date, store: store.trim(), notes: notes.trim() }); }}><div className="form-grid">
+    <Field label="Date"><Input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Store"><Input required maxLength={120} value={store} onChange={(event) => setStore(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+  </div><div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save changes</Button></div></form></Modal>;
+}
+
+function PurchaseEditor({ initial, onClose, onSave }: { initial: Purchase; onClose: () => void; onSave: (purchase: Omit<Purchase, "id">) => void }) {
+  const [form, setForm] = useState({
+    itemId: initial.itemId, itemName: initial.itemName, category: initial.category, quantity: initial.quantity,
+    unit: initial.unit, price: initial.price, date: initial.date, store: initial.store,
+  });
+  const [error, setError] = useState("");
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!form.itemName.trim() || !form.unit.trim() || !form.store.trim() || !form.date ||
+      !Number.isFinite(form.quantity) || form.quantity <= 0 || !Number.isFinite(form.price) || form.price < 0) {
+      setError("Enter an item, store, date, positive quantity, and non-negative price.");
+      return;
+    }
+    onSave({ ...form, itemName: form.itemName.trim(), unit: form.unit.trim(), store: form.store.trim() });
+  }
+  return <Modal title={`Edit purchase · ${initial.itemName}`} onClose={onClose}><form onSubmit={submit}><div className="form-grid">
+    <Field className="full" label="Item"><Input required maxLength={120} value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} /></Field>
+    <Field label="Category"><Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value as Category })}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+    <Field label="Quantity"><Input required type="number" min="0.01" step="any" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: Number(event.target.value) })} /></Field>
+    <Field label="Unit"><Input required maxLength={40} value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} /></Field>
+    <Field label="Paid"><Input required type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></Field>
+    <Field label="Date"><Input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
+    <Field className="full" label="Store"><Input required maxLength={120} value={form.store} onChange={(event) => setForm({ ...form, store: event.target.value })} /></Field>
+  </div>{error && <div className="alert alert-error" role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save changes</Button></div></form></Modal>;
+}
+
+function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData; onSave: (purchase: Purchase) => void; onCopy: (purchase: Purchase) => void; onDelete: (purchase: Purchase) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const [search, setSearch] = useState("");
   const [store, setStore] = useState("All stores");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [editing, setEditing] = useState<Purchase | null>(null);
   const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort();
   const purchases = [...data.purchases].filter((purchase) => (!search || purchase.itemName.toLowerCase().includes(search.toLowerCase())) && (store === "All stores" || purchase.store === store) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) => b.date.localeCompare(a.date));
   const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
   return <><PageHeading eyebrow="A record of the good stuff" title="Purchase history" subtitle="Everything you've brought home, in one place." />
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><Select aria-label="Filter by store" style={{ width: 165 }} value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select><Input className="filter-date" aria-label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /><Input className="filter-date" aria-label="To date" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-    <Card className="table-card"><div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div><table className="data-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td></tr>)}</tbody></table>{purchases.length === 0 && <EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." />}</Card>
+    <Card className="table-card"><div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div><table className="data-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table>{purchases.length === 0 && <EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." />}</Card>
+    {editing && <PurchaseEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(purchase) => { onSave({ ...purchase, id: editing.id, ...(editing.tripId ? { tripId: editing.tripId } : {}) }); setEditing(null); }} />}
   </>;
 }
 
@@ -306,7 +348,7 @@ function ReminderCard({ reminder, categories, onSave, onDelete, onToggle }: {
     <div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{dateLabel(reminder.date)}{reminder.details ? ` · ${reminder.details}` : ""}</div></div>
     <Badge className="reminder-category-badge">{reminder.category || "General"}</Badge>
     <Badge className="reminder-status-badge" tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
-    <div className="table-actions"><button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={startEditing}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${reminder.title}`} onClick={() => { if (window.confirm(`Delete "${reminder.title}"?`)) onDelete(reminder.id); }}><Trash2 size={14} /></button></div>
+    <div className="table-actions"><button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={startEditing}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button></div>
   </Card>;
 }
 
@@ -349,7 +391,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   </>;
 }
 
-function MasterData({ stores, products, reminders, reminderCategories, onAddStore, onDeleteStore, onAddProduct, onDeleteProduct, onAddReminderCategory, onDeleteReminderCategory }: { stores: Store[]; products: Product[]; reminders: Reminder[]; reminderCategories: string[]; onAddStore: (store: Omit<Store, "id">) => void; onDeleteStore: (id: string) => void; onAddProduct: (product: Omit<Product, "id">) => void; onDeleteProduct: (id: string) => void; onAddReminderCategory: (category: string) => void; onDeleteReminderCategory: (category: string) => void }) {
+function MasterData({ stores, products, reminders, reminderCategories, onAddStore, onSaveStore, onDeleteStore, onAddProduct, onSaveProduct, onDeleteProduct, onAddReminderCategory, onRenameReminderCategory, onDeleteReminderCategory }: { stores: Store[]; products: Product[]; reminders: Reminder[]; reminderCategories: string[]; onAddStore: (store: Omit<Store, "id">) => void; onSaveStore: (store: Omit<Store, "id">, id: string) => void; onDeleteStore: (id: string) => void; onAddProduct: (product: Omit<Product, "id">) => void; onSaveProduct: (product: Omit<Product, "id">, id: string) => void; onDeleteProduct: (id: string) => void; onAddReminderCategory: (category: string) => void; onRenameReminderCategory: (oldCategory: string, newCategory: string) => void; onDeleteReminderCategory: (category: string) => void }) {
   const currency = useContext(CurrencyContext);
   const [storeName, setStoreName] = useState("");
   const [location, setLocation] = useState("");
@@ -358,19 +400,24 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
   const [unit, setUnit] = useState("pcs");
   const [price, setPrice] = useState(0);
   const [reminderCategoryName, setReminderCategoryName] = useState("");
+  const [editingStore, setEditingStore] = useState<Store | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [error, setError] = useState("");
   function addStore(event: FormEvent) {
     event.preventDefault();
     if (!storeName.trim()) { setError("Enter a store name."); return; }
-    if (stores.some((store) => store.name.toLowerCase() === storeName.trim().toLowerCase())) { setError("That store is already in your master data."); return; }
-    onAddStore({ name: storeName.trim(), location: location.trim() }); setStoreName(""); setLocation(""); setError("");
+    if (stores.some((store) => store.id !== editingStore?.id && store.name.toLowerCase() === storeName.trim().toLowerCase())) { setError("That store is already in your master data."); return; }
+    const saved = { name: storeName.trim(), location: location.trim() };
+    if (editingStore) onSaveStore(saved, editingStore.id); else onAddStore(saved);
+    setEditingStore(null); setStoreName(""); setLocation(""); setError("");
   }
   function addProduct(event: FormEvent) {
     event.preventDefault();
     if (!productName.trim() || !unit.trim() || !Number.isFinite(price) || price < 0) { setError("Enter a product name, unit, and a non-negative unit price."); return; }
-    if (products.some((product) => product.name.toLowerCase() === productName.trim().toLowerCase())) { setError("That product is already in your master data."); return; }
-    onAddProduct({ name: productName.trim(), category, unit: unit.trim(), estimatedPrice: price });
-    setProductName(""); setUnit("pcs"); setPrice(0); setError("");
+    if (products.some((product) => product.id !== editingProduct?.id && product.name.toLowerCase() === productName.trim().toLowerCase())) { setError("That product is already in your master data."); return; }
+    const saved = { name: productName.trim(), category, unit: unit.trim(), estimatedPrice: price };
+    if (editingProduct) onSaveProduct(saved, editingProduct.id); else onAddProduct(saved);
+    setEditingProduct(null); setProductName(""); setUnit("pcs"); setPrice(0); setError("");
   }
   function addReminderCategory(event: FormEvent) {
     event.preventDefault();
@@ -385,21 +432,177 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
     setReminderCategoryName("");
     setError("");
   }
-  return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Save your common products and stores, including plain-text store locations." />
+  return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Save and maintain reusable products, stores and reminder categories." />
     {error && <div className="alert alert-error" role="alert">{error}</div>}
-    <div className="master-grid"><Card><div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><ShoppingBasket size={16} /></div><form className="form-grid master-form" onSubmit={addProduct}><Field className="full" label="Product name"><Input required maxLength={100} placeholder="e.g. Basmati rice" value={productName} onChange={(event) => setProductName(event.target.value)} /></Field><Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as Category)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field><Field label="Unit"><Input list="master-item-units" required value={unit} onChange={(event) => setUnit(event.target.value)} /><datalist id="master-item-units">{ITEM_UNITS.map((entry) => <option key={entry} value={entry} />)}</datalist></Field><Field className="full" label={`Price per ${unit || "unit"} (${currency})`}><Input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field><div className="full"><Button type="submit"><Plus size={14} />Add product</Button></div></form><div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Delete ${product.name}`} onClick={() => { if (window.confirm(`Delete "${product.name}" from product master data? Existing shopping list entries will be kept.`)) onDeleteProduct(product.id); }}><Trash2 size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div></Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Database size={16} /></div><form className="form-grid master-form" onSubmit={addStore}><Field className="full" label="Store name"><Input required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field><Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field><div className="full"><Button type="submit"><Plus size={14} />Add store</Button></div></form><div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Delete ${store.name}`} onClick={() => { if (window.confirm(`Delete "${store.name}"? Previously recorded trip history will be kept.`)) onDeleteStore(store.id); }}><Trash2 size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div></Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Bell size={16} /></div><form className="master-form reminder-category-master-form" onSubmit={addReminderCategory}><Field label="New category"><Input required maxLength={80} placeholder="e.g. Travel, Family" value={reminderCategoryName} onChange={(event) => setReminderCategoryName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add category</Button></form><div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Delete ${entry} reminder category`} title={uses ? "Category is used by reminders" : "Delete category"} disabled={uses > 0} onClick={() => { if (window.confirm(`Delete the "${entry}" reminder category?`)) onDeleteReminderCategory(entry); }}><Trash2 size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div></Card></div>
+    <div className="master-grid">
+      <Card>
+        <div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><ShoppingBasket size={16} /></div>
+        <form className="form-grid master-form" onSubmit={addProduct}>
+          <Field className="full" label="Product name"><Input required maxLength={100} placeholder="e.g. Basmati rice" value={productName} onChange={(event) => setProductName(event.target.value)} /></Field>
+          <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as Category)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+          <Field label="Unit"><Input list="master-item-units" required value={unit} onChange={(event) => setUnit(event.target.value)} /><datalist id="master-item-units">{ITEM_UNITS.map((entry) => <option key={entry} value={entry} />)}</datalist></Field>
+          <Field className="full" label={`Price per ${unit || "unit"} (${currency})`}><Input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field>
+          <div className="full"><Button type="submit">{editingProduct ? <><Check size={14} />Save product</> : <><Plus size={14} />Add product</>}</Button>{editingProduct && <Button type="button" variant="outline" style={{ marginLeft: 8 }} onClick={() => { setEditingProduct(null); setProductName(""); setUnit("pcs"); setPrice(0); }}>Cancel</Button>}</div>
+        </form>
+        <div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div>
+      </Card>
+      <Card>
+        <div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Database size={16} /></div>
+        <form className="form-grid master-form" onSubmit={addStore}>
+          <Field className="full" label="Store name"><Input required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field>
+          <Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+          <div className="full"><Button type="submit">{editingStore ? <><Check size={14} />Save store</> : <><Plus size={14} />Add store</>}</Button>{editingStore && <Button type="button" variant="outline" style={{ marginLeft: 8 }} onClick={() => { setEditingStore(null); setStoreName(""); setLocation(""); }}>Cancel</Button>}</div>
+        </form>
+        <div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setStoreName(store.name); setLocation(store.location); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div>
+      </Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Bell size={16} /></div><form className="master-form reminder-category-master-form" onSubmit={addReminderCategory}><Field label="New category"><Input required maxLength={80} placeholder="e.g. Travel, Family" value={reminderCategoryName} onChange={(event) => setReminderCategoryName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add category</Button></form><div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div></Card>
+    </div>
   </>;
 }
 
-function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onDeleteBroker, onSaveQuote }: {
+function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: ArchivedRecord[]; onRestore: (id: string) => void; onCopy: (id: string) => void; onDelete: (id: string) => void }) {
+  const sortedRecords = [...records].sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+  return <><PageHeading eyebrow="Recover or permanently remove" title="Archive" subtitle="Deleted records are kept here until you restore them or permanently delete them. The encrypted credential vault is not included." />
+    {sortedRecords.length ? <div className="reminder-page-list">{sortedRecords.map((record) => {
+      const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) =>
+        Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
+      const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
+      return <Card key={record.id}><div className="card-head"><div><h2 className="section-title">{record.label}</h2><p className="section-description">Archived {new Date(record.archivedAt).toLocaleString()}{contents.length ? ` · ${contents.join(", ")}` : ""}</p></div><Badge>{count} {count === 1 ? "record" : "records"}</Badge></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Button onClick={() => onRestore(record.id)}><ArrowDownToLine size={14} />Restore</Button><Button variant="outline" onClick={() => onCopy(record.id)}><Copy size={14} />Restore a copy</Button><Button variant="outline" onClick={() => { if (window.confirm(`Permanently delete "${record.label}" from the archive? This cannot be undone.`)) onDelete(record.id); }}><Trash2 size={14} />Delete permanently</Button></div></Card>;
+    })}</div> : <Card><EmptyState icon={<Archive size={18} />} title="The archive is empty" description="When you archive a record from any supported screen, it will be available here." /></Card>}
+  </>;
+}
+
+function withArchivedRecord(previous: TrackerData, label: string, snapshot: ArchiveSnapshot): TrackerData {
+  const archivedRecord: ArchivedRecord = {
+    id: createId(),
+    label,
+    archivedAt: new Date().toISOString(),
+    snapshot,
+  };
+  return { ...previous, archivedRecords: [archivedRecord, ...(previous.archivedRecords ?? [])] };
+}
+
+function mergeArchivedRows<T extends { id: string }>(current: T[] | undefined, archived: T[] | undefined): T[] {
+  const merged = [...(current ?? [])];
+  for (const record of archived ?? []) {
+    const existing = merged.findIndex((entry) => entry.id === record.id);
+    if (existing < 0) merged.push(record);
+    else merged[existing] = record;
+  }
+  return merged;
+}
+
+function restoreEducationRecords(current: EducationRecord[] | undefined, archived: EducationRecord[] | undefined): EducationRecord[] {
+  const restored = [...(current ?? [])];
+  for (const record of archived ?? []) {
+    const index = restored.findIndex((entry) => entry.id === record.id);
+    if (index < 0) restored.push(record);
+    else {
+      const active = restored[index];
+      restored[index] = {
+        ...active,
+        subjects: mergeArchivedRows(active.subjects, record.subjects),
+        exams: mergeArchivedRows(active.exams, record.exams),
+        payments: mergeArchivedRows(active.payments, record.payments),
+      };
+    }
+  }
+  return restored;
+}
+
+function restoreShoppingTrips(current: ShoppingTrip[] | undefined, archived: ShoppingTrip[] | undefined): ShoppingTrip[] {
+  const restored = [...(current ?? [])];
+  for (const trip of archived ?? []) {
+    const index = restored.findIndex((entry) => entry.id === trip.id);
+    if (index < 0) restored.push(trip);
+    else {
+      const active = restored[index];
+      restored[index] = {
+        ...active,
+        purchaseIds: [...new Set([...active.purchaseIds, ...trip.purchaseIds])],
+      };
+    }
+  }
+  return restored;
+}
+
+function cloneArchiveSnapshot(snapshot: ArchiveSnapshot): ArchiveSnapshot {
+      const ids = new Map<string, string>();
+      function cloneAndRekey(value: unknown): unknown {
+        if (Array.isArray(value)) return value.map(cloneAndRekey);
+        if (typeof value !== "object" || value === null) return value;
+        const cloned: Record<string, unknown> = {};
+        for (const [key, entry] of Object.entries(value)) {
+          if (key === "id" && typeof entry === "string") {
+            const newId = ids.get(entry) ?? createId();
+            ids.set(entry, newId);
+            cloned[key] = newId;
+          } else {
+            cloned[key] = cloneAndRekey(entry);
+          }
+        }
+        return cloned;
+      }
+      function remapReferences(value: unknown): unknown {
+        if (Array.isArray(value)) return value.map(remapReferences);
+        if (typeof value !== "object" || value === null) return value;
+        const cloned: Record<string, unknown> = {};
+        for (const [key, entry] of Object.entries(value)) {
+          if (typeof entry === "string" && ["itemId", "tripId", "stockId", "vehicleId", "recipeId"].includes(key)) {
+            cloned[key] = ids.get(entry) ?? entry;
+          } else if (key === "purchaseIds" && Array.isArray(entry)) {
+            cloned[key] = entry.map((id) => typeof id === "string" ? ids.get(id) ?? id : id);
+          } else {
+            cloned[key] = remapReferences(entry);
+          }
+        }
+        return cloned;
+      }
+      return remapReferences(cloneAndRekey(snapshot)) as ArchiveSnapshot;
+    }
+
+function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot): TrackerData {
+  return {
+        ...previous,
+        items: mergeArchivedRows(previous.items, snapshot.items),
+        purchases: mergeArchivedRows(previous.purchases, snapshot.purchases),
+        trips: restoreShoppingTrips(previous.trips, snapshot.trips),
+        stores: mergeArchivedRows(previous.stores, snapshot.stores),
+        products: mergeArchivedRows(previous.products, snapshot.products),
+        reminders: mergeArchivedRows(previous.reminders, snapshot.reminders),
+        reminderCategories: [...new Set([...(previous.reminderCategories ?? []), ...(snapshot.reminderCategories ?? [])])],
+        brokers: [...new Set([...(previous.brokers ?? []), ...(snapshot.brokers ?? [])])],
+        stocks: mergeArchivedRows(previous.stocks, snapshot.stocks),
+        stockQuotes: mergeArchivedRows(previous.stockQuotes, snapshot.stockQuotes),
+        assets: mergeArchivedRows(previous.assets, snapshot.assets),
+        learningRecords: mergeArchivedRows(previous.learningRecords, snapshot.learningRecords),
+        educationRecords: restoreEducationRecords(previous.educationRecords, snapshot.educationRecords),
+        vehicles: mergeArchivedRows(previous.vehicles, snapshot.vehicles),
+        vehicleJourneys: mergeArchivedRows(previous.vehicleJourneys, snapshot.vehicleJourneys),
+        vehicleMaintenance: mergeArchivedRows(previous.vehicleMaintenance, snapshot.vehicleMaintenance),
+        electricityReadings: mergeArchivedRows(previous.electricityReadings, snapshot.electricityReadings),
+        devotionalEntries: mergeArchivedRows(previous.devotionalEntries, snapshot.devotionalEntries),
+        prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
+        cookingRecipes: mergeArchivedRows(previous.cookingRecipes, snapshot.cookingRecipes),
+        cookingLogs: mergeArchivedRows(previous.cookingLogs, snapshot.cookingLogs),
+        issueRecords: mergeArchivedRows(previous.issueRecords, snapshot.issueRecords),
+        personalEducation: mergeArchivedRows(previous.personalEducation, snapshot.personalEducation),
+        professionalQualifications: mergeArchivedRows(previous.professionalQualifications, snapshot.professionalQualifications),
+        workExperiences: mergeArchivedRows(previous.workExperiences, snapshot.workExperiences),
+        professionalSkills: mergeArchivedRows(previous.professionalSkills, snapshot.professionalSkills),
+        familyMembers: mergeArchivedRows(previous.familyMembers, snapshot.familyMembers),
+        personalRecords: mergeArchivedRows(previous.personalRecords, snapshot.personalRecords),
+  };
+}
+
+function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onRenameBroker, onDeleteBroker, onSaveQuote }: {
   stocks: TrackedStock[];
   brokers: string[];
   quotes: StockQuoteSnapshot[];
   onSaveStock: (stock: Omit<TrackedStock, "id">, id?: string) => void;
   onDeleteStock: (id: string) => void;
   onAddBroker: (name: string) => void;
+  onRenameBroker: (oldName: string, newName: string) => void;
   onDeleteBroker: (name: string) => void;
   onSaveQuote: (quote: Omit<StockQuoteSnapshot, "id">) => void;
 }) {
@@ -533,7 +736,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     <div className="stock-admin-grid">
       <Card><div className="card-head"><div><h2 className="section-title">Broker names</h2><p className="section-description">Labels for grouping your saved stocks only; no broker account is connected.</p></div></div>
         <form className="broker-form" onSubmit={submitBroker}><Field label="Add a broker"><Input maxLength={60} placeholder="e.g. Zerodha" value={brokerName} onChange={(event) => setBrokerName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add broker</Button></form>
-        <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Delete ${entry}`} onClick={() => { if (window.confirm(`Remove "${entry}"? Tracked stocks will remain and be unassigned.`)) onDeleteBroker(entry); }}><Trash2 size={14} /></button></div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
+        <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { const name = window.prompt(`Rename broker "${entry}"`, entry)?.trim(); if (name && name !== entry) onRenameBroker(entry, name); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button></div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
       </Card>
       <Card><div className="card-head"><div><h2 className="section-title">{editingId ? "Edit tracked stock" : "Add a stock"}</h2><p className="section-description">Use the exchange-listed code (without .NS or .BO).</p></div></div>
         <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => setSymbol(event.target.value)} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>
@@ -558,7 +761,8 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             <div className="table-actions">
               <button className="icon-button" aria-label={`Refresh ${stock.symbol}`} disabled={busy} onClick={() => refreshStock(stock)}><RefreshCw size={14} /></button>
               <button className="icon-button" aria-label={`Edit ${stock.symbol}`} onClick={() => editStock(stock)}><Pencil size={14} /></button>
-              <button className="icon-button" aria-label={`Delete ${stock.symbol}`} onClick={() => { if (window.confirm(`Delete ${stock.symbol} and its saved price history?`)) onDeleteStock(stock.id); }}><Trash2 size={14} /></button>
+              <button className="icon-button" aria-label={`Copy ${stock.symbol}`} onClick={() => { const { id, ...copy } = stock; void id; onSaveStock({ ...copy, name: `${stock.name} (copy)` }); }}><Copy size={14} /></button>
+              <button className="icon-button" aria-label={`Archive ${stock.symbol}`} onClick={() => { if (window.confirm(`Move ${stock.symbol} and its saved price history to the archive?`)) onDeleteStock(stock.id); }}><Archive size={14} /></button>
             </div>
           </div>
           <details className="stock-history">
@@ -712,7 +916,7 @@ function AssetManager({ assets, onSave, onDelete }: {
   }
 
   function removeAsset(asset: AssetRecord) {
-    if (window.confirm(`Delete "${asset.name}" from the asset manager?`)) onDelete(asset);
+    if (window.confirm(`Move "${asset.name}" to the archive?`)) onDelete(asset);
   }
 
   return <>
@@ -726,7 +930,7 @@ function AssetManager({ assets, onSave, onDelete }: {
         ? asset.currentValue - asset.investedValue
         : null;
       return <Card className="asset-card" key={asset.id}>
-        <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${asset.name}`} onClick={() => removeAsset(asset)}><Trash2 size={14} /></button></div></div>
+        <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
           {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {asset.currentValue !== null && <div><span>{isLoan ? "Outstanding balance" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
@@ -1044,19 +1248,19 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   }
 
   function removeSubject(subject: EducationSubject) {
-    if (window.confirm(`Remove ${subject.name} from ${record.academicYear || record.gradeCourse || "this academic year"}?`)) {
+    if (window.confirm(`Move ${subject.name} to the archive?`)) {
       onUpdate({ ...record, subjects: subjects.filter((entry) => entry.id !== subject.id) });
     }
   }
 
   function removeExam(exam: EducationExam) {
-    if (window.confirm(`Delete the ${exam.name} result?`)) {
+    if (window.confirm(`Move the ${exam.name} result to the archive?`)) {
       onUpdate({ ...record, exams: exams.filter((entry) => entry.id !== exam.id) });
     }
   }
 
   function removePayment(payment: EducationPayment) {
-    if (window.confirm(`Delete the ${payment.period} payment of ${formatAmount(payment.amount)}?`)) {
+    if (window.confirm(`Move the ${payment.period} payment of ${formatAmount(payment.amount)} to the archive?`)) {
       onUpdate({ ...record, payments: payments.filter((entry) => entry.id !== payment.id) });
     }
   }
@@ -1069,7 +1273,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
         <Badge tone={record.status === "Current" ? "green" : "neutral"}>{record.status}</Badge>
         <button className="icon-button" aria-label={`Edit ${record.studentName} education record`} onClick={onEdit}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Copy ${record.studentName} education record`} title="Copy as a new record" onClick={onCopy}><Copy size={14} /></button>
-        <button className="icon-button" aria-label={`Delete ${record.studentName} education record`} onClick={onDelete}><Trash2 size={14} /></button>
+        <button className="icon-button" aria-label={`Archive ${record.studentName} education record`} onClick={onDelete}><Archive size={14} /></button>
       </div>
     </div>
     <div className="education-expanded" id={`education-details-${record.id}`} hidden={!expanded}>
@@ -1092,15 +1296,15 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     </div>
     <section className="education-section">
       <div className="education-section-head"><div><h3><BookOpen size={14} />Subjects / courses</h3><p>{subjects.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "subject", initial: null })}><Plus size={12} />Add subject</Button></div>
-      {subjects.length ? <div className="education-entry-list">{subjects.map((subject) => <div className="education-entry" key={subject.id}><div><strong>{subject.name}</strong><span>{[subject.code, subject.credits !== null ? `${subject.credits} credits` : "", subject.notes].filter(Boolean).join(" · ")}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${subject.name}`} onClick={() => setEditor({ kind: "subject", initial: subject })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Remove ${subject.name}`} onClick={() => removeSubject(subject)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Add subjects for this class, term, or course.</p>}
+      {subjects.length ? <div className="education-entry-list">{subjects.map((subject) => <div className="education-entry" key={subject.id}><div><strong>{subject.name}</strong><span>{[subject.code, subject.credits !== null ? `${subject.credits} credits` : "", subject.notes].filter(Boolean).join(" · ")}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${subject.name}`} onClick={() => setEditor({ kind: "subject", initial: subject })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${subject.name}`} onClick={() => onUpdate({ ...record, subjects: [{ ...subject, id: createId() }, ...subjects] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${subject.name}`} onClick={() => removeSubject(subject)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Add subjects for this class, term, or course.</p>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div>
-      {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span><small>{exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : ""}{exam.grade ? `${exam.marksObtained !== null ? " · " : ""}Grade / GPA: ${exam.grade}` : ""}{exam.notes ? `${exam.marksObtained !== null || exam.grade ? " · " : ""}${exam.notes}` : ""}</small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${exam.name}`} onClick={() => removeExam(exam)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
+      {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span><small>{exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : ""}{exam.grade ? `${exam.marksObtained !== null ? " · " : ""}Grade / GPA: ${exam.grade}` : ""}{exam.notes ? `${exam.marksObtained !== null || exam.grade ? " · " : ""}${exam.notes}` : ""}</small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><Wallet size={14} />Fee payments</h3><p>{payments.length} logged · {formatAmount(loggedPaid)} paid across all fee types</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record payment</Button></div>
-      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}</span>{payment.notes && <small>{payment.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${payment.period} payment`} onClick={() => removePayment(payment)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
+      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}</span>{payment.notes && <small>{payment.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${payment.period} payment`} onClick={() => onUpdate({ ...record, payments: [{ ...payment, id: createId() }, ...payments] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${payment.period} payment`} onClick={() => removePayment(payment)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
     </section>
     {record.link && <a className="personal-document-link" href={record.link} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
     {record.notes && <p className="personal-record-notes">{record.notes}</p>}
@@ -1206,7 +1410,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
     .sort(compareEducationRecords);
 
   function deleteRecord(record: EducationRecord) {
-    if (window.confirm(`Delete the ${record.academicYear || record.level} record for ${record.studentName} at ${record.institution}?`)) onDelete(record);
+    if (window.confirm(`Move the ${record.academicYear || record.level} record for ${record.studentName} at ${record.institution} to the archive?`)) onDelete(record);
   }
 
   function updateRecord(record: EducationRecord) {
@@ -1323,7 +1527,7 @@ function LearningPage({ records, onSave, onDelete }: {
     .sort((a, b) => a.status.localeCompare(b.status) || a.title.localeCompare(b.title));
 
   function deleteRecord(record: LearningRecord) {
-    if (window.confirm(`Delete "${record.title}" from your learning records?`)) onDelete(record);
+    if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
   }
 
   return <>
@@ -1331,7 +1535,7 @@ function LearningPage({ records, onSave, onDelete }: {
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Save skills, courses, progress, notes, and learning links. AI resource links are optional; add a trusted AI tutor or tool that supports your learning.</span></div>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search learning records" placeholder="Search title, topic, source, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter learning level" style={{ width: 165 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{(["Beginner", "Basic", "Intermediate", "Advanced", "Expert"] as const).map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter learning status" style={{ width: 165 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Not started</option><option>In progress</option><option>Completed</option></Select><Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge></div>
     <div className="learning-list">{visible.map((record) => <Card className="learning-card" key={record.id}>
-      <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${record.title}`} onClick={() => deleteRecord(record)}><Trash2 size={14} /></button></div></div>
+      <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
       <div className="learning-card-meta"><Badge>{record.level}</Badge>{record.startedDate && <span>Started {dateLabel(record.startedDate)}</span>}{record.completedDate && <span>Completed {dateLabel(record.completedDate)}</span>}</div>
       {(record.resourceLink || record.aiLink) && <div className="learning-links">{record.resourceLink && <a className="personal-document-link" href={record.resourceLink} target="_blank" rel="noopener noreferrer">Open learning resource</a>}{record.aiLink && <a className="personal-document-link" href={record.aiLink} target="_blank" rel="noopener noreferrer">Open AI resource</a>}</div>}
       {record.notes && <p className="learning-notes">{record.notes}</p>}
@@ -1465,11 +1669,12 @@ function VehicleMaintenanceModal({ vehicle, initial, onClose, onSave }: {
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save record" : "Add record"}</Button></div></form></Modal>;
 }
 
-function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onDeleteVehicle, onSaveJourney, onDeleteJourney, onSaveMaintenance, onDeleteMaintenance }: {
+function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onCopyVehicle, onDeleteVehicle, onSaveJourney, onDeleteJourney, onSaveMaintenance, onDeleteMaintenance }: {
   vehicles: Vehicle[];
   journeys: VehicleJourney[];
   maintenance: VehicleMaintenance[];
   onSaveVehicle: (vehicle: Omit<Vehicle, "id">, id?: string) => void;
+  onCopyVehicle: (vehicle: Vehicle) => void;
   onDeleteVehicle: (vehicle: Vehicle) => void;
   onSaveJourney: (journey: Omit<VehicleJourney, "id" | "vehicleId">, vehicleId: string, id?: string) => void;
   onDeleteJourney: (journey: VehicleJourney) => void;
@@ -1493,17 +1698,17 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onD
         const travelCost = vehicleJourneys.reduce((total, journey) => total + journey.cost, 0);
         return <Card className="vehicle-card" key={vehicle.id}>
           <div className="vehicle-card-head"><div className="vehicle-heading"><div className="vehicle-icon"><Car size={18} /></div><div><h2 className="section-title">{vehicle.name}</h2><p className="section-description">{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}{vehicle.fuelType ? ` · ${vehicle.fuelType}` : ""}</p></div></div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={() => setVehicleEditor({ initial: vehicle })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${vehicle.name}`} onClick={() => onDeleteVehicle(vehicle)}><Trash2 size={14} /></button></div></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={() => setVehicleEditor({ initial: vehicle })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${vehicle.name} with its logs`} onClick={() => onCopyVehicle(vehicle)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${vehicle.name}`} onClick={() => onDeleteVehicle(vehicle)}><Archive size={14} /></button></div></div>
           {vehicle.notes && <p className="vehicle-notes">{vehicle.notes}</p>}
           <div className="vehicle-stats"><div><span>Travel logs</span><strong>{vehicleJourneys.length}</strong></div><div><span>Recorded distance</span><strong>{recordedDistance.toLocaleString()} km</strong></div><div><span>Travel costs</span><strong>{formatCurrency(travelCost)}</strong></div><div><span>Service & repair cost</span><strong>{formatCurrency(maintenanceCost)}</strong></div></div>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><MapPin size={14} /></span>Travel log</h3><p>{vehicleJourneys.length} recorded {vehicleJourneys.length === 1 ? "journey" : "journeys"}</p></div><Button variant="outline" onClick={() => setJourneyEditor({ vehicle, initial: null })}><Plus size={13} /> Log travel</Button></div>
             {vehicleJourneys.length ? <div className="vehicle-record-list">{vehicleJourneys.map((journey) => {
               const distance = journey.odometerStart !== null && journey.odometerEnd !== null ? journey.odometerEnd - journey.odometerStart : null;
-              return <div className="vehicle-record" key={journey.id}><div className="vehicle-record-main"><strong>{journey.startLocation || "Start"} → {journey.endLocation || "Destination"}</strong><span>{dateLabel(journey.date)}{journey.purpose ? ` · ${journey.purpose}` : ""}</span><small>{distance === null ? "Distance not recorded" : `${distance.toLocaleString()} km`}{journey.cost ? ` · ${formatCurrency(journey.cost)}` : ""}{journey.notes ? ` · ${journey.notes}` : ""}</small></div><div className="table-actions"><button className="icon-button" aria-label="Edit travel log" onClick={() => setJourneyEditor({ vehicle, initial: journey })}><Pencil size={13} /></button><button className="icon-button" aria-label="Delete travel log" onClick={() => onDeleteJourney(journey)}><Trash2 size={13} /></button></div></div>;
+              return <div className="vehicle-record" key={journey.id}><div className="vehicle-record-main"><strong>{journey.startLocation || "Start"} → {journey.endLocation || "Destination"}</strong><span>{dateLabel(journey.date)}{journey.purpose ? ` · ${journey.purpose}` : ""}</span><small>{distance === null ? "Distance not recorded" : `${distance.toLocaleString()} km`}{journey.cost ? ` · ${formatCurrency(journey.cost)}` : ""}{journey.notes ? ` · ${journey.notes}` : ""}</small></div><div className="table-actions"><button className="icon-button" aria-label="Edit travel log" onClick={() => setJourneyEditor({ vehicle, initial: journey })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy travel log" onClick={() => { const { id, vehicleId, ...copy } = journey; void id; onSaveJourney(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive travel log" onClick={() => onDeleteJourney(journey)}><Archive size={13} /></button></div></div>;
             })}</div> : <p className="vehicle-empty">No travel logs yet.</p>}
           </section>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><Wrench size={14} /></span>Services & repairs</h3><p>{vehicleMaintenance.length} records · {formatCurrency(maintenanceCost)} total</p></div><Button variant="outline" onClick={() => setMaintenanceEditor({ vehicle, initial: null })}><Plus size={13} /> Add record</Button></div>
-            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Delete service or repair record" onClick={() => onDeleteMaintenance(entry)}><Trash2 size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">No service or repair records yet.</p>}
+            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy service or repair record" onClick={() => { const { id, vehicleId, ...copy } = entry; void id; onSaveMaintenance(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive service or repair record" onClick={() => onDeleteMaintenance(entry)}><Archive size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">No service or repair records yet.</p>}
           </section>
         </Card>;
       })}</div>}
@@ -1636,7 +1841,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   for (const entry of visible) grouped.set(meterKey(entry), [...(grouped.get(meterKey(entry)) ?? []), entry]);
 
   function deleteReading(reading: ElectricityReading) {
-    if (window.confirm(`Delete the ${dateLabel(reading.readingDate)} reading for ${reading.meterName}?`)) onDelete(reading);
+    if (window.confirm(`Move the ${dateLabel(reading.readingDate)} reading for ${reading.meterName} to the archive?`)) onDelete(reading);
   }
 
   return <>
@@ -1664,7 +1869,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
               <span>{entry.meterReading.toLocaleString()} kWh{used !== null ? ` · ${used.toLocaleString()} kWh used since previous reading` : " · First recorded reading"}{entry.billAmount !== null ? ` · Bill ${formatCurrency(entry.billAmount)}` : ""}</span>
               <small>{[period ? `Period ${period}` : "", entry.ratePerUnit !== null ? `${formatCurrency(entry.ratePerUnit)} / unit` : "", entry.paidDate ? `Paid ${dateLabel(entry.paidDate)}` : "", entry.notes].filter(Boolean).join(" · ") || "No billing details"}</small>
             </div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Trash2 size={13} /></button></div>
+            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => { const { id, ...copy } = entry; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Archive size={13} /></button></div>
           </div>;
         })}</div>
       </Card>;
@@ -1778,10 +1983,10 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
   const answeredCount = requests.filter((request) => request.status === "Answered").length;
 
   function confirmDeleteEntry(entry: DevotionalEntry) {
-    if (window.confirm(`Delete the devotional entry for ${entry.scriptureReference}?`)) onDeleteEntry(entry);
+    if (window.confirm(`Move the devotional entry for ${entry.scriptureReference} to the archive?`)) onDeleteEntry(entry);
   }
   function confirmDeleteRequest(request: PrayerRequest) {
-    if (window.confirm(`Delete the prayer request "${request.title}"?`)) onDeleteRequest(request);
+    if (window.confirm(`Move the prayer request "${request.title}" to the archive?`)) onDeleteRequest(request);
   }
 
   return <>
@@ -1796,14 +2001,14 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
     <div className="devotional-columns">
       <section className="devotional-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div><Button variant="outline" onClick={() => setEntryEditor(null)}><Plus size={13} /> Add entry</Button></div>
         {visibleEntries.length ? <div className="devotional-list">{visibleEntries.map((entry) => <Card className="devotional-card" key={entry.id}>
-          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(entry.date)}</span><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Trash2 size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(entry.date)}</span><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
           {entry.takeaway && <p><strong>Message:</strong> {entry.takeaway}</p>}{entry.reflection && <p><strong>Reflection:</strong> {entry.reflection}</p>}{entry.prayerNotes && <p><strong>Prayer:</strong> {entry.prayerNotes}</p>}
         </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={entries.length ? "No matching reflections" : "No Bible reflections yet"} description={entries.length ? "Try another search." : "Save a Scripture reference and your thoughts about it."} /></Card>}
       </section>
       <section className="devotional-section"><div className="devotional-section-head"><div><h2><Heart size={15} /> Prayer requests</h2><p>{ongoingCount} ongoing · {answeredCount} answered</p></div><Button variant="outline" onClick={() => setRequestEditor(null)}><Plus size={13} /> Add request</Button></div>
         <Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select>
         {visibleRequests.length ? <div className="devotional-list">{visibleRequests.map((request) => <Card className="devotional-card" key={request.id}>
-          <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Trash2 size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy prayer request: ${request.title}`} onClick={() => { const { id, ...copy } = request; void id; onSaveRequest(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Archive size={13} /></button></div></div>
           {request.details && <p>{request.details}</p>}
           <Button size="sm" variant="outline" onClick={() => onSaveRequest({
             ...request,
@@ -1998,13 +2203,13 @@ function CookingPage({ recipes, logs, onSaveRecipe, onDeleteRecipe, onSaveLog, o
     <div className="cooking-columns">
       <section className="cooking-section"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div><Button variant="outline" onClick={() => setRecipeEditor(null)}><Plus size={13} /> Add</Button></div>
         {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <Card className="cooking-card" key={recipe.id}>
-          <div className="devotional-card-head"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={() => setRecipeEditor(recipe)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${recipe.name}`} onClick={() => { if (window.confirm(`Delete "${recipe.name}" from the recipe book? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Trash2 size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={() => setRecipeEditor(recipe)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${recipe.name}`} onClick={() => { const { id, ...copy } = recipe; void id; onSaveRecipe(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${recipe.name}`} onClick={() => { if (window.confirm(`Move "${recipe.name}" to the archive? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Archive size={13} /></button></div></div>
           {recipe.ingredients && <p><strong>Ingredients:</strong> {recipe.ingredients}</p>}{recipe.steps && <p><strong>Steps:</strong> {recipe.steps}</p>}{recipe.allergens.length > 0 && <p><strong>Allergens:</strong> {recipe.allergens.join(", ")}</p>}{recipe.nutritionNotes && <p><strong>Nutrition / vitamins:</strong> {recipe.nutritionNotes}</p>}{recipe.healthNotes && <p><strong>Health notes:</strong> {recipe.healthNotes}</p>}{recipe.notes && <p><strong>Notes:</strong> {recipe.notes}</p>}
         </Card>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
       </section>
       <section className="cooking-section"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div><Button variant="outline" onClick={() => setLogEditor(null)}><Plus size={13} /> Log today</Button></div>
         {visibleLogs.length ? <div className="cooking-list">{visibleLogs.map((log) => <Card className="cooking-card" key={log.id}>
-          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Delete the cooking log for ${dateLabel(log.date)}?`)) onDeleteLog(log); }}><Trash2 size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; onSaveLog(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) onDeleteLog(log); }}><Archive size={13} /></button></div></div>
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> {log.learning}</p>}{log.notes && <p><strong>Notes:</strong> {log.notes}</p>}
         </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
       </section>
@@ -2133,7 +2338,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
     });
 
   function deleteRecord(record: IssueRecord) {
-    if (window.confirm(`Delete "${record.title}" from Issues & maintenance?`)) onDelete(record);
+    if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
   }
 
   return <>
@@ -2155,7 +2360,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
       return <Card className="issue-card" key={record.id}>
         <div className="issue-card-head">
           <div className="issue-card-title"><div className="issue-badges"><Badge>{record.area === "Other" ? record.customArea : record.area}</Badge><Badge tone={record.kind === "Repair" || record.kind === "Maintenance" ? "blue" : "neutral"}>{record.kind}</Badge><Badge tone={record.priority === "Urgent" || record.priority === "High" ? "amber" : "neutral"}>{record.priority} priority</Badge></div><h2>{record.title}</h2></div>
-          <div className="table-actions"><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${record.title}`} onClick={() => deleteRecord(record)}><Trash2 size={13} /></button></div>
+          <div className="table-actions"><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={13} /></button></div>
         </div>
         <div className="issue-card-meta">
           <span>Reported {dateLabel(record.dateReported)}</span>
@@ -2360,16 +2565,17 @@ function CareerSection({ title, description, icon, action, children }: {
   return <section className="career-section"><div className="career-section-head"><div><h2>{icon}{title}</h2><p>{description}</p></div>{action}</div>{children}</section>;
 }
 
-function CareerEntry({ title, subtitle, details, description, link, onEdit, onDelete }: {
+function CareerEntry({ title, subtitle, details, description, link, onEdit, onCopy, onDelete }: {
   title: string;
   subtitle: string;
   details: string[];
   description?: string;
   link?: string;
   onEdit: () => void;
+  onCopy: () => void;
   onDelete: () => void;
 }) {
-  return <Card className="career-card"><div className="career-card-head"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${title}`} onClick={onEdit}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${title}`} onClick={onDelete}><Trash2 size={13} /></button></div></div>
+  return <Card className="career-card"><div className="career-card-head"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${title}`} onClick={onEdit}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${title}`} onClick={onCopy}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${title}`} onClick={onDelete}><Archive size={13} /></button></div></div>
     {details.filter(Boolean).length > 0 && <div className="career-card-details">{details.filter(Boolean).map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}</div>}
     {description && <p className="career-card-description">{description}</p>}
     {link && <a className="career-card-link" href={link} target="_blank" rel="noopener noreferrer">Open link</a>}
@@ -2401,7 +2607,7 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   const totalItems = education.length + qualifications.length + experience.length + skills.length;
 
   function confirmDelete(label: string, remove: () => void) {
-    if (window.confirm(`Delete "${label}" from your education and career profile?`)) remove();
+    if (window.confirm(`Move "${label}" to the archive?`)) remove();
   }
 
   return <>
@@ -2414,16 +2620,16 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
     {totalItems === 0 && !query ? <Card><EmptyState icon={<Briefcase size={18} />} title="Start your professional profile" description="Add your education, qualifications, work history, and professional skills below." /></Card> : null}
     <div className="career-sections">
       <CareerSection title="Education history" description={`${filteredEducation.length} ${filteredEducation.length === 1 ? "record" : "records"}`} icon={<GraduationCap size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "education", record: null })}><Plus size={13} /> Add education</Button>}>
-        {filteredEducation.length ? <div className="career-list">{filteredEducation.map((entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />)}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
+        {filteredEducation.length ? <div className="career-list">{filteredEducation.map((entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveEducation(copy); }} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />)}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
       </CareerSection>
       <CareerSection title="Qualifications & certificates" description={`${filteredQualifications.length} ${filteredQualifications.length === 1 ? "record" : "records"}`} icon={<Award size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "qualification", record: null })}><Plus size={13} /> Add qualification</Button>}>
-        {filteredQualifications.length ? <div className="career-list">{filteredQualifications.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />)}</div> : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search." : "Add professional certificates, licenses, and credentials."} /></Card>}
+        {filteredQualifications.length ? <div className="career-list">{filteredQualifications.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveQualification(copy); }} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />)}</div> : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search." : "Add professional certificates, licenses, and credentials."} /></Card>}
       </CareerSection>
       <CareerSection title="Work history" description={`${filteredExperience.length} ${filteredExperience.length === 1 ? "role" : "roles"}`} icon={<Briefcase size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "experience", record: null })}><Plus size={13} /> Add work</Button>}>
-        {filteredExperience.length ? <div className="career-list">{filteredExperience.map((entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />)}</div> : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
+        {filteredExperience.length ? <div className="career-list">{filteredExperience.map((entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveExperience(copy); }} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />)}</div> : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
       </CareerSection>
       <CareerSection title="Skills & languages" description={`${filteredSkills.length} ${filteredSkills.length === 1 ? "skill" : "skills"}`} icon={<Sparkles size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "skill", record: null })}><Plus size={13} /> Add skill</Button>}>
-        {filteredSkills.length ? <div className="career-list">{filteredSkills.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />)}</div> : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
+        {filteredSkills.length ? <div className="career-list">{filteredSkills.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveSkill(copy); }} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />)}</div> : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
       </CareerSection>
     </div>
     {editor?.type === "education" && <PersonalEducationModal key={editor.record?.id ?? "new-personal-education"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveEducation(record, editor.record?.id); setEditor(null); }} />}
@@ -2524,7 +2730,7 @@ function FamilyPage({ members, onSave, onDelete }: {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   function confirmDelete(member: FamilyMember) {
-    if (window.confirm(`Delete "${member.name}" from the family directory?`)) onDelete(member);
+    if (window.confirm(`Move "${member.name}" to the archive?`)) onDelete(member);
   }
 
   return <>
@@ -2542,7 +2748,7 @@ function FamilyPage({ members, onSave, onDelete }: {
       </Select>
     </div>
     {visibleMembers.length ? <div className="family-list">{visibleMembers.map((member) => <Card className="family-card" key={member.id}>
-      <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${member.name}`} onClick={() => confirmDelete(member)}><Trash2 size={13} /></button></div></div>
+      <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${member.name}`} onClick={() => { const { id, ...copy } = member; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${member.name}`} onClick={() => confirmDelete(member)}><Archive size={13} /></button></div></div>
       <div className="family-details">{member.birthPlace && <div><span>Place of birth</span><strong>{member.birthPlace}</strong></div>}{member.currentResidence && <div><span>Current residence</span><strong>{member.currentResidence}</strong></div>}{member.education && <div><span>Education</span><strong>{member.education}{member.institution ? ` · ${member.institution}` : ""}</strong></div>}{member.occupation && <div><span>Occupation</span><strong>{member.occupation}{member.organization ? ` · ${member.organization}` : ""}</strong></div>}</div>
       {(member.phone || member.email) && <div className="family-contact">{member.phone && <span>Phone: {member.phone}</span>}{member.email && <a href={`mailto:${member.email}`}>Email: {member.email}</a>}</div>}
       {member.notes && <p className="family-notes">{member.notes}</p>}
@@ -2659,7 +2865,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
     <div className="personal-record-list">{visibleRecords.map((record) => {
       const due = dueLabel(record);
       return <Card className="personal-record-card" key={record.id}>
-        <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${record.title}`} onClick={() => onDelete(record)}><Trash2 size={14} /></button></div></div>
+        <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => onDelete(record)}><Archive size={14} /></button></div></div>
         <div className="personal-record-details">
           {record.recordNumber && <div><span>Document / policy number</span><strong>{record.recordNumber}</strong></div>}
           {record.issueDate && <div><span>Issue date</span><strong>{dateLabel(record.issueDate)}</strong></div>}
@@ -3206,6 +3412,7 @@ function emptyTrackerData(): TrackerData {
     workExperiences: [],
     professionalSkills: [],
     familyMembers: [],
+    archivedRecords: [],
   };
 }
 
@@ -3556,6 +3763,29 @@ export default function App() {
     setData((previous) => previous ? mutator(previous) : previous);
     setNotice("");
   }
+  function restoreArchivedRecord(id: string) {
+    update((previous) => {
+      const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
+      if (!archived) return previous;
+      return {
+        ...mergeArchiveSnapshot(previous, archived.snapshot),
+        archivedRecords: (previous.archivedRecords ?? []).filter((entry) => entry.id !== id),
+      };
+    });
+  }
+  function copyArchivedRecord(id: string) {
+    update((previous) => {
+      const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
+      if (!archived) return previous;
+      return mergeArchiveSnapshot(previous, cloneArchiveSnapshot(archived.snapshot));
+    });
+  }
+  function permanentlyDeleteArchivedRecord(id: string) {
+    update((previous) => ({
+      ...previous,
+      archivedRecords: (previous.archivedRecords ?? []).filter((entry) => entry.id !== id),
+    }));
+  }
   function addItem(item: Omit<ShoppingItem, "id">) {
     update((previous) => ({ ...previous, items: [{ ...item, id: createId() }, ...previous.items] }));
     setModal(null);
@@ -3565,6 +3795,9 @@ export default function App() {
     const id = editing.id;
     update((previous) => ({ ...previous, items: previous.items.map((entry) => entry.id === id ? { ...entry, ...item } : entry) }));
     setEditing(null);
+  }
+  function copyItem(item: ShoppingItem) {
+    update((previous) => ({ ...previous, items: [{ ...item, id: createId(), name: `${item.name} (copy)`, purchased: false }, ...previous.items] }));
   }
   function togglePurchased(item: ShoppingItem) {
     update((previous) => {
@@ -3582,8 +3815,11 @@ export default function App() {
     });
   }
   function deleteItem(item: ShoppingItem) {
-    if (!window.confirm(`Delete "${item.name}" from your shopping list? Purchase history will be kept.`)) return;
-    update((previous) => ({ ...previous, items: previous.items.filter((entry) => entry.id !== item.id) }));
+    if (!window.confirm(`Move "${item.name}" to the archive? Purchase history will be kept.`)) return;
+    update((previous) => ({
+      ...withArchivedRecord(previous, item.name, { items: [item] }),
+      items: previous.items.filter((entry) => entry.id !== item.id),
+    }));
   }
   function saveTrip(trip: Omit<ShoppingTrip, "id" | "purchaseIds">, itemIds: string[]) {
     update((previous) => {
@@ -3595,6 +3831,80 @@ export default function App() {
     });
     setModal(null);
   }
+  function copyTrip(trip: ShoppingTrip) {
+    update((previous) => {
+      const newTripId = createId();
+      const originalPurchases = trip.purchaseIds
+        .map((id) => previous.purchases.find((purchase) => purchase.id === id))
+        .filter((purchase): purchase is Purchase => Boolean(purchase));
+      const copiedPurchases = originalPurchases.map((purchase) => ({
+        ...purchase,
+        id: createId(),
+        tripId: newTripId,
+      }));
+      return {
+        ...previous,
+        purchases: [...copiedPurchases, ...previous.purchases],
+        trips: [{ ...trip, id: newTripId, purchaseIds: copiedPurchases.map((purchase) => purchase.id) }, ...previous.trips],
+      };
+    });
+  }
+  function saveTripEdits(trip: ShoppingTrip) {
+    update((previous) => ({
+      ...previous,
+      trips: previous.trips.map((entry) => entry.id === trip.id ? trip : entry),
+      purchases: previous.purchases.map((purchase) => purchase.tripId === trip.id
+        ? { ...purchase, date: trip.date, store: trip.store }
+        : purchase),
+    }));
+  }
+  function archiveTrip(trip: ShoppingTrip) {
+    if (!window.confirm(`Move the shopping trip to ${trip.store} and its purchases to the archive?`)) return;
+    update((previous) => {
+      const purchases = previous.purchases.filter((purchase) => trip.purchaseIds.includes(purchase.id));
+      const selectedItemIds = new Set(purchases.map((purchase) => purchase.itemId));
+      return {
+        ...withArchivedRecord(previous, `Shopping trip · ${trip.store} · ${trip.date}`, {
+          trips: [trip],
+          purchases,
+          items: previous.items.filter((item) => selectedItemIds.has(item.id)),
+        }),
+        trips: previous.trips.filter((entry) => entry.id !== trip.id),
+        purchases: previous.purchases.filter((purchase) => !trip.purchaseIds.includes(purchase.id)),
+        items: previous.items.map((item) => selectedItemIds.has(item.id) ? { ...item, purchased: false } : item),
+      };
+    });
+  }
+  function savePurchase(purchase: Purchase) {
+    update((previous) => ({
+      ...previous,
+      purchases: (previous.purchases ?? []).map((entry) => entry.id === purchase.id ? purchase : entry),
+    }));
+  }
+  function copyPurchase(purchase: Purchase) {
+    const standalonePurchase = { ...purchase, id: createId() };
+    delete standalonePurchase.tripId;
+    update((previous) => ({ ...previous, purchases: [standalonePurchase, ...previous.purchases] }));
+  }
+  function archivePurchase(purchase: Purchase) {
+    if (!window.confirm(`Move the purchase of "${purchase.itemName}" to the archive?`)) return;
+    update((previous) => {
+      const linkedTrip = purchase.tripId ? previous.trips.find((trip) => trip.id === purchase.tripId) : undefined;
+      const snapshot: ArchiveSnapshot = {
+        purchases: [purchase],
+        ...(linkedTrip ? { trips: [{ ...linkedTrip, purchaseIds: [purchase.id] }] } : {}),
+      };
+      return {
+        ...withArchivedRecord(previous, `Purchase: ${purchase.itemName}`, snapshot),
+        purchases: previous.purchases.filter((entry) => entry.id !== purchase.id),
+        trips: linkedTrip
+          ? previous.trips.map((trip) => trip.id === linkedTrip.id
+            ? { ...trip, purchaseIds: trip.purchaseIds.filter((id) => id !== purchase.id) }
+            : trip)
+          : previous.trips,
+      };
+    });
+  }
   function saveReminder(reminder: Omit<Reminder, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -3604,33 +3914,77 @@ export default function App() {
         : [{ ...reminder, id: createId() }, ...(previous.reminders ?? [])],
     }));
   }
+  function deleteReminder(id: string) {
+    update((previous) => {
+      const reminder = (previous.reminders ?? []).find((entry) => entry.id === id);
+      if (!reminder) return previous;
+      return {
+        ...withArchivedRecord(previous, reminder.title, { reminders: [reminder] }),
+        reminders: (previous.reminders ?? []).filter((entry) => entry.id !== id),
+      };
+    });
+  }
   function toggleReminder(reminder: Reminder) {
     update((previous) => ({ ...previous, reminders: (previous.reminders ?? []).map((entry) => entry.id === reminder.id ? { ...entry, completed: !entry.completed } : entry) }));
   }
   function addStore(store: Omit<Store, "id">) {
     update((previous) => ({ ...previous, stores: [...(previous.stores ?? []), { ...store, id: createId() }] }));
   }
+  function saveStore(store: Omit<Store, "id">, id: string) {
+    update((previous) => ({ ...previous, stores: (previous.stores ?? []).map((entry) => entry.id === id ? { ...store, id } : entry) }));
+  }
   function addProduct(product: Omit<Product, "id">) {
     update((previous) => ({ ...previous, products: [...(previous.products ?? []), { ...product, id: createId() }] }));
+  }
+  function saveProduct(product: Omit<Product, "id">, id: string) {
+    update((previous) => ({ ...previous, products: (previous.products ?? []).map((entry) => entry.id === id ? { ...product, id } : entry) }));
   }
   function addReminderCategory(category: string) {
     update((previous) => ({ ...previous, reminderCategories: [...(previous.reminderCategories ?? []), category] }));
   }
-  function deleteReminderCategory(category: string) {
+  function renameReminderCategory(oldCategory: string, newCategory: string) {
+    if (!newCategory || newCategory.length > 80 || REMINDER_CATEGORIES.some((entry) => entry.toLocaleLowerCase() === newCategory.toLocaleLowerCase()) ||
+      data?.reminderCategories?.some((entry) => entry.toLocaleLowerCase() === newCategory.toLocaleLowerCase() && entry !== oldCategory)) {
+      setError("Choose a non-empty category name that is not already in use.");
+      return;
+    }
     update((previous) => ({
       ...previous,
+      reminderCategories: (previous.reminderCategories ?? []).map((entry) => entry === oldCategory ? newCategory : entry),
+      reminders: (previous.reminders ?? []).map((reminder) =>
+        (reminder.category || "General").toLocaleLowerCase() === oldCategory.toLocaleLowerCase()
+          ? { ...reminder, category: newCategory }
+          : reminder),
+    }));
+  }
+  function deleteReminderCategory(category: string) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Reminder category: ${category}`, { reminderCategories: [category] }),
       reminderCategories: (previous.reminderCategories ?? []).filter((entry) => entry !== category),
     }));
   }
   function addBroker(name: string) {
     update((previous) => ({ ...previous, brokers: [...(previous.brokers ?? []), name] }));
   }
-  function deleteBroker(name: string) {
+  function renameBroker(oldName: string, newName: string) {
+    if (!newName || newName.length > 80 || (data?.brokers ?? []).some((entry) => entry.toLocaleLowerCase() === newName.toLocaleLowerCase() && entry !== oldName)) {
+      setError("Choose a non-empty broker name that is not already in use.");
+      return;
+    }
     update((previous) => ({
       ...previous,
+      brokers: (previous.brokers ?? []).map((entry) => entry === oldName ? newName : entry),
+      stocks: (previous.stocks ?? []).map((stock) => stock.broker === oldName ? { ...stock, broker: newName } : stock),
+    }));
+  }
+  function deleteBroker(name: string) {
+    update((previous) => {
+      const affectedStocks = (previous.stocks ?? []).filter((stock) => stock.broker === name);
+      return {
+      ...withArchivedRecord(previous, `Broker: ${name}`, { brokers: [name], stocks: affectedStocks }),
       brokers: (previous.brokers ?? []).filter((entry) => entry !== name),
       stocks: (previous.stocks ?? []).map((stock) => stock.broker === name ? { ...stock, broker: "" } : stock),
-    }));
+    };});
   }
   function saveStock(stock: Omit<TrackedStock, "id">, id?: string) {
     update((previous) => {
@@ -3647,11 +4001,15 @@ export default function App() {
     });
   }
   function deleteStock(id: string) {
-    update((previous) => ({
-      ...previous,
+    update((previous) => {
+      const stock = (previous.stocks ?? []).find((entry) => entry.id === id);
+      const quotes = (previous.stockQuotes ?? []).filter((quote) => quote.stockId === id);
+      if (!stock) return previous;
+      return {
+      ...withArchivedRecord(previous, `Stock: ${stock.symbol}`, { stocks: [stock], stockQuotes: quotes }),
       stocks: (previous.stocks ?? []).filter((stock) => stock.id !== id),
       stockQuotes: (previous.stockQuotes ?? []).filter((quote) => quote.stockId !== id),
-    }));
+    };});
   }
   function saveStockQuote(quote: Omit<StockQuoteSnapshot, "id">) {
     update((previous) => ({
@@ -3669,21 +4027,32 @@ export default function App() {
   }
   function deleteAsset(asset: AssetRecord) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, asset.name, { assets: [asset] }),
       assets: (previous.assets ?? []).filter((entry) => entry.id !== asset.id),
     }));
   }
   function saveEducationRecord(record: Omit<EducationRecord, "id">, id?: string) {
-    update((previous) => ({
-      ...previous,
-      educationRecords: id
-        ? (previous.educationRecords ?? []).map((entry) => entry.id === id ? { ...record, id } : entry)
-        : [{ ...record, id: createId() }, ...(previous.educationRecords ?? [])],
-    }));
+    update((previous) => {
+      if (!id) return { ...previous, educationRecords: [{ ...record, id: createId() }, ...(previous.educationRecords ?? [])] };
+      const current = (previous.educationRecords ?? []).find((entry) => entry.id === id);
+      if (!current) return previous;
+      const removedSubjects = (current.subjects ?? []).filter((entry) => !(record.subjects ?? []).some((updated) => updated.id === entry.id));
+      const removedExams = (current.exams ?? []).filter((entry) => !(record.exams ?? []).some((updated) => updated.id === entry.id));
+      const removedPayments = (current.payments ?? []).filter((entry) => !(record.payments ?? []).some((updated) => updated.id === entry.id));
+      const next = removedSubjects.length || removedExams.length || removedPayments.length
+        ? withArchivedRecord(previous, `${current.studentName} education details`, {
+          educationRecords: [{ ...current, subjects: removedSubjects, exams: removedExams, payments: removedPayments }],
+        })
+        : previous;
+      return {
+        ...next,
+        educationRecords: (previous.educationRecords ?? []).map((entry) => entry.id === id ? { ...record, id } : entry),
+      };
+    });
   }
   function deleteEducationRecord(record: EducationRecord) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.studentName, { educationRecords: [record] }),
       educationRecords: (previous.educationRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
@@ -3696,9 +4065,9 @@ export default function App() {
     }));
   }
   function deleteLearningRecord(record: LearningRecord) {
-    if (!window.confirm(`Delete "${record.title}" from your learning records? This cannot be undone.`)) return;
+    if (!window.confirm(`Move "${record.title}" to the archive?`)) return;
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.title, { learningRecords: [record] }),
       learningRecords: (previous.learningRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
@@ -3710,10 +4079,29 @@ export default function App() {
         : [{ ...vehicle, id: createId() }, ...(previous.vehicles ?? [])],
     }));
   }
+  function copyVehicle(vehicle: Vehicle) {
+    update((previous) => {
+      const newVehicleId = createId();
+      const journeys = (previous.vehicleJourneys ?? []).filter((entry) => entry.vehicleId === vehicle.id)
+        .map((entry) => ({ ...entry, id: createId(), vehicleId: newVehicleId }));
+      const maintenance = (previous.vehicleMaintenance ?? []).filter((entry) => entry.vehicleId === vehicle.id)
+        .map((entry) => ({ ...entry, id: createId(), vehicleId: newVehicleId }));
+      return {
+        ...previous,
+        vehicles: [{ ...vehicle, id: newVehicleId, name: `${vehicle.name} (copy)` }, ...(previous.vehicles ?? [])],
+        vehicleJourneys: [...journeys, ...(previous.vehicleJourneys ?? [])],
+        vehicleMaintenance: [...maintenance, ...(previous.vehicleMaintenance ?? [])],
+      };
+    });
+  }
   function deleteVehicle(vehicle: Vehicle) {
-    if (!window.confirm(`Delete ${vehicle.name} and all its travel, service and repair records? This cannot be undone.`)) return;
+    if (!window.confirm(`Move ${vehicle.name} and all its travel, service and repair records to the archive?`)) return;
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, vehicle.name, {
+        vehicles: [vehicle],
+        vehicleJourneys: (previous.vehicleJourneys ?? []).filter((entry) => entry.vehicleId === vehicle.id),
+        vehicleMaintenance: (previous.vehicleMaintenance ?? []).filter((entry) => entry.vehicleId === vehicle.id),
+      }),
       vehicles: (previous.vehicles ?? []).filter((entry) => entry.id !== vehicle.id),
       vehicleJourneys: (previous.vehicleJourneys ?? []).filter((entry) => entry.vehicleId !== vehicle.id),
       vehicleMaintenance: (previous.vehicleMaintenance ?? []).filter((entry) => entry.vehicleId !== vehicle.id),
@@ -3728,9 +4116,9 @@ export default function App() {
     }));
   }
   function deleteVehicleJourney(journey: VehicleJourney) {
-    if (!window.confirm("Delete this travel log?")) return;
+    if (!window.confirm("Move this travel log to the archive?")) return;
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Travel log · ${journey.date}`, { vehicleJourneys: [journey] }),
       vehicleJourneys: (previous.vehicleJourneys ?? []).filter((entry) => entry.id !== journey.id),
     }));
   }
@@ -3743,9 +4131,9 @@ export default function App() {
     }));
   }
   function deleteVehicleMaintenance(entry: VehicleMaintenance) {
-    if (!window.confirm(`Delete this ${entry.type.toLowerCase()} record?`)) return;
+    if (!window.confirm(`Move this ${entry.type.toLowerCase()} record to the archive?`)) return;
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `${entry.type} · ${entry.date}`, { vehicleMaintenance: [entry] }),
       vehicleMaintenance: (previous.vehicleMaintenance ?? []).filter((record) => record.id !== entry.id),
     }));
   }
@@ -3759,7 +4147,7 @@ export default function App() {
   }
   function deleteElectricityReading(reading: ElectricityReading) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Electricity reading · ${reading.readingDate}`, { electricityReadings: [reading] }),
       electricityReadings: (previous.electricityReadings ?? []).filter((entry) => entry.id !== reading.id),
     }));
   }
@@ -3773,7 +4161,7 @@ export default function App() {
   }
   function deleteDevotionalEntry(entry: DevotionalEntry) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Devotional entry · ${entry.date}`, { devotionalEntries: [entry] }),
       devotionalEntries: (previous.devotionalEntries ?? []).filter((current) => current.id !== entry.id),
     }));
   }
@@ -3787,7 +4175,7 @@ export default function App() {
   }
   function deletePrayerRequest(request: PrayerRequest) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Prayer request: ${request.title}`, { prayerRequests: [request] }),
       prayerRequests: (previous.prayerRequests ?? []).filter((current) => current.id !== request.id),
     }));
   }
@@ -3801,7 +4189,7 @@ export default function App() {
   }
   function deleteCookingRecipe(recipe: CookingRecipe) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Recipe: ${recipe.name}`, { cookingRecipes: [recipe] }),
       cookingRecipes: (previous.cookingRecipes ?? []).filter((current) => current.id !== recipe.id),
     }));
   }
@@ -3815,7 +4203,7 @@ export default function App() {
   }
   function deleteCookingLog(log: CookingLog) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `Cooking log · ${log.date}`, { cookingLogs: [log] }),
       cookingLogs: (previous.cookingLogs ?? []).filter((current) => current.id !== log.id),
     }));
   }
@@ -3829,7 +4217,7 @@ export default function App() {
   }
   function deleteIssueRecord(record: IssueRecord) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.title, { issueRecords: [record] }),
       issueRecords: (previous.issueRecords ?? []).filter((current) => current.id !== record.id),
     }));
   }
@@ -3843,7 +4231,7 @@ export default function App() {
   }
   function deletePersonalEducation(record: PersonalEducationRecord) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.qualification, { personalEducation: [record] }),
       personalEducation: (previous.personalEducation ?? []).filter((current) => current.id !== record.id),
     }));
   }
@@ -3857,7 +4245,7 @@ export default function App() {
   }
   function deleteProfessionalQualification(record: ProfessionalQualification) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.name, { professionalQualifications: [record] }),
       professionalQualifications: (previous.professionalQualifications ?? []).filter((current) => current.id !== record.id),
     }));
   }
@@ -3871,7 +4259,7 @@ export default function App() {
   }
   function deleteWorkExperience(record: WorkExperience) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, `${record.jobTitle} · ${record.company}`, { workExperiences: [record] }),
       workExperiences: (previous.workExperiences ?? []).filter((current) => current.id !== record.id),
     }));
   }
@@ -3885,7 +4273,7 @@ export default function App() {
   }
   function deleteProfessionalSkill(record: ProfessionalSkill) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.name, { professionalSkills: [record] }),
       professionalSkills: (previous.professionalSkills ?? []).filter((current) => current.id !== record.id),
     }));
   }
@@ -3899,7 +4287,7 @@ export default function App() {
   }
   function deleteFamilyMember(member: FamilyMember) {
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, member.name, { familyMembers: [member] }),
       familyMembers: (previous.familyMembers ?? []).filter((current) => current.id !== member.id),
     }));
   }
@@ -3912,9 +4300,9 @@ export default function App() {
     }));
   }
   function deletePersonalRecord(record: PersonalRecord) {
-    if (!window.confirm(`Delete "${record.title}" from your personal records? This cannot be undone.`)) return;
+    if (!window.confirm(`Move "${record.title}" to the archive?`)) return;
     update((previous) => ({
-      ...previous,
+      ...withArchivedRecord(previous, record.title, { personalRecords: [record] }),
       personalRecords: (previous.personalRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
@@ -3935,8 +4323,19 @@ export default function App() {
     setNotice("Your backup is ready to save.");
   }
   function clearData() {
-    if (!window.confirm("Clear all shopping, stock, asset, learning, education, career profile, family, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
-    setData(emptyTrackerData());
+    if (!data) return;
+    if (!window.confirm("Clear all active Daybook records? They will be moved to the Archive first. The encrypted credential vault is excluded from archive and will be permanently cleared.")) return;
+    const { version, archivedRecords, credentialVault, stockSeedVersion, ...snapshot } = data;
+    void version;
+    void credentialVault;
+    void stockSeedVersion;
+    const archive: ArchivedRecord = {
+      id: createId(),
+      label: "All records before clear",
+      archivedAt: new Date().toISOString(),
+      snapshot,
+    };
+    setData({ ...emptyTrackerData(), archivedRecords: [archive, ...(archivedRecords ?? [])] });
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
   }
@@ -3953,14 +4352,22 @@ export default function App() {
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} onPage={changePage} />,
-    "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onDelete={deleteItem} />,
-    "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} />,
-    "Purchase history": <PurchaseHistory data={data} />,
+    "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
+    "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
+    "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
     Reports: <Reports data={data} />,
-    "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={(id) => update((previous) => ({ ...previous, reminders: (previous.reminders ?? []).filter((entry) => entry.id !== id) }))} onToggle={toggleReminder} />,
-    "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onDeleteStore={(id) => update((previous) => ({ ...previous, stores: (previous.stores ?? []).filter((entry) => entry.id !== id) }))} onAddProduct={addProduct} onDeleteProduct={(id) => update((previous) => ({ ...previous, products: (previous.products ?? []).filter((entry) => entry.id !== id) }))} onAddReminderCategory={addReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
-    Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
+    "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
+    "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {
+      const store = (previous.stores ?? []).find((entry) => entry.id === id);
+      if (!store) return previous;
+      return { ...withArchivedRecord(previous, `Store: ${store.name}`, { stores: [store] }), stores: (previous.stores ?? []).filter((entry) => entry.id !== id) };
+    })} onAddProduct={addProduct} onSaveProduct={saveProduct} onDeleteProduct={(id) => update((previous) => {
+      const product = (previous.products ?? []).find((entry) => entry.id === id);
+      if (!product) return previous;
+      return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
+    })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
+    Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
@@ -3969,9 +4376,10 @@ export default function App() {
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
-    Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
+    Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
+    Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,

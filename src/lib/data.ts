@@ -353,6 +353,25 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.reminderDays === "number" && [0, 7, 30, 60, 90].includes(entry.reminderDays) &&
     (entry.additionalFields === undefined || (Array.isArray(entry.additionalFields) && entry.additionalFields.every((field) =>
       isRecord(field) && typeof field.label === "string" && typeof field.value === "string")))));
+  const archiveCollections = [
+    "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
+    "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "educationRecords",
+    "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings",
+    "devotionalEntries", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
+    "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
+    "familyMembers", "personalRecords",
+  ];
+  const archivedRecordsOk = value.archivedRecords === undefined ||
+    (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {
+      if (!isRecord(entry) || typeof entry.id !== "string" || !entry.id ||
+        typeof entry.label !== "string" || !entry.label.trim() || entry.label.length > 200 ||
+        typeof entry.archivedAt !== "string" || Number.isNaN(Date.parse(entry.archivedAt)) ||
+        !isRecord(entry.snapshot)) return false;
+      const collectionsOk = Object.entries(entry.snapshot).every(([key, records]) =>
+        archiveCollections.includes(key) && Array.isArray(records) &&
+        records.every((record) => isRecord(record) || typeof record === "string"));
+      return collectionsOk && validateData({ ...value, ...entry.snapshot, archivedRecords: [] });
+    }));
   const credentialVaultOk = value.credentialVault === undefined || (() => {
     const vault = value.credentialVault;
     return isRecord(vault) && vault.version === 1 && vault.kdf === "PBKDF2-SHA-256" &&
@@ -386,6 +405,7 @@ export function validateData(value: unknown): value is TrackerData {
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
     !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk ||
+    !archivedRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -519,6 +539,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     workExperiences: data.workExperiences ?? [],
     professionalSkills: data.professionalSkills ?? [],
     familyMembers: data.familyMembers ?? [],
+    archivedRecords: data.archivedRecords ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],
