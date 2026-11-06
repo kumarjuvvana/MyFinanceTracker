@@ -54,6 +54,9 @@ const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; descriptio
   { id: "vehicles", label: "Vehicles", description: "Vehicles and recent maintenance" },
   { id: "electricity", label: "Electricity", description: "Recent meter readings and unpaid bills" },
 ];
+function stockIdentityKey(stock: Pick<TrackedStock, "symbol" | "exchange" | "broker">) {
+  return `${stock.exchange}:${stock.symbol.trim().toLocaleUpperCase()}:${stock.broker.trim().toLocaleLowerCase()}`;
+}
 const CurrencyContext = createContext<Currency>("INR");
 function useCurrencyFormatter() {
   const currency = useContext(CurrencyContext);
@@ -1039,7 +1042,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setBroker(stock.broker);
     setAverageBuyPrice(stock.averageBuyPrice == null ? "" : String(stock.averageBuyPrice));
     setQuantity(stock.quantity ? String(stock.quantity) : "");
-    setError(`Change the stock code or exchange before saving; ${stock.symbol} on ${stock.exchange} is already tracked.`);
+    setError(`Choose a different broker before saving; ${stock.symbol} on ${stock.exchange} is already tracked with ${stock.broker || "no broker"}.`);
     setNotice("");
   }
   function submitStock(event: FormEvent) {
@@ -1048,8 +1051,8 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     if (!/^[A-Z0-9][A-Z0-9.&_-]{0,29}$/.test(normalizedSymbol) || !name.trim()) {
       setError("Enter a stock code using letters or numbers and a display name."); return;
     }
-    if (stocks.some((stock) => stock.id !== editingId && stock.symbol === normalizedSymbol && stock.exchange === exchange)) {
-      setError(`That ${exchange} stock code is already on your list.`); return;
+    if (stocks.some((stock) => stock.id !== editingId && stockIdentityKey(stock) === stockIdentityKey({ symbol: normalizedSymbol, exchange, broker }))) {
+      setError(`That ${exchange} stock code is already on your list with this broker.`); return;
     }
     const parsedAverageBuyPrice = averageBuyPrice.trim() ? Number(averageBuyPrice) : null;
     const parsedQuantity = quantity.trim() ? Number(quantity) : 0;
@@ -1183,7 +1186,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   function commitImportedStocks() {
     const errors: string[] = [];
     const imported: Omit<TrackedStock, "id">[] = [];
-    const seen = new Set(stocks.map((stock) => `${stock.exchange}:${stock.symbol.toUpperCase()}`));
+    const seen = new Set(stocks.map(stockIdentityKey));
     for (const [index, row] of importRows.entries()) {
       const symbol = row.symbol.trim().toUpperCase();
       const exchange = row.exchange;
@@ -1192,9 +1195,9 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         errors.push(`${label}: enter a valid stock code and name.`);
         continue;
       }
-      const stockKey = `${exchange}:${symbol}`;
+      const stockKey = stockIdentityKey({ exchange, symbol, broker: row.broker });
       if (seen.has(stockKey)) {
-        errors.push(`${label}: ${symbol} on ${exchange} is already tracked or duplicated in this import.`);
+        errors.push(`${label}: ${symbol} on ${exchange} is already tracked or duplicated in this import for this broker.`);
         continue;
       }
       if (row.broker && !brokers.includes(row.broker)) {

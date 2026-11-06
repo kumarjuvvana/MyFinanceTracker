@@ -565,7 +565,8 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
     const stocks = value.stocks as TrackedStock[];
-    if (new Set(stocks.map((stock) => `${stock.exchange}:${stock.symbol.toUpperCase()}`)).size !== stocks.length) return false;
+    if (new Set(stocks.map((stock) =>
+      `${stock.exchange}:${stock.symbol.trim().toLocaleUpperCase()}:${stock.broker.trim().toLocaleLowerCase()}`)).size !== stocks.length) return false;
     const brokerNames = new Set((value.brokers as string[] | undefined ?? []));
     if (!stocks.every((stock) => stock.broker === "" || brokerNames.has(stock.broker))) return false;
   }
