@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import stockPriceHandler from "./api/stock-price";
 import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
+import databaseHandler from "./api/database";
 import dataAuthHandler from "./src/lib/dataAuth";
 
 type ApiRequest = {
@@ -18,7 +19,7 @@ type ApiHandler = (request: ApiRequest, response: ApiResponse) => void | Promise
 export default defineConfig(({ command, mode }) => {
   if (command === "serve") {
     const env = loadEnv(mode, process.cwd(), "");
-    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS"]) {
+    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS"]) {
       if (!process.env[key] && env[key]) process.env[key] = env[key];
     }
   }
@@ -31,6 +32,7 @@ export default defineConfig(({ command, mode }) => {
           ["/api/data-auth", dataAuthHandler],
           ["/api/data", dataHandler],
           ["/api/documents", documentsHandler],
+          ["/api/database", databaseHandler],
         ];
         for (const [path, handler] of routes) {
           server.middlewares.use(path, (request, response, next) => {

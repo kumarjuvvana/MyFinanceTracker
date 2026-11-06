@@ -436,6 +436,49 @@ body{background:#f3f5ef}
   .app-shell.dark .prompt-list>.prompt-card{border-bottom-color:var(--line,#343d35)}
 }
 
+.database-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.database-browser{min-width:0}
+.database-table-select{display:flex;align-items:flex-end;gap:12px}
+.database-table-select .field-wrap{flex:1;min-width:0}
+.database-column-list{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:18px}
+.database-column-list>strong{font-size:10px;color:#6e766d;margin-right:3px}
+.database-row-list{display:grid;margin-top:15px}
+.database-row{min-width:0;padding:14px 0;border-top:1px solid #eef0ec}
+.database-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.database-row-head>strong{font:600 11px ui-monospace,SFMono-Regular,Consolas,monospace;color:#4d594e;overflow-wrap:anywhere}
+.database-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;margin-top:10px}
+.database-fields>div{min-width:0;padding:8px 10px;border:1px solid #eef0ec;border-radius:8px}
+.database-fields>div>span{display:block;color:#858d83;font-size:9px;font-weight:700}
+.database-fields pre,.database-delete-row pre{max-height:160px;overflow:auto;margin:5px 0 0;color:#394139;font:10px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.database-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;border-top:1px solid #eef0ec}
+.database-pagination>span{font-size:10px;color:#858d83}
+.database-pagination>div{display:flex;gap:7px}
+.database-object-list{display:grid;gap:12px}
+.database-object{min-width:0}
+.database-object>pre{max-height:520px;overflow:auto;margin:0;padding:12px;border:1px solid #eef0ec;border-radius:8px;background:#f8f9f7;color:#394139;font:10px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.database-delete-row{margin-top:14px;padding:12px;border:1px solid #eef0ec;border-radius:8px}
+.database-delete-row>strong{font-size:11px}
+.database-dependency-heading{margin:18px 0 9px;font-size:12px}
+.database-dependencies{display:grid;gap:7px}
+.database-dependencies>div{display:flex;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid #eef0ec;border-radius:8px}
+.database-dependencies strong{font-size:10px}
+.database-dependencies span{font-size:10px;color:#858d83;text-align:right}
+.database-confirm-linked{display:flex;align-items:flex-start;gap:8px;margin-top:13px;color:#816b40;font-size:11px;line-height:1.5}
+.database-confirm-linked input{margin-top:2px}
+.app-shell.dark .database-column-list>strong,.app-shell.dark .database-row-head>strong,.app-shell.dark .database-fields pre,.app-shell.dark .database-object>pre{color:#d4ddd4}
+.app-shell.dark .database-row,.app-shell.dark .database-pagination{border-color:#343d35}
+.app-shell.dark .database-fields>div,.app-shell.dark .database-delete-row,.app-shell.dark .database-dependencies>div{border-color:#343d35}
+.app-shell.dark .database-fields pre{color:#d4ddd4}
+.app-shell.dark .database-object>pre{background:#202720;border-color:#343d35}
+@media(max-width:600px){
+  .database-table-select{align-items:flex-start;flex-direction:column}
+  .database-table-select .field-wrap{width:100%}
+  .database-fields{grid-template-columns:minmax(0,1fr)}
+  .database-dependencies>div{flex-direction:column;gap:4px}
+  .database-dependencies span{text-align:left}
+  .database-row-head{align-items:flex-start;flex-direction:column}
+}
+
 .sidebar{overflow-y:auto}
 .vehicle-list{display:grid;gap:16px}
 .vehicle-card{padding:18px}

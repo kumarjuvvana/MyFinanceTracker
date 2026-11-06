@@ -11,6 +11,7 @@ import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalize
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
+import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
@@ -63,6 +64,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Electricity", icon: Zap },
   { name: "Personal documents", icon: FileText },
   { name: "Documents", icon: FileDown },
+  { name: "Database manager", icon: Database },
   { name: "Archive", icon: Archive },
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
@@ -1737,6 +1739,129 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
     </Card>)}</div>
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
     {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
+function formatDatabaseValue(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function DatabaseManagerPage() {
+  const [catalog, setCatalog] = useState<DatabaseCatalog | null>(null);
+  const [rows, setRows] = useState<DatabaseRows | null>(null);
+  const [selectedTable, setSelectedTable] = useState("");
+  const [view, setView] = useState<"tables" | "routines" | "triggers">("tables");
+  const [deletePreview, setDeletePreview] = useState<DeletePreview | null>(null);
+  const [confirmLinkedChanges, setConfirmLinkedChanges] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function refreshCatalog() {
+    setLoading(true);
+    setError("");
+    try {
+      const next = await loadDatabaseCatalog();
+      setCatalog(next);
+      if (!selectedTable && next.tables.length) setSelectedTable(next.tables[0].name);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load database objects.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function refreshRows(table: string, offset = 0) {
+    setBusy(true);
+    setError("");
+    try {
+      setRows(await loadDatabaseRows(table, offset));
+      setSelectedTable(table);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load table records.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshCatalog();
+  }, []);
+
+  useEffect(() => {
+    if (selectedTable && view === "tables" && !rows) void refreshRows(selectedTable);
+  }, [selectedTable, view, rows]);
+
+  async function startDelete(row: Record<string, unknown>) {
+    if (!rows) return;
+    const keys = Object.fromEntries(rows.primaryKey.map((column) => [column, row[column]]));
+    setBusy(true);
+    setError("");
+    setConfirmLinkedChanges(false);
+    try {
+      setDeletePreview(await previewDatabaseDelete(rows.table, keys));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not check linked records.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deletePreview || !rows) return;
+    const keys = Object.fromEntries(rows.primaryKey.map((column) => [column, deletePreview.row[column]]));
+    setBusy(true);
+    setError("");
+    try {
+      await deleteDatabaseRow(rows.table, keys, confirmLinkedChanges);
+      setDeletePreview(null);
+      setConfirmLinkedChanges(false);
+      setNotice("The selected database row was permanently deleted.");
+      await refreshRows(rows.table, rows.offset);
+      await refreshCatalog();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The row could not be deleted.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const linkedRows = deletePreview?.dependencies.filter((dependency) => dependency.count > 0) ?? [];
+  const blockedLinks = linkedRows.filter((dependency) => !["cascade", "set null", "set default"].includes(dependency.onDelete));
+
+  return <>
+    <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Inspect public tables, rows, functions, procedures, and triggers. Row deletion is permanent and shows linked records first." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy}><RefreshCw size={14} />Refresh</Button>} />
+    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>Anyone with the shared Daybook password can use this screen. It does not execute SQL or change schema objects. Row deletion is permanent and bypasses the app archive; download a JSON backup first.</span></div>
+    {error && <div className="alert alert-error" role="alert">{error}</div>}
+    {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    <div className="database-tabs" role="tablist" aria-label="Database objects">
+      {(["tables", "routines", "triggers"] as const).map((tab) => <Button key={tab} variant={view === tab ? "primary" : "outline"} role="tab" aria-selected={view === tab} onClick={() => setView(tab)}>{tab === "tables" ? "Tables & rows" : tab === "routines" ? "Functions & procedures" : "Triggers"}</Button>)}
+    </div>
+    {loading && !catalog ? <Card><p className="section-description">Loading database objects...</p></Card> : catalog && view === "tables" && <>
+      <Card className="database-browser"><div className="database-table-select"><Field label="Public table"><Select value={selectedTable} onChange={(event) => { setRows(null); setSelectedTable(event.target.value); }}>{catalog.tables.map((table) => <option value={table.name} key={table.name}>{table.name} · ~{table.estimated_rows} rows · {table.column_count} columns</option>)}</Select></Field><Badge>{catalog.tables.length} tables</Badge></div>
+        {rows && <><div className="database-column-list"><strong>Columns</strong>{rows.columns.map((column) => <Badge key={column.column_name}>{column.column_name} · {column.data_type}{rows.primaryKey.includes(column.column_name) ? " · PK" : ""}</Badge>)}</div>
+          <div className="database-row-list">{rows.rows.map((row, index) => {
+            const key = Object.fromEntries(rows.primaryKey.map((column) => [column, row[column]]));
+            const keyLabel = rows.primaryKey.map((column) => `${column}=${formatDatabaseValue(row[column])}`).join(", ");
+            return <article className="database-row" key={JSON.stringify(key) || index}><div className="database-row-head"><strong>{keyLabel || `Row ${rows.offset + index + 1}`}</strong>{rows.primaryKey.length > 0 && <Button variant="danger" size="sm" disabled={busy} onClick={() => void startDelete(row)}><Trash2 size={13} />Delete row</Button>}</div><div className="database-fields">{rows.columns.map((column) => <div key={column.column_name}><span>{column.column_name}</span><pre>{formatDatabaseValue(row[column.column_name])}</pre></div>)}</div></article>;
+          })}{!rows.rows.length && <EmptyState icon={<Database size={18} />} title="No rows in this table" description="This table is currently empty." />}</div>
+          <div className="database-pagination"><span>Rows {rows.offset + 1}–{rows.offset + rows.rows.length}</span><div><Button variant="outline" size="sm" disabled={busy || rows.offset === 0} onClick={() => void refreshRows(rows.table, Math.max(0, rows.offset - 50))}>Previous</Button><Button variant="outline" size="sm" disabled={busy || !rows.hasMore} onClick={() => void refreshRows(rows.table, rows.offset + 50)}>Next</Button></div></div>
+        </>}
+      </Card>
+    </>}
+    {catalog && view === "routines" && <div className="database-object-list">{catalog.routines.map((routine) => <Card className="database-object" key={routine.id}><div className="card-head"><div><h2 className="section-title">{routine.name}</h2><p className="section-description">{routine.kind}{routine.arguments ? ` · ${routine.arguments}` : ""}</p></div><Badge>Read only</Badge></div><pre>{routine.definition}</pre></Card>)}{!catalog.routines.length && <Card><EmptyState icon={<Database size={18} />} title="No public functions or procedures" description="No routines were found in the public schema." /></Card>}</div>}
+    {catalog && view === "triggers" && <div className="database-object-list">{catalog.triggers.map((trigger) => <Card className="database-object" key={`${trigger.table_name}:${trigger.name}`}><div className="card-head"><div><h2 className="section-title">{trigger.name}</h2><p className="section-description">Table: {trigger.table_name}</p></div><Badge>Read only</Badge></div><pre>{trigger.definition}</pre></Card>)}{!catalog.triggers.length && <Card><EmptyState icon={<Database size={18} />} title="No public triggers" description="No non-internal triggers were found in the public schema." /></Card>}</div>}
+    {deletePreview && <Modal title="Permanently delete database row?" onClose={() => { if (!busy) setDeletePreview(null); }} wide><p className="section-description">This deletion cannot be undone and will not be added to the Daybook archive.</p><div className="database-delete-row"><strong>{deletePreview.table}</strong><pre>{JSON.stringify(Object.fromEntries(rows?.primaryKey.map((column) => [column, deletePreview.row[column]]) ?? []), null, 2)}</pre></div>
+      <h3 className="database-dependency-heading">Linked records</h3>{linkedRows.length ? <div className="database-dependencies">{linkedRows.map((dependency) => <div key={dependency.constraint}><strong>{dependency.table}</strong><span>{dependency.count} linked {dependency.count === 1 ? "row" : "rows"} · ON DELETE {dependency.onDelete.toUpperCase()}</span></div>)}</div> : <p className="section-description">No linked rows reference this record.</p>}
+      {blockedLinks.length > 0 && <div className="alert alert-error" role="alert">This row cannot be deleted while these linked rows exist. Delete or reassign the linked records first, then refresh.</div>}
+      {linkedRows.length > 0 && !blockedLinks.length && <label className="database-confirm-linked"><input type="checkbox" checked={confirmLinkedChanges} onChange={(event) => setConfirmLinkedChanges(event.target.checked)} /><span>I understand that linked rows will be changed by their database ON DELETE rules.</span></label>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={() => setDeletePreview(null)}>Cancel</Button><Button type="button" variant="danger" disabled={busy || blockedLinks.length > 0 || (linkedRows.length > 0 && !confirmLinkedChanges)} onClick={() => void confirmDelete()}><Trash2 size={14} />{busy ? "Deleting..." : "Permanently delete"}</Button></div>
+    </Modal>}
   </>;
 }
 
@@ -4877,6 +5002,7 @@ export default function App() {
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={allDocuments.reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onArchive={archiveDocument} />,
+    "Database manager": <DatabaseManagerPage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
