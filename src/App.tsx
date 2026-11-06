@@ -9,8 +9,10 @@ import {
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
+import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
+import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
@@ -59,6 +61,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
   { name: "Personal documents", icon: FileText },
+  { name: "Documents", icon: FileDown },
   { name: "Archive", icon: Archive },
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
@@ -574,7 +577,8 @@ function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: Archiv
       const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) =>
         Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
       const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
-      return <Card key={record.id}><div className="card-head"><div><h2 className="section-title">{record.label}</h2><p className="section-description">Archived {new Date(record.archivedAt).toLocaleString()}{contents.length ? ` · ${contents.join(", ")}` : ""}</p></div><Badge>{count} {count === 1 ? "record" : "records"}</Badge></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Button onClick={() => onRestore(record.id)}><ArrowDownToLine size={14} />Restore</Button><Button variant="outline" onClick={() => onCopy(record.id)}><Copy size={14} />Restore a copy</Button><Button variant="outline" onClick={() => { if (window.confirm(`Permanently delete "${record.label}" from the archive? This cannot be undone.`)) onDelete(record.id); }}><Trash2 size={14} />Delete permanently</Button></div></Card>;
+      const hasDocuments = (record.snapshot.documents?.length ?? 0) > 0;
+      return <Card key={record.id}><div className="card-head"><div><h2 className="section-title">{record.label}</h2><p className="section-description">Archived {new Date(record.archivedAt).toLocaleString()}{contents.length ? ` · ${contents.join(", ")}` : ""}</p></div><Badge>{count} {count === 1 ? "record" : "records"}</Badge></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Button onClick={() => onRestore(record.id)}><ArrowDownToLine size={14} />Restore</Button>{!hasDocuments && <Button variant="outline" onClick={() => onCopy(record.id)}><Copy size={14} />Restore a copy</Button>}<Button variant="outline" onClick={() => { if (window.confirm(`Permanently delete "${record.label}" from the archive? This cannot be undone.`)) onDelete(record.id); }}><Trash2 size={14} />Delete permanently</Button></div></Card>;
     })}</div> : <Card><EmptyState icon={<Archive size={18} />} title="The archive is empty" description="When you archive a record from any supported screen, it will be available here." /></Card>}
   </>;
 }
@@ -700,6 +704,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         professionalSkills: mergeArchivedRows(previous.professionalSkills, snapshot.professionalSkills),
         familyMembers: mergeArchivedRows(previous.familyMembers, snapshot.familyMembers),
         personalRecords: mergeArchivedRows(previous.personalRecords, snapshot.personalRecords),
+        documents: mergeArchivedRows(previous.documents, snapshot.documents),
   };
 }
 
@@ -3067,7 +3072,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
   }
 
   return <><PageHeading eyebrow="Important information" title="Personal documents" subtitle="Keep frequently needed IDs, policies, dates and secure document links together." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add record</Button>} />
-    <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details are stored as readable text in the private GitHub repository. People with repository access can read them, and prior values remain in Git history after edits or deletion. Add a link to a securely shared document instead of uploading scans here; only use links with access controls you trust.</span></div>
+    <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These record details are stored in Supabase as readable text. Anyone with the Daybook password or Supabase service-role access can read them. Use the separate Documents screen to upload files to private storage; uploaded files are not end-to-end encrypted.</span></div>
     {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} expired` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter personal records" style={{ width: 165 }} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
     <div className="personal-record-list">{visibleRecords.map((record) => {
@@ -3086,6 +3091,109 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
     })}</div>
     {!visibleRecords.length && <Card><EmptyState icon={<FileText size={18} />} title={records.length ? "No matching records" : "No personal records yet"} description={records.length ? "Try another search or record type." : "Add a record for an ID, insurance policy, license or other frequently needed information."} /></Card>}
     {editor && <PersonalRecordModal key={editor.initial?.id ?? "new-personal-record"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.initial?.id); setEditor(null); }} />}
+  </>;
+}
+
+type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes">;
+
+function formatFileSize(sizeBytes: number): string {
+  if (sizeBytes <= 0) return "0 B";
+  if (sizeBytes < 1024 * 1024) return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function DocumentModal({ initial, onClose, onSave }: {
+  initial: DocumentAttachment | null;
+  onClose: () => void;
+  onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [personName, setPersonName] = useState(initial?.personName ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [file, setFile] = useState<File | undefined>();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const accept = Object.keys(DOCUMENT_FILE_TYPES).join(",");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!initial && !file) {
+      setError("Choose a document to upload.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Enter a document name.");
+      return;
+    }
+    if (file && !getDocumentFileType(file.name)) {
+      setError("Choose a PDF, image, text, spreadsheet, presentation, or Word document.");
+      return;
+    }
+    if (file && file.size > MAX_DOCUMENT_FILE_BYTES) {
+      setError("Choose a file no larger than 10 MB.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSave({ title: title.trim(), personName: personName.trim(), notes: notes.trim() }, file, initial?.id);
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The document could not be saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <Modal title={initial ? "Edit document details" : "Add a document"} onClose={onClose} wide>
+    <form onSubmit={(event) => void submit(event)}><div className="form-grid">
+      <Field className="full" label="Document name"><Input autoFocus required maxLength={120} placeholder="e.g. Aadhaar card, PAN card" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field className="full" label="Belongs to (person's name)"><Input maxLength={120} placeholder="Optional" value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>
+      {!initial ? <Field className="full" label="File (PDF, image, Word, spreadsheet, presentation, text)"><input className="field document-file-input" required type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">Maximum 10 MB per file. Keep identity-document scans clear and legible.</span></Field> : <div className="alert full"><FileText size={14} /> Editing these details does not replace the uploaded file. To replace it, add the new file and archive the old record.</div>}
+      <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Uploading..." : initial ? "Save details" : "Upload document"}</Button></div></form>
+  </Modal>;
+}
+
+function DocumentViewer({ document, onClose }: { document: DocumentAttachment; onClose: () => void }) {
+  const source = `/api/documents?path=${encodeURIComponent(document.storagePath)}`;
+  const isImage = document.contentType.startsWith("image/");
+  return <Modal title={document.title} onClose={onClose} wide><div className="document-viewer">
+    {isImage ? <img src={source} alt={document.title} /> : <iframe title={document.title} src={source} />}
+  </div></Modal>;
+}
+
+function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onArchive }: {
+  documents: DocumentAttachment[];
+  archivedDocumentCount: number;
+  totalStoredBytes: number;
+  onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
+  onArchive: (document: DocumentAttachment) => void;
+}) {
+  const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
+  const [viewer, setViewer] = useState<DocumentAttachment | null>(null);
+  const [search, setSearch] = useState("");
+  const percentUsed = totalStoredBytes / (1024 * 1024 * 1024) * 100;
+  const visible = documents.filter((document) =>
+    `${document.title} ${document.personName} ${document.fileName} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+
+  return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together, with a simple name, person, and optional note." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Files are kept in a private Supabase bucket and opened through your signed-in Daybook session. Anyone with the shared Daybook password can access them. They are protected by access controls, not end-to-end encrypted. Upload only files you are comfortable storing under this shared-access model.</span></div>
+    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan file storage; each document can be up to 10 MB.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
+    {visible.length ? <div className="document-list">{visible.map((document) => {
+      const canPreview = document.contentType === "application/pdf" || document.contentType.startsWith("image/");
+      const downloadUrl = `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`;
+      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{document.fileName} · {formatFileSize(document.sizeBytes)}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
+        {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
+        <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>
+        <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
+        <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
+      </div></Card>;
+    })}</div> : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search." : "Upload an important document and optionally note whose it is."} /></Card>}
+    {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} onClose={() => setEditor(null)} onSave={onSave} />}
+    {viewer && <DocumentViewer document={viewer} onClose={() => setViewer(null)} />}
   </>;
 }
 
@@ -3325,8 +3433,8 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
 
 function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through the private GitHub repository and can be backed up or moved whenever you like." />
-    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to the private GitHub repository. Account credentials are encrypted separately; other records remain readable to repository collaborators and prior values remain in Git history. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
+  return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through Supabase and can be backed up or moved whenever you like." />
+    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to Supabase. Account credentials are encrypted separately; other records remain readable to people with the Daybook password or Supabase service-role access. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
     <Card className="settings-card theme-picker-card">
       <div className="card-head"><div><h2 className="section-title">Choose your look</h2><p className="section-description">Preview a visual style across every page. Your choice is saved on this browser.</p></div><Palette size={18} /></div>
       <div className="theme-picker" role="group" aria-label="Visual theme">
@@ -3340,7 +3448,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentC
     </Card>
     <Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card>
     <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose your font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern sans</option><option value="editorial">Editorial serif</option><option value="rounded">Friendly rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="small">Small</option><option value="medium">Default</option><option value="large">Large</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>GitHub sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a backup</h3><p>Save your shopping data, product and store master data, and reminders as versioned JSON.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
         const blob = new Blob([exportCsv(data.purchases)], { type: "text/csv;charset=utf-8" });
@@ -3628,6 +3736,7 @@ function emptyTrackerData(): TrackerData {
     workExperiences: [],
     professionalSkills: [],
     familyMembers: [],
+    documents: [],
     archivedRecords: [],
   };
 }
@@ -3999,7 +4108,23 @@ export default function App() {
       return mergeArchiveSnapshot(previous, cloneArchiveSnapshot(archived.snapshot));
     });
   }
-  function permanentlyDeleteArchivedRecord(id: string) {
+  async function permanentlyDeleteArchivedRecord(id: string) {
+    const archived = data?.archivedRecords?.find((entry) => entry.id === id);
+    if (!archived) return;
+    const archivedPaths = (archived.snapshot.documents ?? []).map((document) => document.storagePath);
+    const referencedPaths = new Set([
+      ...(data?.documents ?? []).map((document) => document.storagePath),
+      ...(data?.archivedRecords ?? []).filter((entry) => entry.id !== id)
+        .flatMap((entry) => entry.snapshot.documents ?? []).map((document) => document.storagePath),
+    ]);
+    try {
+      for (const path of new Set(archivedPaths.filter((entry) => !referencedPaths.has(entry)))) {
+        await deleteDocumentFile(path);
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? `The archived document was not permanently deleted: ${caught.message}` : "The archived document file could not be deleted.");
+      return;
+    }
     update((previous) => ({
       ...previous,
       archivedRecords: (previous.archivedRecords ?? []).filter((entry) => entry.id !== id),
@@ -4540,13 +4665,41 @@ export default function App() {
       personalRecords: (previous.personalRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
+  async function saveDocument(details: DocumentDetails, file: File | undefined, id?: string): Promise<void> {
+    if (id) {
+      update((previous) => ({
+        ...previous,
+        documents: (previous.documents ?? []).map((document) => document.id === id ? { ...document, ...details } : document),
+      }));
+      return;
+    }
+    if (!file) throw new Error("Choose a document file to upload.");
+    const uploaded = await uploadDocumentFile(file);
+    const document: DocumentAttachment = {
+      ...details,
+      id: createId(),
+      fileName: file.name,
+      contentType: uploaded.contentType,
+      sizeBytes: file.size,
+      storagePath: uploaded.storagePath,
+      uploadedAt: new Date().toISOString(),
+    };
+    update((previous) => ({ ...previous, documents: [document, ...(previous.documents ?? [])] }));
+  }
+  function archiveDocument(document: DocumentAttachment) {
+    if (!window.confirm(`Move "${document.title}" to the archive? Its file will remain stored until you permanently delete the archived record.`)) return;
+    update((previous) => ({
+      ...withArchivedRecord(previous, document.title, { documents: [document] }),
+      documents: (previous.documents ?? []).filter((entry) => entry.id !== document.id),
+    }));
+  }
   async function importBackup(file: File) {
     try {
       const parsed: unknown = JSON.parse(await file.text());
       if (!validateData(parsed)) throw new Error("This file is not a valid Daybook backup (version 1). Your current data has not been changed.");
       setData(normalizeTrackerData(parsed));
       setError("");
-      setNotice("Backup loaded. Saving it to the private GitHub repository…");
+      setNotice("Backup loaded. Saving to Supabase. Uploaded file attachments are not included in JSON backups.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We couldn't read that backup file. Your current data has not been changed.");
     }
@@ -4584,6 +4737,8 @@ export default function App() {
   if (dataLoading && !data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Loading your shared Daybook data...</div></div>;
   if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Daybook records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Daybook data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
+  const archivedDocuments = (data.archivedRecords ?? []).flatMap((record) => record.snapshot.documents ?? []);
+  const allDocuments = [...(data.documents ?? []), ...archivedDocuments];
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
@@ -4614,6 +4769,7 @@ export default function App() {
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
+    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={allDocuments.reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onArchive={archiveDocument} />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,

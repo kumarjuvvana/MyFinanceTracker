@@ -10,5 +10,6 @@
   "stocks": [],
   "stockQuotes": [],
   "stockSeedVersion": 3,
-  "trainingSessions": []
+  "trainingSessions": [],
+  "documents": []
 }

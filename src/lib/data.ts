@@ -1,4 +1,5 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -366,13 +367,23 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.reminderDays === "number" && [0, 7, 30, 60, 90].includes(entry.reminderDays) &&
     (entry.additionalFields === undefined || (Array.isArray(entry.additionalFields) && entry.additionalFields.every((field) =>
       isRecord(field) && typeof field.label === "string" && typeof field.value === "string")))));
+  const documentsOk = value.documents === undefined || (Array.isArray(value.documents) && value.documents.every((entry) =>
+    isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+    typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
+    typeof entry.personName === "string" && entry.personName.length <= 120 &&
+    typeof entry.notes === "string" && entry.notes.length <= 2000 &&
+    typeof entry.fileName === "string" && entry.fileName.length > 0 && entry.fileName.length <= 255 &&
+    typeof entry.contentType === "string" && Object.values(DOCUMENT_FILE_TYPES).some((type) => type === entry.contentType) &&
+    typeof entry.sizeBytes === "number" && Number.isInteger(entry.sizeBytes) && entry.sizeBytes > 0 && entry.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
+    typeof entry.storagePath === "string" && isDocumentStoragePath(entry.storagePath) &&
+    typeof entry.uploadedAt === "string" && !Number.isNaN(Date.parse(entry.uploadedAt))));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings",
     "devotionalEntries", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
-    "familyMembers", "personalRecords",
+    "familyMembers", "personalRecords", "documents",
   ];
   const archivedRecordsOk = value.archivedRecords === undefined ||
     (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {
@@ -417,7 +428,7 @@ export function validateData(value: unknown): value is TrackerData {
     !assetsOk || !educationRecordsOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
     !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
-    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk ||
+    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk ||
     !archivedRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
@@ -477,6 +488,7 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.familyMembers) &&
     new Set((value.familyMembers as FamilyMember[]).map((entry) => entry.id)).size !== value.familyMembers.length) return false;
   if (Array.isArray(value.personalRecords) && new Set((value.personalRecords as PersonalRecord[]).map((entry) => entry.id)).size !== value.personalRecords.length) return false;
+  if (Array.isArray(value.documents) && new Set((value.documents as DocumentAttachment[]).map((entry) => entry.id)).size !== value.documents.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
     const stocks = value.stocks as TrackedStock[];
@@ -559,6 +571,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       ...record,
       additionalFields: record.additionalFields ?? [],
     })),
+    documents: data.documents ?? [],
   };
 }
 

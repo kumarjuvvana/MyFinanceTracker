@@ -33,6 +33,7 @@ export type Page =
   | "Vehicles"
   | "Electricity"
   | "Personal documents"
+  | "Documents"
   | "Archive"
   | "Account credentials"
   | "Data management"
@@ -491,6 +492,18 @@ export interface PersonalRecord {
   additionalFields: PersonalRecordField[];
 }
 
+export interface DocumentAttachment {
+  id: string;
+  title: string;
+  personName: string;
+  notes: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  storagePath: string;
+  uploadedAt: string;
+}
+
 export interface CredentialRecord {
   id: string;
   provider: string;
@@ -546,6 +559,7 @@ export interface TrackerData {
   familyMembers?: FamilyMember[];
   archivedRecords?: ArchivedRecord[];
   personalRecords?: PersonalRecord[];
+  documents?: DocumentAttachment[];
   credentialVault?: EncryptedCredentialVault;
 }
 

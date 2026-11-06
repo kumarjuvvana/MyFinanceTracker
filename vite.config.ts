@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import stockPriceHandler from "./api/stock-price";
 import dataHandler from "./api/data";
+import documentsHandler from "./api/documents";
 import dataAuthHandler from "./src/lib/dataAuth";
 
 type ApiRequest = {
@@ -29,6 +30,7 @@ export default defineConfig(({ command, mode }) => {
           ["/api/stock-price", stockPriceHandler],
           ["/api/data-auth", dataAuthHandler],
           ["/api/data", dataHandler],
+          ["/api/documents", documentsHandler],
         ];
         for (const [path, handler] of routes) {
           server.middlewares.use(path, (request, response, next) => {

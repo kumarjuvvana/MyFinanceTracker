@@ -754,6 +754,35 @@ body{background:#f3f5ef}
 .personal-fields{display:grid;gap:10px}
 .personal-fields-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .personal-field-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) 32px;align-items:center;gap:8px}
+.document-storage-summary{margin:18px 0}
+.document-storage-stats{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap;font-size:11px;color:#7f887e}
+.document-storage-stats strong{color:#424a42}
+.document-storage-track{height:7px;margin-top:12px;overflow:hidden;border-radius:99px;background:#edf0eb}
+.document-storage-track span{display:block;height:100%;border-radius:inherit;background:#6c9873;transition:width .2s ease}
+.document-storage-warning{margin:10px 0 0;color:#886736;font-size:11px}
+.document-storage-warning.near-limit{color:#9a4540}
+.document-list{display:grid;gap:12px}
+.document-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-width:0}
+.document-card-main{display:flex;align-items:flex-start;gap:12px;min-width:0;flex:1}
+.document-icon{display:grid;place-items:center;flex:none;width:38px;height:38px;border-radius:11px;background:#edf4ee;color:#4e7e57}
+.document-card-info{min-width:0}
+.document-card-info h2{margin:0;color:#303830;font:700 14px Manrope,sans-serif;overflow-wrap:anywhere}
+.document-card-info p{margin:5px 0 0;color:#858d83;font-size:10px;overflow-wrap:anywhere}
+.document-card-info small{display:block;margin-top:7px;color:#92998f;font-size:9px}
+.document-notes{margin-top:8px;color:#747d73;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.document-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap;flex:none}
+.document-download{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
+.document-file-input{height:auto;min-height:42px;padding:8px}
+.document-viewer{height:min(75vh,760px);min-height:260px;display:grid;place-items:center;overflow:auto;background:#f3f5f2;border-radius:9px}
+.document-viewer iframe{width:100%;height:100%;min-height:60vh;border:0;background:#fff}
+.document-viewer img{display:block;max-width:100%;max-height:72vh;object-fit:contain}
+.app-shell.dark .document-storage-stats{color:#a7b0a7}
+.app-shell.dark .document-storage-stats strong,.app-shell.dark .document-card-info h2{color:#e3e8e2}
+.app-shell.dark .document-card-info p,.app-shell.dark .document-card-info small,.app-shell.dark .document-notes{color:#a7b0a7}
+.app-shell.dark .document-icon{background:#2b382d;color:#a8c9a9}
+.app-shell.dark .document-storage-track{background:#343e35}
+.app-shell.dark .document-viewer{background:#171c18}
+.app-shell.dark .document-viewer iframe{background:#fff}
 .credential-lock-card{max-width:560px;margin:18px auto;padding:26px}
 .credential-lock-icon,.credential-icon{display:grid;place-items:center;flex:none;border-radius:11px;background:#edf4ee;color:#4e7e57}
 .credential-lock-icon{width:44px;height:44px;margin-bottom:14px}
@@ -792,6 +821,10 @@ body{background:#f3f5ef}
 .app-shell.dark .personal-due-summary{background:#332f24;border-color:#51462f;color:#e0c991}
 @media(max-width:600px){
   .personal-record-card{padding:14px}
+  .document-card{flex-direction:column;gap:12px;padding:14px}
+  .document-card-actions{width:100%;justify-content:flex-start}
+  .document-viewer{height:70vh;min-height:220px}
+  .document-viewer iframe{min-height:65vh}
   .personal-record-head{align-items:flex-start}
   .personal-record-actions{gap:3px;flex-wrap:wrap;justify-content:flex-end}
   .personal-record-actions .badge{white-space:normal;text-align:center}
@@ -807,8 +840,8 @@ body{background:#f3f5ef}
 }
 
 @media(max-width:600px){
-  .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.training-session-list,.personal-record-list{gap:0}
-  .trip-card,.asset-list>.asset-card,.electricity-list>.electricity-card,.devotional-list>.devotional-card,.cooking-list>.cooking-card,.issues-list>.issue-card,.career-list>.career-card,.family-list>.family-card,.education-list>.education-card,.learning-list>.learning-card,.training-session-list>.training-session-card,.personal-record-list>.personal-record-card{
+  .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.training-session-list,.personal-record-list,.document-list{gap:0}
+  .trip-card,.asset-list>.asset-card,.electricity-list>.electricity-card,.devotional-list>.devotional-card,.cooking-list>.cooking-card,.issues-list>.issue-card,.career-list>.career-card,.family-list>.family-card,.education-list>.education-card,.learning-list>.learning-card,.training-session-list>.training-session-card,.personal-record-list>.personal-record-card,.document-list>.document-card{
     border:0;
     border-bottom:1px solid var(--panel-line,#e8ece6);
     border-radius:0;
@@ -816,7 +849,7 @@ body{background:#f3f5ef}
     padding:11px 2px;
     background:transparent;
   }
-  .trip-card:hover,.asset-list>.asset-card:hover,.electricity-list>.electricity-card:hover,.devotional-list>.devotional-card:hover,.cooking-list>.cooking-card:hover,.issues-list>.issue-card:hover,.career-list>.career-card:hover,.family-list>.family-card:hover,.education-list>.education-card:hover,.learning-list>.learning-card:hover,.training-session-list>.training-session-card:hover,.personal-record-list>.personal-record-card:hover{transform:none;box-shadow:none}
+  .trip-card:hover,.asset-list>.asset-card:hover,.electricity-list>.electricity-card:hover,.devotional-list>.devotional-card:hover,.cooking-list>.cooking-card:hover,.issues-list>.issue-card:hover,.career-list>.career-card:hover,.family-list>.family-card:hover,.education-list>.education-card:hover,.learning-list>.learning-card:hover,.training-session-list>.training-session-card:hover,.personal-record-list>.personal-record-card:hover,.document-list>.document-card:hover{transform:none;box-shadow:none}
   .trip-card-top{align-items:center;gap:8px}
   .trip-note{margin:6px 0;font-size:10px}
   .trip-items{padding-top:7px}
@@ -837,7 +870,7 @@ body{background:#f3f5ef}
   .vehicle-record{padding:7px 0}
   .electricity-record-list{margin-top:7px}
   .electricity-record{padding:7px 0}
-  .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
+  .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .personal-record-list>.personal-record-card,.app-shell.dark .document-list>.document-card{border-bottom-color:var(--line,#343d35);background:transparent}
   .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .training-session-list>.training-session-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
   .training-session-list>.training-session-card{padding:11px 2px}
   .training-session-head{align-items:flex-start;gap:6px}
