@@ -6,7 +6,7 @@ import {
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound,
 } from "lucide-react";
-import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
+import { Badge, Button, Card, DateInput, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
@@ -194,7 +194,7 @@ function TripModal({ data, onClose, onSave }: { data: TrackerData; onClose: () =
     onSave({ date, store: storeName.trim(), notes: notes.trim() }, selected);
   }
   return <Modal title="Plan a shopping trip" onClose={onClose} wide><form onSubmit={submit}><div className="form-grid">
-    <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required /></Field>
+    <Field label="Date"><DateInput value={date} onValueChange={setDate} required /></Field>
     <Field label="Store"><Select autoFocus value={store} onChange={(e) => setStore(e.target.value)}><option value="">Choose a saved store</option>{(data.stores ?? []).map((entry) => <option key={entry.id} value={entry.name}>{entry.location ? `${entry.name} — ${entry.location}` : entry.name}</option>)}<option value="__custom">Other (enter manually)</option></Select>{store === "__custom" && <Input autoFocus placeholder="Where are you headed?" value={customStore} onChange={(e) => setCustomStore(e.target.value)} />}</Field>
     <Field className="full" label="A note for later"><Input placeholder="Anything to remember?" value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
     <div className="field-wrap full"><span className="field-label">Items to pick up</span>{pending.length ? <div className="recent-list">{pending.map((item) => <label className="recent-row" key={item.id} style={{ cursor: "pointer" }}><input type="checkbox" checked={selected.includes(item.id)} onChange={(e) => setSelected(e.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))} /><div className="recent-info"><div className="recent-name">{item.name}</div><div className="recent-meta">{item.quantity} {item.unit} · {item.category}</div></div><span className="recent-price">{formatCurrency(item.estimatedPrice * item.quantity)}</span></label>)}</div> : <p className="section-description">Your list is empty for now. Add items first and they'll be ready to choose here.</p>}</div>
@@ -220,7 +220,7 @@ function TripEditor({ initial, onClose, onSave }: { initial: ShoppingTrip; onClo
   const [store, setStore] = useState(initial.store);
   const [notes, setNotes] = useState(initial.notes);
   return <Modal title={`Edit shopping trip · ${initial.store}`} onClose={onClose}><form onSubmit={(event) => { event.preventDefault(); onSave({ ...initial, date, store: store.trim(), notes: notes.trim() }); }}><div className="form-grid">
-    <Field label="Date"><Input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
     <Field label="Store"><Input required maxLength={120} value={store} onChange={(event) => setStore(event.target.value)} /></Field>
     <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div><div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save changes</Button></div></form></Modal>;
@@ -247,7 +247,7 @@ function PurchaseEditor({ initial, onClose, onSave }: { initial: Purchase; onClo
     <Field label="Quantity"><Input required type="number" min="0.01" step="any" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: Number(event.target.value) })} /></Field>
     <Field label="Unit"><Input required maxLength={40} value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })} /></Field>
     <Field label="Paid"><Input required type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} /></Field>
-    <Field label="Date"><Input required type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></Field>
+    <Field label="Date"><DateInput required value={form.date} onValueChange={(date) => setForm({ ...form, date })} /></Field>
     <Field className="full" label="Store"><Input required maxLength={120} value={form.store} onChange={(event) => setForm({ ...form, store: event.target.value })} /></Field>
   </div>{error && <div className="alert alert-error" role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save changes</Button></div></form></Modal>;
 }
@@ -263,7 +263,7 @@ function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData
   const purchases = [...data.purchases].filter((purchase) => (!search || purchase.itemName.toLowerCase().includes(search.toLowerCase())) && (store === "All stores" || purchase.store === store) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) => b.date.localeCompare(a.date));
   const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
   return <><PageHeading eyebrow="A record of the good stuff" title="Purchase history" subtitle="Everything you've brought home, in one place." />
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><Select aria-label="Filter by store" style={{ width: 165 }} value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select><Input className="filter-date" aria-label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /><Input className="filter-date" aria-label="To date" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><Select aria-label="Filter by store" style={{ width: 165 }} value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /><DateInput className="filter-date" aria-label="To date" value={to} onValueChange={setTo} /></div>
     <Card className="table-card"><div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div><table className="data-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table>{purchases.length === 0 && <EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." />}</Card>
     {editing && <PurchaseEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(purchase) => { onSave({ ...purchase, id: editing.id, ...(editing.tripId ? { tripId: editing.tripId } : {}) }); setEditing(null); }} />}
   </>;
@@ -335,7 +335,7 @@ function ReminderCard({ reminder, categories, onSave, onDelete, onToggle }: {
   if (editing) return <Card className="reminder-card reminder-card-editing">
     <form className="reminder-inline-form" onSubmit={submit}>
       <Field label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
-      <Field label="Date"><Input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
       <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
       <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={1000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
@@ -379,7 +379,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Search and group reminders by category. Edit any record directly where it appears in the list." />
     <Card className="reminder-form-card"><h2 className="section-title">Add a note or reminder</h2><form className="form-grid reminder-form" onSubmit={submit}>
       <Field label="Title"><Input autoFocus maxLength={120} required placeholder="e.g. Pick up a prescription" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
-      <Field label="Date"><Input type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
       <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
       <Field className="full" label="Details (optional)"><textarea className="field textarea" rows={3} maxLength={1000} placeholder="Add any useful details..." value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
@@ -875,8 +875,8 @@ function AssetModal({ initial, onClose, onSave }: {
       {numericInput(isLoan ? "Outstanding balance" : "Current value", currentValue, setCurrentValue)}
       {numericInput("Units / quantity", quantity, setQuantity, { step: "any" })}
       {numericInput("Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
-      <Field label={isLoan ? "Start / disbursal date" : "Purchase / start date"}><Input type="date" value={asset.startDate} onChange={(event) => setAsset((current) => ({ ...current, startDate: event.target.value }))} /></Field>
-      <Field label="Maturity / renewal date"><Input type="date" value={asset.maturityDate} onChange={(event) => setAsset((current) => ({ ...current, maturityDate: event.target.value }))} /></Field>
+      <Field label={isLoan ? "Start / disbursal date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
+      <Field label="Maturity / renewal date"><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
       <Field className="full" label="Account / document link"><Input type="url" maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
@@ -1083,8 +1083,8 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="Academic year"><Input maxLength={40} placeholder="e.g. 2026–2027" value={record.academicYear} onChange={(event) => setRecord((current) => ({ ...current, academicYear: event.target.value }))} /></Field>
       <Field label="Board / university"><Input maxLength={120} placeholder="Optional" value={record.boardUniversity} onChange={(event) => setRecord((current) => ({ ...current, boardUniversity: event.target.value }))} /></Field>
       <Field label="Currency"><Select value={record.currency} onChange={(event) => setRecord((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
-      <Field label="Start date"><Input type="date" value={record.startDate} onChange={(event) => setRecord((current) => ({ ...current, startDate: event.target.value }))} /></Field>
-      <Field label="End / completion date"><Input type="date" value={record.endDate} onChange={(event) => setRecord((current) => ({ ...current, endDate: event.target.value }))} /></Field>
+      <Field label="Start date"><DateInput value={record.startDate} onValueChange={(startDate) => setRecord((current) => ({ ...current, startDate }))} /></Field>
+      <Field label="End / completion date"><DateInput value={record.endDate} onValueChange={(endDate) => setRecord((current) => ({ ...current, endDate }))} /></Field>
       <Field label="Annual tuition"><Input type="number" min="0" step="0.01" placeholder="Optional; tuition only" value={annualFee} onChange={(event) => setAnnualFee(event.target.value)} /></Field>
       <Field label="Admission fee"><Input type="number" min="0" step="0.01" placeholder="Optional one-time charge" value={admissionFee} onChange={(event) => setAdmissionFee(event.target.value)} /></Field>
       <Field label="School van / transport fee (year total)"><Input type="number" min="0" step="0.01" placeholder="Optional" value={schoolVanFee} onChange={(event) => setSchoolVanFee(event.target.value)} /></Field>
@@ -1168,7 +1168,7 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
     <Field label="Exam / assessment name"><Input autoFocus required maxLength={120} placeholder="e.g. Mathematics Midterm" value={name} onChange={(event) => setName(event.target.value)} /></Field>
     <Field label="Assessment type"><Input required maxLength={80} list="education-assessment-types" placeholder="e.g. Term exam, semester, lab" value={assessmentType} onChange={(event) => setAssessmentType(event.target.value)} /><datalist id="education-assessment-types">{["Unit test", "Assignment", "Quiz", "Practical", "Laboratory", "Midterm", "Term exam", "Semester exam", "Final exam", "Viva", "Project", "Other"].map((type) => <option key={type} value={type} />)}</datalist></Field>
     <Field label="Subject / course"><Input maxLength={120} list="education-subjects" placeholder="Optional" value={subject} onChange={(event) => setSubject(event.target.value)} /><datalist id="education-subjects">{subjects.map((entry) => <option key={entry.id} value={entry.name} />)}</datalist></Field>
-    <Field label="Exam date"><Input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Exam date"><DateInput value={date} onValueChange={setDate} /></Field>
     <Field label="Marks obtained"><Input type="number" min="0" step="any" placeholder="Optional" value={marksObtained} onChange={(event) => setMarksObtained(event.target.value)} /></Field>
     <Field label="Maximum marks"><Input type="number" min="0.01" step="any" placeholder="Optional" value={maximumMarks} onChange={(event) => setMaximumMarks(event.target.value)} /></Field>
     <Field label="Grade / GPA"><Input maxLength={40} placeholder="Optional (e.g. A, 3.8 GPA, Pass)" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
@@ -1213,7 +1213,7 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
     <Field label="Fee type"><Select value={feeType} onChange={(event) => setFeeType(event.target.value as EducationFeeType)}>{EDUCATION_FEE_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field>
     <Field className="full" label="Term / installment (required)"><Input autoFocus required maxLength={100} placeholder="e.g. Term 1, Semester 2, Admission fee" value={period} onChange={(event) => setPeriod(event.target.value)} /></Field>
     <Field label={`Amount paid (${currency})`}><Input required type="number" min="0.01" max={maxAmount === null ? undefined : Math.max(maxAmount, initial?.amount ?? 0)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
-    <Field label="Payment date"><Input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Payment date"><DateInput required value={date} onValueChange={setDate} /></Field>
     <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Bank transfer</option><option>UPI</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Online portal</option><option>Other</option></Select></Field>
     <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
     <Field className="full" label="Notes"><Input maxLength={500} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
@@ -1499,8 +1499,8 @@ function LearningRecordModal({ initial, onClose, onSave }: {
       <Field label="Learning level"><Select value={record.level} onChange={(event) => setRecord((current) => ({ ...current, level: event.target.value as LearningLevel }))}><option>Beginner</option><option>Basic</option><option>Intermediate</option><option>Advanced</option><option>Expert</option></Select></Field>
       <Field label="Status"><Select value={record.status} onChange={(event) => setRecord((current) => ({ ...current, status: event.target.value as LearningStatus }))}><option>Not started</option><option>In progress</option><option>Completed</option></Select></Field>
       <Field label="Course / source"><Input maxLength={120} placeholder="e.g. provider, book, mentor" value={record.provider} onChange={(event) => setRecord((current) => ({ ...current, provider: event.target.value }))} /></Field>
-      <Field label="Start date"><Input type="date" value={record.startedDate} onChange={(event) => setRecord((current) => ({ ...current, startedDate: event.target.value }))} /></Field>
-      <Field label="Completion date"><Input type="date" value={record.completedDate} onChange={(event) => setRecord((current) => ({ ...current, completedDate: event.target.value }))} /></Field>
+      <Field label="Start date"><DateInput value={record.startedDate} onValueChange={(startedDate) => setRecord((current) => ({ ...current, startedDate }))} /></Field>
+      <Field label="Completion date"><DateInput value={record.completedDate} onValueChange={(completedDate) => setRecord((current) => ({ ...current, completedDate }))} /></Field>
       <Field className="full" label="Course / learning resource link"><Input type="url" maxLength={2000} placeholder="Optional HTTPS link" value={record.resourceLink} onChange={(event) => setRecord((current) => ({ ...current, resourceLink: event.target.value }))} /></Field>
       <Field className="full" label="AI tool / resource link"><Input type="url" maxLength={2000} placeholder="Optional HTTPS link to an AI tutor, tool, or learning resource" value={record.aiLink} onChange={(event) => setRecord((current) => ({ ...current, aiLink: event.target.value }))} /></Field>
       <Field className="full" label="Notes / next steps"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Key ideas, practice tasks, or what to learn next" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
@@ -1614,7 +1614,7 @@ function VehicleJourneyModal({ vehicle, initial, onClose, onSave }: {
   }
 
   return <Modal title={`${initial ? "Edit" : "Log"} travel · ${vehicle.name}`} onClose={onClose} wide><form onSubmit={submit}><div className="form-grid">
-    <Field label="Travel date"><Input autoFocus type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Travel date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
     <Field label="Purpose"><Input maxLength={120} placeholder="Commute, appointment..." value={purpose} onChange={(event) => setPurpose(event.target.value)} /></Field>
     <Field label="From"><Input maxLength={120} placeholder="Starting location" value={startLocation} onChange={(event) => setStartLocation(event.target.value)} /></Field>
     <Field label="To"><Input maxLength={120} placeholder="Destination" value={endLocation} onChange={(event) => setEndLocation(event.target.value)} /></Field>
@@ -1657,13 +1657,13 @@ function VehicleMaintenanceModal({ vehicle, initial, onClose, onSave }: {
   }
 
   return <Modal title={`${initial ? "Edit" : "Log"} service or repair · ${vehicle.name}`} onClose={onClose} wide><form onSubmit={submit}><div className="form-grid">
-    <Field label="Date"><Input autoFocus type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+    <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
     <Field label="Type"><Select value={type} onChange={(event) => setType(event.target.value as VehicleMaintenanceType)}><option value="Service">Service</option><option value="Repair">Repair</option></Select></Field>
     <Field className="full" label="Work performed"><Input maxLength={160} required placeholder="e.g. Oil change, brake replacement" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
     <Field label="Odometer (km)"><Input type="number" min="0" step="any" placeholder="Optional" value={odometer} onChange={(event) => setOdometer(event.target.value)} /></Field>
     <Field label="Cost"><Input type="number" min="0" step="0.01" value={cost} onChange={(event) => setCost(event.target.value)} /></Field>
     <Field label="Service provider"><Input maxLength={120} placeholder="Garage or service center" value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
-    <Field label="Next due date"><Input type="date" value={nextDueDate} onChange={(event) => setNextDueDate(event.target.value)} /></Field>
+    <Field label="Next due date"><DateInput value={nextDueDate} onValueChange={setNextDueDate} /></Field>
     <Field label="Next due odometer (km)"><Input type="number" min="0" step="any" placeholder="Optional" value={nextDueOdometer} onChange={(event) => setNextDueOdometer(event.target.value)} /></Field>
     <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Parts, warranty, or other details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save record" : "Add record"}</Button></div></form></Modal>;
@@ -1802,10 +1802,10 @@ function ElectricityReadingModal({ initial, readings, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Meter name"><Input autoFocus required maxLength={100} list="electricity-meter-names" placeholder="e.g. Main meter" value={meterName} onChange={(event) => setMeterName(event.target.value)} /><datalist id="electricity-meter-names">{[...new Set(readings.map((entry) => entry.meterName))].map((name) => <option key={name} value={name} />)}</datalist></Field>
       <Field label="Location"><Input maxLength={120} placeholder="Home, rental, or building" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
-      <Field label="Reading date"><Input type="date" required value={readingDate} onChange={(event) => setReadingDate(event.target.value)} /></Field>
+      <Field label="Reading date"><DateInput required value={readingDate} onValueChange={setReadingDate} /></Field>
       <Field label="Cumulative meter reading (kWh)"><Input type="number" min="0" step="any" required value={meterReading} onChange={(event) => setMeterReading(event.target.value)} /></Field>
-      <Field label="Billing period start"><Input type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} /></Field>
-      <Field label="Billing period end"><Input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></Field>
+      <Field label="Billing period start"><DateInput value={periodStart} onValueChange={setPeriodStart} /></Field>
+      <Field label="Billing period end"><DateInput value={periodEnd} onValueChange={setPeriodEnd} /></Field>
       <Field label="Rate per unit"><Input type="number" min="0" step="any" placeholder="Optional" value={ratePerUnit} onChange={(event) => setRatePerUnit(event.target.value)} /></Field>
       <Field label="Bill amount"><Input type="number" min="0" step="0.01" placeholder="Optional" value={billAmount} onChange={(event) => setBillAmount(event.target.value)} /></Field>
       <Field label="Payment status"><Select value={paid ? "paid" : "unpaid"} onChange={(event) => {
@@ -1814,7 +1814,7 @@ function ElectricityReadingModal({ initial, readings, onClose, onSave }: {
         if (isPaid && !paidDate) setPaidDate(today());
         if (!isPaid) setPaidDate("");
       }}><option value="unpaid">Unpaid</option><option value="paid">Paid</option></Select></Field>
-      <Field label="Payment date"><Input type="date" disabled={!paid} required={paid} value={paidDate} onChange={(event) => setPaidDate(event.target.value)} /></Field>
+      <Field label="Payment date"><DateInput disabled={!paid} required={paid} value={paidDate} onValueChange={setPaidDate} /></Field>
       <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add reading"}</Button></div>
@@ -1901,7 +1901,7 @@ function DevotionalEntryModal({ initial, onClose, onSave }: {
 
   return <Modal title={initial ? "Edit devotional entry" : "Add devotional entry"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
-      <Field label="Date"><Input autoFocus type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Bible passage reference"><Input required maxLength={120} placeholder="e.g. Psalm 23:1–6" value={scriptureReference} onChange={(event) => setScriptureReference(event.target.value)} /></Field>
       <Field className="full" label="Message or takeaway"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="What stood out in this passage?" value={takeaway} onChange={(event) => setTakeaway(event.target.value)} /></Field>
       <Field className="full" label="Personal reflection"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Record your thoughts, questions, or how you want to apply it." value={reflection} onChange={(event) => setReflection(event.target.value)} /></Field>
@@ -1944,14 +1944,14 @@ function PrayerRequestModal({ initial, onClose, onSave }: {
   return <Modal title={initial ? "Edit prayer request" : "Add prayer request"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Prayer request"><Input autoFocus required maxLength={160} placeholder="A short title for this prayer" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
-      <Field label="Date added"><Input type="date" required value={dateAdded} onChange={(event) => setDateAdded(event.target.value)} /></Field>
+      <Field label="Date added"><DateInput required value={dateAdded} onValueChange={setDateAdded} /></Field>
       <Field label="Status"><Select value={status} onChange={(event) => {
         const nextStatus = event.target.value as PrayerRequestStatus;
         setStatus(nextStatus);
         if (nextStatus === "Answered" && !answeredDate) setAnsweredDate(today());
         if (nextStatus === "Ongoing") setAnsweredDate("");
       }}><option>Ongoing</option><option>Answered</option></Select></Field>
-      {status === "Answered" && <Field label="Answered date"><Input type="date" required value={answeredDate} onChange={(event) => setAnsweredDate(event.target.value)} /></Field>}
+      {status === "Answered" && <Field label="Answered date"><DateInput required value={answeredDate} onValueChange={setAnsweredDate} /></Field>}
       <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional context or updates" value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add request"}</Button></div>
@@ -2157,7 +2157,7 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
 
   return <Modal title={initial ? "Edit daily cooking log" : "Add daily cooking log"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
-      <Field label="Date"><Input autoFocus required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Meal / occasion"><Input maxLength={100} placeholder="Breakfast, lunch, snack, family dinner..." value={occasion} onChange={(event) => setOccasion(event.target.value)} /></Field>
       <Field className="full" label="Add from your recipe book">{recipes.length ? <div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
       <Field className="full" label="Add a one-off dish, drink, or prepared item"><div className="cooking-add-dish"><Input maxLength={120} placeholder="e.g. Fresh lime juice" value={customDish} onChange={(event) => setCustomDish(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomDish(); } }} /><Button type="button" variant="outline" disabled={!customDish.trim()} onClick={addCustomDish}><Plus size={13} /> Add item</Button></div></Field>
@@ -2294,8 +2294,8 @@ function IssueRecordModal({ initial, onClose, onSave }: {
       <Field label="Record type"><Select value={kind} onChange={(event) => setKind(event.target.value as IssueKind)}><option>Issue</option><option>Repair</option><option>Maintenance</option><option>Task</option></Select></Field>
       <Field label="Priority"><Select value={priority} onChange={(event) => setPriority(event.target.value as IssuePriority)}><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></Select></Field>
       <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as IssueStatus)}><option>Open</option><option>In progress</option><option>Waiting</option><option>Resolved</option><option>Closed</option></Select></Field>
-      <Field label="Date reported / identified"><Input required type="date" value={dateReported} onChange={(event) => setDateReported(event.target.value)} /></Field>
-      <Field label="Due date (optional)"><Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></Field>
+      <Field label="Date reported / identified"><DateInput required value={dateReported} onValueChange={setDateReported} /></Field>
+      <Field label="Due date (optional)"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
       <Field label="Vehicle, appliance, room, or project"><Input maxLength={120} placeholder="e.g. Honda City, washing machine, kitchen" value={assetName} onChange={(event) => setAssetName(event.target.value)} /></Field>
       <Field label="Location"><Input maxLength={160} placeholder="Address, room, office, or remote" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
       <Field label="Assigned to"><Input maxLength={120} placeholder="Person responsible" value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} /></Field>
@@ -2466,8 +2466,8 @@ function ProfessionalQualificationModal({ initial, onClose, onSave }: {
       <Field className="full" label="Qualification / certificate"><Input autoFocus required maxLength={160} placeholder="e.g. Project Management Professional" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Issuing organization"><Input maxLength={160} value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
       <Field label="Credential ID (optional)"><Input maxLength={120} value={credentialId} onChange={(event) => setCredentialId(event.target.value)} /></Field>
-      <Field label="Issue date"><Input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></Field>
-      <Field label="Expiry date (optional)"><Input type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} /></Field>
+      <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
+      <Field label="Expiry date (optional)"><DateInput value={expiryDate} onValueChange={setExpiryDate} /></Field>
       <Field className="full" label="Credential / verification link (HTTPS)"><Input type="url" maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add qualification"}</Button></div></form>
@@ -2811,8 +2811,8 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
     <Field label="Name on record"><Input maxLength={120} placeholder="Optional" value={holder} onChange={(event) => setHolder(event.target.value)} /></Field>
     <Field label="Document / policy number"><Input maxLength={120} autoComplete="off" placeholder="Store only if needed" value={recordNumber} onChange={(event) => setRecordNumber(event.target.value)} /></Field>
     <Field label="Issued by / provider"><Input maxLength={120} placeholder="Authority or insurer" value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
-    <Field label="Issue date"><Input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></Field>
-    <Field label="Expiry / renewal date"><Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></Field>
+    <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
+    <Field label="Expiry / renewal date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
     <Field label="Remind me"><Select value={reminderDays} onChange={(event) => setReminderDays(Number(event.target.value))}><option value={0}>On the due date</option><option value={7}>7 days before</option><option value={30}>30 days before</option><option value={60}>60 days before</option><option value={90}>90 days before</option></Select></Field>
     <Field className="full" label="Shared document link"><Input type="url" maxLength={2000} placeholder="https://... (use a private link with appropriate sharing access)" value={documentLink} onChange={(event) => setDocumentLink(event.target.value)} /></Field>
     <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Additional information, renewal instructions, contacts..." value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
