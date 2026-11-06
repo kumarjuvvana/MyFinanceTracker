@@ -586,6 +586,20 @@ body{background:#f3f5ef}
 .education-card.expanded .education-toggle svg{transform:rotate(90deg)}
 .education-expanded{min-width:0}
 .learning-list{display:grid;gap:12px}
+.training-session-list{display:grid;gap:12px}
+.training-session-card{min-width:0;padding:16px}
+.training-session-head,.training-session-title{display:flex;align-items:center;gap:10px;min-width:0}
+.training-session-head{justify-content:space-between}
+.training-session-title{flex:1}
+.training-session-icon{width:32px;height:32px;display:grid;place-items:center;flex:none;border-radius:9px;background:var(--user-accent-soft,#edf4ee);color:var(--user-accent,#4e7e57)}
+.training-session-title h2{margin:0;color:var(--text-main,#303830);font:700 13px Manrope,sans-serif;overflow-wrap:anywhere}
+.training-session-title p,.training-session-meta,.training-session-notes{margin:4px 0 0;color:var(--text-muted,#858d83);font-size:10px;overflow-wrap:anywhere}
+.training-session-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.training-session-learning{margin-top:10px;color:var(--text-main,#303830);font-size:11px;overflow-wrap:anywhere}
+.training-session-learning p{margin:4px 0 0;white-space:pre-wrap}
+.training-session-notes{white-space:pre-wrap}
+.app-shell.dark .training-session-title h2,.app-shell.dark .training-session-learning{color:#e3e8e2}
+.app-shell.dark .training-session-title p,.app-shell.dark .training-session-meta,.app-shell.dark .training-session-notes{color:#a7b0a7}
 .learning-card{min-width:0;padding:16px}
 .learning-card-head{display:flex;align-items:center;gap:10px;min-width:0}
 .learning-icon{width:36px;height:36px;flex:none;border-radius:11px;background:#edf4ee;color:#4e7e57;display:grid;place-items:center}
@@ -772,8 +786,8 @@ body{background:#f3f5ef}
 }
 
 @media(max-width:600px){
-  .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.personal-record-list{gap:0}
-  .trip-card,.asset-list>.asset-card,.electricity-list>.electricity-card,.devotional-list>.devotional-card,.cooking-list>.cooking-card,.issues-list>.issue-card,.career-list>.career-card,.family-list>.family-card,.education-list>.education-card,.learning-list>.learning-card,.personal-record-list>.personal-record-card{
+  .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.training-session-list,.personal-record-list{gap:0}
+  .trip-card,.asset-list>.asset-card,.electricity-list>.electricity-card,.devotional-list>.devotional-card,.cooking-list>.cooking-card,.issues-list>.issue-card,.career-list>.career-card,.family-list>.family-card,.education-list>.education-card,.learning-list>.learning-card,.training-session-list>.training-session-card,.personal-record-list>.personal-record-card{
     border:0;
     border-bottom:1px solid var(--panel-line,#e8ece6);
     border-radius:0;
@@ -781,7 +795,7 @@ body{background:#f3f5ef}
     padding:11px 2px;
     background:transparent;
   }
-  .trip-card:hover,.asset-list>.asset-card:hover,.electricity-list>.electricity-card:hover,.devotional-list>.devotional-card:hover,.cooking-list>.cooking-card:hover,.issues-list>.issue-card:hover,.career-list>.career-card:hover,.family-list>.family-card:hover,.education-list>.education-card:hover,.learning-list>.learning-card:hover,.personal-record-list>.personal-record-card:hover{transform:none;box-shadow:none}
+  .trip-card:hover,.asset-list>.asset-card:hover,.electricity-list>.electricity-card:hover,.devotional-list>.devotional-card:hover,.cooking-list>.cooking-card:hover,.issues-list>.issue-card:hover,.career-list>.career-card:hover,.family-list>.family-card:hover,.education-list>.education-card:hover,.learning-list>.learning-card:hover,.training-session-list>.training-session-card:hover,.personal-record-list>.personal-record-card:hover{transform:none;box-shadow:none}
   .trip-card-top{align-items:center;gap:8px}
   .trip-note{margin:6px 0;font-size:10px}
   .trip-items{padding-top:7px}
@@ -803,6 +817,18 @@ body{background:#f3f5ef}
   .electricity-record-list{margin-top:7px}
   .electricity-record{padding:7px 0}
   .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
+  .app-shell.dark .trip-card,.app-shell.dark .asset-list>.asset-card,.app-shell.dark .electricity-list>.electricity-card,.app-shell.dark .devotional-list>.devotional-card,.app-shell.dark .cooking-list>.cooking-card,.app-shell.dark .issues-list>.issue-card,.app-shell.dark .career-list>.career-card,.app-shell.dark .family-list>.family-card,.app-shell.dark .education-list>.education-card,.app-shell.dark .learning-list>.learning-card,.app-shell.dark .training-session-list>.training-session-card,.app-shell.dark .personal-record-list>.personal-record-card{border-bottom-color:var(--line,#343d35);background:transparent}
+  .training-session-list>.training-session-card{padding:11px 2px}
+  .training-session-head{align-items:flex-start;gap:6px}
+  .training-session-head>.table-actions{gap:2px;flex-wrap:wrap;justify-content:flex-end}
+  .training-session-head>.table-actions .badge{font-size:9px}
+  .training-session-head>.table-actions .icon-button{width:28px;height:28px}
+  .training-session-title{gap:7px}
+  .training-session-icon{width:28px;height:28px}
+  .training-session-title h2{font-size:11px}
+  .training-session-meta{gap:4px 10px;margin-top:7px}
+  .training-session-learning{margin-top:7px;font-size:10px}
+  .training-session-notes{font-size:10px}
   .vehicle-list{gap:0}
   .vehicle-card{border:0;border-bottom:1px solid var(--panel-line,#e8ece6);border-radius:0;box-shadow:none;padding:12px 0;background:transparent}
   .vehicle-card:hover{transform:none;box-shadow:none}

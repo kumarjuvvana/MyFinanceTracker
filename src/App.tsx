@@ -10,7 +10,7 @@ import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, I
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -30,6 +30,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Stocks", icon: TrendingUp },
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
+  { name: "Training & classes", icon: CalendarDays },
   { name: "Devotional", icon: Heart },
   { name: "Cooking", icon: CookingPot },
   { name: "Issues & maintenance", icon: Wrench },
@@ -576,6 +577,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         stockQuotes: mergeArchivedRows(previous.stockQuotes, snapshot.stockQuotes),
         assets: mergeArchivedRows(previous.assets, snapshot.assets),
         learningRecords: mergeArchivedRows(previous.learningRecords, snapshot.learningRecords),
+        trainingSessions: mergeArchivedRows(previous.trainingSessions, snapshot.trainingSessions),
         educationRecords: restoreEducationRecords(previous.educationRecords, snapshot.educationRecords),
         vehicles: mergeArchivedRows(previous.vehicles, snapshot.vehicles),
         vehicleJourneys: mergeArchivedRows(previous.vehicleJourneys, snapshot.vehicleJourneys),
@@ -1542,6 +1544,106 @@ function LearningPage({ records, onSave, onDelete }: {
     </Card>)}</div>
     {!visible.length && <Card><EmptyState icon={<BookOpen size={18} />} title={records.length ? "No matching learning records" : "No learning records yet"} description={records.length ? "Try another search or filter." : "Add a skill or course you are learning to start your progress log."} /></Card>}
     {editor !== undefined && <LearningRecordModal key={editor?.id ?? "new-learning-record"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
+const TRAINING_DELIVERY_MODES: TrainingDeliveryMode[] = ["In-person class", "Online class", "Virtual class", "Self-study"];
+
+function TrainingSessionModal({ initial, onClose, onSave }: {
+  initial: TrainingSession | null;
+  onClose: () => void;
+  onSave: (session: Omit<TrainingSession, "id">) => void;
+}) {
+  const [courseName, setCourseName] = useState(initial?.courseName ?? "");
+  const [institution, setInstitution] = useState(initial?.institution ?? "");
+  const [mode, setMode] = useState<TrainingDeliveryMode>(initial?.mode ?? "In-person class");
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [startTime, setStartTime] = useState(initial?.startTime ?? "");
+  const [endTime, setEndTime] = useState(initial?.endTime ?? "");
+  const [topic, setTopic] = useState(initial?.topic ?? "");
+  const [instructor, setInstructor] = useState(initial?.instructor ?? "");
+  const [learned, setLearned] = useState(initial?.learned ?? "");
+  const [resourceLink, setResourceLink] = useState(initial?.resourceLink ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!courseName.trim() || !date || !learned.trim()) {
+      setError("Enter a course or class name, date, and what you learned.");
+      return;
+    }
+    if (startTime && endTime && endTime < startTime) {
+      setError("The end time cannot be earlier than the start time.");
+      return;
+    }
+    if (resourceLink && !isHttpsLink(resourceLink)) {
+      setError("Enter a valid HTTPS resource link, or leave it blank.");
+      return;
+    }
+    onSave({
+      courseName: courseName.trim(),
+      institution: institution.trim(),
+      mode,
+      date,
+      startTime,
+      endTime,
+      topic: topic.trim(),
+      instructor: instructor.trim(),
+      learned: learned.trim(),
+      resourceLink: resourceLink.trim(),
+      notes: notes.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit class or learning session" : "Log a class or learning session"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Course / class name (required)"><Input autoFocus required maxLength={140} placeholder="e.g. DevOps Engineer training" value={courseName} onChange={(event) => setCourseName(event.target.value)} /></Field>
+      <Field label="Training format"><Select value={mode} onChange={(event) => setMode(event.target.value as TrainingDeliveryMode)}>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+      <Field label="Training institute / platform"><Input maxLength={140} placeholder="Institute, online platform, or self-study" value={institution} onChange={(event) => setInstitution(event.target.value)} /></Field>
+      <Field label="Class / learning date"><DateInput required value={date} onValueChange={setDate} /></Field>
+      <Field label="Instructor / mentor"><Input maxLength={120} placeholder="Optional" value={instructor} onChange={(event) => setInstructor(event.target.value)} /></Field>
+      <Field label="Start time"><Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></Field>
+      <Field label="End time"><Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></Field>
+      <Field className="full" label="Class topic"><Input maxLength={180} placeholder="e.g. Docker images and containers" value={topic} onChange={(event) => setTopic(event.target.value)} /></Field>
+      <Field className="full" label="What did you learn? (required)"><textarea className="field textarea" rows={4} required maxLength={5000} placeholder="Capture the key concepts, commands, exercises, or takeaways from this date..." value={learned} onChange={(event) => setLearned(event.target.value)} /></Field>
+      <Field className="full" label="Class materials / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link to class notes, slides, or recording" value={resourceLink} onChange={(event) => setResourceLink(event.target.value)} /></Field>
+      <Field className="full" label="Additional notes"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Questions to revisit, homework, or next steps" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>
+    {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save session"}</Button></div></form>
+  </Modal>;
+}
+
+function TrainingClassesPage({ sessions, onSave, onDelete }: {
+  sessions: TrainingSession[];
+  onSave: (session: Omit<TrainingSession, "id">, id?: string) => void;
+  onDelete: (session: TrainingSession) => void;
+}) {
+  const [editor, setEditor] = useState<TrainingSession | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [modeFilter, setModeFilter] = useState("All formats");
+  const query = search.trim().toLocaleLowerCase();
+  const visible = sessions
+    .filter((session) => modeFilter === "All formats" || session.mode === modeFilter)
+    .filter((session) => [
+      session.courseName, session.institution, session.mode, session.date, session.topic,
+      session.instructor, session.learned, session.notes,
+    ].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime));
+
+  return <>
+    <PageHeading eyebrow="Build your skills" title="Training & classes" subtitle="Keep a dated journal of institute classes, online or virtual training, and self-study sessions." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Log a session</Button>} />
+    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>This log is separate from daily Learning. Add one entry for each class or study date to track the subject, format, materials, and what you learned.</span></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search training sessions" placeholder="Search course, date, topic, learning..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter training format" style={{ width: 180 }} value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option>All formats</option>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
+    {visible.length ? <div className="training-session-list">{visible.map((session) => <Card className="training-session-card" key={session.id}>
+      <div className="training-session-head"><div className="training-session-title"><div className="training-session-icon"><BookOpen size={16} /></div><div><h2>{session.courseName}</h2><p>{[session.institution, session.topic].filter(Boolean).join(" · ") || "Class session"}</p></div></div><div className="table-actions"><Badge>{session.mode}</Badge><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></div>
+      <div className="training-session-meta"><span>{dateLabel(session.date)}{session.startTime ? ` · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}` : ""}</span>{session.instructor && <span>Instructor: {session.instructor}</span>}</div>
+      <div className="training-session-learning"><strong>What I learned</strong><p><LinkifiedText>{session.learned}</LinkifiedText></p></div>
+      {session.notes && <p className="training-session-notes"><LinkifiedText>{session.notes}</LinkifiedText></p>}
+      {session.resourceLink && <a className="personal-document-link" href={session.resourceLink} target="_blank" rel="noopener noreferrer">Open class materials</a>}
+    </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={sessions.length ? "No matching sessions" : "No class sessions yet"} description={sessions.length ? "Try another search or format filter." : "Log a dated training class or study session to start your learning journal."} /></Card>}
+    {editor !== undefined && <TrainingSessionModal key={editor?.id ?? "new-training-session"} initial={editor} onClose={() => setEditor(undefined)} onSave={(session) => { onSave(session, editor?.id); setEditor(undefined); }} />}
   </>;
 }
 
@@ -3401,6 +3503,7 @@ function emptyTrackerData(): TrackerData {
     vehicleJourneys: [],
     vehicleMaintenance: [],
     learningRecords: [],
+    trainingSessions: [],
     personalRecords: [],
     assets: [],
     educationRecords: [],
@@ -4071,6 +4174,21 @@ export default function App() {
       learningRecords: (previous.learningRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
+  function saveTrainingSession(session: Omit<TrainingSession, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      trainingSessions: id
+        ? (previous.trainingSessions ?? []).map((entry) => entry.id === id ? { ...session, id } : entry)
+        : [{ ...session, id: createId() }, ...(previous.trainingSessions ?? [])],
+    }));
+  }
+  function deleteTrainingSession(session: TrainingSession) {
+    if (!window.confirm(`Move the ${session.date} session for "${session.courseName}" to the archive?`)) return;
+    update((previous) => ({
+      ...withArchivedRecord(previous, `${session.courseName} · ${session.date}`, { trainingSessions: [session] }),
+      trainingSessions: (previous.trainingSessions ?? []).filter((entry) => entry.id !== session.id),
+    }));
+  }
   function saveVehicle(vehicle: Omit<Vehicle, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -4370,6 +4488,7 @@ export default function App() {
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
+    "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,

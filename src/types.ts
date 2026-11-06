@@ -23,6 +23,7 @@ export type Page =
   | "Stocks"
   | "Asset manager"
   | "Learning"
+  | "Training & classes"
   | "Devotional"
   | "Cooking"
   | "Issues & maintenance"
@@ -233,6 +234,23 @@ export interface LearningRecord {
   aiLink: string;
   startedDate: string;
   completedDate: string;
+  notes: string;
+}
+
+export type TrainingDeliveryMode = "In-person class" | "Online class" | "Virtual class" | "Self-study";
+
+export interface TrainingSession {
+  id: string;
+  courseName: string;
+  institution: string;
+  mode: TrainingDeliveryMode;
+  date: string;
+  startTime: string;
+  endTime: string;
+  topic: string;
+  instructor: string;
+  learned: string;
+  resourceLink: string;
   notes: string;
 }
 
@@ -510,6 +528,7 @@ export interface TrackerData {
   stockSeedVersion?: 1 | 2 | 3;
   assets?: AssetRecord[];
   learningRecords?: LearningRecord[];
+  trainingSessions?: TrainingSession[];
   educationRecords?: EducationRecord[];
   vehicles?: Vehicle[];
   vehicleJourneys?: VehicleJourney[];

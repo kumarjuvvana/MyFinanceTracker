@@ -9,5 +9,6 @@
   "brokers": [],
   "stocks": [],
   "stockQuotes": [],
-  "stockSeedVersion": 3
+  "stockSeedVersion": 3,
+  "trainingSessions": []
 }

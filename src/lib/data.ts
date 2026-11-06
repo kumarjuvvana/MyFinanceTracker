@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -183,6 +183,19 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.startedDate === "string" && (entry.startedDate === "" || !Number.isNaN(Date.parse(entry.startedDate))) &&
     typeof entry.completedDate === "string" && (entry.completedDate === "" || !Number.isNaN(Date.parse(entry.completedDate))) &&
     typeof entry.notes === "string"));
+  const trainingSessionsOk = value.trainingSessions === undefined || (Array.isArray(value.trainingSessions) && value.trainingSessions.every((entry) =>
+    isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+    typeof entry.courseName === "string" && entry.courseName.trim().length > 0 &&
+    typeof entry.institution === "string" &&
+    (entry.mode === "In-person class" || entry.mode === "Online class" || entry.mode === "Virtual class" || entry.mode === "Self-study") &&
+    typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+    typeof entry.startTime === "string" && (entry.startTime === "" || /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.startTime)) &&
+    typeof entry.endTime === "string" && (entry.endTime === "" || /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.endTime)) &&
+    (!entry.startTime || !entry.endTime || entry.endTime >= entry.startTime) &&
+    typeof entry.topic === "string" && typeof entry.instructor === "string" &&
+    typeof entry.learned === "string" && entry.learned.trim().length > 0 &&
+    typeof entry.resourceLink === "string" && isSafeExternalLink(entry.resourceLink) &&
+    typeof entry.notes === "string"));
   const vehiclesOk = value.vehicles === undefined || (Array.isArray(value.vehicles) && value.vehicles.every((vehicle) =>
     isRecord(vehicle) && typeof vehicle.id === "string" && typeof vehicle.name === "string" &&
     typeof vehicle.make === "string" && typeof vehicle.model === "string" &&
@@ -355,7 +368,7 @@ export function validateData(value: unknown): value is TrackerData {
       isRecord(field) && typeof field.label === "string" && typeof field.value === "string")))));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
-    "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "educationRecords",
+    "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings",
     "devotionalEntries", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
@@ -401,7 +414,7 @@ export function validateData(value: unknown): value is TrackerData {
     trip.purchaseIds.every((id) => typeof id === "string"));
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
-    !assetsOk || !educationRecordsOk || !learningRecordsOk ||
+    !assetsOk || !educationRecordsOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
     !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk ||
@@ -414,6 +427,7 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.assets) && new Set((value.assets as AssetRecord[]).map((asset) => asset.id)).size !== value.assets.length) return false;
   if (Array.isArray(value.educationRecords) && new Set((value.educationRecords as EducationRecord[]).map((entry) => entry.id)).size !== value.educationRecords.length) return false;
   if (Array.isArray(value.learningRecords) && new Set((value.learningRecords as LearningRecord[]).map((entry) => entry.id)).size !== value.learningRecords.length) return false;
+  if (Array.isArray(value.trainingSessions) && new Set((value.trainingSessions as TrainingSession[]).map((entry) => entry.id)).size !== value.trainingSessions.length) return false;
   if (Array.isArray(value.educationRecords)) {
     for (const record of value.educationRecords as EducationRecord[]) {
       if (new Set((record.subjects ?? []).map((subject) => subject.id)).size !== (record.subjects ?? []).length ||
@@ -513,6 +527,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     stockSeedVersion: STOCK_SEED_VERSION,
     assets: data.assets ?? [],
     learningRecords: data.learningRecords ?? [],
+    trainingSessions: data.trainingSessions ?? [],
     educationRecords: (data.educationRecords ?? []).map((record) => ({
       ...record,
       admissionFee: record.admissionFee ?? null,
