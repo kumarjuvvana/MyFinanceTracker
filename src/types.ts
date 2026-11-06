@@ -13,6 +13,7 @@ export const CURRENCIES = ["INR", "USD", "EUR", "GBP"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 export type Page =
   | "Dashboard"
+  | "Global search"
   | "Shopping list"
   | "Shopping trips"
   | "Purchase history"

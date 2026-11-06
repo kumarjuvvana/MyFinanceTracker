@@ -7,6 +7,7 @@ import {
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
+import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
@@ -56,6 +57,7 @@ function useCurrencyFormatter() {
 }
 const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Dashboard", icon: LayoutDashboard },
+  { name: "Global search", icon: Search },
   { name: "Shopping list", icon: ListChecks },
   { name: "Shopping trips", icon: ShoppingBag },
   { name: "Purchase history", icon: Clock3 },
@@ -86,6 +88,16 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Account credentials", icon: KeyRound },
   { name: "R&D / Test Connectors", icon: Mail },
 ];
+function readAppRoute() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedPage = params.get("page") as Page | null;
+  const knownPages = new Set<Page>([...navigation.map((entry) => entry.name), "Data management"]);
+  return {
+    page: requestedPage && knownPages.has(requestedPage) ? requestedPage : "Dashboard" as Page,
+    query: params.get("q") ?? "",
+    selectedKey: params.get("record"),
+  };
+}
 const categoryColors: Record<Category, string> = {
   Vegetables: "#6d9873", Groceries: "#8a7db3", Fruits: "#d19a50",
   Household: "#6688a0", "Personal Care": "#bd7b8d", Others: "#829080",
@@ -4495,7 +4507,9 @@ function readLegacyBrowserData(): TrackerData | null {
 
 export default function App() {
   const [data, setData] = useState<TrackerData | null>(null);
-  const [page, setPage] = useState<Page>("Dashboard");
+  const [page, setPage] = useState<Page>(() => readAppRoute().page);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState(() => readAppRoute().query);
+  const [selectedSearchResultKey, setSelectedSearchResultKey] = useState<string | null>(() => readAppRoute().selectedKey);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -4538,6 +4552,18 @@ export default function App() {
   revisionRef.current = revision;
   authenticatedRef.current = authenticated;
   syncStatusRef.current = syncStatus;
+
+  useEffect(() => {
+    function syncRouteFromLocation() {
+      const route = readAppRoute();
+      setPage(route.page);
+      setGlobalSearchQuery(route.query);
+      setSelectedSearchResultKey(route.selectedKey);
+      setMobileMenu(false);
+    }
+    window.addEventListener("popstate", syncRouteFromLocation);
+    return () => window.removeEventListener("popstate", syncRouteFromLocation);
+  }, []);
 
   function queueSave(snapshot: TrackerData) {
     setSyncStatus("saving");
@@ -5556,8 +5582,27 @@ export default function App() {
   }
   function changePage(next: Page) {
     setPage(next);
+    setSelectedSearchResultKey(null);
     setMobileMenu(false);
+    const params = new URLSearchParams({ page: next });
+    if (next === "Global search" && globalSearchQuery.trim()) params.set("q", globalSearchQuery.trim());
+    window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function selectSearchResult(key: string | null) {
+    setPage("Global search");
+    setSelectedSearchResultKey(key);
+    const params = new URLSearchParams({ page: "Global search" });
+    if (globalSearchQuery.trim()) params.set("q", globalSearchQuery.trim());
+    if (key) params.set("record", key);
+    window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
+  }
+  function updateGlobalSearchQuery(query: string) {
+    setGlobalSearchQuery(query);
+    setSelectedSearchResultKey(null);
+    const params = new URLSearchParams({ page: "Global search" });
+    if (query.trim()) params.set("q", query.trim());
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
   }
 
   if (authLoading) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Checking your Daybook session...</div></div>;
@@ -5569,6 +5614,7 @@ export default function App() {
   const allDocuments = [...(data.documents ?? []), ...archivedDocuments];
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
+    "Global search": <GlobalSearchPage data={data} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
@@ -5614,10 +5660,10 @@ export default function App() {
       <div className="nav-label">YOUR SPACE</div><nav className="nav-list" aria-label="Main navigation">{navigation.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}</nav>
       <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday shopping, gently organized in one place.</div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
+    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
       <div className="main-content">{error && <div className="alert alert-error" role="alert"><X size={15} style={{ flex: "none", marginTop: 1 }} /><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}><X size={14} /></button></div>}{notice && <div className="alert alert-success" role="status"><CheckCircle2 size={15} /><span>{notice}</span><button className="icon-button" aria-label="Dismiss message" onClick={() => setNotice("")}><X size={14} /></button></div>}{pageContent[page]}</div>
     </main>
-    <nav className="mobile-nav" aria-label="Mobile navigation">{[navigation[0], navigation[1], navigation[2], navigation[3]].map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
+    <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.filter(({ name }) => ["Dashboard", "Shopping list", "Shopping trips", "Purchase history"].includes(name)).map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
     {modal === "add" && <ItemModal products={data.products ?? []} onClose={() => setModal(null)} onSave={addItem} />}
     {editing && <ItemModal initial={editing} products={data.products ?? []} onClose={() => setEditing(null)} onSave={editItem} />}
     {modal === "trip" && <TripModal data={data} onClose={() => setModal(null)} onSave={saveTrip} />}
