@@ -13,7 +13,7 @@ import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
@@ -52,6 +52,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Stocks", icon: TrendingUp },
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
+  { name: "Mind & habits", icon: Heart },
   { name: "AI Prompts", icon: Sparkles },
   { name: "Training & classes", icon: CalendarDays },
   { name: "Devotional", icon: Heart },
@@ -709,6 +710,8 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         personalRecords: mergeArchivedRows(previous.personalRecords, snapshot.personalRecords),
         documents: mergeArchivedRows(previous.documents, snapshot.documents),
         promptRecords: mergeArchivedRows(previous.promptRecords, snapshot.promptRecords),
+        mindfulHabits: mergeArchivedRows(previous.mindfulHabits, snapshot.mindfulHabits),
+        mindfulnessLogs: mergeArchivedRows(previous.mindfulnessLogs, snapshot.mindfulnessLogs),
   };
 }
 
@@ -1739,6 +1742,153 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
     </Card>)}</div>
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
     {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
+function emptyMindfulHabit(): Omit<MindfulHabit, "id"> {
+  return { title: "", description: "" };
+}
+
+function MindfulHabitModal({ initial, onClose, onSave }: {
+  initial: MindfulHabit | null;
+  onClose: () => void;
+  onSave: (habit: Omit<MindfulHabit, "id">) => void;
+}) {
+  const [habit, setHabit] = useState<Omit<MindfulHabit, "id">>(initial ?? emptyMindfulHabit());
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!habit.title.trim()) {
+      setError("Enter a habit name.");
+      return;
+    }
+    onSave({ title: habit.title.trim(), description: habit.description.trim() });
+  }
+
+  return <Modal title={initial ? "Edit positive habit" : "Add positive habit"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Habit (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Pause before replying when upset" value={habit.title} onChange={(event) => setHabit((current) => ({ ...current, title: event.target.value }))} /></Field>
+      <Field className="full" label="What does this look like for you?"><textarea className="field textarea" rows={3} maxLength={1000} placeholder="Optional reminder or description" value={habit.description} onChange={(event) => setHabit((current) => ({ ...current, description: event.target.value }))} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add habit"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function MindfulnessLogModal({ initial, habits, onClose, onSave }: {
+  initial: MindfulnessLog | null;
+  habits: MindfulHabit[];
+  onClose: () => void;
+  onSave: (log: Omit<MindfulnessLog, "id">) => void;
+}) {
+  const [log, setLog] = useState<Omit<MindfulnessLog, "id">>(initial ?? {
+    date: today(),
+    emotion: "Calm",
+    intensity: 3,
+    trigger: "",
+    response: "",
+    positiveAction: "",
+    reflection: "",
+    completedHabitIds: [],
+  });
+  const [error, setError] = useState("");
+  const hiddenCompletedHabits = initial?.completedHabitIds.filter((id) => !habits.some((habit) => habit.id === id)) ?? [];
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!log.date || !log.emotion) {
+      setError("Choose a date and emotion.");
+      return;
+    }
+    onSave({
+      ...log,
+      trigger: log.trigger.trim(),
+      response: log.response.trim(),
+      positiveAction: log.positiveAction.trim(),
+      reflection: log.reflection.trim(),
+      completedHabitIds: [...new Set([...hiddenCompletedHabits, ...log.completedHabitIds])],
+    });
+  }
+
+  function toggleHabit(id: string) {
+    setLog((current) => ({
+      ...current,
+      completedHabitIds: current.completedHabitIds.includes(id)
+        ? current.completedHabitIds.filter((entry) => entry !== id)
+        : [...current.completedHabitIds, id],
+    }));
+  }
+
+  return <Modal title={initial ? "Edit reflection" : "Add reflection"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Date"><DateInput required value={log.date} onValueChange={(date) => setLog((current) => ({ ...current, date }))} /></Field>
+      <Field label="Emotion"><Select value={log.emotion} onChange={(event) => setLog((current) => ({ ...current, emotion: event.target.value as MindfulnessEmotion }))}><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select></Field>
+      <Field label="Intensity (1–5)"><Select value={log.intensity} onChange={(event) => setLog((current) => ({ ...current, intensity: Number(event.target.value) }))}>{[1, 2, 3, 4, 5].map((level) => <option value={level} key={level}>{level}{level === 1 ? " · gentle" : level === 5 ? " · very strong" : ""}</option>)}</Select></Field>
+      <Field className="full" label="What was happening?"><textarea className="field textarea" rows={2} maxLength={1000} placeholder="Optional trigger or situation" value={log.trigger} onChange={(event) => setLog((current) => ({ ...current, trigger: event.target.value }))} /></Field>
+      <Field className="full" label="How did you respond?"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Notice what you did without judging yourself." value={log.response} onChange={(event) => setLog((current) => ({ ...current, response: event.target.value }))} /></Field>
+      <Field className="full" label="Positive action / kindness"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="A pause, a kind word, gratitude, or another helpful choice" value={log.positiveAction} onChange={(event) => setLog((current) => ({ ...current, positiveAction: event.target.value }))} /></Field>
+      <Field className="full" label="Reflection / what might help next time?"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional notes to help you learn from the moment" value={log.reflection} onChange={(event) => setLog((current) => ({ ...current, reflection: event.target.value }))} /></Field>
+      {habits.length > 0 && <fieldset className="mindful-habit-checklist full"><legend>Positive habits practiced</legend><div>{habits.map((habit) => <label key={habit.id}><input type="checkbox" checked={log.completedHabitIds.includes(habit.id)} onChange={() => toggleHabit(habit.id)} /><span><strong>{habit.title}</strong>{habit.description && <small>{habit.description}</small>}</span></label>)}</div></fieldset>}
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save reflection" : "Save reflection"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog, onArchiveLog }: {
+  habits: MindfulHabit[];
+  logs: MindfulnessLog[];
+  onSaveHabit: (habit: Omit<MindfulHabit, "id">, id?: string) => void;
+  onArchiveHabit: (habit: MindfulHabit) => void;
+  onSaveLog: (log: Omit<MindfulnessLog, "id">, id?: string) => void;
+  onArchiveLog: (log: MindfulnessLog) => void;
+}) {
+  const [habitEditor, setHabitEditor] = useState<MindfulHabit | null | undefined>(undefined);
+  const [logEditor, setLogEditor] = useState<MindfulnessLog | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [emotionFilter, setEmotionFilter] = useState("All emotions");
+  const query = search.trim().toLocaleLowerCase();
+  const visibleLogs = [...logs]
+    .filter((log) => emotionFilter === "All emotions" || log.emotion === emotionFilter)
+    .filter((log) => [log.date, log.emotion, log.trigger, log.response, log.positiveAction, log.reflection]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const since = new Date(`${today()}T00:00:00`);
+  since.setDate(since.getDate() - 6);
+  const sinceDate = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, "0")}-${String(since.getDate()).padStart(2, "0")}`;
+  const recentLogs = logs.filter((log) => log.date >= sinceDate && log.date <= today());
+  const recentDays = new Set(recentLogs.map((log) => log.date)).size;
+  const recentHabitPractices = new Set(recentLogs.flatMap((log) => log.completedHabitIds.map((id) => `${log.date}:${id}`))).size;
+  const habitNames = new Map(habits.map((habit) => [habit.id, habit.title]));
+
+  function archiveHabit(habit: MindfulHabit) {
+    if (window.confirm(`Move "${habit.title}" to the archive? Past reflections will remain unchanged.`)) onArchiveHabit(habit);
+  }
+
+  function archiveLog(log: MindfulnessLog) {
+    if (window.confirm(`Move the ${log.date} reflection to the archive?`)) onArchiveLog(log);
+  }
+
+  return <>
+    <PageHeading eyebrow="Practice with patience" title="Mind & habits" subtitle="Notice emotional patterns, reflect on responses, and recognize small actions that build patience, kindness, love, and gratitude." action={<Button onClick={() => setLogEditor(null)}><Plus size={15} /> Add reflection</Button>} />
+    <div className="alert"><Heart size={15} style={{ flex: "none", marginTop: 1 }} /><span>A gentle personal journal, not a medical assessment. Progress is about noticing and practicing, not being perfect. These notes are saved in your shared Daybook data.</span></div>
+    <div className="mindful-summary"><Card><span>Days reflected · last 7 days</span><strong>{recentDays} / 7</strong></Card><Card><span>Habit practices · last 7 days</span><strong>{recentHabitPractices}</strong></Card><Card><span>Positive habits</span><strong>{habits.length}</strong></Card></div>
+    <Card className="mindful-habits-card"><div className="card-head"><div><h2 className="section-title">Positive habits</h2><p className="section-description">Choose small, repeatable actions that matter to you.</p></div><Button size="sm" variant="outline" onClick={() => setHabitEditor(null)}><Plus size={14} /> Add habit</Button></div>
+      {habits.length ? <div className="mindful-habit-list">{habits.map((habit) => <div className="mindful-habit-row" key={habit.id}><div><strong>{habit.title}</strong>{habit.description && <p>{habit.description}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button></div></div>)}</div> : <p className="mindful-empty-habits">Add a habit such as “Pause and take three breaths” or “Show appreciation to someone.”</p>}
+    </Card>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reflections" placeholder="Search date, emotion, situation, response..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter reflections by emotion" style={{ width: 170 }} value={emotionFilter} onChange={(event) => setEmotionFilter(event.target.value)}><option>All emotions</option><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select><Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge></div>
+    <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
+      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone={log.emotion === "Anger" || log.emotion === "Frustration" || log.emotion === "Stress" ? "amber" : "green"}>{log.emotion}</Badge><Badge>Intensity {log.intensity}/5</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
+      {log.trigger && <div className="mindful-log-section"><span>Situation</span><p>{log.trigger}</p></div>}
+      {log.response && <div className="mindful-log-section"><span>Response</span><p>{log.response}</p></div>}
+      {log.positiveAction && <div className="mindful-log-section mindful-positive"><span>Positive action</span><p>{log.positiveAction}</p></div>}
+      {log.reflection && <div className="mindful-log-section"><span>Reflection</span><p>{log.reflection}</p></div>}
+      {log.completedHabitIds.length > 0 && <div className="mindful-practiced"><strong>Habits practiced</strong>{log.completedHabitIds.map((id) => <Badge key={id}>{habitNames.get(id) ?? "Past habit"}</Badge>)}</div>}
+    </Card>)}</div>
+    {!visibleLogs.length && <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search or emotion." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
+    {habitEditor !== undefined && <MindfulHabitModal key={habitEditor?.id ?? "new-mindful-habit"} initial={habitEditor} onClose={() => setHabitEditor(undefined)} onSave={(habit) => { onSaveHabit(habit, habitEditor?.id); setHabitEditor(undefined); }} />}
+    {logEditor !== undefined && <MindfulnessLogModal key={logEditor?.id ?? "new-mindfulness-log"} initial={logEditor} habits={habits} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
   </>;
 }
 
@@ -3935,6 +4085,8 @@ function emptyTrackerData(): TrackerData {
     personalRecords: [],
     assets: [],
     promptRecords: [],
+    mindfulHabits: [],
+    mindfulnessLogs: [],
     educationRecords: [],
     cookingRecipes: [],
     cookingLogs: [],
@@ -4637,6 +4789,34 @@ export default function App() {
       promptRecords: (previous.promptRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
+  function saveMindfulHabit(habit: Omit<MindfulHabit, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      mindfulHabits: id
+        ? (previous.mindfulHabits ?? []).map((entry) => entry.id === id ? { ...habit, id } : entry)
+        : [{ ...habit, id: createId() }, ...(previous.mindfulHabits ?? [])],
+    }));
+  }
+  function archiveMindfulHabit(habit: MindfulHabit) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Positive habit: ${habit.title}`, { mindfulHabits: [habit] }),
+      mindfulHabits: (previous.mindfulHabits ?? []).filter((entry) => entry.id !== habit.id),
+    }));
+  }
+  function saveMindfulnessLog(log: Omit<MindfulnessLog, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      mindfulnessLogs: id
+        ? (previous.mindfulnessLogs ?? []).map((entry) => entry.id === id ? { ...log, id } : entry)
+        : [{ ...log, id: createId() }, ...(previous.mindfulnessLogs ?? [])],
+    }));
+  }
+  function archiveMindfulnessLog(log: MindfulnessLog) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Mind & habits reflection · ${log.date}`, { mindfulnessLogs: [log] }),
+      mindfulnessLogs: (previous.mindfulnessLogs ?? []).filter((entry) => entry.id !== log.id),
+    }));
+  }
   async function copyPromptToClipboard(record: PromptRecord) {
     try {
       await navigator.clipboard.writeText(record.prompt);
@@ -4990,6 +5170,7 @@ export default function App() {
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
+    "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,

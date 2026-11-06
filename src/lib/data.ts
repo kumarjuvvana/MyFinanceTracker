@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -47,6 +47,8 @@ export function makeSeedData(): TrackerData {
     stockQuotes: [],
     stockSeedVersion: STOCK_SEED_VERSION,
     promptRecords: [],
+    mindfulHabits: [],
+    mindfulnessLogs: [],
   };
 }
 
@@ -386,13 +388,28 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.tool === "string" && entry.tool.length <= 120 &&
     (entry.type === "" || entry.type === "System" || entry.type === "Developer" || entry.type === "User" || entry.type === "Task" || entry.type === "Other") &&
     typeof entry.category === "string" && entry.category.length <= 80));
+  const mindfulHabitsOk = value.mindfulHabits === undefined || (Array.isArray(value.mindfulHabits) && value.mindfulHabits.every((entry) =>
+    isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+    typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
+    typeof entry.description === "string" && entry.description.length <= 1000));
+  const mindfulnessLogsOk = value.mindfulnessLogs === undefined || (Array.isArray(value.mindfulnessLogs) && value.mindfulnessLogs.every((entry) =>
+    isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+    typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+    (entry.emotion === "Anger" || entry.emotion === "Frustration" || entry.emotion === "Stress" || entry.emotion === "Calm" ||
+      entry.emotion === "Love / kindness" || entry.emotion === "Gratitude" || entry.emotion === "Other") &&
+    typeof entry.intensity === "number" && Number.isInteger(entry.intensity) && entry.intensity >= 1 && entry.intensity <= 5 &&
+    typeof entry.trigger === "string" && entry.trigger.length <= 1000 &&
+    typeof entry.response === "string" && entry.response.length <= 2000 &&
+    typeof entry.positiveAction === "string" && entry.positiveAction.length <= 2000 &&
+    typeof entry.reflection === "string" && entry.reflection.length <= 3000 &&
+    Array.isArray(entry.completedHabitIds) && entry.completedHabitIds.every((id) => typeof id === "string")));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings",
     "devotionalEntries", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
-    "familyMembers", "personalRecords", "documents", "promptRecords",
+    "familyMembers", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
   ];
   const archivedRecordsOk = value.archivedRecords === undefined ||
     (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {
@@ -437,7 +454,7 @@ export function validateData(value: unknown): value is TrackerData {
     !assetsOk || !educationRecordsOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
     !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
-    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk ||
+    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
     !archivedRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
@@ -499,6 +516,8 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.personalRecords) && new Set((value.personalRecords as PersonalRecord[]).map((entry) => entry.id)).size !== value.personalRecords.length) return false;
   if (Array.isArray(value.documents) && new Set((value.documents as DocumentAttachment[]).map((entry) => entry.id)).size !== value.documents.length) return false;
   if (Array.isArray(value.promptRecords) && new Set((value.promptRecords as PromptRecord[]).map((entry) => entry.id)).size !== value.promptRecords.length) return false;
+  if (Array.isArray(value.mindfulHabits) && new Set((value.mindfulHabits as MindfulHabit[]).map((entry) => entry.id)).size !== value.mindfulHabits.length) return false;
+  if (Array.isArray(value.mindfulnessLogs) && new Set((value.mindfulnessLogs as MindfulnessLog[]).map((entry) => entry.id)).size !== value.mindfulnessLogs.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
     const stocks = value.stocks as TrackedStock[];
@@ -583,6 +602,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     })),
     documents: data.documents ?? [],
     promptRecords: data.promptRecords ?? [],
+    mindfulHabits: data.mindfulHabits ?? [],
+    mindfulnessLogs: data.mindfulnessLogs ?? [],
   };
 }
 

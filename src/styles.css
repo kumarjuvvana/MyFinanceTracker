@@ -980,3 +980,52 @@ body{background:#f3f5ef}
   .app-shell.dark .vehicle-card{border-bottom-color:var(--line,#343d35);background:transparent}
   .app-shell.dark .vehicle-stats>div{border-bottom-color:var(--line,#343d35)}
 }
+
+.mindful-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.mindful-summary>.card{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:15px 17px}
+.mindful-summary span{font-size:11px;color:#818a80}
+.mindful-summary strong{font:700 19px Manrope,sans-serif;color:#3e6747;white-space:nowrap}
+.mindful-habits-card{margin-bottom:16px}
+.mindful-habit-list{display:grid}
+.mindful-habit-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #eef0ec}
+.mindful-habit-row>div:first-child{min-width:0}
+.mindful-habit-row strong{font-size:12px;color:#424a42}
+.mindful-habit-row p{margin:3px 0 0;color:#8b9388;font-size:11px;white-space:pre-wrap}
+.mindful-empty-habits{margin:0;color:#8b9388;font-size:11px}
+.mindful-log-list{display:grid;gap:12px}
+.mindful-log-card{display:grid;gap:13px}
+.mindful-log-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.mindful-log-head h2{margin:0 0 7px;font:700 14px Manrope,sans-serif;color:#343d35}
+.mindful-log-badges{display:flex;gap:6px;flex-wrap:wrap}
+.mindful-log-section{display:grid;gap:4px}
+.mindful-log-section>span,.mindful-practiced>strong{font-size:10px;font-weight:700;color:#7a8479;text-transform:uppercase;letter-spacing:.5px}
+.mindful-log-section p{margin:0;color:#515a51;font-size:12px;line-height:1.55;white-space:pre-wrap}
+.mindful-log-section.mindful-positive{padding:10px 12px;border-radius:9px;background:#f1f7f0}
+.mindful-log-section.mindful-positive>span{color:#4f7956}
+.mindful-practiced{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mindful-habit-checklist{min-width:0;margin:0;padding:12px;border:1px solid #e6eae4;border-radius:9px}
+.mindful-habit-checklist legend{padding:0 5px;color:#5e675f;font-size:11px;font-weight:700}
+.mindful-habit-checklist>div{display:grid;gap:8px}
+.mindful-habit-checklist label{display:flex;align-items:flex-start;gap:8px;color:#454e45;font-size:11px;cursor:pointer}
+.mindful-habit-checklist input{margin:2px 0 0;accent-color:#4c8059}
+.mindful-habit-checklist label span{display:grid;gap:2px}
+.mindful-habit-checklist label strong{font-size:11px}
+.mindful-habit-checklist label small{color:#8b9388;font-size:10px}
+.app-shell.dark .mindful-summary span,.app-shell.dark .mindful-habit-row p,.app-shell.dark .mindful-empty-habits,.app-shell.dark .mindful-log-section>span,.app-shell.dark .mindful-practiced>strong,.app-shell.dark .mindful-habit-checklist label small{color:#a7b0a7}
+.app-shell.dark .mindful-summary strong{color:#a6c1a8}
+.app-shell.dark .mindful-habit-row{border-color:#343d35}
+.app-shell.dark .mindful-habit-row strong,.app-shell.dark .mindful-log-head h2,.app-shell.dark .mindful-log-section p,.app-shell.dark .mindful-habit-checklist legend,.app-shell.dark .mindful-habit-checklist label{color:#e3e8e2}
+.app-shell.dark .mindful-log-section.mindful-positive{background:#26352a}
+.app-shell.dark .mindful-log-section.mindful-positive>span{color:#a6c1a8}
+.app-shell.dark .mindful-habit-checklist{border-color:#343d35}
+@media(max-width:600px){
+  .mindful-summary{grid-template-columns:1fr;gap:8px}
+  .mindful-summary>.card{padding:12px 14px}
+  .mindful-log-card{padding:14px}
+  .mindful-log-head{gap:4px}
+  .mindful-log-head>.table-actions{gap:1px}
+  .mindful-log-head>.table-actions .icon-button{width:28px;height:28px}
+  .mindful-habit-row{align-items:flex-start}
+  .mindful-habit-row>.table-actions{gap:1px;flex:none}
+  .mindful-habit-row>.table-actions .icon-button{width:28px;height:28px}
+}

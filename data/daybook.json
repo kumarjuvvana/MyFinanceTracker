@@ -12,5 +12,7 @@
   "stockSeedVersion": 3,
   "trainingSessions": [],
   "documents": [],
-  "promptRecords": []
+  "promptRecords": [],
+  "mindfulHabits": [],
+  "mindfulnessLogs": []
 }

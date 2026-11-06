@@ -23,6 +23,7 @@ export type Page =
   | "Stocks"
   | "Asset manager"
   | "Learning"
+  | "Mind & habits"
   | "Training & classes"
   | "Devotional"
   | "Cooking"
@@ -250,6 +251,26 @@ export interface PromptRecord {
   tool: string;
   type: PromptType | "";
   category: string;
+}
+
+export interface MindfulHabit {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export type MindfulnessEmotion = "Anger" | "Frustration" | "Stress" | "Calm" | "Love / kindness" | "Gratitude" | "Other";
+
+export interface MindfulnessLog {
+  id: string;
+  date: string;
+  emotion: MindfulnessEmotion;
+  intensity: number;
+  trigger: string;
+  response: string;
+  positiveAction: string;
+  reflection: string;
+  completedHabitIds: string[];
 }
 
 export type TrainingDeliveryMode = "In-person class" | "Online class" | "Virtual class" | "Self-study";
@@ -575,6 +596,8 @@ export interface TrackerData {
   personalRecords?: PersonalRecord[];
   documents?: DocumentAttachment[];
   promptRecords?: PromptRecord[];
+  mindfulHabits?: MindfulHabit[];
+  mindfulnessLogs?: MindfulnessLog[];
   credentialVault?: EncryptedCredentialVault;
 }
 
