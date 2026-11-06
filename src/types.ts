@@ -34,6 +34,7 @@ export type Page =
   | "Electricity"
   | "Personal documents"
   | "Documents"
+  | "AI Prompts"
   | "Archive"
   | "Account credentials"
   | "Data management"
@@ -236,6 +237,18 @@ export interface LearningRecord {
   startedDate: string;
   completedDate: string;
   notes: string;
+}
+
+export type PromptType = "System" | "Developer" | "User" | "Task" | "Other";
+
+export interface PromptRecord {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  tool: string;
+  type: PromptType | "";
+  category: string;
 }
 
 export type TrainingDeliveryMode = "In-person class" | "Online class" | "Virtual class" | "Self-study";
@@ -560,6 +573,7 @@ export interface TrackerData {
   archivedRecords?: ArchivedRecord[];
   personalRecords?: PersonalRecord[];
   documents?: DocumentAttachment[];
+  promptRecords?: PromptRecord[];
   credentialVault?: EncryptedCredentialVault;
 }
 

@@ -11,5 +11,6 @@
   "stockQuotes": [],
   "stockSeedVersion": 3,
   "trainingSessions": [],
-  "documents": []
+  "documents": [],
+  "promptRecords": []
 }

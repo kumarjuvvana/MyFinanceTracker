@@ -12,7 +12,7 @@ import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validate
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
@@ -51,6 +51,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Stocks", icon: TrendingUp },
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
+  { name: "AI Prompts", icon: Sparkles },
   { name: "Training & classes", icon: CalendarDays },
   { name: "Devotional", icon: Heart },
   { name: "Cooking", icon: CookingPot },
@@ -705,6 +706,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         familyMembers: mergeArchivedRows(previous.familyMembers, snapshot.familyMembers),
         personalRecords: mergeArchivedRows(previous.personalRecords, snapshot.personalRecords),
         documents: mergeArchivedRows(previous.documents, snapshot.documents),
+        promptRecords: mergeArchivedRows(previous.promptRecords, snapshot.promptRecords),
   };
 }
 
@@ -1655,6 +1657,86 @@ function LearningPage({ records, onSave, onDelete }: {
     </Card>)}</div>
     {!visible.length && <Card><EmptyState icon={<BookOpen size={18} />} title={records.length ? "No matching learning records" : "No learning records yet"} description={records.length ? "Try another search or filter." : "Add a skill or course you are learning to start your progress log."} /></Card>}
     {editor !== undefined && <LearningRecordModal key={editor?.id ?? "new-learning-record"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
+  </>;
+}
+
+function emptyPromptRecord(): Omit<PromptRecord, "id"> {
+  return { title: "", description: "", prompt: "", tool: "", type: "", category: "" };
+}
+
+function PromptRecordModal({ initial, onClose, onSave }: {
+  initial: PromptRecord | null;
+  onClose: () => void;
+  onSave: (record: Omit<PromptRecord, "id">) => void;
+}) {
+  const [record, setRecord] = useState<Omit<PromptRecord, "id">>(initial ?? emptyPromptRecord());
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!record.title.trim() || !record.prompt.trim()) {
+      setError("Enter a title and prompt text.");
+      return;
+    }
+    onSave({
+      ...record,
+      title: record.title.trim(),
+      description: record.description.trim(),
+      prompt: record.prompt.trim(),
+      tool: record.tool.trim(),
+      category: record.category.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit AI prompt" : "Add AI prompt"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Title (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Review a pull request" value={record.title} onChange={(event) => setRecord((current) => ({ ...current, title: event.target.value }))} /></Field>
+      <Field className="full" label="Description / when to use it"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Describe the goal, context, intended audience, or when this prompt is useful." value={record.description} onChange={(event) => setRecord((current) => ({ ...current, description: event.target.value }))} /></Field>
+      <Field label="AI tool / platform"><Input maxLength={120} placeholder="e.g. ChatGPT, Copilot, Claude" value={record.tool} onChange={(event) => setRecord((current) => ({ ...current, tool: event.target.value }))} /></Field>
+      <Field label="Prompt type"><Select value={record.type} onChange={(event) => setRecord((current) => ({ ...current, type: event.target.value as PromptType | "" }))}><option value="">Not specified</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field>
+      <Field className="full" label="Category"><Input maxLength={80} placeholder="e.g. DevOps, Coding, Writing, Research" value={record.category} onChange={(event) => setRecord((current) => ({ ...current, category: event.target.value }))} /></Field>
+      <Field className="full" label="Prompt text (required)"><textarea className="field textarea prompt-editor" rows={12} required maxLength={20000} placeholder="Write the reusable prompt here. You can include placeholders such as [project name] or [paste code here]." value={record.prompt} onChange={(event) => setRecord((current) => ({ ...current, prompt: event.target.value }))} /></Field>
+    </div>
+    {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add prompt"}</Button></div></form>
+  </Modal>;
+}
+
+function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
+  records: PromptRecord[];
+  onSave: (record: Omit<PromptRecord, "id">, id?: string) => void;
+  onDelete: (record: PromptRecord) => void;
+  onCopy: (record: PromptRecord) => void;
+}) {
+  const [editor, setEditor] = useState<PromptRecord | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All categories");
+  const [typeFilter, setTypeFilter] = useState("All types");
+  const categories = [...new Set(records.map((record) => record.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const query = search.trim().toLocaleLowerCase();
+  const visible = records
+    .filter((record) => categoryFilter === "All categories" || record.category === categoryFilter)
+    .filter((record) => typeFilter === "All types" || record.type === typeFilter)
+    .filter((record) => [record.title, record.description, record.prompt, record.tool, record.category, record.type]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.title.localeCompare(b.title));
+
+  function deleteRecord(record: PromptRecord) {
+    if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
+  }
+
+  return <>
+    <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Keep frequently used prompts organized, searchable, and ready to copy into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
+    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter prompt category" style={{ width: 165 }} value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select><Select aria-label="Filter prompt type" style={{ width: 150 }} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    <div className="prompt-list">{visible.map((record) => <Card className="prompt-card" key={record.id}>
+      <div className="prompt-card-head"><div className="prompt-card-title"><div className="prompt-icon"><Sparkles size={17} /></div><div><h2>{record.title}</h2><p>{[record.category, record.tool].filter(Boolean).join(" · ") || "Reusable prompt"}</p></div></div><div className="prompt-card-actions"><Button size="sm" variant="outline" onClick={() => onCopy(record)}><Copy size={13} />Copy prompt</Button><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.title}`} onClick={() => onSave({ ...record, title: `${record.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
+      {(record.type || record.tool || record.category) && <div className="prompt-meta">{record.type && <Badge>{record.type}</Badge>}{record.category && <Badge tone="neutral">{record.category}</Badge>}{record.tool && <span>For {record.tool}</span>}</div>}
+      {record.description && <p className="prompt-description">{record.description}</p>}
+      <pre className="prompt-body">{record.prompt}</pre>
+    </Card>)}</div>
+    {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
+    {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
 }
 
@@ -3727,6 +3809,7 @@ function emptyTrackerData(): TrackerData {
     trainingSessions: [],
     personalRecords: [],
     assets: [],
+    promptRecords: [],
     educationRecords: [],
     cookingRecipes: [],
     cookingLogs: [],
@@ -4415,6 +4498,29 @@ export default function App() {
       learningRecords: (previous.learningRecords ?? []).filter((entry) => entry.id !== record.id),
     }));
   }
+  function savePromptRecord(record: Omit<PromptRecord, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      promptRecords: id
+        ? (previous.promptRecords ?? []).map((entry) => entry.id === id ? { ...record, id } : entry)
+        : [{ ...record, id: createId() }, ...(previous.promptRecords ?? [])],
+    }));
+  }
+  function deletePromptRecord(record: PromptRecord) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `AI prompt: ${record.title}`, { promptRecords: [record] }),
+      promptRecords: (previous.promptRecords ?? []).filter((entry) => entry.id !== record.id),
+    }));
+  }
+  async function copyPromptToClipboard(record: PromptRecord) {
+    try {
+      await navigator.clipboard.writeText(record.prompt);
+      setError("");
+      setNotice(`Copied "${record.title}" to the clipboard.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? `Could not copy the prompt: ${caught.message}` : "Could not copy the prompt. Check clipboard permissions and try again.");
+    }
+  }
   function saveTrainingSession(session: Omit<TrainingSession, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -4759,6 +4865,7 @@ export default function App() {
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
+    "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,

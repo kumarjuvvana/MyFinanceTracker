@@ -100,3 +100,7 @@ The development server includes a matching `/api/stock-price` middleware, so **S
 For a local-only UI/data preview while diagnosing sign-in, set `LOCAL_AUTH_BYPASS=true` in `.env.local` and run `npm run dev`. This skips the password only for requests addressed to `localhost`, `127.0.0.1`, or `::1`, and only outside production. It still requires the local Supabase server credentials to load cloud data. Never enable this in Vercel or expose the development server to your network. Remove the setting or set it to `false` after testing.
 
 Gmail API sending is a test-email connector, not a scheduled reminder system.
+
+## AI Prompts storage
+
+Before deploying the AI Prompts screen to an existing database, back up your data and run `supabase/migrations/20261106140000_add_ai_prompt_storage.sql` in the Supabase SQL Editor. It creates the service-role-only `public.prompt_records` table and updates the existing Daybook save/load functions to persist and restore prompts, including title, description, prompt text, tool, type, and category. The app preserves prompt order and archive/restore behavior. To inspect saved prompts, run `select id, position, record ->> 'title' as title, record ->> 'tool' as tool, record ->> 'type' as prompt_type, record ->> 'category' as category from public.prompt_records order by position;`.

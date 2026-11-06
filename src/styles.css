@@ -407,6 +407,35 @@ body{background:#f3f5ef}
   .history-summary>strong{font-size:12px}
 }
 
+.prompt-list{display:grid;gap:12px}
+.prompt-card{min-width:0;padding:17px}
+.prompt-card-head,.prompt-card-title{display:flex;align-items:center;gap:10px}
+.prompt-card-head{justify-content:space-between;align-items:flex-start}
+.prompt-card-title{min-width:0}
+.prompt-card-title>div:last-child{min-width:0}
+.prompt-card-title h2{margin:0;color:#303830;font:700 14px Manrope,sans-serif;overflow-wrap:anywhere}
+.prompt-card-title p{margin:4px 0 0;color:#858d83;font-size:11px;overflow-wrap:anywhere}
+.prompt-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:11px;background:#edf4ee;color:#4e7e57}
+.prompt-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;flex:none}
+.prompt-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:12px}
+.prompt-meta>span{font-size:10px;color:#858d83}
+.prompt-description{margin:11px 0 0;color:#747d73;font-size:11px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.prompt-body{max-height:430px;overflow:auto;margin:12px 0 0;padding:12px;border:1px solid #eef0ec;border-radius:8px;background:#f8f9f7;color:#394139;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.prompt-editor{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;line-height:1.55}
+.app-shell.dark .prompt-card-title h2{color:#e3e8e2}
+.app-shell.dark .prompt-card-title p,.app-shell.dark .prompt-meta>span,.app-shell.dark .prompt-description{color:#a7b0a7}
+.app-shell.dark .prompt-icon{background:#2b382d;color:#a8c9a9}
+.app-shell.dark .prompt-body{border-color:#343d35;background:#202720;color:#d4ddd4}
+@media(max-width:600px){
+  .prompt-card{padding:13px}
+  .prompt-card-head{flex-direction:column;gap:10px}
+  .prompt-card-actions{width:100%;justify-content:flex-start}
+  .prompt-list{gap:0}
+  .prompt-list>.prompt-card{border:0;border-bottom:1px solid var(--panel-line,#e8ece6);border-radius:0;box-shadow:none;background:transparent}
+  .prompt-list>.prompt-card:hover{transform:none;box-shadow:none}
+  .app-shell.dark .prompt-list>.prompt-card{border-bottom-color:var(--line,#343d35)}
+}
+
 .sidebar{overflow-y:auto}
 .vehicle-list{display:grid;gap:16px}
 .vehicle-card{padding:18px}
