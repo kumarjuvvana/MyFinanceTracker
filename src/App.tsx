@@ -31,7 +31,7 @@ const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
   tahoma: "Tahoma",
   courier: "Courier New",
 };
-type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
+type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity" | "mindfulness" | "prompts" | "subscriptions" | "documents";
 const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = ["shopping", "reminders", "personalDocuments"];
 const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; description: string }[] = [
   { id: "shopping", label: "Shopping", description: "Spending, shopping list, and trips" },
@@ -41,6 +41,10 @@ const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; descriptio
   { id: "assets", label: "Asset manager", description: "Your saved assets and valuations" },
   { id: "learning", label: "Learning", description: "Learning topics and progress" },
   { id: "training", label: "Training & classes", description: "Recent dated classes and lessons" },
+  { id: "mindfulness", label: "Mind & habits", description: "Recent reflections and saved habits" },
+  { id: "prompts", label: "AI Prompts", description: "Your saved prompt library" },
+  { id: "subscriptions", label: "Subscriptions & bills", description: "Services and recent billing activity" },
+  { id: "documents", label: "Documents", description: "Recently uploaded document records" },
   { id: "devotional", label: "Devotional", description: "Recent devotional entries and prayer requests" },
   { id: "cooking", label: "Cooking", description: "Recently logged dishes and cooking lessons" },
   { id: "issues", label: "Issues & maintenance", description: "Open issues, repairs, and tasks" },
@@ -230,6 +234,36 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
     training: {
       title: "Training & classes", page: "Training & classes", emptyMessage: "No classes or study sessions recorded yet.",
       entries: [...(data.trainingSessions ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4).map((session) => ({ title: session.courseName, detail: [dateLabel(session.date), session.topic, session.mode].filter(Boolean).join(" · ") })),
+    },
+    mindfulness: {
+      title: "Mind & habits", page: "Mind & habits", emptyMessage: "No reflections or habits recorded yet.",
+      entries: [
+        ...[...(data.mindfulnessLogs ?? [])].sort((a, b) => b.date.localeCompare(a.date)).map((log) => ({ title: `${log.emotion} reflection`, detail: [dateLabel(log.date), `Intensity ${log.intensity}/5`, log.completedHabitIds.length ? `${log.completedHabitIds.length} habits completed` : ""].filter(Boolean).join(" · "), date: log.date })),
+        ...(data.mindfulHabits ?? []).map((habit) => ({ title: habit.title, detail: habit.description ? `Habit · ${habit.description}` : "Saved habit", date: "" })),
+      ].slice(0, 4),
+    },
+    prompts: {
+      title: "AI Prompts", page: "AI Prompts", emptyMessage: "No prompts saved yet.",
+      entries: (data.promptRecords ?? []).slice(0, 4).map((prompt) => ({ title: prompt.title, detail: [prompt.category, prompt.tool, prompt.type].filter(Boolean).join(" · ") })),
+    },
+    subscriptions: {
+      title: "Subscriptions & bills", page: "Subscriptions & bills", emptyMessage: "No services or bills recorded yet.",
+      entries: [...(data.subscriptions ?? [])].sort((a, b) => {
+        const latestDate = (account: SubscriptionAccount) => account.transactions.reduce((latest, transaction) => transaction.transactionDate > latest ? transaction.transactionDate : latest, "");
+        return latestDate(b).localeCompare(latestDate(a));
+      }).slice(0, 4).map((account) => {
+        const latest = [...account.transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0];
+        return {
+          title: account.name,
+          detail: latest
+            ? [account.provider, account.category, latest.dueDate ? `Due ${dateLabel(latest.dueDate)}` : dateLabel(latest.transactionDate), latest.amount !== null ? formatMoney(latest.amount, account.currency) : "", latest.paid ? "Paid" : "Unpaid"].filter(Boolean).join(" · ")
+            : [account.provider, account.category, "No billing activity"].filter(Boolean).join(" · "),
+        };
+      }),
+    },
+    documents: {
+      title: "Documents", page: "Documents", emptyMessage: "No documents uploaded yet.",
+      entries: [...(data.documents ?? [])].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4).map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
     },
     devotional: {
       title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries or prayer requests recorded yet.",
