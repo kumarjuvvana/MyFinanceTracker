@@ -478,6 +478,26 @@ body{background:#f3f5ef}
 .app-shell.dark .devotional-summary strong,.app-shell.dark .devotional-section-head h2,.app-shell.dark .devotional-card h3,.app-shell.dark .devotional-card p strong{color:#e3e8e2}
 .app-shell.dark .devotional-summary span,.app-shell.dark .devotional-date,.app-shell.dark .devotional-section-head p,.app-shell.dark .devotional-card p{color:#a7b0a7}
 .app-shell.dark .devotional-section-head h2 svg{color:#a6c1a8}
+.cooking-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
+.cooking-summary .card{display:grid;gap:6px;padding:14px}
+.cooking-summary span{font-size:10px;color:#92998f}
+.cooking-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
+.cooking-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.cooking-section{display:grid;gap:10px;min-width:0}
+.cooking-list{display:grid;gap:10px}
+.cooking-card{min-width:0;padding:14px}
+.cooking-card h3{margin:4px 0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
+.cooking-card p{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
+.cooking-card p strong{color:#414a42}
+.cooking-tags{display:flex;flex-wrap:wrap;gap:4px}
+.cooking-add-dish{display:flex;align-items:center;gap:8px}
+.cooking-add-dish>.field{flex:1;min-width:0}
+.cooking-selected-dishes{display:grid;gap:6px}
+.cooking-selected-dishes>strong{font-size:11px;color:#414a42}
+.cooking-selected-dishes>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border:1px solid #e8ebe6;border-radius:8px;font-size:11px;color:#586258}
+.app-shell.dark .cooking-summary strong,.app-shell.dark .cooking-card h3,.app-shell.dark .cooking-card p strong,.app-shell.dark .cooking-selected-dishes>strong{color:#e3e8e2}
+.app-shell.dark .cooking-summary span,.app-shell.dark .cooking-card p{color:#a7b0a7}
+.app-shell.dark .cooking-selected-dishes>div{border-color:#343d35;color:#c2cbc2}
 .education-list{display:grid;gap:14px}
 .education-card{min-width:0;padding:12px 16px}
 .education-card-head,.education-card-title,.education-card-actions{display:flex;align-items:center;gap:10px}
@@ -553,6 +573,10 @@ body{background:#f3f5ef}
   .devotional-columns{grid-template-columns:minmax(0,1fr)}
   .devotional-section-head{align-items:flex-start}
   .devotional-card{padding:12px}
+  .cooking-columns{grid-template-columns:minmax(0,1fr)}
+  .cooking-card{padding:12px}
+  .cooking-add-dish{align-items:stretch}
+  .cooking-add-dish>.button{flex:none}
   .asset-card{padding:14px}
   .asset-details{grid-template-columns:minmax(0,1fr)}
   .asset-total-card{grid-template-columns:1fr}

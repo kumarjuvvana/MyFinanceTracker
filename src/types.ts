@@ -24,6 +24,7 @@ export type Page =
   | "Asset manager"
   | "Learning"
   | "Devotional"
+  | "Cooking"
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
@@ -306,6 +307,39 @@ export interface PrayerRequest {
   answeredDate: string;
 }
 
+export interface CookingRecipe {
+  id: string;
+  name: string;
+  dishType: string;
+  cuisine: string;
+  country: string;
+  ingredients: string;
+  steps: string;
+  servings: number | null;
+  prepMinutes: number | null;
+  cookMinutes: number | null;
+  nutritionNotes: string;
+  healthNotes: string;
+  dietaryTags: string[];
+  allergens: string[];
+  notes: string;
+}
+
+export interface CookedDish {
+  recipeId: string | null;
+  name: string;
+}
+
+export interface CookingLog {
+  id: string;
+  date: string;
+  occasion: string;
+  dishes: CookedDish[];
+  rating: number | null;
+  learning: string;
+  notes: string;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -377,6 +411,8 @@ export interface TrackerData {
   electricityReadings?: ElectricityReading[];
   devotionalEntries?: DevotionalEntry[];
   prayerRequests?: PrayerRequest[];
+  cookingRecipes?: CookingRecipe[];
+  cookingLogs?: CookingLog[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }

@@ -4,13 +4,13 @@ import {
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
-  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart,
+  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -31,6 +31,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
   { name: "Devotional", icon: Heart },
+  { name: "Cooking", icon: CookingPot },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
@@ -1804,6 +1805,202 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
   </>;
 }
 
+function CookingRecipeModal({ initial, onClose, onSave }: {
+  initial: CookingRecipe | null;
+  onClose: () => void;
+  onSave: (recipe: Omit<CookingRecipe, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [dishType, setDishType] = useState(initial?.dishType ?? "");
+  const [cuisine, setCuisine] = useState(initial?.cuisine ?? "");
+  const [country, setCountry] = useState(initial?.country ?? "");
+  const [ingredients, setIngredients] = useState(initial?.ingredients ?? "");
+  const [steps, setSteps] = useState(initial?.steps ?? "");
+  const [servings, setServings] = useState(initial?.servings?.toString() ?? "");
+  const [prepMinutes, setPrepMinutes] = useState(initial?.prepMinutes?.toString() ?? "");
+  const [cookMinutes, setCookMinutes] = useState(initial?.cookMinutes?.toString() ?? "");
+  const [nutritionNotes, setNutritionNotes] = useState(initial?.nutritionNotes ?? "");
+  const [healthNotes, setHealthNotes] = useState(initial?.healthNotes ?? "");
+  const [dietaryTags, setDietaryTags] = useState(initial?.dietaryTags.join(", ") ?? "");
+  const [allergens, setAllergens] = useState(initial?.allergens.join(", ") ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function optionalInteger(value: string) {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    return Number.isInteger(parsed) ? parsed : null;
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const normalizedName = name.trim();
+    const normalizedType = dishType.trim();
+    const parsedServings = optionalInteger(servings);
+    const parsedPrep = optionalInteger(prepMinutes);
+    const parsedCook = optionalInteger(cookMinutes);
+    if (!normalizedName || !normalizedType) {
+      setError("Enter a recipe or item name and its type.");
+      return;
+    }
+    if ((servings && (parsedServings === null || parsedServings < 1)) ||
+      (prepMinutes && (parsedPrep === null || parsedPrep < 0)) ||
+      (cookMinutes && (parsedCook === null || parsedCook < 0))) {
+      setError("Servings must be a positive whole number; preparation and cooking times must be zero or more whole minutes.");
+      return;
+    }
+    onSave({
+      name: normalizedName,
+      dishType: normalizedType,
+      cuisine: cuisine.trim(),
+      country: country.trim(),
+      ingredients: ingredients.trim(),
+      steps: steps.trim(),
+      servings: parsedServings,
+      prepMinutes: parsedPrep,
+      cookMinutes: parsedCook,
+      nutritionNotes: nutritionNotes.trim(),
+      healthNotes: healthNotes.trim(),
+      dietaryTags: dietaryTags.split(",").map((tag) => tag.trim()).filter(Boolean),
+      allergens: allergens.split(",").map((allergen) => allergen.trim()).filter(Boolean),
+      notes: notes.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit recipe or prepared item" : "Add recipe or prepared item"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Name"><Input autoFocus required maxLength={120} placeholder="e.g. Spinach curry or mango juice" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Type"><Input required maxLength={80} placeholder="Curry, drink, juice, snack..." value={dishType} onChange={(event) => setDishType(event.target.value)} /></Field>
+      <Field label="Cuisine"><Input maxLength={80} placeholder="e.g. Andhra, Mediterranean" value={cuisine} onChange={(event) => setCuisine(event.target.value)} /></Field>
+      <Field label="Country / origin"><Input maxLength={80} placeholder="e.g. India" value={country} onChange={(event) => setCountry(event.target.value)} /></Field>
+      <Field className="full" label="Ingredients and quantities"><textarea className="field textarea" rows={4} maxLength={5000} placeholder={"One ingredient per line, with quantities"} value={ingredients} onChange={(event) => setIngredients(event.target.value)} /></Field>
+      <Field className="full" label="Preparation steps"><textarea className="field textarea" rows={4} maxLength={8000} placeholder={"Add each cooking step on a new line"} value={steps} onChange={(event) => setSteps(event.target.value)} /></Field>
+      <Field label="Servings"><Input type="number" min="1" step="1" value={servings} onChange={(event) => setServings(event.target.value)} /></Field>
+      <Field label="Preparation time (minutes)"><Input type="number" min="0" step="1" value={prepMinutes} onChange={(event) => setPrepMinutes(event.target.value)} /></Field>
+      <Field label="Cooking time (minutes)"><Input type="number" min="0" step="1" value={cookMinutes} onChange={(event) => setCookMinutes(event.target.value)} /></Field>
+      <Field label="Dietary tags (comma-separated)"><Input maxLength={300} placeholder="Vegetarian, dairy-free" value={dietaryTags} onChange={(event) => setDietaryTags(event.target.value)} /></Field>
+      <Field label="Allergens (comma-separated)"><Input maxLength={300} placeholder="Peanuts, milk" value={allergens} onChange={(event) => setAllergens(event.target.value)} /></Field>
+      <Field className="full" label="Nutrition / vitamins (your notes)"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Optional notes or estimates you entered" value={nutritionNotes} onChange={(event) => setNutritionNotes(event.target.value)} /></Field>
+      <Field className="full" label="Health benefits (your notes)"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Personal notes only; not medical or nutrition advice" value={healthNotes} onChange={(event) => setHealthNotes(event.target.value)} /></Field>
+      <Field className="full" label="Variations and other notes"><textarea className="field textarea" rows={2} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add to recipe book"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function CookingLogModal({ initial, recipes, onClose, onSave }: {
+  initial: CookingLog | null;
+  recipes: CookingRecipe[];
+  onClose: () => void;
+  onSave: (log: Omit<CookingLog, "id">) => void;
+}) {
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [occasion, setOccasion] = useState(initial?.occasion ?? "");
+  const [dishes, setDishes] = useState<CookedDish[]>(initial?.dishes ?? []);
+  const [recipeId, setRecipeId] = useState("");
+  const [customDish, setCustomDish] = useState("");
+  const [rating, setRating] = useState(initial?.rating?.toString() ?? "");
+  const [learning, setLearning] = useState(initial?.learning ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function addRecipe() {
+    const recipe = recipes.find((entry) => entry.id === recipeId);
+    if (!recipe) return;
+    setDishes((current) => [...current, { recipeId: recipe.id, name: recipe.name }]);
+    setRecipeId("");
+  }
+
+  function addCustomDish() {
+    const name = customDish.trim();
+    if (!name) return;
+    setDishes((current) => [...current, { recipeId: null, name }]);
+    setCustomDish("");
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!date) {
+      setError("Choose the date for this cooking log.");
+      return;
+    }
+    if (!dishes.length) {
+      setError("Add at least one prepared dish, drink, or other item.");
+      return;
+    }
+    const parsedRating = rating ? Number(rating) : null;
+    if (parsedRating !== null && (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5)) {
+      setError("Choose a rating from 1 to 5.");
+      return;
+    }
+    onSave({ date, occasion: occasion.trim(), dishes, rating: parsedRating, learning: learning.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit daily cooking log" : "Add daily cooking log"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Date"><Input autoFocus required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Meal / occasion"><Input maxLength={100} placeholder="Breakfast, lunch, snack, family dinner..." value={occasion} onChange={(event) => setOccasion(event.target.value)} /></Field>
+      <Field className="full" label="Add from your recipe book">{recipes.length ? <div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
+      <Field className="full" label="Add a one-off dish, drink, or prepared item"><div className="cooking-add-dish"><Input maxLength={120} placeholder="e.g. Fresh lime juice" value={customDish} onChange={(event) => setCustomDish(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomDish(); } }} /><Button type="button" variant="outline" disabled={!customDish.trim()} onClick={addCustomDish}><Plus size={13} /> Add item</Button></div></Field>
+      {dishes.length > 0 && <div className="full cooking-selected-dishes"><strong>Prepared today</strong>{dishes.map((dish, index) => <div key={`${dish.recipeId ?? "custom"}-${index}`}><span>{dish.name}</span><button className="icon-button" type="button" aria-label={`Remove ${dish.name}`} onClick={() => setDishes((current) => current.filter((_, dishIndex) => dishIndex !== index))}><X size={13} /></button></div>)}</div>}
+      <Field label="How did it turn out?"><Select value={rating} onChange={(event) => setRating(event.target.value)}><option value="">Not rated</option><option value="1">1 · Needs practice</option><option value="2">2 · Fair</option><option value="3">3 · Good</option><option value="4">4 · Very good</option><option value="5">5 · Excellent</option></Select></Field>
+      <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
+      <Field className="full" label="Daily notes"><textarea className="field textarea" rows={2} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save daily log"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function CookingPage({ recipes, logs, onSaveRecipe, onDeleteRecipe, onSaveLog, onDeleteLog }: {
+  recipes: CookingRecipe[];
+  logs: CookingLog[];
+  onSaveRecipe: (recipe: Omit<CookingRecipe, "id">, id?: string) => void;
+  onDeleteRecipe: (recipe: CookingRecipe) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
+  onDeleteLog: (log: CookingLog) => void;
+}) {
+  const [recipeEditor, setRecipeEditor] = useState<CookingRecipe | null | undefined>(undefined);
+  const [logEditor, setLogEditor] = useState<CookingLog | null | undefined>(undefined);
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const visibleRecipes = [...recipes].filter((recipe) =>
+    !query || [recipe.name, recipe.dishType, recipe.cuisine, recipe.country, recipe.ingredients, recipe.notes].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const visibleLogs = [...logs].filter((log) =>
+    !query || [log.occasion, log.learning, log.notes, ...log.dishes.map((dish) => dish.name)].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const todayCount = logs.filter((log) => log.date === today()).length;
+
+  return <>
+    <PageHeading eyebrow="Kitchen journal" title="Cooking" subtitle="Keep your recipes and prepared items together, then record what you make and learn each day." action={<Button onClick={() => setRecipeEditor(null)}><Plus size={15} /> Add recipe / item</Button>} />
+    <div className="cooking-summary">
+      <Card><span>Saved recipes and items</span><strong>{recipes.length}</strong></Card>
+      <Card><span>Daily cooking logs</span><strong>{logs.length}</strong></Card>
+      <Card><span>Logs today</span><strong>{todayCount}</strong></Card>
+    </div>
+    <div className="alert"><Utensils size={15} style={{ flex: "none", marginTop: 1 }} /><span>Nutrition, vitamin, and health-benefit fields are your own notes, not verified nutritional data or medical advice.</span></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search cooking recipes and logs" placeholder="Search recipes, ingredients, cuisine, or journal..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    <div className="cooking-columns">
+      <section className="cooking-section"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div><Button variant="outline" onClick={() => setRecipeEditor(null)}><Plus size={13} /> Add</Button></div>
+        {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <Card className="cooking-card" key={recipe.id}>
+          <div className="devotional-card-head"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={() => setRecipeEditor(recipe)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${recipe.name}`} onClick={() => { if (window.confirm(`Delete "${recipe.name}" from the recipe book? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Trash2 size={13} /></button></div></div>
+          {recipe.ingredients && <p><strong>Ingredients:</strong> {recipe.ingredients}</p>}{recipe.steps && <p><strong>Steps:</strong> {recipe.steps}</p>}{recipe.allergens.length > 0 && <p><strong>Allergens:</strong> {recipe.allergens.join(", ")}</p>}{recipe.nutritionNotes && <p><strong>Nutrition / vitamins:</strong> {recipe.nutritionNotes}</p>}{recipe.healthNotes && <p><strong>Health notes:</strong> {recipe.healthNotes}</p>}{recipe.notes && <p><strong>Notes:</strong> {recipe.notes}</p>}
+        </Card>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
+      </section>
+      <section className="cooking-section"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div><Button variant="outline" onClick={() => setLogEditor(null)}><Plus size={13} /> Log today</Button></div>
+        {visibleLogs.length ? <div className="cooking-list">{visibleLogs.map((log) => <Card className="cooking-card" key={log.id}>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Delete the cooking log for ${dateLabel(log.date)}?`)) onDeleteLog(log); }}><Trash2 size={13} /></button></div></div>
+          {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> {log.learning}</p>}{log.notes && <p><strong>Notes:</strong> {log.notes}</p>}
+        </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
+      </section>
+    </div>
+    {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
+    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -2451,6 +2648,8 @@ function emptyTrackerData(): TrackerData {
     personalRecords: [],
     assets: [],
     educationRecords: [],
+    cookingRecipes: [],
+    cookingLogs: [],
   };
 }
 
@@ -3036,6 +3235,34 @@ export default function App() {
       prayerRequests: (previous.prayerRequests ?? []).filter((current) => current.id !== request.id),
     }));
   }
+  function saveCookingRecipe(recipe: Omit<CookingRecipe, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      cookingRecipes: id
+        ? (previous.cookingRecipes ?? []).map((current) => current.id === id ? { ...recipe, id } : current)
+        : [{ ...recipe, id: createId() }, ...(previous.cookingRecipes ?? [])],
+    }));
+  }
+  function deleteCookingRecipe(recipe: CookingRecipe) {
+    update((previous) => ({
+      ...previous,
+      cookingRecipes: (previous.cookingRecipes ?? []).filter((current) => current.id !== recipe.id),
+    }));
+  }
+  function saveCookingLog(log: Omit<CookingLog, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      cookingLogs: id
+        ? (previous.cookingLogs ?? []).map((current) => current.id === id ? { ...log, id } : current)
+        : [{ ...log, id: createId() }, ...(previous.cookingLogs ?? [])],
+    }));
+  }
+  function deleteCookingLog(log: CookingLog) {
+    update((previous) => ({
+      ...previous,
+      cookingLogs: (previous.cookingLogs ?? []).filter((current) => current.id !== log.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -3068,7 +3295,7 @@ export default function App() {
     setNotice("Your backup is ready to save.");
   }
   function clearData() {
-    if (!window.confirm("Clear all shopping, stock, asset, learning, education, vehicle, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
+    if (!window.confirm("Clear all shopping, stock, asset, learning, education, vehicle, electricity, devotional, cooking, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
     setData(emptyTrackerData());
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
@@ -3097,6 +3324,7 @@ export default function App() {
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
+    Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,

@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -243,6 +243,30 @@ export function validateData(value: unknown): value is TrackerData {
       (entry.answeredDate === "" || !Number.isNaN(Date.parse(entry.answeredDate))) &&
       (!entry.answeredDate || Date.parse(entry.answeredDate) >= Date.parse(entry.dateAdded)) &&
       ((entry.status === "Answered") === (entry.answeredDate !== ""))));
+  const cookingRecipesOk = value.cookingRecipes === undefined ||
+    (Array.isArray(value.cookingRecipes) && value.cookingRecipes.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.name === "string" && entry.name.trim().length > 0 &&
+      typeof entry.dishType === "string" && entry.dishType.trim().length > 0 &&
+      typeof entry.cuisine === "string" && typeof entry.country === "string" &&
+      typeof entry.ingredients === "string" && typeof entry.steps === "string" &&
+      (entry.servings === null || (typeof entry.servings === "number" && Number.isInteger(entry.servings) && entry.servings > 0)) &&
+      (entry.prepMinutes === null || (typeof entry.prepMinutes === "number" && Number.isInteger(entry.prepMinutes) && entry.prepMinutes >= 0)) &&
+      (entry.cookMinutes === null || (typeof entry.cookMinutes === "number" && Number.isInteger(entry.cookMinutes) && entry.cookMinutes >= 0)) &&
+      typeof entry.nutritionNotes === "string" && typeof entry.healthNotes === "string" &&
+      Array.isArray(entry.dietaryTags) && entry.dietaryTags.every((tag) => typeof tag === "string") &&
+      Array.isArray(entry.allergens) && entry.allergens.every((allergen) => typeof allergen === "string") &&
+      typeof entry.notes === "string"));
+  const cookingLogsOk = value.cookingLogs === undefined ||
+    (Array.isArray(value.cookingLogs) && value.cookingLogs.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      typeof entry.occasion === "string" &&
+      Array.isArray(entry.dishes) && entry.dishes.length > 0 && entry.dishes.every((dish) =>
+        isRecord(dish) && (dish.recipeId === null || typeof dish.recipeId === "string") &&
+        typeof dish.name === "string" && dish.name.trim().length > 0) &&
+      (entry.rating === null || (typeof entry.rating === "number" && Number.isInteger(entry.rating) && entry.rating >= 1 && entry.rating <= 5)) &&
+      typeof entry.learning === "string" && typeof entry.notes === "string"));
   const personalRecordsOk = value.personalRecords === undefined || (Array.isArray(value.personalRecords) && value.personalRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.title === "string" &&
     (entry.type === "Identity" || entry.type === "Insurance" || entry.type === "License" ||
@@ -288,7 +312,7 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
-    !devotionalEntriesOk || !prayerRequestsOk || !personalRecordsOk ||
+    !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !personalRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -324,6 +348,10 @@ export function validateData(value: unknown): value is TrackerData {
       new Set((value.devotionalEntries as DevotionalEntry[]).map((entry) => entry.id)).size !== value.devotionalEntries.length) return false;
     if (Array.isArray(value.prayerRequests) &&
       new Set((value.prayerRequests as PrayerRequest[]).map((entry) => entry.id)).size !== value.prayerRequests.length) return false;
+    if (Array.isArray(value.cookingRecipes) &&
+      new Set((value.cookingRecipes as CookingRecipe[]).map((entry) => entry.id)).size !== value.cookingRecipes.length) return false;
+    if (Array.isArray(value.cookingLogs) &&
+      new Set((value.cookingLogs as CookingLog[]).map((entry) => entry.id)).size !== value.cookingLogs.length) return false;
     for (const meterReadings of byMeter.values()) {
       const sorted = [...meterReadings].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
       if (sorted.some((entry, index) => index > 0 && entry.meterReading < sorted[index - 1].meterReading)) return false;
@@ -398,6 +426,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     electricityReadings: data.electricityReadings ?? [],
     devotionalEntries: data.devotionalEntries ?? [],
     prayerRequests: data.prayerRequests ?? [],
+    cookingRecipes: data.cookingRecipes ?? [],
+    cookingLogs: data.cookingLogs ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],
