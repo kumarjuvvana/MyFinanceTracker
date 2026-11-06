@@ -1002,6 +1002,15 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [importBroker, setImportBroker] = useState("");
   const [importBrokerDraft, setImportBrokerDraft] = useState("");
   const [addingImportBroker, setAddingImportBroker] = useState(false);
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockBrokerFilter, setStockBrokerFilter] = useState("all");
+  const [stockExchangeFilter, setStockExchangeFilter] = useState("all");
+  const [stockHoldingFilter, setStockHoldingFilter] = useState("all");
+  const [stockQuoteFilter, setStockQuoteFilter] = useState("all");
+  const [stockSortBy, setStockSortBy] = useState<"symbol" | "name" | "broker" | "price" | "quantity" | "value" | "profitLoss">("symbol");
+  const [stockSortOrder, setStockSortOrder] = useState<"asc" | "desc">("asc");
+  const [stockGroupBy, setStockGroupBy] = useState<"none" | "broker" | "exchange">("none");
+  const [collapsedStockGroups, setCollapsedStockGroups] = useState<Set<string>>(() => new Set());
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const latestQuotes = new Map<string, StockQuoteSnapshot>();
@@ -1298,6 +1307,53 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(price); }
     catch { return `${currency} ${price.toFixed(2)}`; }
   }
+  const filteredStocks = stocks.filter((stock) => {
+    const latest = latestQuotes.get(stock.id);
+    const search = stockSearch.trim().toLocaleLowerCase();
+    return (!search || [stock.symbol, stock.name, stock.exchange, stock.broker].some((value) => value.toLocaleLowerCase().includes(search))) &&
+      (stockBrokerFilter === "all" || (stockBrokerFilter === "unassigned" ? !stock.broker : stock.broker === stockBrokerFilter)) &&
+      (stockExchangeFilter === "all" || stock.exchange === stockExchangeFilter) &&
+      (stockHoldingFilter === "all" || (stockHoldingFilter === "holdings" ? (stock.quantity ?? 0) > 0 : (stock.quantity ?? 0) === 0)) &&
+      (stockQuoteFilter === "all" || (stockQuoteFilter === "priced" ? Boolean(latest) : !latest));
+  }).sort((a, b) => {
+    const aQuote = latestQuotes.get(a.id);
+    const bQuote = latestQuotes.get(b.id);
+    const aValue = aQuote && a.quantity ? aQuote.price * a.quantity : null;
+    const bValue = bQuote && b.quantity ? bQuote.price * b.quantity : null;
+    const aProfitLoss = aValue !== null && a.averageBuyPrice ? aValue - a.averageBuyPrice * (a.quantity ?? 0) : null;
+    const bProfitLoss = bValue !== null && b.averageBuyPrice ? bValue - b.averageBuyPrice * (b.quantity ?? 0) : null;
+    const numericValues: Partial<Record<typeof stockSortBy, [number | null, number | null]>> = {
+      price: [aQuote?.price ?? null, bQuote?.price ?? null],
+      quantity: [a.quantity ?? 0, b.quantity ?? 0],
+      value: [aValue, bValue],
+      profitLoss: [aProfitLoss, bProfitLoss],
+    };
+    const pair = numericValues[stockSortBy];
+    if (pair) {
+      if (pair[0] === null) return pair[1] === null ? a.symbol.localeCompare(b.symbol) : 1;
+      if (pair[1] === null) return -1;
+      const difference = pair[0] - pair[1];
+      return difference === 0 ? a.symbol.localeCompare(b.symbol) : difference * (stockSortOrder === "asc" ? 1 : -1);
+    }
+    const aText = stockSortBy === "name" ? a.name : stockSortBy === "broker" ? a.broker || "No broker" : a.symbol;
+    const bText = stockSortBy === "name" ? b.name : stockSortBy === "broker" ? b.broker || "No broker" : b.symbol;
+    const comparison = aText.localeCompare(bText, undefined, { sensitivity: "base" });
+    return (comparison || a.symbol.localeCompare(b.symbol)) * (stockSortOrder === "asc" ? 1 : -1);
+  });
+  const stockGroups = (() => {
+    const groups = new Map<string, { key: string; label: string; stocks: TrackedStock[] }>();
+    for (const stock of filteredStocks) {
+      const label = stockGroupBy === "broker" ? stock.broker || "No broker"
+        : stockGroupBy === "exchange" ? stock.exchange : "";
+      const key = stockGroupBy === "none" ? "all-stocks" : `${stockGroupBy}:${label}`;
+      const group = groups.get(key) ?? { key, label: stockGroupBy === "none" ? "All stocks" : label, stocks: [] };
+      group.stocks.push(stock);
+      groups.set(key, group);
+    }
+    return stockGroupBy === "none" ? [...groups.values()] : [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
+  })();
+  const activeStockFilters = stockSearch.trim() || stockBrokerFilter !== "all" || stockExchangeFilter !== "all" ||
+    stockHoldingFilter !== "all" || stockQuoteFilter !== "all";
 
   return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and save refreshed price snapshots." action={<div className="stock-heading-actions"><input ref={importInputRef} className="sr-only" type="file" accept="image/*" aria-label="Choose stock screenshot" onChange={(event) => { const file = event.target.files?.[0]; if (file) void recognizeStockScreenshot(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importBusy}>{importBusy ? <LoaderCircle size={14} className="spin" /> : <ImagePlus size={14} />}{importBusy ? `Reading ${importProgress}%` : "Import screenshot"}</Button><Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button></div>} />
     <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. All snapshots are saved only in this browser.</span></div>
@@ -1322,8 +1378,27 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => { setSymbol(event.target.value); setError(""); }} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>
       </Card>
     </div>
-    <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">{stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
-      {stocks.length ? <div className="stock-list">{stocks.map((stock) => {
+    <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">Showing {filteredStocks.length} of {stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
+      <div className="stock-view-controls">
+        <label className="stock-search-control"><Search size={14} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></label>
+        <Field label="Exchange"><Select value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field>
+        <Field label="Broker"><Select value={stockBrokerFilter} onChange={(event) => setStockBrokerFilter(event.target.value)}><option value="all">All brokers</option><option value="unassigned">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Position"><Select value={stockHoldingFilter} onChange={(event) => setStockHoldingFilter(event.target.value)}><option value="all">All stocks</option><option value="holdings">Holdings</option><option value="watchlist">Watchlist only</option></Select></Field>
+        <Field label="Quote"><Select value={stockQuoteFilter} onChange={(event) => setStockQuoteFilter(event.target.value)}><option value="all">Any price status</option><option value="priced">Has a price</option><option value="unpriced">No price yet</option></Select></Field>
+        <Field label="Sort by"><Select value={stockSortBy} onChange={(event) => setStockSortBy(event.target.value as typeof stockSortBy)}><option value="symbol">Stock code</option><option value="name">Name</option><option value="broker">Broker</option><option value="price">Latest price</option><option value="quantity">Shares owned</option><option value="value">Holding value</option><option value="profitLoss">Profit / loss</option></Select></Field>
+        <Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
+        <Field label="Group by"><Select value={stockGroupBy} onChange={(event) => { setStockGroupBy(event.target.value as typeof stockGroupBy); setCollapsedStockGroups(new Set()); }}><option value="none">No grouping</option><option value="broker">Broker</option><option value="exchange">Exchange</option></Select></Field>
+        {activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}
+      </div>
+      {stocks.length ? filteredStocks.length ? <div className="stock-list">{stockGroups.map((group) => {
+        const collapsed = collapsedStockGroups.has(group.key);
+        return <div className={`stock-group ${stockGroupBy === "none" ? "stock-group-ungrouped" : ""}`} key={group.key}>
+          {stockGroupBy !== "none" && <button className="stock-group-heading" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedStockGroups((current) => {
+            const next = new Set(current);
+            if (next.has(group.key)) next.delete(group.key); else next.add(group.key);
+            return next;
+          })}><ChevronRight size={15} className={`stock-group-chevron ${collapsed ? "" : "expanded"}`} /><strong>{group.label}</strong><span>{group.stocks.length} {group.stocks.length === 1 ? "stock" : "stocks"}</span></button>}
+          {!collapsed && <div className={`stock-group-children ${stockGroupBy !== "none" ? "stock-group-tree" : ""}`}>{group.stocks.map((stock) => {
         const latest = latestQuotes.get(stock.id);
         const history = sortedHistory(stock.id);
         return <div className="stock-row" key={stock.id}>
@@ -1360,7 +1435,9 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">Refresh this stock to save its first price snapshot.</p>}
           </details>
         </div>;
-      })}</div> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
+      })}</div>}
+        </div>;
+      })}</div> : <EmptyState icon={<Filter size={18} />} title="No stocks match these filters" description="Try changing your search or filters to see more stocks." /> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
     </Card>
     {importOpen && <Modal title="Review stock screenshot" onClose={() => { if (!importBusy) { setImportOpen(false); setImportError(""); } }} wide>
       <p className="section-description stock-import-intro">OCR reads the ticker, quantity, and average price from their table columns. It runs in this browser; check and correct the results before saving. Choose one broker for all rows, or override it per stock. Current quotes can be fetched after import. {importFileName && <strong>{importFileName}</strong>}</p>
