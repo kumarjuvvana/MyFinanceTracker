@@ -13,6 +13,25 @@ import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialV
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
+type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
+const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = ["shopping", "reminders", "personalDocuments"];
+const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; description: string }[] = [
+  { id: "shopping", label: "Shopping", description: "Spending, shopping list, and trips" },
+  { id: "reminders", label: "Notes & reminders", description: "Upcoming and overdue reminders" },
+  { id: "personalDocuments", label: "Personal documents", description: "Upcoming and expired document dates" },
+  { id: "stocks", label: "Stocks", description: "Tracked stocks and quantities" },
+  { id: "assets", label: "Asset manager", description: "Your saved assets and valuations" },
+  { id: "learning", label: "Learning", description: "Learning topics and progress" },
+  { id: "training", label: "Training & classes", description: "Recent dated classes and lessons" },
+  { id: "devotional", label: "Devotional", description: "Recent devotional entries and prayer requests" },
+  { id: "cooking", label: "Cooking", description: "Recently logged dishes and cooking lessons" },
+  { id: "issues", label: "Issues & maintenance", description: "Open issues, repairs, and tasks" },
+  { id: "career", label: "Education & career", description: "Qualifications, experience, and skills" },
+  { id: "family", label: "Family", description: "Family directory highlights" },
+  { id: "schools", label: "Schools & Colleges", description: "Recent student education records" },
+  { id: "vehicles", label: "Vehicles", description: "Vehicles and recent maintenance" },
+  { id: "electricity", label: "Electricity", description: "Recent meter readings and unpaid bills" },
+];
 const CurrencyContext = createContext<Currency>("INR");
 function useCurrencyFormatter() {
   const currency = useContext(CurrencyContext);
@@ -106,7 +125,25 @@ function RecentPurchases({ purchases, onViewAll }: { purchases: Purchase[]; onVi
       : <EmptyState icon={<ShoppingBasket size={18} />} title="No purchases yet" description="Once you pick up an item, it will appear here." />}</Card>;
 }
 
-function Dashboard({ data, onPage }: { data: TrackerData; onPage: (page: Page) => void }) {
+interface DashboardEntry {
+  title: string;
+  detail: string;
+}
+
+function DashboardModuleCard({ title, page, entries, emptyMessage, onPage }: {
+  title: string;
+  page: Page;
+  entries: DashboardEntry[];
+  emptyMessage: string;
+  onPage: (page: Page) => void;
+}) {
+  return <Card className="dashboard-module-card">
+    <div className="card-head"><div><h2 className="section-title">{title}</h2><p className="section-description">{entries.length ? "Recent records" : emptyMessage}</p></div><button className="text-link" type="button" onClick={() => onPage(page)}>View <ChevronRight size={12} /></button></div>
+    {entries.length ? <div className="dashboard-module-list">{entries.slice(0, 4).map((entry, index) => <div className="dashboard-module-entry" key={`${entry.title}-${index}`}><div className="recent-name">{entry.title}</div>{entry.detail && <div className="recent-meta">{entry.detail}</div>}</div>)}</div> : <p className="dashboard-module-empty">{emptyMessage}</p>}
+  </Card>;
+}
+
+function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: DashboardWidget[]; onPage: (page: Page) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const currentMonth = monthKey(today());
   const daily = data.purchases.filter((purchase) => purchase.date === today()).reduce((sum, purchase) => sum + purchase.price, 0);
@@ -125,20 +162,89 @@ function Dashboard({ data, onPage }: { data: TrackerData; onPage: (page: Page) =
     { label: "Still on your list", value: String(pending.length), note: `About ${formatCurrency(pendingValue)} planned`, icon: ShoppingCart, tone: "blue" },
     { label: "Shopping trips", value: String(tripCount), note: "This month so far", icon: ShoppingBag, tone: "purple" },
   ];
-  return <><PageHeading eyebrow="Your little corner of calm" title="Good things, in check." subtitle="A clearer picture of your everyday shopping." action={<Button onClick={() => onPage("Shopping list")}><Plus size={15} /> Add to list</Button>} />
-    <div className="stat-grid">{stats.map(({ label, value, note, icon: Icon, tone }) => <Card className="stat-card" key={label}><div className="stat-top"><span>{label}</span><span className={`stat-icon icon-${tone}`}><Icon size={16} /></span></div><p className="stat-value">{value}</p><div className="stat-foot">{note}</div></Card>)}</div>
-    {reminders.length > 0 && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Notes & reminders</h2><p className="section-description">Due now or coming up in the next 7 days</p></div><button className="text-link" onClick={() => onPage("Notes & reminders")}>See all <ChevronRight size={12} /></button></div><div className="reminder-list">{reminders.slice(0, 4).map((reminder) => <div className="reminder-row" key={reminder.id}><Bell size={15} /><div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{reminder.category || "General"} · <LinkifiedText>{reminder.details || "No extra details"}</LinkifiedText></div></div><Badge tone={reminder.date < today() ? "amber" : "green"}>{reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : dateLabel(reminder.date)}</Badge></div>)}</div></Card>}
-    {documentDue.length > 0 && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Document & policy dates</h2><p className="section-description">Expired or approaching the reminder date you set</p></div><button className="text-link" onClick={() => onPage("Personal documents")}>Manage records <ChevronRight size={12} /></button></div><div className="reminder-list">{documentDue.slice(0, 5).map((record) => {
+  const moduleCards: Record<Exclude<DashboardWidget, "shopping" | "reminders" | "personalDocuments">, { title: string; page: Page; emptyMessage: string; entries: DashboardEntry[] }> = {
+    stocks: {
+      title: "Stocks", page: "Stocks", emptyMessage: "No stocks tracked yet.",
+      entries: (data.stocks ?? []).slice(0, 4).map((stock) => ({ title: `${stock.symbol} · ${stock.name}`, detail: `${stock.exchange}${stock.quantity ? ` · ${stock.quantity} shares` : ""}` })),
+    },
+    assets: {
+      title: "Asset manager", page: "Asset manager", emptyMessage: "No assets recorded yet.",
+      entries: (data.assets ?? []).slice(0, 4).map((asset) => ({ title: asset.name, detail: `${asset.type}${asset.currentValue !== null ? ` · ${formatCurrency(asset.currentValue)}` : ""}` })),
+    },
+    learning: {
+      title: "Learning", page: "Learning", emptyMessage: "No learning topics recorded yet.",
+      entries: (data.learningRecords ?? []).slice(0, 4).map((record) => ({ title: record.title, detail: [record.topic, record.status].filter(Boolean).join(" · ") })),
+    },
+    training: {
+      title: "Training & classes", page: "Training & classes", emptyMessage: "No classes or study sessions recorded yet.",
+      entries: [...(data.trainingSessions ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4).map((session) => ({ title: session.courseName, detail: [dateLabel(session.date), session.topic, session.mode].filter(Boolean).join(" · ") })),
+    },
+    devotional: {
+      title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries or prayer requests recorded yet.",
+      entries: [
+        ...(data.devotionalEntries ?? []).map((entry) => ({ title: entry.scriptureReference, detail: [dateLabel(entry.date), entry.takeaway].filter(Boolean).join(" · "), date: entry.date })),
+        ...(data.prayerRequests ?? []).filter((entry) => entry.status === "Ongoing").map((entry) => ({ title: entry.title, detail: `Prayer request · ${entry.status}`, date: entry.dateAdded })),
+      ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4),
+    },
+    cooking: {
+      title: "Cooking", page: "Cooking", emptyMessage: "No cooking logs recorded yet.",
+      entries: [...(data.cookingLogs ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4).map((entry) => ({ title: entry.dishes.map((dish) => dish.name).join(", "), detail: [dateLabel(entry.date), entry.occasion, entry.learning].filter(Boolean).join(" · ") })),
+    },
+    issues: {
+      title: "Issues & maintenance", page: "Issues & maintenance", emptyMessage: "No issues or maintenance records yet.",
+      entries: [...(data.issueRecords ?? [])].filter((entry) => entry.status !== "Resolved" && entry.status !== "Closed").sort((a, b) => b.dateReported.localeCompare(a.dateReported)).slice(0, 4).map((entry) => ({ title: entry.title, detail: `${entry.area === "Other" ? entry.customArea : entry.area} · ${entry.status} · ${entry.priority}` })),
+    },
+    career: {
+      title: "Education & career", page: "Education & career", emptyMessage: "No career or professional records yet.",
+      entries: [
+        ...(data.professionalQualifications ?? []).map((entry) => ({ title: entry.name, detail: entry.issuer ? `Qualification · ${entry.issuer}` : "Qualification" })),
+        ...(data.workExperiences ?? []).map((entry) => ({ title: `${entry.jobTitle} · ${entry.company}`, detail: entry.current ? "Current role" : "Work experience" })),
+        ...(data.professionalSkills ?? []).map((entry) => ({ title: entry.name, detail: `${entry.category} · ${entry.proficiency}` })),
+        ...(data.personalEducation ?? []).map((entry) => ({ title: entry.qualification, detail: `Education · ${entry.institution}` })),
+      ].slice(0, 4),
+    },
+    family: {
+      title: "Family", page: "Family", emptyMessage: "No family members added yet.",
+      entries: (data.familyMembers ?? []).slice(0, 4).map((member) => ({ title: member.name, detail: [member.relationship === "Other" ? member.relationshipDetail : member.relationship, member.currentResidence].filter(Boolean).join(" · ") })),
+    },
+    schools: {
+      title: "Schools & Colleges", page: "Schools & Colleges", emptyMessage: "No school or college records yet.",
+      entries: [...(data.educationRecords ?? [])].sort((a, b) => b.academicYear.localeCompare(a.academicYear)).slice(0, 4).map((record) => ({ title: `${record.studentName} · ${record.institution}`, detail: [record.gradeCourse || record.level, record.academicYear, record.status].filter(Boolean).join(" · ") })),
+    },
+    vehicles: {
+      title: "Vehicles", page: "Vehicles", emptyMessage: "No vehicles recorded yet.",
+      entries: (data.vehicles ?? []).slice(0, 4).map((vehicle) => {
+        const latestMaintenance = (data.vehicleMaintenance ?? []).filter((entry) => entry.vehicleId === vehicle.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+        return { title: vehicle.name, detail: latestMaintenance ? `Last ${latestMaintenance.type.toLocaleLowerCase()} · ${dateLabel(latestMaintenance.date)}` : [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") };
+      }),
+    },
+    electricity: {
+      title: "Electricity", page: "Electricity", emptyMessage: "No electricity readings recorded yet.",
+      entries: [...(data.electricityReadings ?? [])].sort((a, b) => b.readingDate.localeCompare(a.readingDate)).slice(0, 4).map((entry) => ({ title: `${entry.meterName} · ${entry.meterReading.toLocaleString()} kWh`, detail: [entry.location, dateLabel(entry.readingDate), entry.paid ? "Paid" : entry.billAmount !== null ? `Unpaid · ${formatCurrency(entry.billAmount)}` : "Bill not recorded"].filter(Boolean).join(" · ") })),
+    },
+  };
+  return <><PageHeading eyebrow="Your little corner of calm" title="Good things, in check." subtitle="A personal snapshot of the screens you choose." action={widgets.includes("shopping") ? <Button onClick={() => onPage("Shopping list")}><Plus size={15} /> Add to list</Button> : undefined} />
+    {widgets.includes("shopping") && <>
+      <div className="stat-grid">{stats.map(({ label, value, note, icon: Icon, tone }) => <Card className="stat-card" key={label}><div className="stat-top"><span>{label}</span><span className={`stat-icon icon-${tone}`}><Icon size={16} /></span></div><p className="stat-value">{value}</p><div className="stat-foot">{note}</div></Card>)}</div>
+      <div className="section-grid"><Card><div className="card-head"><div><h2 className="section-title">Your spending, lately</h2><p className="section-description">The last seven days, at a glance</p></div><Badge tone="green"><TrendingUp size={11} /> This week</Badge></div><div className="spend-summary"><strong>{formatCurrency(data.purchases.filter((purchase) => {
+        const start = new Date(); start.setDate(start.getDate() - 6); return purchase.date >= start.toISOString().slice(0, 10);
+      }).reduce((sum, purchase) => sum + purchase.price, 0))}</strong><span>in the last 7 days</span></div><SpendingChart purchases={data.purchases} /></Card>
+        <RecentPurchases purchases={[...data.purchases].sort((a, b) => b.date.localeCompare(a.date))} onViewAll={() => onPage("Purchase history")} /></div>
+      <div className="section-grid"><Card><div className="card-head"><div><h2 className="section-title">A few things to pick up</h2><p className="section-description">Your next trip is already taking shape</p></div><button className="text-link" onClick={() => onPage("Shopping list")}>See the list <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div>
+        {pending.slice(0, 4).length ? <div className="recent-list">{pending.slice(0, 4).map((item) => <div className="recent-row" key={item.id}><div className="item-dot"><Leaf size={15} /></div><div className="recent-info"><div className="recent-name">{item.name}</div><div className="recent-meta">{item.quantity} {item.unit} · {item.category}</div></div><div className="recent-price">{formatCurrency(item.estimatedPrice * item.quantity)}</div></div>)}</div> : <EmptyState icon={<CheckCircle2 size={18} />} title="All caught up!" description="Your shopping list is clear. Enjoy the moment." />}</Card>
+        <Card><div className="card-head"><div><h2 className="section-title">Where it goes</h2><p className="section-description">This month's spending by category</p></div><button className="text-link" onClick={() => onPage("Reports")}>Full report <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div><CategoryBreakdown purchases={monthlyPurchases} /></Card></div>
+    </>}
+    {widgets.includes("reminders") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Notes & reminders</h2><p className="section-description">Due now or coming up in the next 7 days</p></div><button className="text-link" onClick={() => onPage("Notes & reminders")}>See all <ChevronRight size={12} /></button></div>{reminders.length ? <div className="reminder-list">{reminders.slice(0, 4).map((reminder) => <div className="reminder-row" key={reminder.id}><Bell size={15} /><div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{reminder.category || "General"} · <LinkifiedText>{reminder.details || "No extra details"}</LinkifiedText></div></div><Badge tone={reminder.date < today() ? "amber" : "green"}>{reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : dateLabel(reminder.date)}</Badge></div>)}</div> : <p className="dashboard-module-empty">No upcoming reminders.</p>}</Card>}
+    {widgets.includes("personalDocuments") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Document & policy dates</h2><p className="section-description">Expired or approaching the reminder date you set</p></div><button className="text-link" onClick={() => onPage("Personal documents")}>Manage records <ChevronRight size={12} /></button></div>{documentDue.length ? <div className="reminder-list">{documentDue.slice(0, 5).map((record) => {
       const remaining = daysUntil(record.dueDate);
       return <div className="reminder-row" key={record.id}><FileText size={15} /><div className="recent-info"><div className="recent-name">{record.title}</div><div className="recent-meta">{record.type} · Due {dateLabel(record.dueDate)}</div></div><Badge tone="amber">{remaining < 0 ? "Expired" : remaining === 0 ? "Today" : `${remaining} days`}</Badge></div>;
-    })}</div></Card>}
-    <div className="section-grid"><Card><div className="card-head"><div><h2 className="section-title">Your spending, lately</h2><p className="section-description">The last seven days, at a glance</p></div><Badge tone="green"><TrendingUp size={11} /> This week</Badge></div><div className="spend-summary"><strong>{formatCurrency(data.purchases.filter((purchase) => {
-      const start = new Date(); start.setDate(start.getDate() - 6); return purchase.date >= start.toISOString().slice(0, 10);
-    }).reduce((sum, purchase) => sum + purchase.price, 0))}</strong><span>in the last 7 days</span></div><SpendingChart purchases={data.purchases} /></Card>
-      <RecentPurchases purchases={[...data.purchases].sort((a, b) => b.date.localeCompare(a.date))} onViewAll={() => onPage("Purchase history")} /></div>
-    <div className="section-grid"><Card><div className="card-head"><div><h2 className="section-title">A few things to pick up</h2><p className="section-description">Your next trip is already taking shape</p></div><button className="text-link" onClick={() => onPage("Shopping list")}>See the list <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div>
-      {pending.slice(0, 4).length ? <div className="recent-list">{pending.slice(0, 4).map((item) => <div className="recent-row" key={item.id}><div className="item-dot"><Leaf size={15} /></div><div className="recent-info"><div className="recent-name">{item.name}</div><div className="recent-meta">{item.quantity} {item.unit} · {item.category}</div></div><div className="recent-price">{formatCurrency(item.estimatedPrice * item.quantity)}</div></div>)}</div> : <EmptyState icon={<CheckCircle2 size={18} />} title="All caught up!" description="Your shopping list is clear. Enjoy the moment." />}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Where it goes</h2><p className="section-description">This month's spending by category</p></div><button className="text-link" onClick={() => onPage("Reports")}>Full report <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div><CategoryBreakdown purchases={monthlyPurchases} /></Card></div>
+    })}</div> : <p className="dashboard-module-empty">No documents or policy dates need attention.</p>}</Card>}
+    <div className="dashboard-module-grid">{DASHBOARD_WIDGET_OPTIONS.filter((option): option is typeof option & { id: Exclude<DashboardWidget, "shopping" | "reminders" | "personalDocuments"> } =>
+      widgets.includes(option.id) && option.id !== "shopping" && option.id !== "reminders" && option.id !== "personalDocuments")
+      .map(({ id }) => {
+        const module = moduleCards[id];
+        return <DashboardModuleCard key={id} title={module.title} page={module.page} entries={module.entries} emptyMessage={module.emptyMessage} onPage={onPage} />;
+      })}</div>
   </>;
 }
 
@@ -3217,7 +3323,7 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through the private GitHub repository and can be backed up or moved whenever you like." />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to the private GitHub repository. Account credentials are encrypted separately; other records remain readable to repository collaborators and prior values remain in Git history. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
@@ -3232,6 +3338,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentC
         </button>)}
       </div>
     </Card>
+    <Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card>
     <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose your font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern sans</option><option value="editorial">Editorial serif</option><option value="rounded">Friendly rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="small">Small</option><option value="medium">Default</option><option value="large">Large</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>GitHub sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a backup</h3><p>Save your shopping data, product and store master data, and reminders as versioned JSON.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download JSON backup</Button></Card>
@@ -3476,6 +3583,12 @@ function isDarkTheme(value: unknown): value is DarkTheme {
 function isVisualTheme(value: unknown): value is VisualTheme {
   return VISUAL_THEMES.some((theme) => theme === value);
 }
+function isDashboardWidget(value: unknown): value is DashboardWidget {
+  return DASHBOARD_WIDGET_OPTIONS.some((option) => option.id === value);
+}
+function isDashboardWidgetList(value: unknown): value is DashboardWidget[] {
+  return Array.isArray(value) && value.every(isDashboardWidget);
+}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -3568,6 +3681,7 @@ export default function App() {
   const [accentColor, setAccentColor] = useState<AccentColor>("green");
   const [darkTheme, setDarkTheme] = useState<DarkTheme>("forest");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("sage");
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(DEFAULT_DASHBOARD_WIDGETS);
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [modal, setModal] = useState<"add" | "trip" | null>(null);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
@@ -3618,7 +3732,8 @@ export default function App() {
           ("fontStyle" in parsed && !isFontStyle(parsed.fontStyle)) ||
           ("accentColor" in parsed && !isAccentColor(parsed.accentColor)) ||
           ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
-          ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme))) {
+          ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme)) ||
+          ("dashboardWidgets" in parsed && !isDashboardWidgetList(parsed.dashboardWidgets))) {
           throw new Error("Saved preferences are invalid. Default appearance and currency settings will be used.");
         }
         setCurrency(parsed.currency);
@@ -3628,6 +3743,7 @@ export default function App() {
         if ("accentColor" in parsed && isAccentColor(parsed.accentColor)) setAccentColor(parsed.accentColor);
         if ("darkTheme" in parsed && isDarkTheme(parsed.darkTheme)) setDarkTheme(parsed.darkTheme);
         if ("visualTheme" in parsed && isVisualTheme(parsed.visualTheme)) setVisualTheme(parsed.visualTheme);
+        if ("dashboardWidgets" in parsed && isDashboardWidgetList(parsed.dashboardWidgets)) setDashboardWidgets([...new Set(parsed.dashboardWidgets)]);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not read saved preferences from this browser.");
@@ -3639,11 +3755,11 @@ export default function App() {
   useEffect(() => {
     if (!preferencesReady) return;
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme }));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets }));
     } catch {
       setError("Your preferences could not be saved in this browser.");
     }
-  }, [currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, preferencesReady]);
+  }, [currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets, preferencesReady]);
 
   useEffect(() => {
     if (!data || !authenticated || setupRequired) return;
@@ -4469,7 +4585,7 @@ export default function App() {
   if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Daybook records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Daybook data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
   const pageContent: Record<Page, ReactNode> = {
-    Dashboard: <Dashboard data={data} onPage={changePage} />,
+    Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
@@ -4500,7 +4616,7 @@ export default function App() {
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
