@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type IssueRecord, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type IssueRecord, type LearningRecord, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -283,6 +283,46 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.description === "string" && typeof entry.updates === "string" &&
       (entry.estimatedCost === null || (typeof entry.estimatedCost === "number" && Number.isFinite(entry.estimatedCost) && entry.estimatedCost >= 0)) &&
       (entry.actualCost === null || (typeof entry.actualCost === "number" && Number.isFinite(entry.actualCost) && entry.actualCost >= 0))));
+  const personalEducationOk = value.personalEducation === undefined ||
+    (Array.isArray(value.personalEducation) && value.personalEducation.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.institution === "string" && entry.institution.trim().length > 0 &&
+      typeof entry.qualification === "string" && entry.qualification.trim().length > 0 &&
+      typeof entry.fieldOfStudy === "string" && typeof entry.location === "string" &&
+      typeof entry.startDate === "string" && (entry.startDate === "" || !Number.isNaN(Date.parse(entry.startDate))) &&
+      typeof entry.endDate === "string" && (entry.endDate === "" || !Number.isNaN(Date.parse(entry.endDate))) &&
+      (!entry.startDate || !entry.endDate || entry.endDate >= entry.startDate) &&
+      (entry.status === "Completed" || entry.status === "In progress" || entry.status === "On hold") &&
+      typeof entry.grade === "string" && typeof entry.link === "string" && isSafeExternalLink(entry.link) &&
+      typeof entry.notes === "string"));
+  const professionalQualificationsOk = value.professionalQualifications === undefined ||
+    (Array.isArray(value.professionalQualifications) && value.professionalQualifications.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.name === "string" && entry.name.trim().length > 0 &&
+      typeof entry.issuer === "string" && typeof entry.credentialId === "string" &&
+      typeof entry.issueDate === "string" && (entry.issueDate === "" || !Number.isNaN(Date.parse(entry.issueDate))) &&
+      typeof entry.expiryDate === "string" && (entry.expiryDate === "" || !Number.isNaN(Date.parse(entry.expiryDate))) &&
+      (!entry.issueDate || !entry.expiryDate || entry.expiryDate >= entry.issueDate) &&
+      typeof entry.link === "string" && isSafeExternalLink(entry.link) && typeof entry.notes === "string"));
+  const workExperiencesOk = value.workExperiences === undefined ||
+    (Array.isArray(value.workExperiences) && value.workExperiences.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.company === "string" && entry.company.trim().length > 0 &&
+      typeof entry.jobTitle === "string" && entry.jobTitle.trim().length > 0 &&
+      typeof entry.location === "string" && typeof entry.employmentType === "string" &&
+      typeof entry.startDate === "string" && (entry.startDate === "" || !Number.isNaN(Date.parse(entry.startDate))) &&
+      typeof entry.endDate === "string" && (entry.endDate === "" || !Number.isNaN(Date.parse(entry.endDate))) &&
+      typeof entry.current === "boolean" && (!entry.current || entry.endDate === "") &&
+      (!entry.startDate || !entry.endDate || entry.endDate >= entry.startDate) &&
+      typeof entry.summary === "string" && typeof entry.skills === "string"));
+  const professionalSkillsOk = value.professionalSkills === undefined ||
+    (Array.isArray(value.professionalSkills) && value.professionalSkills.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.name === "string" && entry.name.trim().length > 0 &&
+      typeof entry.category === "string" &&
+      (entry.proficiency === "Beginner" || entry.proficiency === "Intermediate" || entry.proficiency === "Advanced" || entry.proficiency === "Expert") &&
+      (entry.yearsExperience === null || (typeof entry.yearsExperience === "number" && Number.isFinite(entry.yearsExperience) && entry.yearsExperience >= 0)) &&
+      typeof entry.notes === "string"));
   const personalRecordsOk = value.personalRecords === undefined || (Array.isArray(value.personalRecords) && value.personalRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.title === "string" &&
     (entry.type === "Identity" || entry.type === "Insurance" || entry.type === "License" ||
@@ -328,7 +368,8 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
-    !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk || !personalRecordsOk ||
+    !devotionalEntriesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
+    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !personalRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -375,6 +416,14 @@ export function validateData(value: unknown): value is TrackerData {
     new Set((value.cookingLogs as CookingLog[]).map((entry) => entry.id)).size !== value.cookingLogs.length) return false;
   if (Array.isArray(value.issueRecords) &&
     new Set((value.issueRecords as IssueRecord[]).map((entry) => entry.id)).size !== value.issueRecords.length) return false;
+  if (Array.isArray(value.personalEducation) &&
+    new Set((value.personalEducation as PersonalEducationRecord[]).map((entry) => entry.id)).size !== value.personalEducation.length) return false;
+  if (Array.isArray(value.professionalQualifications) &&
+    new Set((value.professionalQualifications as ProfessionalQualification[]).map((entry) => entry.id)).size !== value.professionalQualifications.length) return false;
+  if (Array.isArray(value.workExperiences) &&
+    new Set((value.workExperiences as WorkExperience[]).map((entry) => entry.id)).size !== value.workExperiences.length) return false;
+  if (Array.isArray(value.professionalSkills) &&
+    new Set((value.professionalSkills as ProfessionalSkill[]).map((entry) => entry.id)).size !== value.professionalSkills.length) return false;
   if (Array.isArray(value.personalRecords) && new Set((value.personalRecords as PersonalRecord[]).map((entry) => entry.id)).size !== value.personalRecords.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
@@ -447,6 +496,10 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     cookingRecipes: data.cookingRecipes ?? [],
     cookingLogs: data.cookingLogs ?? [],
     issueRecords: data.issueRecords ?? [],
+    personalEducation: data.personalEducation ?? [],
+    professionalQualifications: data.professionalQualifications ?? [],
+    workExperiences: data.workExperiences ?? [],
+    professionalSkills: data.professionalSkills ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],

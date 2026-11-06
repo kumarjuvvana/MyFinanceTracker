@@ -26,6 +26,7 @@ export type Page =
   | "Devotional"
   | "Cooking"
   | "Issues & maintenance"
+  | "Education & career"
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
@@ -366,6 +367,53 @@ export interface IssueRecord {
   actualCost: number | null;
 }
 
+export interface PersonalEducationRecord {
+  id: string;
+  institution: string;
+  qualification: string;
+  fieldOfStudy: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  status: "Completed" | "In progress" | "On hold";
+  grade: string;
+  link: string;
+  notes: string;
+}
+
+export interface ProfessionalQualification {
+  id: string;
+  name: string;
+  issuer: string;
+  credentialId: string;
+  issueDate: string;
+  expiryDate: string;
+  link: string;
+  notes: string;
+}
+
+export interface WorkExperience {
+  id: string;
+  company: string;
+  jobTitle: string;
+  location: string;
+  employmentType: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  summary: string;
+  skills: string;
+}
+
+export interface ProfessionalSkill {
+  id: string;
+  name: string;
+  category: string;
+  proficiency: "Beginner" | "Intermediate" | "Advanced" | "Expert";
+  yearsExperience: number | null;
+  notes: string;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -440,6 +488,10 @@ export interface TrackerData {
   cookingRecipes?: CookingRecipe[];
   cookingLogs?: CookingLog[];
   issueRecords?: IssueRecord[];
+  personalEducation?: PersonalEducationRecord[];
+  professionalQualifications?: ProfessionalQualification[];
+  workExperiences?: WorkExperience[];
+  professionalSkills?: ProfessionalSkill[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }

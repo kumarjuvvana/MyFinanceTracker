@@ -519,6 +519,30 @@ body{background:#f3f5ef}
 .app-shell.dark .issues-summary strong,.app-shell.dark .issue-card h2,.app-shell.dark .issue-card>p strong{color:#e3e8e2}
 .app-shell.dark .issues-summary span,.app-shell.dark .issue-card-meta,.app-shell.dark .issue-card-controls>span,.app-shell.dark .issue-card>p{color:#a7b0a7}
 .app-shell.dark .issue-overdue{color:#e0b875!important}
+.career-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-bottom:14px}
+.career-summary .card{display:grid;gap:6px;padding:14px}
+.career-summary span{font-size:10px;color:#92998f}
+.career-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
+.career-sections{display:grid;gap:20px}
+.career-section{display:grid;gap:10px;min-width:0}
+.career-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.career-section-head>div{min-width:0}
+.career-section-head h2{display:flex;align-items:center;gap:7px;margin:0;font:700 13px Manrope,sans-serif;color:#3d493e}
+.career-section-head h2 svg{color:#648568;flex:none}
+.career-section-head p{margin:4px 0 0;font-size:10px;color:#92998f}
+.career-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:10px}
+.career-card{min-width:0;padding:14px}
+.career-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.career-card-head>div:first-child{min-width:0}
+.career-card h3{margin:0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
+.career-card-head p{margin:4px 0 0;font-size:11px;color:#858d83;overflow-wrap:anywhere}
+.career-card-details{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:9px;font-size:10px;color:#667066}
+.career-card-description{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
+.career-card-link{display:inline-block;margin-top:9px;font-size:10px;color:#4e7e57;text-decoration:none}
+.career-card-link:hover{text-decoration:underline}
+.app-shell.dark .career-summary strong,.app-shell.dark .career-section-head h2,.app-shell.dark .career-card h3{color:#e3e8e2}
+.app-shell.dark .career-summary span,.app-shell.dark .career-section-head p,.app-shell.dark .career-card-head p,.app-shell.dark .career-card-details,.app-shell.dark .career-card-description{color:#a7b0a7}
+.app-shell.dark .career-card-link{color:#a6c1a8}
 .education-list{display:grid;gap:14px}
 .education-card{min-width:0;padding:12px 16px}
 .education-card-head,.education-card-title,.education-card-actions{display:flex;align-items:center;gap:10px}
@@ -601,6 +625,9 @@ body{background:#f3f5ef}
   .issues-toolbar{grid-template-columns:minmax(0,1fr)}
   .issue-card{padding:12px}
   .issue-card-controls{align-items:stretch}
+  .career-section-head{align-items:flex-start}
+  .career-section-head>.button{height:auto;min-height:32px;padding:6px 8px;white-space:normal}
+  .career-card{padding:12px}
   .asset-card{padding:14px}
   .asset-details{grid-template-columns:minmax(0,1fr)}
   .asset-total-card{grid-template-columns:1fr}

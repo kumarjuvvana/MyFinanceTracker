@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  ArrowDownToLine, ArrowLeftRight, Bell, BarChart3, BookOpen, CalendarDays, Car, Check, CheckCircle2,
+  ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
@@ -10,7 +10,7 @@ import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -33,6 +33,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Devotional", icon: Heart },
   { name: "Cooking", icon: CookingPot },
   { name: "Issues & maintenance", icon: Wrench },
+  { name: "Education & career", icon: Briefcase },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
@@ -48,6 +49,16 @@ const defaultItem = (): Omit<ShoppingItem, "id"> => ({
   name: "", quantity: 1, unit: "pcs", category: "Groceries", estimatedPrice: 0, purchased: false,
 });
 const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const monthYearLabel = (date: string) => /^\d{4}-\d{2}$/.test(date)
+  ? new Date(`${date}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
+  : date ? dateLabel(date) : "";
+function isHttpsLink(value: string) {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 const dateAfterDays = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -2163,6 +2174,264 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
   </>;
 }
 
+function PersonalEducationModal({ initial, onClose, onSave }: {
+  initial: PersonalEducationRecord | null;
+  onClose: () => void;
+  onSave: (record: Omit<PersonalEducationRecord, "id">) => void;
+}) {
+  const [institution, setInstitution] = useState(initial?.institution ?? "");
+  const [qualification, setQualification] = useState(initial?.qualification ?? "");
+  const [fieldOfStudy, setFieldOfStudy] = useState(initial?.fieldOfStudy ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [status, setStatus] = useState<PersonalEducationRecord["status"]>(initial?.status ?? "Completed");
+  const [grade, setGrade] = useState(initial?.grade ?? "");
+  const [link, setLink] = useState(initial?.link ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!institution.trim() || !qualification.trim()) {
+      setError("Enter the institution and qualification.");
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setError("The end date cannot be before the start date.");
+      return;
+    }
+    if (link && !isHttpsLink(link)) {
+      setError("Use a complete HTTPS link.");
+      return;
+    }
+    onSave({ institution: institution.trim(), qualification: qualification.trim(), fieldOfStudy: fieldOfStudy.trim(), location: location.trim(), startDate, endDate, status, grade: grade.trim(), link: link.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit education" : "Add education"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Institution"><Input autoFocus required maxLength={160} value={institution} onChange={(event) => setInstitution(event.target.value)} /></Field>
+      <Field label="Degree / qualification"><Input required maxLength={140} placeholder="e.g. Bachelor of Commerce" value={qualification} onChange={(event) => setQualification(event.target.value)} /></Field>
+      <Field label="Field of study"><Input maxLength={120} value={fieldOfStudy} onChange={(event) => setFieldOfStudy(event.target.value)} /></Field>
+      <Field label="Location"><Input maxLength={120} value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+      <Field label="Start date"><Input type="month" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field>
+      <Field label="End date"><Input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field>
+      <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as PersonalEducationRecord["status"])}><option>Completed</option><option>In progress</option><option>On hold</option></Select></Field>
+      <Field label="Grade / result"><Input maxLength={80} placeholder="Optional" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
+      <Field className="full" label="Certificate / institution link (HTTPS)"><Input type="url" maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add education"}</Button></div></form>
+  </Modal>;
+}
+
+function ProfessionalQualificationModal({ initial, onClose, onSave }: {
+  initial: ProfessionalQualification | null;
+  onClose: () => void;
+  onSave: (record: Omit<ProfessionalQualification, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [issuer, setIssuer] = useState(initial?.issuer ?? "");
+  const [credentialId, setCredentialId] = useState(initial?.credentialId ?? "");
+  const [issueDate, setIssueDate] = useState(initial?.issueDate ?? "");
+  const [expiryDate, setExpiryDate] = useState(initial?.expiryDate ?? "");
+  const [link, setLink] = useState(initial?.link ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError("Enter a qualification or certificate name.");
+      return;
+    }
+    if (issueDate && expiryDate && expiryDate < issueDate) {
+      setError("The expiry date cannot be before the issue date.");
+      return;
+    }
+    if (link && !isHttpsLink(link)) {
+      setError("Use a complete HTTPS link.");
+      return;
+    }
+    onSave({ name: name.trim(), issuer: issuer.trim(), credentialId: credentialId.trim(), issueDate, expiryDate, link: link.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit qualification" : "Add qualification"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Qualification / certificate"><Input autoFocus required maxLength={160} placeholder="e.g. Project Management Professional" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Issuing organization"><Input maxLength={160} value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
+      <Field label="Credential ID (optional)"><Input maxLength={120} value={credentialId} onChange={(event) => setCredentialId(event.target.value)} /></Field>
+      <Field label="Issue date"><Input type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} /></Field>
+      <Field label="Expiry date (optional)"><Input type="date" value={expiryDate} onChange={(event) => setExpiryDate(event.target.value)} /></Field>
+      <Field className="full" label="Credential / verification link (HTTPS)"><Input type="url" maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add qualification"}</Button></div></form>
+  </Modal>;
+}
+
+function WorkExperienceModal({ initial, onClose, onSave }: {
+  initial: WorkExperience | null;
+  onClose: () => void;
+  onSave: (record: Omit<WorkExperience, "id">) => void;
+}) {
+  const [company, setCompany] = useState(initial?.company ?? "");
+  const [jobTitle, setJobTitle] = useState(initial?.jobTitle ?? "");
+  const [location, setLocation] = useState(initial?.location ?? "");
+  const [employmentType, setEmploymentType] = useState(initial?.employmentType ?? "");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [current, setCurrent] = useState(initial?.current ?? false);
+  const [summary, setSummary] = useState(initial?.summary ?? "");
+  const [skills, setSkills] = useState(initial?.skills ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!company.trim() || !jobTitle.trim()) {
+      setError("Enter the company and job title.");
+      return;
+    }
+    if (!current && startDate && endDate && endDate < startDate) {
+      setError("The end date cannot be before the start date.");
+      return;
+    }
+    onSave({ company: company.trim(), jobTitle: jobTitle.trim(), location: location.trim(), employmentType: employmentType.trim(), startDate, endDate: current ? "" : endDate, current, summary: summary.trim(), skills: skills.trim() });
+  }
+
+  return <Modal title={initial ? "Edit work experience" : "Add work experience"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Company / organization"><Input autoFocus required maxLength={160} value={company} onChange={(event) => setCompany(event.target.value)} /></Field>
+      <Field label="Job title"><Input required maxLength={140} value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} /></Field>
+      <Field label="Location"><Input maxLength={120} placeholder="City, country, or remote" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+      <Field label="Employment type"><Input maxLength={80} placeholder="Full-time, contract, freelance..." value={employmentType} onChange={(event) => setEmploymentType(event.target.value)} /></Field>
+      <Field label="Start date"><Input type="month" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></Field>
+      {!current && <Field label="End date"><Input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field>}
+      <Field label="Current role"><Select value={current ? "yes" : "no"} onChange={(event) => setCurrent(event.target.value === "yes")}><option value="no">No</option><option value="yes">Yes</option></Select></Field>
+      <Field className="full" label="Role summary and achievements"><textarea className="field textarea" rows={4} maxLength={5000} placeholder="Responsibilities, projects, and accomplishments" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
+      <Field className="full" label="Skills used (comma-separated)"><Input maxLength={1000} value={skills} onChange={(event) => setSkills(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add experience"}</Button></div></form>
+  </Modal>;
+}
+
+function ProfessionalSkillModal({ initial, onClose, onSave }: {
+  initial: ProfessionalSkill | null;
+  onClose: () => void;
+  onSave: (record: Omit<ProfessionalSkill, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [category, setCategory] = useState(initial?.category ?? "");
+  const [proficiency, setProficiency] = useState<ProfessionalSkill["proficiency"]>(initial?.proficiency ?? "Intermediate");
+  const [yearsExperience, setYearsExperience] = useState(initial?.yearsExperience?.toString() ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim()) {
+      setError("Enter a skill or language.");
+      return;
+    }
+    const years = yearsExperience.trim() ? Number(yearsExperience) : null;
+    if (years !== null && (!Number.isFinite(years) || years < 0)) {
+      setError("Years of experience must be zero or more.");
+      return;
+    }
+    onSave({ name: name.trim(), category: category.trim(), proficiency, yearsExperience: years, notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit skill" : "Add skill"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Skill / language"><Input autoFocus required maxLength={120} placeholder="e.g. TypeScript, stakeholder management, Telugu" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Category"><Input maxLength={80} placeholder="Technical, leadership, language..." value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
+      <Field label="Proficiency"><Select value={proficiency} onChange={(event) => setProficiency(event.target.value as ProfessionalSkill["proficiency"])}><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option></Select></Field>
+      <Field label="Years of experience"><Input type="number" min="0" step="0.5" value={yearsExperience} onChange={(event) => setYearsExperience(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add skill"}</Button></div></form>
+  </Modal>;
+}
+
+function CareerSection({ title, description, icon, action, children }: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  action: ReactNode;
+  children: ReactNode;
+}) {
+  return <section className="career-section"><div className="career-section-head"><div><h2>{icon}{title}</h2><p>{description}</p></div>{action}</div>{children}</section>;
+}
+
+function CareerEntry({ title, subtitle, details, description, link, onEdit, onDelete }: {
+  title: string;
+  subtitle: string;
+  details: string[];
+  description?: string;
+  link?: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return <Card className="career-card"><div className="career-card-head"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${title}`} onClick={onEdit}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${title}`} onClick={onDelete}><Trash2 size={13} /></button></div></div>
+    {details.filter(Boolean).length > 0 && <div className="career-card-details">{details.filter(Boolean).map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}</div>}
+    {description && <p className="career-card-description">{description}</p>}
+    {link && <a className="career-card-link" href={link} target="_blank" rel="noopener noreferrer">Open link</a>}
+  </Card>;
+}
+
+function EducationCareerPage({ education, qualifications, experience, skills, onSaveEducation, onDeleteEducation, onSaveQualification, onDeleteQualification, onSaveExperience, onDeleteExperience, onSaveSkill, onDeleteSkill }: {
+  education: PersonalEducationRecord[];
+  qualifications: ProfessionalQualification[];
+  experience: WorkExperience[];
+  skills: ProfessionalSkill[];
+  onSaveEducation: (record: Omit<PersonalEducationRecord, "id">, id?: string) => void;
+  onDeleteEducation: (record: PersonalEducationRecord) => void;
+  onSaveQualification: (record: Omit<ProfessionalQualification, "id">, id?: string) => void;
+  onDeleteQualification: (record: ProfessionalQualification) => void;
+  onSaveExperience: (record: Omit<WorkExperience, "id">, id?: string) => void;
+  onDeleteExperience: (record: WorkExperience) => void;
+  onSaveSkill: (record: Omit<ProfessionalSkill, "id">, id?: string) => void;
+  onDeleteSkill: (record: ProfessionalSkill) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [editor, setEditor] = useState<{ type: "education"; record: PersonalEducationRecord | null } | { type: "qualification"; record: ProfessionalQualification | null } | { type: "experience"; record: WorkExperience | null } | { type: "skill"; record: ProfessionalSkill | null } | null>(null);
+  const query = search.trim().toLocaleLowerCase();
+  const matches = (...values: string[]) => !query || values.some((value) => value.toLocaleLowerCase().includes(query));
+  const filteredEducation = [...education].filter((entry) => matches(entry.institution, entry.qualification, entry.fieldOfStudy, entry.location, entry.grade, entry.notes)).sort((a, b) => b.startDate.localeCompare(a.startDate));
+  const filteredQualifications = [...qualifications].filter((entry) => matches(entry.name, entry.issuer, entry.credentialId, entry.notes)).sort((a, b) => b.issueDate.localeCompare(a.issueDate));
+  const filteredExperience = [...experience].filter((entry) => matches(entry.company, entry.jobTitle, entry.location, entry.employmentType, entry.summary, entry.skills)).sort((a, b) => Number(b.current) - Number(a.current) || b.startDate.localeCompare(a.startDate));
+  const filteredSkills = [...skills].filter((entry) => matches(entry.name, entry.category, entry.proficiency, entry.notes)).sort((a, b) => a.name.localeCompare(b.name));
+  const totalItems = education.length + qualifications.length + experience.length + skills.length;
+
+  function confirmDelete(label: string, remove: () => void) {
+    if (window.confirm(`Delete "${label}" from your education and career profile?`)) remove();
+  }
+
+  return <>
+    <PageHeading eyebrow="Personal profile" title="Education & career" subtitle="Keep your education, credentials, work history, and professional skills together in one private profile." />
+    <div className="career-summary">
+      <Card><span>Education</span><strong>{education.length}</strong></Card><Card><span>Qualifications</span><strong>{qualifications.length}</strong></Card><Card><span>Work roles</span><strong>{experience.length}</strong></Card><Card><span>Skills</span><strong>{skills.length}</strong></Card>
+    </div>
+    <div className="alert"><Briefcase size={15} style={{ flex: "none", marginTop: 1 }} /><span>This is your own career profile, separate from the Schools & Colleges records and Learning goals. Profile details are stored as shared Daybook data and included in JSON backups.</span></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education and career profile" placeholder="Search schools, qualifications, employers, or skills..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    {totalItems === 0 && !query ? <Card><EmptyState icon={<Briefcase size={18} />} title="Start your professional profile" description="Add your education, qualifications, work history, and professional skills below." /></Card> : null}
+    <div className="career-sections">
+      <CareerSection title="Education history" description={`${filteredEducation.length} ${filteredEducation.length === 1 ? "record" : "records"}`} icon={<GraduationCap size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "education", record: null })}><Plus size={13} /> Add education</Button>}>
+        {filteredEducation.length ? <div className="career-list">{filteredEducation.map((entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />)}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
+      </CareerSection>
+      <CareerSection title="Qualifications & certificates" description={`${filteredQualifications.length} ${filteredQualifications.length === 1 ? "record" : "records"}`} icon={<Award size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "qualification", record: null })}><Plus size={13} /> Add qualification</Button>}>
+        {filteredQualifications.length ? <div className="career-list">{filteredQualifications.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />)}</div> : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search." : "Add professional certificates, licenses, and credentials."} /></Card>}
+      </CareerSection>
+      <CareerSection title="Work history" description={`${filteredExperience.length} ${filteredExperience.length === 1 ? "role" : "roles"}`} icon={<Briefcase size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "experience", record: null })}><Plus size={13} /> Add work</Button>}>
+        {filteredExperience.length ? <div className="career-list">{filteredExperience.map((entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />)}</div> : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
+      </CareerSection>
+      <CareerSection title="Skills & languages" description={`${filteredSkills.length} ${filteredSkills.length === 1 ? "skill" : "skills"}`} icon={<Sparkles size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "skill", record: null })}><Plus size={13} /> Add skill</Button>}>
+        {filteredSkills.length ? <div className="career-list">{filteredSkills.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />)}</div> : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
+      </CareerSection>
+    </div>
+    {editor?.type === "education" && <PersonalEducationModal key={editor.record?.id ?? "new-personal-education"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveEducation(record, editor.record?.id); setEditor(null); }} />}
+    {editor?.type === "qualification" && <ProfessionalQualificationModal key={editor.record?.id ?? "new-professional-qualification"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveQualification(record, editor.record?.id); setEditor(null); }} />}
+    {editor?.type === "experience" && <WorkExperienceModal key={editor.record?.id ?? "new-work-experience"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveExperience(record, editor.record?.id); setEditor(null); }} />}
+    {editor?.type === "skill" && <ProfessionalSkillModal key={editor.record?.id ?? "new-professional-skill"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveSkill(record, editor.record?.id); setEditor(null); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -2813,6 +3082,10 @@ function emptyTrackerData(): TrackerData {
     cookingRecipes: [],
     cookingLogs: [],
     issueRecords: [],
+    personalEducation: [],
+    professionalQualifications: [],
+    workExperiences: [],
+    professionalSkills: [],
   };
 }
 
@@ -3440,6 +3713,62 @@ export default function App() {
       issueRecords: (previous.issueRecords ?? []).filter((current) => current.id !== record.id),
     }));
   }
+  function savePersonalEducation(record: Omit<PersonalEducationRecord, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      personalEducation: id
+        ? (previous.personalEducation ?? []).map((current) => current.id === id ? { ...record, id } : current)
+        : [{ ...record, id: createId() }, ...(previous.personalEducation ?? [])],
+    }));
+  }
+  function deletePersonalEducation(record: PersonalEducationRecord) {
+    update((previous) => ({
+      ...previous,
+      personalEducation: (previous.personalEducation ?? []).filter((current) => current.id !== record.id),
+    }));
+  }
+  function saveProfessionalQualification(record: Omit<ProfessionalQualification, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      professionalQualifications: id
+        ? (previous.professionalQualifications ?? []).map((current) => current.id === id ? { ...record, id } : current)
+        : [{ ...record, id: createId() }, ...(previous.professionalQualifications ?? [])],
+    }));
+  }
+  function deleteProfessionalQualification(record: ProfessionalQualification) {
+    update((previous) => ({
+      ...previous,
+      professionalQualifications: (previous.professionalQualifications ?? []).filter((current) => current.id !== record.id),
+    }));
+  }
+  function saveWorkExperience(record: Omit<WorkExperience, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      workExperiences: id
+        ? (previous.workExperiences ?? []).map((current) => current.id === id ? { ...record, id } : current)
+        : [{ ...record, id: createId() }, ...(previous.workExperiences ?? [])],
+    }));
+  }
+  function deleteWorkExperience(record: WorkExperience) {
+    update((previous) => ({
+      ...previous,
+      workExperiences: (previous.workExperiences ?? []).filter((current) => current.id !== record.id),
+    }));
+  }
+  function saveProfessionalSkill(record: Omit<ProfessionalSkill, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      professionalSkills: id
+        ? (previous.professionalSkills ?? []).map((current) => current.id === id ? { ...record, id } : current)
+        : [{ ...record, id: createId() }, ...(previous.professionalSkills ?? [])],
+    }));
+  }
+  function deleteProfessionalSkill(record: ProfessionalSkill) {
+    update((previous) => ({
+      ...previous,
+      professionalSkills: (previous.professionalSkills ?? []).filter((current) => current.id !== record.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -3472,7 +3801,7 @@ export default function App() {
     setNotice("Your backup is ready to save.");
   }
   function clearData() {
-    if (!window.confirm("Clear all shopping, stock, asset, learning, education, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
+    if (!window.confirm("Clear all shopping, stock, asset, learning, education, career profile, vehicle, electricity, devotional, cooking, issue and maintenance, personal document and encrypted credential data from shared storage? This cannot be undone.")) return;
     setData(emptyTrackerData());
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
@@ -3503,6 +3832,7 @@ export default function App() {
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
+    "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
