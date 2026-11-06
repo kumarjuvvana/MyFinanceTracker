@@ -4389,6 +4389,11 @@ function DocumentModal({ initial, onClose, onSave }: {
       setError("Choose a file no larger than 10 MB.");
       return;
     }
+    if (file && file.size > 5 * 1024 * 1024 &&
+      !window.confirm(`${file.name} is ${formatFileSize(file.size)}. Upload this large file to private Supabase Storage? Each file is limited to 10 MB.`)) {
+      setError("Upload cancelled. Choose a smaller file or confirm the large-file upload.");
+      return;
+    }
     setBusy(true);
     try {
       await onSave({ title: title.trim(), personName: personName.trim(), notes: notes.trim(), externalLink: externalLink.trim() }, file, initial?.id);
@@ -4420,13 +4425,14 @@ function DocumentViewer({ document, onClose }: { document: DocumentAttachment; o
   </div></Modal>;
 }
 
-function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onCopy, onArchive }: {
+function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onCopy, onArchive, onRemoveFile }: {
   documents: DocumentAttachment[];
   archivedDocumentCount: number;
   totalStoredBytes: number;
   onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
   onCopy: (document: DocumentAttachment) => void;
   onArchive: (document: DocumentAttachment) => void;
+  onRemoveFile: (document: DocumentAttachment) => void;
 }) {
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
   const [viewer, setViewer] = useState<DocumentAttachment | null>(null);
@@ -4446,12 +4452,13 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
       const downloadUrl = hasFile
         ? `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`
         : "";
-      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : "External link"}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
+      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
         {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
         {hasFile && <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>}
         {document.externalLink && <a className="button button-outline document-download" href={document.externalLink} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
+        {hasFile && <button className="icon-button" aria-label={`Remove uploaded file from ${document.title}`} title="Remove uploaded file" onClick={() => onRemoveFile(document)}><Trash2 size={14} /></button>}
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
-        <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create another record referencing the same file" onClick={() => onCopy(document)}><Copy size={14} /></button>
+        <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => onCopy(document)}><Copy size={14} /></button>
         <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
       </div></Card>;
     })}</div> : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search." : "Upload an important document and optionally note whose it is."} /></Card>}
@@ -6133,6 +6140,51 @@ export default function App() {
       setError(caught instanceof Error ? caught.message : "The document could not be archived.");
     }
   }
+  async function removeDocumentFile(document: DocumentAttachment) {
+    const path = document.storagePath;
+    if (!path) return;
+    const otherReferences = [
+      ...(data?.documents ?? []).filter((entry) => entry.id !== document.id).map((entry) => entry.storagePath),
+      ...(data?.archivedRecords ?? []).flatMap((entry) => entry.snapshot.documents ?? []).map((entry) => entry.storagePath),
+    ].filter(Boolean);
+    const fileIsShared = otherReferences.includes(path);
+    if (!window.confirm(fileIsShared
+      ? `Remove the uploaded file from "${document.title}"? Other active or archived records still use this file, so it will remain stored.`
+      : `Permanently delete the uploaded file for "${document.title}" from private storage? The document record will remain.`)) return;
+    try {
+      await persistUpdate((previous) => ({
+        ...previous,
+        documents: (previous.documents ?? []).map((entry) => entry.id === document.id
+          ? { ...entry, fileName: "", contentType: "", sizeBytes: 0, storagePath: "" }
+          : entry),
+      }));
+      if (!fileIsShared) {
+        try {
+          await deleteDocumentFile(path);
+        } catch (caught) {
+          const message = caught instanceof Error ? caught.message : "The file could not be removed from storage.";
+          try {
+            await persistUpdate((previous) => ({
+              ...previous,
+              documents: (previous.documents ?? []).map((entry) => entry.id === document.id
+                ? { ...entry, fileName: document.fileName, contentType: document.contentType, sizeBytes: document.sizeBytes, storagePath: path }
+                : entry),
+            }));
+            setError(`The uploaded file could not be deleted, so the document attachment was restored. ${message}`);
+          } catch (restoreError) {
+            const restoreMessage = restoreError instanceof Error ? restoreError.message : "The document attachment could not be restored.";
+            setError(`The uploaded file could not be deleted. Restoring its document record also failed: ${restoreMessage}`);
+          }
+          return;
+        }
+      }
+      setNotice(fileIsShared
+        ? "The file was removed from this document. It remains stored because another active or archived record uses it."
+        : "The uploaded file was deleted. The document record was kept.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The document attachment could not be removed.");
+    }
+  }
   async function copyDocument(document: DocumentAttachment) {
     try {
       await persistUpdate((previous) => ({
@@ -6141,9 +6193,14 @@ export default function App() {
           ...document,
           id: createId(),
           title: copyLabel(document.title, 160),
+          fileName: "",
+          contentType: "",
+          sizeBytes: 0,
+          storagePath: "",
           uploadedAt: new Date().toISOString(),
         }, ...(previous.documents ?? [])],
       }));
+      setNotice(`Copied "${document.title}" without copying its uploaded file.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The document record could not be copied.");
     }
@@ -6257,7 +6314,7 @@ export default function App() {
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
-    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={[...new Map(allDocuments.map((document) => [document.storagePath, document])).values()].reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onCopy={copyDocument} onArchive={archiveDocument} />,
+    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={[...new Map(allDocuments.map((document) => [document.storagePath, document])).values()].reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onCopy={copyDocument} onArchive={archiveDocument} onRemoveFile={removeDocumentFile} />,
     "Database manager": <DatabaseManagerPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
