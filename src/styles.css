@@ -143,8 +143,12 @@ button{cursor:pointer}
 .app-shell[class*="accent-"] .nav-item.active{color:var(--user-accent);background:var(--user-accent-soft)}
 .app-shell[class*="accent-"] .text-link,.app-shell[class*="accent-"] .brand-name span{color:var(--user-accent)}
 .app-shell[class*="accent-"] .field:focus{border-color:var(--user-accent);box-shadow:0 0 0 3px var(--user-accent-soft)}
+.app-shell.font-extra-small{zoom:.82}
 .app-shell.font-small{zoom:.92}
+.app-shell.font-medium{zoom:1}
 .app-shell.font-large{zoom:1.08}
+.app-shell.font-extra-large{zoom:1.16}
+.app-shell.font-xx-large{zoom:1.24}
 .app-shell.dark.theme-slate{background:#171d27}
 .app-shell.dark.theme-slate .sidebar,.app-shell.dark.theme-slate .topbar,.app-shell.dark.theme-slate .mobile-nav{background:#212a37;border-color:#374251}
 .app-shell.dark.theme-slate .topbar{background:rgba(33,42,55,.9)}
@@ -299,12 +303,19 @@ body{background:#f3f5ef}
 .app-shell.dark .bar{background:#344a37}
 .app-shell.dark .side-note{background:#ffffff0a;border-color:#ffffff18}
 .app-shell.dark[class*="accent-"] .sidebar .nav-item.active{background:#ffffff1a;color:#fff}
-.app-shell.font-style-modern{font-family:Inter,Aptos,"Segoe UI",sans-serif}
-.app-shell.font-style-editorial{font-family:Georgia,"Times New Roman",serif}
-.app-shell.font-style-editorial .page-title,.app-shell.font-style-editorial .brand-name,.app-shell.font-style-editorial .stat-value,.app-shell.font-style-editorial .section-title,.app-shell.font-style-editorial .spend-summary strong{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.45px}
-.app-shell.font-style-rounded{font-family:"Trebuchet MS",Arial,sans-serif}
-.app-shell.font-style-rounded .page-title,.app-shell.font-style-rounded .brand-name,.app-shell.font-style-rounded .stat-value,.app-shell.font-style-rounded .section-title,.app-shell.font-style-rounded .spend-summary strong{font-family:"Trebuchet MS",Arial,sans-serif;letter-spacing:-.7px}
-.app-shell.font-style-editorial .nav-item,.app-shell.font-style-editorial .button,.app-shell.font-style-editorial .field{font-family:Inter,Aptos,"Segoe UI",sans-serif}
+.app-shell.font-style-editorial .page-title,.app-shell.font-style-editorial .brand-name,.app-shell.font-style-editorial .stat-value,.app-shell.font-style-editorial .section-title,.app-shell.font-style-editorial .spend-summary strong{letter-spacing:-.45px}
+.app-shell.font-style-rounded .page-title,.app-shell.font-style-rounded .brand-name,.app-shell.font-style-rounded .stat-value,.app-shell.font-style-rounded .section-title,.app-shell.font-style-rounded .spend-summary strong{letter-spacing:-.7px}
+.app-shell.font-family-system :where(*){font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app-shell.font-family-inter :where(*){font-family:Inter,Aptos,"Segoe UI",sans-serif}
+.app-shell.font-family-arial :where(*){font-family:Arial,Helvetica,sans-serif}
+.app-shell.font-family-roboto :where(*){font-family:Roboto,"Arial",sans-serif}
+.app-shell.font-family-segoe :where(*){font-family:"Segoe UI",Tahoma,sans-serif}
+.app-shell.font-family-georgia :where(*){font-family:Georgia,"Times New Roman",serif}
+.app-shell.font-family-times :where(*){font-family:"Times New Roman",Times,serif}
+.app-shell.font-family-trebuchet :where(*){font-family:"Trebuchet MS",Arial,sans-serif}
+.app-shell.font-family-verdana :where(*){font-family:Verdana,Geneva,sans-serif}
+.app-shell.font-family-tahoma :where(*){font-family:Tahoma,Verdana,sans-serif}
+.app-shell.font-family-courier :where(*){font-family:"Courier New",Courier,monospace}
 @media(hover:hover){.card:hover{transform:translateY(-2px);box-shadow:0 16px 38px #1f382013;border-color:#dce6d8}.app-shell.dark .card:hover{box-shadow:0 16px 38px #07110b45;border-color:#4b6250}}
 @media(max-width:900px){.main-content{padding:28px 25px 48px}}
 @media(max-width:600px){.main-content{padding:23px 15px 38px}.page-title{font-size:28px}.sidebar{box-shadow:14px 0 40px #10281d2b}}

@@ -14,9 +14,22 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
+const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
+  system: "System UI",
+  inter: "Inter",
+  arial: "Arial",
+  roboto: "Roboto",
+  segoe: "Segoe UI",
+  georgia: "Georgia",
+  times: "Times New Roman",
+  trebuchet: "Trebuchet MS",
+  verdana: "Verdana",
+  tahoma: "Tahoma",
+  courier: "Courier New",
+};
 type DashboardWidget = "shopping" | "reminders" | "personalDocuments" | "stocks" | "assets" | "learning" | "training" | "devotional" | "cooking" | "issues" | "career" | "family" | "schools" | "vehicles" | "electricity";
 const DEFAULT_DASHBOARD_WIDGETS: DashboardWidget[] = ["shopping", "reminders", "personalDocuments"];
 const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; description: string }[] = [
@@ -3878,7 +3891,7 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through Supabase and can be backed up or moved whenever you like." />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to Supabase. Account credentials are encrypted separately; other records remain readable to people with the Daybook password or Supabase service-role access. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
@@ -3894,7 +3907,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, accentC
       </div>
     </Card>
     <Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card>
-    <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose your font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern sans</option><option value="editorial">Editorial serif</option><option value="rounded">Friendly rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="small">Small</option><option value="medium">Default</option><option value="large">Large</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
+    <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a backup</h3><p>Save your shopping data, product and store master data, and reminders as versioned JSON.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
@@ -4124,10 +4137,14 @@ function isCurrency(value: unknown): value is Currency {
   return CURRENCIES.some((currency) => currency === value);
 }
 function isFontSize(value: unknown): value is FontSize {
-  return value === "small" || value === "medium" || value === "large";
+  return value === "extra-small" || value === "small" || value === "medium" ||
+    value === "large" || value === "extra-large" || value === "xx-large";
 }
 function isFontStyle(value: unknown): value is FontStyle {
   return value === "modern" || value === "editorial" || value === "rounded";
+}
+function isFontFamily(value: unknown): value is FontFamily {
+  return FONT_FAMILIES.some((family) => family === value);
 }
 function isAccentColor(value: unknown): value is AccentColor {
   return ACCENT_COLORS.some((color) => color === value);
@@ -4237,6 +4254,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [fontSize, setFontSize] = useState<FontSize>("medium");
   const [fontStyle, setFontStyle] = useState<FontStyle>("modern");
+  const [fontFamily, setFontFamily] = useState<FontFamily>("inter");
   const [accentColor, setAccentColor] = useState<AccentColor>("green");
   const [darkTheme, setDarkTheme] = useState<DarkTheme>("forest");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("sage");
@@ -4289,6 +4307,7 @@ export default function App() {
           !isCurrency(parsed.currency) || !("darkMode" in parsed) || typeof parsed.darkMode !== "boolean" ||
           ("fontSize" in parsed && !isFontSize(parsed.fontSize)) ||
           ("fontStyle" in parsed && !isFontStyle(parsed.fontStyle)) ||
+          ("fontFamily" in parsed && !isFontFamily(parsed.fontFamily)) ||
           ("accentColor" in parsed && !isAccentColor(parsed.accentColor)) ||
           ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
           ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme)) ||
@@ -4299,6 +4318,7 @@ export default function App() {
         setDarkMode(parsed.darkMode);
         if ("fontSize" in parsed && isFontSize(parsed.fontSize)) setFontSize(parsed.fontSize);
         if ("fontStyle" in parsed && isFontStyle(parsed.fontStyle)) setFontStyle(parsed.fontStyle);
+        if ("fontFamily" in parsed && isFontFamily(parsed.fontFamily)) setFontFamily(parsed.fontFamily);
         if ("accentColor" in parsed && isAccentColor(parsed.accentColor)) setAccentColor(parsed.accentColor);
         if ("darkTheme" in parsed && isDarkTheme(parsed.darkTheme)) setDarkTheme(parsed.darkTheme);
         if ("visualTheme" in parsed && isVisualTheme(parsed.visualTheme)) setVisualTheme(parsed.visualTheme);
@@ -4314,11 +4334,11 @@ export default function App() {
   useEffect(() => {
     if (!preferencesReady) return;
     try {
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets }));
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify({ currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets }));
     } catch {
       setError("Your preferences could not be saved in this browser.");
     }
-  }, [currency, darkMode, fontSize, fontStyle, accentColor, darkTheme, visualTheme, dashboardWidgets, preferencesReady]);
+  }, [currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, preferencesReady]);
 
   useEffect(() => {
     if (!data || !authenticated || setupRequired) return;
@@ -5277,10 +5297,10 @@ export default function App() {
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
-  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
+  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
     <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
       <div className="nav-label">YOUR SPACE</div><nav className="nav-list" aria-label="Main navigation">{navigation.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}</nav>
