@@ -3,7 +3,7 @@ import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
-  Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
+  ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
@@ -776,6 +776,59 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
   };
 }
 
+type StockImportDraft = {
+  id: string;
+  symbol: string;
+  name: string;
+  exchange: StockExchange;
+  broker: string;
+  averageBuyPrice: string;
+  quantity: string;
+};
+
+const STOCK_IMPORT_LABELS = new Set([
+  "ACCOUNT", "AMOUNT", "AVG", "AVERAGE", "BALANCE", "BSE", "BUY", "CHANGE", "CLOSE", "COST", "CURRENT",
+  "DESCRIPTION", "EQUITY", "HIGH", "HOLDING", "HOLDINGS", "INVESTED", "INVESTMENT", "LOW", "LTP", "MARKET",
+  "NAME", "NSE", "OPEN", "PERCENT", "PORTFOLIO", "PRICE", "QTY", "QUANTITY", "SECURITY", "SHARES", "SCRIP",
+  "STOCK", "STOCKS", "SYMBOL", "TOTAL", "VALUE",
+]);
+
+function parseStockImportText(text: string): StockImportDraft[] {
+  const rows: StockImportDraft[] = [];
+  const seen = new Set<string>();
+  for (const line of text.split(/\r?\n/)) {
+    const tokens = line.match(/[A-Za-z][A-Za-z0-9.&_-]{1,29}/g) ?? [];
+    const symbolToken = tokens.find((token) => !STOCK_IMPORT_LABELS.has(token.toUpperCase()));
+    if (!symbolToken) continue;
+    const symbol = symbolToken.replace(/[.,]+$/, "").toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9.&_-]{0,29}$/.test(symbol) || STOCK_IMPORT_LABELS.has(symbol)) continue;
+    const exchange = /\bBSE\b/i.test(line) ? "BSE" : "NSE";
+    const key = `${exchange}:${symbol}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const name = line.replace(symbolToken, " ")
+      .replace(/\b(?:NSE|BSE|INR|RS|QTY|QUANTITY|SHARES|AVG|AVERAGE|BUY|PRICE|COST|LTP|VALUE|HOLDINGS?)\b/gi, " ")
+      .replace(/[₹,$\d][\d,.]*/g, " ")
+      .replace(/[^A-Za-z&()./' -]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const quantityMatch = line.match(/\b(?:qty|quantity|shares?)\s*[:=-]?\s*([\d,]+)/i);
+    const priceMatch = line.match(/\b(?:avg\.?\s*(?:(?:buy|average)\s*)?(?:price|cost)|average(?:\s+buy)?(?:\s+(?:price|cost))?|buy\s+price)\s*[:=₹\s]*([\d,]+(?:\.\d+)?)/i);
+
+    rows.push({
+      id: createId(),
+      symbol,
+      name: name || symbol,
+      exchange,
+      broker: "",
+      averageBuyPrice: priceMatch ? priceMatch[1].replace(/,/g, "") : "",
+      quantity: quantityMatch ? quantityMatch[1].replace(/,/g, "") : "",
+    });
+    if (rows.length >= 100) break;
+  }
+  return rows;
+}
+
 function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onRenameBroker, onDeleteBroker, onSaveQuote }: {
   stocks: TrackedStock[];
   brokers: string[];
@@ -800,6 +853,14 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshErrors, setRefreshErrors] = useState<string[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importFileName, setImportFileName] = useState("");
+  const [importText, setImportText] = useState("");
+  const [importRows, setImportRows] = useState<StockImportDraft[]>([]);
+  const [importError, setImportError] = useState("");
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const latestQuotes = new Map<string, StockQuoteSnapshot>();
   for (const quote of quotes) {
@@ -884,6 +945,92 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setError("");
     setNotice("Broker name updated.");
   }
+  function updateImportRow(id: string, updates: Partial<StockImportDraft>) {
+    setImportRows((rows) => rows.map((row) => row.id === id ? { ...row, ...updates } : row));
+  }
+  async function recognizeStockScreenshot(file: File) {
+    setError("");
+    setNotice("");
+    setImportError("");
+    if (!file.type.startsWith("image/")) {
+      setError("Choose an image file to import stock details.");
+      return;
+    }
+    if (file.size > MAX_DOCUMENT_FILE_BYTES) {
+      setError("Choose an image no larger than 10 MB.");
+      return;
+    }
+    setImportBusy(true);
+    setImportProgress(0);
+    setImportFileName(file.name);
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("eng", undefined, {
+        logger: (message) => {
+          if (message.status === "recognizing text") setImportProgress(Math.round(message.progress * 100));
+        },
+      });
+      let text: string;
+      try {
+        ({ data: { text } } = await worker.recognize(file));
+      } finally {
+        await worker.terminate();
+      }
+      const parsedRows = parseStockImportText(text);
+      setImportText(text);
+      setImportRows(parsedRows);
+      setImportOpen(true);
+      if (!parsedRows.length) setImportError("No stock rows were recognized. You can edit the OCR text and try parsing it again, or add a row manually.");
+    } catch (caught) {
+      setError(`Could not read the image. ${caught instanceof Error ? caught.message : "Try a clearer screenshot."}`);
+    } finally {
+      setImportBusy(false);
+      setImportProgress(0);
+    }
+  }
+  function commitImportedStocks() {
+    const errors: string[] = [];
+    const imported: Omit<TrackedStock, "id">[] = [];
+    const seen = new Set(stocks.map((stock) => `${stock.exchange}:${stock.symbol.toUpperCase()}`));
+    for (const [index, row] of importRows.entries()) {
+      const symbol = row.symbol.trim().toUpperCase();
+      const exchange = row.exchange;
+      const label = `Row ${index + 1}`;
+      if (!/^[A-Z0-9][A-Z0-9.&_-]{0,29}$/.test(symbol) || STOCK_IMPORT_LABELS.has(symbol) || !row.name.trim()) {
+        errors.push(`${label}: enter a valid stock code and name.`);
+        continue;
+      }
+      const stockKey = `${exchange}:${symbol}`;
+      if (seen.has(stockKey)) {
+        errors.push(`${label}: ${symbol} on ${exchange} is already tracked or duplicated in this import.`);
+        continue;
+      }
+      if (row.broker && !brokers.includes(row.broker)) {
+        errors.push(`${label}: choose a broker from the list.`);
+        continue;
+      }
+      const averageBuyPrice = row.averageBuyPrice.trim() ? Number(row.averageBuyPrice) : null;
+      const quantity = row.quantity.trim() ? Number(row.quantity) : 0;
+      if ((averageBuyPrice !== null && (!Number.isFinite(averageBuyPrice) || averageBuyPrice <= 0)) ||
+        !Number.isInteger(quantity) || quantity < 0 ||
+        ((averageBuyPrice !== null) !== (quantity > 0))) {
+        errors.push(`${label}: enter both a positive average price and whole-number quantity, or leave both empty.`);
+        continue;
+      }
+      seen.add(stockKey);
+      imported.push({ symbol, name: row.name.trim(), exchange, broker: row.broker, averageBuyPrice, quantity });
+    }
+    if (errors.length || !imported.length) {
+      setImportError(errors.length ? errors.join(" ") : "Add at least one stock row before importing.");
+      return;
+    }
+    imported.forEach((stock) => onSaveStock(stock));
+    setImportOpen(false);
+    setImportRows([]);
+    setImportText("");
+    setImportError("");
+    setNotice(`Imported ${imported.length} ${imported.length === 1 ? "stock" : "stocks"}.`);
+  }
   async function fetchStockQuote(stock: TrackedStock): Promise<Omit<StockQuoteSnapshot, "id" | "stockId">> {
     const params = new URLSearchParams({ symbol: stock.symbol, exchange: stock.exchange });
     const response = await fetch(`/api/stock-price?${params.toString()}`);
@@ -934,7 +1081,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     catch { return `${currency} ${price.toFixed(2)}`; }
   }
 
-  return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and save refreshed price snapshots." action={<Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button>} />
+  return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and save refreshed price snapshots." action={<div className="stock-heading-actions"><input ref={importInputRef} className="sr-only" type="file" accept="image/*" aria-label="Choose stock screenshot" onChange={(event) => { const file = event.target.files?.[0]; if (file) void recognizeStockScreenshot(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importBusy}>{importBusy ? <LoaderCircle size={14} className="spin" /> : <ImagePlus size={14} />}{importBusy ? `Reading ${importProgress}%` : "Import screenshot"}</Button><Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button></div>} />
     <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. All snapshots are saved only in this browser.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
@@ -987,6 +1134,23 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
         </div>;
       })}</div> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
     </Card>
+    {importOpen && <Modal title="Review stock screenshot" onClose={() => { if (!importBusy) { setImportOpen(false); setImportError(""); } }} wide>
+      <p className="section-description stock-import-intro">OCR runs in this browser. Check every field—the image may be read incorrectly. {importFileName && <strong>{importFileName}</strong>}</p>
+      <Field className="full" label="Recognized text (editable)"><textarea className="field textarea" rows={4} value={importText} onChange={(event) => setImportText(event.target.value)} /></Field>
+      <div className="stock-import-tools"><Button type="button" variant="outline" onClick={() => { setImportRows(parseStockImportText(importText)); setImportError(""); }}>Parse text again</Button><Button type="button" variant="outline" onClick={() => { setImportRows((rows) => [...rows, { id: createId(), symbol: "", name: "", exchange: "NSE", broker: "", averageBuyPrice: "", quantity: "" }]); setImportError(""); }}><Plus size={14} />Add row</Button></div>
+      {importBusy && <div className="alert"><LoaderCircle size={14} className="spin" />Reading screenshot… {importProgress}%</div>}
+      {importRows.length > 0 && <div className="stock-import-list">{importRows.map((row, index) => <div className="stock-import-row" key={row.id}>
+        <div className="stock-import-row-head"><strong>Stock {index + 1}</strong><button className="icon-button" type="button" aria-label={`Remove stock row ${index + 1}`} onClick={() => setImportRows((rows) => rows.filter((entry) => entry.id !== row.id))}><X size={14} /></button></div>
+        <Field label="Stock code"><Input maxLength={30} value={row.symbol} onChange={(event) => updateImportRow(row.id, { symbol: event.target.value })} /></Field>
+        <Field label="Display name"><Input maxLength={100} value={row.name} onChange={(event) => updateImportRow(row.id, { name: event.target.value })} /></Field>
+        <Field label="Exchange"><Select value={row.exchange} onChange={(event) => updateImportRow(row.id, { exchange: event.target.value as StockExchange })}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field>
+        <Field label="Broker"><Select value={row.broker} onChange={(event) => updateImportRow(row.id, { broker: event.target.value })}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Average buy price (INR)"><Input type="number" min="0.01" step="0.01" value={row.averageBuyPrice} onChange={(event) => updateImportRow(row.id, { averageBuyPrice: event.target.value })} /></Field>
+        <Field label="Shares owned"><Input type="number" min="0" step="1" value={row.quantity} onChange={(event) => updateImportRow(row.id, { quantity: event.target.value })} /></Field>
+      </div>)}</div>}
+      {importError && <div className="alert alert-error stock-import-error" role="alert">{importError}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={() => { setImportOpen(false); setImportError(""); }}>Cancel</Button><Button type="button" onClick={commitImportedStocks} disabled={importBusy || !importRows.length}>Import {importRows.length} {importRows.length === 1 ? "stock" : "stocks"}</Button></div>
+    </Modal>}
   </>;
 }
 
