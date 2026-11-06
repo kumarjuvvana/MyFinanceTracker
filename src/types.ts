@@ -355,6 +355,14 @@ export interface DevotionalEntry {
   prayerNotes: string;
 }
 
+export interface DevotionalResource {
+  id: string;
+  title: string;
+  link: string;
+  description: string;
+  source: string;
+}
+
 export type PrayerRequestStatus = "Ongoing" | "Answered";
 
 export interface PrayerRequest {
@@ -584,6 +592,7 @@ export interface TrackerData {
   vehicleMaintenance?: VehicleMaintenance[];
   electricityReadings?: ElectricityReading[];
   devotionalEntries?: DevotionalEntry[];
+  devotionalResources?: DevotionalResource[];
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];
   cookingLogs?: CookingLog[];

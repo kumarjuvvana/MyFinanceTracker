@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type F
 import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
   ChevronRight, ClipboardList, Clock3, Database, Download,
-  Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
+  Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
   RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { deleteDatabaseRow, loadDatabaseCatalog, loadDatabaseRows, previewDatabaseDelete, type DatabaseCatalog, type DatabaseRows, type DeletePreview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -713,6 +713,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         vehicleMaintenance: mergeArchivedRows(previous.vehicleMaintenance, snapshot.vehicleMaintenance),
         electricityReadings: mergeArchivedRows(previous.electricityReadings, snapshot.electricityReadings),
         devotionalEntries: mergeArchivedRows(previous.devotionalEntries, snapshot.devotionalEntries),
+        devotionalResources: mergeArchivedRows(previous.devotionalResources, snapshot.devotionalResources),
         prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
         cookingRecipes: mergeArchivedRows(previous.cookingRecipes, snapshot.cookingRecipes),
         cookingLogs: mergeArchivedRows(previous.cookingLogs, snapshot.cookingLogs),
@@ -2632,15 +2633,58 @@ function PrayerRequestModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveRequest, onDeleteRequest }: {
+function DevotionalResourceModal({ initial, onClose, onSave }: {
+  initial: DevotionalResource | null;
+  onClose: () => void;
+  onSave: (resource: Omit<DevotionalResource, "id">) => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [link, setLink] = useState(initial?.link ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [source, setSource] = useState(initial?.source ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const normalizedLink = link.trim();
+    try {
+      if (new URL(normalizedLink).protocol !== "https:") throw new Error();
+    } catch {
+      setError("Enter a valid HTTPS link.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Enter a title for this resource.");
+      return;
+    }
+    onSave({ title: title.trim(), link: normalizedLink, description: description.trim(), source: source.trim() });
+  }
+
+  return <Modal title={initial ? "Edit devotional resource" : "Add devotional resource"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="Song, sermon, video, audio, Scripture study..." value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field className="full" label="Link (HTTPS)"><Input type="url" required maxLength={2048} placeholder="https://..." value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="What is this resource or why did you save it?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+      <Field label="Source (optional)"><Input maxLength={120} placeholder="Church, artist, channel, website..." value={source} onChange={(event) => setSource(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save resource"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEntry, onSaveResource, onDeleteResource, onSaveRequest, onDeleteRequest }: {
   entries: DevotionalEntry[];
+  resources: DevotionalResource[];
   requests: PrayerRequest[];
   onSaveEntry: (entry: Omit<DevotionalEntry, "id">, id?: string) => void;
   onDeleteEntry: (entry: DevotionalEntry) => void;
+  onSaveResource: (resource: Omit<DevotionalResource, "id">, id?: string) => void;
+  onDeleteResource: (resource: DevotionalResource) => void;
   onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
   const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
+  const [resourceEditor, setResourceEditor] = useState<DevotionalResource | null | undefined>(undefined);
   const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
   const [requestFilter, setRequestFilter] = useState("Ongoing");
   const [search, setSearch] = useState("");
@@ -2652,6 +2696,9 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
     (requestFilter === "All requests" || request.status === requestFilter) &&
     (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))))
     .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+  const visibleResources = [...resources].filter((resource) =>
+    !query || [resource.title, resource.link, resource.description, resource.source].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.title.localeCompare(b.title));
   const ongoingCount = requests.filter((request) => request.status === "Ongoing").length;
   const answeredCount = requests.filter((request) => request.status === "Answered").length;
 
@@ -2660,6 +2707,9 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
   }
   function confirmDeleteRequest(request: PrayerRequest) {
     if (window.confirm(`Move the prayer request "${request.title}" to the archive?`)) onDeleteRequest(request);
+  }
+  function confirmDeleteResource(resource: DevotionalResource) {
+    if (window.confirm(`Move "${resource.title}" to the archive?`)) onDeleteResource(resource);
   }
 
   return <>
@@ -2670,7 +2720,7 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
       <Card><span>Ongoing prayers</span><strong>{ongoingCount}</strong></Card>
       <Card><span>Answered prayers</span><strong>{answeredCount}</strong></Card>
     </div>
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
     <div className="devotional-columns">
       <section className="devotional-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div><Button variant="outline" onClick={() => setEntryEditor(null)}><Plus size={13} /> Add entry</Button></div>
         {visibleEntries.length ? <div className="devotional-list">{visibleEntries.map((entry) => <Card className="devotional-card" key={entry.id}>
@@ -2691,7 +2741,15 @@ function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveR
         </Card>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={requests.length ? "No matching prayer requests" : "No prayer requests yet"} description={requests.length ? "Try another search or status filter." : "Add a request to keep it in your prayer list."} /></Card>}
       </section>
     </div>
+    <section className="devotional-resource-section"><div className="devotional-section-head"><div><h2><PlayCircle size={15} /> Music, media & other resources</h2><p>{visibleResources.length} {visibleResources.length === 1 ? "resource" : "resources"} · audio, video, songs, sermons, Scripture study, and more</p></div><Button variant="outline" onClick={() => setResourceEditor(null)}><Plus size={13} /> Add resource</Button></div>
+      {visibleResources.length ? <div className="devotional-resource-list">{visibleResources.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
+        <div className="devotional-card-head"><div><h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, title: `${resource.title.slice(0, 153)} (copy)` })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
+        {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
+        <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
+      </Card>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
+    </section>
     {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
+    {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
     {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
 }
@@ -4187,6 +4245,7 @@ function emptyTrackerData(): TrackerData {
     vehicles: [],
     vehicleJourneys: [],
     vehicleMaintenance: [],
+    devotionalResources: [],
     learningRecords: [],
     trainingSessions: [],
     personalRecords: [],
@@ -5045,6 +5104,20 @@ export default function App() {
       devotionalEntries: (previous.devotionalEntries ?? []).filter((current) => current.id !== entry.id),
     }));
   }
+  function saveDevotionalResource(resource: Omit<DevotionalResource, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      devotionalResources: id
+        ? (previous.devotionalResources ?? []).map((current) => current.id === id ? { ...resource, id } : current)
+        : [{ ...resource, id: createId() }, ...(previous.devotionalResources ?? [])],
+    }));
+  }
+  function deleteDevotionalResource(resource: DevotionalResource) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Devotional resource: ${resource.title}`, { devotionalResources: [resource] }),
+      devotionalResources: (previous.devotionalResources ?? []).filter((current) => current.id !== resource.id),
+    }));
+  }
   function savePrayerRequest(request: Omit<PrayerRequest, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -5283,7 +5356,7 @@ export default function App() {
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
-    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
+    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,

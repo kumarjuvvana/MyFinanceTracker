@@ -581,6 +581,16 @@ body{background:#f3f5ef}
 .app-shell.dark .devotional-summary strong,.app-shell.dark .devotional-section-head h2,.app-shell.dark .devotional-card h3,.app-shell.dark .devotional-card p strong{color:#e3e8e2}
 .app-shell.dark .devotional-summary span,.app-shell.dark .devotional-date,.app-shell.dark .devotional-section-head p,.app-shell.dark .devotional-card p{color:#a7b0a7}
 .app-shell.dark .devotional-section-head h2 svg{color:#a6c1a8}
+.devotional-resource-section{display:grid;gap:10px;margin-top:18px}
+.devotional-resource-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px}
+.devotional-resource-card{min-width:0;padding:14px}
+.devotional-resource-card h3{margin:4px 0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
+.devotional-resource-card p{margin:9px 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
+.devotional-resource-link{display:inline-flex;align-items:center;gap:6px;margin-top:6px;color:#4e7e57;font-size:11px;font-weight:600;text-decoration:none}
+.devotional-resource-link:hover{text-decoration:underline}
+.app-shell.dark .devotional-resource-card h3{color:#e3e8e2}
+.app-shell.dark .devotional-resource-card p{color:#a7b0a7}
+.app-shell.dark .devotional-resource-link{color:#a6c1a8}
 .cooking-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
 .cooking-summary .card{display:grid;gap:6px;padding:14px}
 .cooking-summary span{font-size:10px;color:#92998f}
