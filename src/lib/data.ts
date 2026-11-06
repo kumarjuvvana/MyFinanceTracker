@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type Currency, type DevotionalEntry, type EducationFeeType, type EducationRecord, type ElectricityReading, type LearningRecord, type PersonalRecord, type PrayerRequest, type Product, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type TrackerData, type TrackedStock, type Vehicle, type VehicleJourney, type VehicleMaintenance } from "../types.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -225,6 +225,24 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.paidDate === "string" && (entry.paidDate === "" || !Number.isNaN(Date.parse(entry.paidDate))) &&
       (!entry.paid || entry.paidDate !== "") &&
       typeof entry.notes === "string"));
+  const devotionalEntriesOk = value.devotionalEntries === undefined ||
+    (Array.isArray(value.devotionalEntries) && value.devotionalEntries.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      typeof entry.scriptureReference === "string" && entry.scriptureReference.trim().length > 0 &&
+      typeof entry.takeaway === "string" && typeof entry.reflection === "string" &&
+      typeof entry.prayerNotes === "string"));
+  const prayerRequestsOk = value.prayerRequests === undefined ||
+    (Array.isArray(value.prayerRequests) && value.prayerRequests.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.title === "string" && entry.title.trim().length > 0 &&
+      typeof entry.details === "string" &&
+      typeof entry.dateAdded === "string" && !Number.isNaN(Date.parse(entry.dateAdded)) &&
+      (entry.status === "Ongoing" || entry.status === "Answered") &&
+      typeof entry.answeredDate === "string" &&
+      (entry.answeredDate === "" || !Number.isNaN(Date.parse(entry.answeredDate))) &&
+      (!entry.answeredDate || Date.parse(entry.answeredDate) >= Date.parse(entry.dateAdded)) &&
+      ((entry.status === "Answered") === (entry.answeredDate !== ""))));
   const personalRecordsOk = value.personalRecords === undefined || (Array.isArray(value.personalRecords) && value.personalRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && typeof entry.title === "string" &&
     (entry.type === "Identity" || entry.type === "Insurance" || entry.type === "License" ||
@@ -269,7 +287,8 @@ export function validateData(value: unknown): value is TrackerData {
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !learningRecordsOk ||
-    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !personalRecordsOk ||
+    !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk ||
+    !devotionalEntriesOk || !prayerRequestsOk || !personalRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
@@ -301,6 +320,10 @@ export function validateData(value: unknown): value is TrackerData {
       const key = `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
       byMeter.set(key, [...(byMeter.get(key) ?? []), entry]);
     }
+    if (Array.isArray(value.devotionalEntries) &&
+      new Set((value.devotionalEntries as DevotionalEntry[]).map((entry) => entry.id)).size !== value.devotionalEntries.length) return false;
+    if (Array.isArray(value.prayerRequests) &&
+      new Set((value.prayerRequests as PrayerRequest[]).map((entry) => entry.id)).size !== value.prayerRequests.length) return false;
     for (const meterReadings of byMeter.values()) {
       const sorted = [...meterReadings].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
       if (sorted.some((entry, index) => index > 0 && entry.meterReading < sorted[index - 1].meterReading)) return false;
@@ -373,6 +396,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     vehicleJourneys: data.vehicleJourneys ?? [],
     vehicleMaintenance: data.vehicleMaintenance ?? [],
     electricityReadings: data.electricityReadings ?? [],
+    devotionalEntries: data.devotionalEntries ?? [],
+    prayerRequests: data.prayerRequests ?? [],
     personalRecords: (data.personalRecords ?? []).map((record) => ({
       ...record,
       additionalFields: record.additionalFields ?? [],

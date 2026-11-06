@@ -4,13 +4,13 @@ import {
   ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil,
   Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles,
-  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap,
+  RefreshCw, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart,
 } from "lucide-react";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select } from "./components/ui";
 import { createId, exportCsv, formatCurrency as formatMoney, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type AssetRecord, type AssetType, type Category, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FontSize, type FontStyle, type LearningLevel, type LearningRecord, type LearningStatus, type Page, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type Product, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type TrackedStock, type TrackerData, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const CurrencyContext = createContext<Currency>("INR");
@@ -30,6 +30,7 @@ const navigation: { name: Page; icon: typeof LayoutDashboard }[] = [
   { name: "Stocks", icon: TrendingUp },
   { name: "Asset manager", icon: Wallet },
   { name: "Learning", icon: BookOpen },
+  { name: "Devotional", icon: Heart },
   { name: "Schools & Colleges", icon: GraduationCap },
   { name: "Vehicles", icon: Car },
   { name: "Electricity", icon: Zap },
@@ -1658,6 +1659,151 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   </>;
 }
 
+function DevotionalEntryModal({ initial, onClose, onSave }: {
+  initial: DevotionalEntry | null;
+  onClose: () => void;
+  onSave: (entry: Omit<DevotionalEntry, "id">) => void;
+}) {
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [scriptureReference, setScriptureReference] = useState(initial?.scriptureReference ?? "");
+  const [takeaway, setTakeaway] = useState(initial?.takeaway ?? "");
+  const [reflection, setReflection] = useState(initial?.reflection ?? "");
+  const [prayerNotes, setPrayerNotes] = useState(initial?.prayerNotes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!date || !scriptureReference.trim()) {
+      setError("Enter a date and a Bible passage reference.");
+      return;
+    }
+    onSave({ date, scriptureReference: scriptureReference.trim(), takeaway: takeaway.trim(), reflection: reflection.trim(), prayerNotes: prayerNotes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit devotional entry" : "Add devotional entry"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Date"><Input autoFocus type="date" required value={date} onChange={(event) => setDate(event.target.value)} /></Field>
+      <Field label="Bible passage reference"><Input required maxLength={120} placeholder="e.g. Psalm 23:1–6" value={scriptureReference} onChange={(event) => setScriptureReference(event.target.value)} /></Field>
+      <Field className="full" label="Message or takeaway"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="What stood out in this passage?" value={takeaway} onChange={(event) => setTakeaway(event.target.value)} /></Field>
+      <Field className="full" label="Personal reflection"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Record your thoughts, questions, or how you want to apply it." value={reflection} onChange={(event) => setReflection(event.target.value)} /></Field>
+      <Field className="full" label="Prayer notes"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Optional prayer inspired by this reading" value={prayerNotes} onChange={(event) => setPrayerNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add entry"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function PrayerRequestModal({ initial, onClose, onSave }: {
+  initial: PrayerRequest | null;
+  onClose: () => void;
+  onSave: (request: Omit<PrayerRequest, "id">) => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [details, setDetails] = useState(initial?.details ?? "");
+  const [dateAdded, setDateAdded] = useState(initial?.dateAdded ?? today());
+  const [status, setStatus] = useState<PrayerRequestStatus>(initial?.status ?? "Ongoing");
+  const [answeredDate, setAnsweredDate] = useState(initial?.answeredDate ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim() || !dateAdded) {
+      setError("Enter a prayer request and the date you added it.");
+      return;
+    }
+    if (status === "Answered" && !answeredDate) {
+      setError("Enter the date this prayer was answered.");
+      return;
+    }
+    if (status === "Answered" && answeredDate < dateAdded) {
+      setError("The answered date cannot be before the request date.");
+      return;
+    }
+    onSave({ title: title.trim(), details: details.trim(), dateAdded, status, answeredDate: status === "Answered" ? answeredDate : "" });
+  }
+
+  return <Modal title={initial ? "Edit prayer request" : "Add prayer request"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Prayer request"><Input autoFocus required maxLength={160} placeholder="A short title for this prayer" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+      <Field label="Date added"><Input type="date" required value={dateAdded} onChange={(event) => setDateAdded(event.target.value)} /></Field>
+      <Field label="Status"><Select value={status} onChange={(event) => {
+        const nextStatus = event.target.value as PrayerRequestStatus;
+        setStatus(nextStatus);
+        if (nextStatus === "Answered" && !answeredDate) setAnsweredDate(today());
+        if (nextStatus === "Ongoing") setAnsweredDate("");
+      }}><option>Ongoing</option><option>Answered</option></Select></Field>
+      {status === "Answered" && <Field label="Answered date"><Input type="date" required value={answeredDate} onChange={(event) => setAnsweredDate(event.target.value)} /></Field>}
+      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional context or updates" value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add request"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function DevotionalPage({ entries, requests, onSaveEntry, onDeleteEntry, onSaveRequest, onDeleteRequest }: {
+  entries: DevotionalEntry[];
+  requests: PrayerRequest[];
+  onSaveEntry: (entry: Omit<DevotionalEntry, "id">, id?: string) => void;
+  onDeleteEntry: (entry: DevotionalEntry) => void;
+  onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
+  onDeleteRequest: (request: PrayerRequest) => void;
+}) {
+  const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
+  const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
+  const [requestFilter, setRequestFilter] = useState("Ongoing");
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const visibleEntries = [...entries].filter((entry) =>
+    !query || [entry.scriptureReference, entry.takeaway, entry.reflection, entry.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const visibleRequests = [...requests].filter((request) =>
+    (requestFilter === "All requests" || request.status === requestFilter) &&
+    (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))))
+    .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+  const ongoingCount = requests.filter((request) => request.status === "Ongoing").length;
+  const answeredCount = requests.filter((request) => request.status === "Answered").length;
+
+  function confirmDeleteEntry(entry: DevotionalEntry) {
+    if (window.confirm(`Delete the devotional entry for ${entry.scriptureReference}?`)) onDeleteEntry(entry);
+  }
+  function confirmDeleteRequest(request: PrayerRequest) {
+    if (window.confirm(`Delete the prayer request "${request.title}"?`)) onDeleteRequest(request);
+  }
+
+  return <>
+    <PageHeading eyebrow="Christian faith" title="Devotional" subtitle="Keep Scripture reflections and prayer requests together in your personal faith journal." action={<Button onClick={() => setEntryEditor(null)}><Plus size={15} /> Add Bible reflection</Button>} />
+    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Record Bible references and your own reflections, not full copyrighted passage text. Devotional notes and prayer requests are private shared Daybook data.</span></div>
+    <div className="devotional-summary">
+      <Card><span>Bible reflections</span><strong>{entries.length}</strong></Card>
+      <Card><span>Ongoing prayers</span><strong>{ongoingCount}</strong></Card>
+      <Card><span>Answered prayers</span><strong>{answeredCount}</strong></Card>
+    </div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    <div className="devotional-columns">
+      <section className="devotional-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div><Button variant="outline" onClick={() => setEntryEditor(null)}><Plus size={13} /> Add entry</Button></div>
+        {visibleEntries.length ? <div className="devotional-list">{visibleEntries.map((entry) => <Card className="devotional-card" key={entry.id}>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(entry.date)}</span><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Trash2 size={13} /></button></div></div>
+          {entry.takeaway && <p><strong>Message:</strong> {entry.takeaway}</p>}{entry.reflection && <p><strong>Reflection:</strong> {entry.reflection}</p>}{entry.prayerNotes && <p><strong>Prayer:</strong> {entry.prayerNotes}</p>}
+        </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={entries.length ? "No matching reflections" : "No Bible reflections yet"} description={entries.length ? "Try another search." : "Save a Scripture reference and your thoughts about it."} /></Card>}
+      </section>
+      <section className="devotional-section"><div className="devotional-section-head"><div><h2><Heart size={15} /> Prayer requests</h2><p>{ongoingCount} ongoing · {answeredCount} answered</p></div><Button variant="outline" onClick={() => setRequestEditor(null)}><Plus size={13} /> Add request</Button></div>
+        <Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select>
+        {visibleRequests.length ? <div className="devotional-list">{visibleRequests.map((request) => <Card className="devotional-card" key={request.id}>
+          <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Delete prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Trash2 size={13} /></button></div></div>
+          {request.details && <p>{request.details}</p>}
+          <Button size="sm" variant="outline" onClick={() => onSaveRequest({
+            ...request,
+            status: request.status === "Ongoing" ? "Answered" : "Ongoing",
+            answeredDate: request.status === "Ongoing" ? (today() < request.dateAdded ? request.dateAdded : today()) : "",
+          }, request.id)}>{request.status === "Ongoing" ? "Mark answered" : "Reopen request"}</Button>
+        </Card>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={requests.length ? "No matching prayer requests" : "No prayer requests yet"} description={requests.length ? "Try another search or status filter." : "Add a request to keep it in your prayer list."} /></Card>}
+      </section>
+    </div>
+    {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
+    {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
+  </>;
+}
+
 function PersonalRecordModal({ initial, onClose, onSave }: {
   initial: PersonalRecord | null;
   onClose: () => void;
@@ -2862,6 +3008,34 @@ export default function App() {
       electricityReadings: (previous.electricityReadings ?? []).filter((entry) => entry.id !== reading.id),
     }));
   }
+  function saveDevotionalEntry(entry: Omit<DevotionalEntry, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      devotionalEntries: id
+        ? (previous.devotionalEntries ?? []).map((current) => current.id === id ? { ...entry, id } : current)
+        : [{ ...entry, id: createId() }, ...(previous.devotionalEntries ?? [])],
+    }));
+  }
+  function deleteDevotionalEntry(entry: DevotionalEntry) {
+    update((previous) => ({
+      ...previous,
+      devotionalEntries: (previous.devotionalEntries ?? []).filter((current) => current.id !== entry.id),
+    }));
+  }
+  function savePrayerRequest(request: Omit<PrayerRequest, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      prayerRequests: id
+        ? (previous.prayerRequests ?? []).map((current) => current.id === id ? { ...request, id } : current)
+        : [{ ...request, id: createId() }, ...(previous.prayerRequests ?? [])],
+    }));
+  }
+  function deletePrayerRequest(request: PrayerRequest) {
+    update((previous) => ({
+      ...previous,
+      prayerRequests: (previous.prayerRequests ?? []).filter((current) => current.id !== request.id),
+    }));
+  }
   function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -2922,6 +3096,7 @@ export default function App() {
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
+    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,

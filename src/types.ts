@@ -23,6 +23,7 @@ export type Page =
   | "Stocks"
   | "Asset manager"
   | "Learning"
+  | "Devotional"
   | "Schools & Colleges"
   | "Vehicles"
   | "Electricity"
@@ -285,6 +286,26 @@ export interface ElectricityReading {
   notes: string;
 }
 
+export interface DevotionalEntry {
+  id: string;
+  date: string;
+  scriptureReference: string;
+  takeaway: string;
+  reflection: string;
+  prayerNotes: string;
+}
+
+export type PrayerRequestStatus = "Ongoing" | "Answered";
+
+export interface PrayerRequest {
+  id: string;
+  title: string;
+  details: string;
+  dateAdded: string;
+  status: PrayerRequestStatus;
+  answeredDate: string;
+}
+
 export type PersonalRecordType =
   | "Identity"
   | "Insurance"
@@ -354,6 +375,8 @@ export interface TrackerData {
   vehicleJourneys?: VehicleJourney[];
   vehicleMaintenance?: VehicleMaintenance[];
   electricityReadings?: ElectricityReading[];
+  devotionalEntries?: DevotionalEntry[];
+  prayerRequests?: PrayerRequest[];
   personalRecords?: PersonalRecord[];
   credentialVault?: EncryptedCredentialVault;
 }
