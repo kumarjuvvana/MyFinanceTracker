@@ -31,6 +31,28 @@ export function ExternalLinkInput({ value, ...props }: ExternalLinkInputProps) {
   </>;
 }
 
+export function LinkifiedText({ children }: { children: string }) {
+  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of children.matchAll(urlPattern)) {
+    const rawUrl = match[0];
+    const trailingPunctuation = rawUrl.match(/[),.!?;:]+$/)?.[0] ?? "";
+    const url = rawUrl.slice(0, rawUrl.length - trailingPunctuation.length);
+    if (!url) continue;
+
+    const start = match.index ?? 0;
+    if (start > lastIndex) parts.push(children.slice(lastIndex, start));
+    parts.push(<a className="linkified-text-link" href={url} target="_blank" rel="noopener noreferrer" key={`${start}-${url}`}>{url}</a>);
+    if (trailingPunctuation) parts.push(trailingPunctuation);
+    lastIndex = start + rawUrl.length;
+  }
+
+  if (lastIndex < children.length) parts.push(children.slice(lastIndex));
+  return <>{parts.length ? parts : children}</>;
+}
+
 type DateInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & {
   value: string;
   onValueChange: (value: string) => void;
