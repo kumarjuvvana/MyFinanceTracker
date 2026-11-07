@@ -2227,7 +2227,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   >(null);
   const [expanded, setExpanded] = useState(false);
   const [examView, setExamView] = useState<"table" | "list">("table");
-  const [attendanceView, setAttendanceView] = useState<"list" | "calendar">("calendar");
+  const [attendanceView, setAttendanceView] = useState<"list" | "calendar-days" | "calendar">("calendar-days");
   const subjects = record.subjects ?? [];
   const exams = record.exams ?? [];
   const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
@@ -2410,13 +2410,40 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       <div className="education-section-head"><div><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
       {(monthlyAttendance.length > 0 || dailyAttendance.length > 0) && <>
         <div className="education-result-tabs" role="tablist" aria-label={`Attendance views for ${record.studentName} ${record.academicYear}`}>
-          <button type="button" role="tab" aria-selected={attendanceView === "list"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("list")}>List</button>
+          <button type="button" role="tab" aria-selected={attendanceView === "calendar-days"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar-days")}>Calendar Days</button>
           <button type="button" role="tab" aria-selected={attendanceView === "calendar"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar")}>Calendar</button>
+          <button type="button" role="tab" aria-selected={attendanceView === "list"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("list")}>List</button>
         </div>
         <div id={`education-attendance-panel-${record.id}`} className="education-result-panel" role="tabpanel">
           {attendanceView === "list" ? <>
             {monthlyAttendance.length > 0 && <div className="education-entry-list">{[...monthlyAttendance].sort((a, b) => b.month.localeCompare(a.month)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>{entry.daysPresent} / {entry.workingDays} days present{entry.workingDays ? ` · ${(entry.daysPresent / entry.workingDays * 100).toFixed(1)}%` : ""}</span>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit monthly attendance" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive monthly attendance" onClick={() => { if (window.confirm(`Move the ${entry.month} attendance summary to the archive?`)) onUpdate({ ...record, monthlyAttendance: monthlyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
             {dailyAttendance.length > 0 && <div className="education-entry-list">{[...dailyAttendance].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{dateLabel(entry.date)} · {entry.status}</strong>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit daily attendance" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive daily attendance" onClick={() => { if (window.confirm(`Move ${dateLabel(entry.date)} attendance to the archive?`)) onUpdate({ ...record, dailyAttendance: dailyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
+          </> : attendanceView === "calendar-days" ? <>
+            <p className="education-calendar-note">Counts dated attendance entries for each month against its calendar days. Monthly report-card totals are shown separately and are not treated as specific dated entries.</p>
+            <div className="education-calendar-grid education-calendar-count-grid">
+              {attendanceCalendarMonths.map((month) => {
+                const [yearText, monthText] = month.split("-");
+                const year = Number(yearText);
+                const monthIndex = Number(monthText) - 1;
+                const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+                const entries = [...attendanceByDate].filter(([date]) => date.startsWith(month)).map(([, entry]) => entry);
+                const countStatus = (status: EducationAttendanceStatus) => entries.filter((entry) => entry.status === status).length;
+                const summary = monthlyAttendanceByMonth.get(month);
+                return <div className="education-calendar-month education-calendar-count-card" key={month}>
+                  <div className="education-calendar-month-head">
+                    <strong>{new Date(year, monthIndex, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+                  </div>
+                  <strong className="education-calendar-count">{entries.length} / {daysInMonth}</strong>
+                  <span className="education-calendar-count-label">calendar days recorded</span>
+                  <div className="education-calendar-status-counts">
+                    {(["Present", "Absent", "Leave", "Late", "Other"] as const).filter((status) => countStatus(status) > 0)
+                      .map((status) => <span key={status}><i className={`education-calendar-key status-${status.toLowerCase()}`} />{status}: {countStatus(status)}</span>)}
+                    {!entries.length && <span>No dated attendance entries</span>}
+                  </div>
+                  {summary && <span className="education-calendar-month-summary">Report card: {summary.daysPresent}/{summary.workingDays} days present</span>}
+                </div>;
+              })}
+            </div>
           </> : <>
             <p className="education-calendar-note">Showing months with attendance records for this education year. Only day-wise entries are marked; monthly totals do not identify which dates were attended.</p>
             <div className="education-calendar-grid">
@@ -2458,6 +2485,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
+      <p className="section-description">Charges are amounts billed by the school and determine the fee balance. Record money actually paid, or outside school purchases, in the ledger below.</p>
       {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
       {feeCharges.length ? <div className="education-entry-list">{feeCharges.map((charge) => {
         const allocated = allocatedToCharge(charge.id);

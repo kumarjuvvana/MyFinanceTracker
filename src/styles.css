@@ -878,6 +878,13 @@ body{background:#f3f5ef}
 .education-calendar-month-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}
 .education-calendar-month-head strong{font-size:11px;color:#414a42}
 .education-calendar-month-head span{font-size:9px;color:#858d83;white-space:nowrap}
+.education-calendar-count-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.education-calendar-count-card{display:flex;flex-direction:column;align-items:flex-start;gap:7px}
+.education-calendar-count{font-size:22px;line-height:1.2;color:#414a42}
+.education-calendar-count-label{font-size:9px;color:#858d83}
+.education-calendar-status-counts{display:flex;flex-wrap:wrap;gap:6px 10px}
+.education-calendar-status-counts>span{display:inline-flex;align-items:center;gap:4px;font-size:9px;color:#858d83}
+.education-calendar-month-summary{font-size:9px;line-height:1.4;color:#858d83}
 .education-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
 .education-calendar-weekday,.education-calendar-day,.education-calendar-blank{display:grid;min-width:0;aspect-ratio:1;place-items:center}
 .education-calendar-weekday{font-size:8px;font-weight:700;color:#92998f}
@@ -918,6 +925,8 @@ body{background:#f3f5ef}
 .app-shell.dark .education-calendar-note,.app-shell.dark .education-calendar-month-head span,.app-shell.dark .education-calendar-legend>span{color:#a7b0a7}
 .app-shell.dark .education-calendar-month{border-color:#343d35}
 .app-shell.dark .education-calendar-month-head strong{color:#e3e8e2}
+.app-shell.dark .education-calendar-count{color:#e3e8e2}
+.app-shell.dark .education-calendar-count-label,.app-shell.dark .education-calendar-status-counts>span,.app-shell.dark .education-calendar-month-summary{color:#a7b0a7}
 .app-shell.dark .education-calendar-weekday{color:#a7b0a7}
 .app-shell.dark .education-calendar-day{background:#2b332d;color:#d4ddd4}
 .app-shell.dark .education-calendar-day.status-present,.app-shell.dark .education-calendar-key.status-present{background:#294332;color:#a8d1ad}
