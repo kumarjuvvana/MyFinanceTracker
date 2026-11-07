@@ -12,6 +12,10 @@ export interface GlobalSearchResult {
   page: Page;
   snippet: string;
   fields: GlobalSearchField[];
+  dates: string[];
+  categories: string[];
+  statuses: string[];
+  providers: string[];
 }
 
 const collections: { key: keyof TrackerData; label: string; page: Page; titles: string[] }[] = [
@@ -88,9 +92,35 @@ function getSnippet(fields: GlobalSearchField[], terms: string[]) {
   return text.length > 180 ? `${text.slice(0, 177)}…` : text;
 }
 
+function getFacetValues(fields: GlobalSearchField[], matches: (label: string) => boolean) {
+  return [...new Set(fields
+    .filter((field) => matches(field.label))
+    .map((field) => field.value.trim())
+    .filter(Boolean))];
+}
+
+function getFieldKey(label: string) {
+  const parts = label.split(" · ");
+  return parts[parts.length - 1]
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLocaleLowerCase()
+    .replace(/[^a-z]/g, "");
+}
+
+function isValidDate(value: string) {
+  const date = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  return new Date(`${date}T00:00:00.000Z`).toISOString().slice(0, 10) === date;
+}
+
+function getResultDates(fields: GlobalSearchField[]) {
+  return getFacetValues(fields, (label) => /date|uploadedat/.test(getFieldKey(label)))
+    .map((value) => value.slice(0, 10))
+    .filter(isValidDate);
+}
+
 export function searchTrackerData(data: TrackerData, query: string): GlobalSearchResult[] {
   const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-  if (!terms.length) return [];
   const results: GlobalSearchResult[] = [];
   const stockNames = new Map((data.stocks ?? []).map((stock) => [stock.id, `${stock.symbol} · ${stock.name}`]));
   const vehicleNames = new Map((data.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle.name]));
@@ -112,7 +142,7 @@ export function searchTrackerData(data: TrackerData, query: string): GlobalSearc
         if (vehicleName) fields.push({ label: "Vehicle", value: vehicleName });
       }
       const searchableText = fields.map(({ label, value }) => `${label} ${value}`).join(" ").toLocaleLowerCase();
-      if (!terms.every((term) => searchableText.includes(term))) continue;
+      if (terms.length && !terms.every((term) => searchableText.includes(term))) continue;
       const relatedTitle = collection.key === "stockQuotes" && typeof entry.stockId === "string"
         ? stockNames.get(entry.stockId)?.split(" · ")[0]
         : undefined;
@@ -126,6 +156,16 @@ export function searchTrackerData(data: TrackerData, query: string): GlobalSearc
         page: collection.page,
         snippet: getSnippet(fields, terms),
         fields,
+        dates: getResultDates(fields),
+        categories: getFacetValues(fields, (label) => /category|type|area|kind|priority|emotion|level/.test(getFieldKey(label))),
+        statuses: [
+          ...getFacetValues(fields, (label) => /status/.test(getFieldKey(label))),
+          ...getFacetValues(fields, (label) => /completed/.test(getFieldKey(label)))
+            .map((value) => value.toLocaleLowerCase() === "true" ? "Completed" : "Not completed"),
+          ...getFacetValues(fields, (label) => /paid/.test(getFieldKey(label)))
+            .map((value) => value.toLocaleLowerCase() === "true" ? "Paid" : "Unpaid"),
+        ],
+        providers: getFacetValues(fields, (label) => /provider|institution|company|issuer|broker|source|store|school/.test(getFieldKey(label))),
       });
     }
   }

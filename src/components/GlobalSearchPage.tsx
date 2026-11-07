@@ -1,6 +1,6 @@
-import { useMemo, type MouseEvent } from "react";
-import { ArrowUpRight, Search, X } from "lucide-react";
-import { Button, Card, EmptyState, Input } from "./ui";
+import { useMemo, useState, type MouseEvent } from "react";
+import { ArrowUpRight, Filter, Search, X } from "lucide-react";
+import { Button, Card, EmptyState, Input, Select } from "./ui";
 import { searchTrackerData, type GlobalSearchResult } from "../lib/globalSearch";
 import type { Page, TrackerData } from "../types";
 
@@ -36,9 +36,51 @@ function ResultDetails({ result, onClose, onGoToPage }: {
 }
 
 export function GlobalSearchPage({ data, query, selectedKey, onQueryChange, onSelect, onGoToPage }: GlobalSearchPageProps) {
-  const results = useMemo(() => searchTrackerData(data, query), [data, query]);
+  const [section, setSection] = useState("");
+  const [category, setCategory] = useState("");
+  const [status, setStatus] = useState("");
+  const [provider, setProvider] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const allResults = useMemo(() => searchTrackerData(data, ""), [data]);
+  const activeQuery = query.trim().length >= 2 ? query : "";
+  const normalizedSearch = activeQuery.toLocaleLowerCase().trim();
+  const searchTerms = normalizedSearch.split(/\s+/).filter(Boolean);
+  const searchedResults = useMemo(() => searchTerms.length
+    ? allResults.filter((result) => {
+      const searchableText = result.fields.map(({ label, value }) => `${label} ${value}`).join(" ").toLocaleLowerCase();
+      return searchTerms.every((term) => searchableText.includes(term));
+    })
+    : allResults, [allResults, normalizedSearch]);
+  const sections = useMemo(() => [...new Set(allResults.map((result) => result.collection))]
+    .sort((a, b) => a.localeCompare(b)), [allResults]);
+  const categories = useMemo(() => [...new Set(allResults.flatMap((result) => result.categories))]
+    .sort((a, b) => a.localeCompare(b)), [allResults]);
+  const statuses = useMemo(() => [...new Set(allResults.flatMap((result) => result.statuses))]
+    .sort((a, b) => a.localeCompare(b)), [allResults]);
+  const providers = useMemo(() => [...new Set(allResults.flatMap((result) => result.providers))]
+    .sort((a, b) => a.localeCompare(b)), [allResults]);
+  const hasActiveFilters = Boolean(section || category || status || provider || dateFrom || dateTo);
+  const results = useMemo(() => searchedResults.filter((result) =>
+    (!section || result.collection === section) &&
+    (!category || result.categories.includes(category)) &&
+    (!status || result.statuses.includes(status)) &&
+    (!provider || result.providers.includes(provider)) &&
+    (!(dateFrom || dateTo) || result.dates.some((date) =>
+      (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo)))), [
+    searchedResults, section, category, status, provider, dateFrom, dateTo,
+  ]);
   const selected = results.find((result) => result.key === selectedKey);
-  const minQueryLength = query.trim().length >= 2;
+  const canShowResults = Boolean(activeQuery || hasActiveFilters);
+
+  function clearFilters() {
+    setSection("");
+    setCategory("");
+    setStatus("");
+    setProvider("");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   function openResult(event: MouseEvent<HTMLAnchorElement>, key: string) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -51,19 +93,40 @@ export function GlobalSearchPage({ data, query, selectedKey, onQueryChange, onSe
     <Card className="global-search-card">
       <label className="global-search-input"><Search size={17} /><Input autoFocus={!selectedKey} aria-label="Search all records" placeholder="Search by keyword or text…" value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
       <p className="section-description global-search-hint">Searches saved record details and notes. Passwords and encrypted credential data are never indexed. Right-click a result to open its details in a new tab.</p>
+      <div className="global-search-filters" aria-label="Filter records">
+        <div className="global-search-filter-heading"><Filter size={14} /><span>Filter results</span></div>
+        <Select aria-label="Filter by section" value={section} onChange={(event) => setSection(event.target.value)}>
+          <option value="">All sections</option>
+          {sections.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+        <Select aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}>
+          <option value="">All categories</option>
+          {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+        <Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="">All statuses</option>
+          {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+        <Select aria-label="Filter by provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
+          <option value="">All providers</option>
+          {providers.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+        <Input aria-label="Filter from date" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+        <Input aria-label="Filter to date" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} />
+        {hasActiveFilters && <Button variant="outline" size="sm" type="button" onClick={clearFilters}>Clear filters</Button>}
+      </div>
     </Card>
-    {query.trim() && (minQueryLength
+    {canShowResults
       ? <div className="global-search-results" aria-live="polite">
         <div className="global-search-count">{results.length ? `${results.length} matching ${results.length === 1 ? "record" : "records"}` : "No matching records"}</div>
-        {results.length ? results.slice(0, 100).map((result) => <a className="global-search-result" href={resultHref(query.trim(), result.key)} key={result.key} onClick={(event) => openResult(event, result.key)}>
+        {results.length ? results.slice(0, 100).map((result) => <a className="global-search-result" href={resultHref(activeQuery.trim(), result.key)} key={result.key} onClick={(event) => openResult(event, result.key)}>
           <div className="global-search-result-top"><strong>{result.title}</strong><span>{result.collection}</span></div>
           {result.snippet && <p>{result.snippet}</p>}
           <small>Open details <ArrowUpRight size={12} /></small>
         </a>) : <Card><EmptyState icon={<Search size={18} />} title="No matches found" description="Try another word or a shorter phrase." /></Card>}
-        {results.length > 100 && <p className="global-search-limit">Showing the first 100 matches. Add another keyword to narrow the results.</p>}
+        {results.length > 100 && <p className="global-search-limit">Showing the first 100 matches. Add a keyword or filter to narrow the results.</p>}
       </div>
-      : <Card className="global-search-empty"><EmptyState icon={<Search size={18} />} title="Start typing to search" description="Enter at least two characters to find matching records." /></Card>)}
-    {!query.trim() && <Card className="global-search-empty"><EmptyState icon={<Search size={18} />} title="Start typing to search" description="Enter at least two characters to find matching records." /></Card>}
+      : <Card className="global-search-empty"><EmptyState icon={<Search size={18} />} title="Search or filter your records" description="Enter at least two characters, or choose filters to browse matching records." /></Card>}
     {selected && <ResultDetails result={selected} onClose={() => onSelect(null)} onGoToPage={onGoToPage} />}
   </>;
 }
