@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import pg from "pg";
-import { isAuthenticated } from "../src/lib/dataAuth.js";
+import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
+import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
 
 const { Pool } = pg;
 const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault"]);
@@ -10,6 +12,7 @@ interface ApiRequest {
   method?: string;
   url?: string;
   headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
 }
 
 interface ApiResponse {
@@ -26,6 +29,19 @@ function respond(response: ApiResponse, status: number, body: Record<string, unk
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.end(JSON.stringify(body));
+}
+
+function requestBody(request: ApiRequest): unknown {
+  if (typeof request.body !== "string") return request.body;
+  try {
+    return JSON.parse(request.body) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function quoteIdentifier(value: string): string {
@@ -156,18 +172,82 @@ function validateTableName(value: string | null): value is string {
   return typeof value === "string" && IDENTIFIER_PATTERN.test(value) && !PROTECTED_TABLES.has(value);
 }
 
+async function validateSqlTables(client: pg.PoolClient, tables: string[]) {
+  for (const table of tables) {
+    if (!validateTableName(table)) throw new Error("SQL may target eligible public tables only.");
+    if (!(await publicTableExists(client, table))) throw new Error(`Public table "${table}" does not exist.`);
+  }
+}
+
 async function databaseHandler(request: ApiRequest, response: ApiResponse) {
   if (!isAuthenticated(request)) {
     respond(response, 401, { error: "Your Daybook session expired. Enter the access password again." });
     return;
   }
-  if (request.method !== "GET") {
-    response.setHeader("Allow", "GET");
-    respond(response, 405, { error: "The Database manager is read-only and accepts GET requests only." });
+  if (request.method !== "GET" && request.method !== "POST") {
+    response.setHeader("Allow", "GET, POST");
+    respond(response, 405, { error: "Only GET and POST requests are supported." });
+    return;
+  }
+  if (request.method === "POST" && !isSameOrigin(request)) {
+    respond(response, 403, { error: "This request must come from the Daybook site." });
     return;
   }
   let client: pg.PoolClient | undefined;
+  let transactionOpen = false;
   try {
+    if (request.method === "POST") {
+      const body = requestBody(request);
+      if (!isRecord(body) || (body.action !== "review-sql" && body.action !== "execute-sql")) {
+        respond(response, 400, { error: "Choose a supported SQL console action." });
+        return;
+      }
+      if (typeof body.sql !== "string") {
+        respond(response, 400, { error: "SQL must be provided as text." });
+        return;
+      }
+      const sql = body.sql;
+      const statementHash = createHash("sha256").update(sql).digest("hex");
+      const inspection = inspectSqlStatement(sql);
+      client = await getPool().connect();
+      await validateSqlTables(client, inspection.tables);
+      if (body.action === "review-sql") {
+        respond(response, 200, {
+          command: inspection.command,
+          tables: inspection.tables,
+          requiresConfirmation: inspection.requiresConfirmation,
+          confirmationPhrase: inspection.requiresConfirmation ? sqlConfirmationPhrase(inspection.command) : "",
+          statementHash,
+        });
+        return;
+      }
+      if (body.statementHash !== statementHash) {
+        respond(response, 409, { error: "This SQL differs from the reviewed statement. Review it again before execution." });
+        return;
+      }
+      if (inspection.requiresConfirmation && body.confirmation !== sqlConfirmationPhrase(inspection.command)) {
+        respond(response, 400, { error: `Type "${sqlConfirmationPhrase(inspection.command)}" to confirm this database change.` });
+        return;
+      }
+      if (inspection.requiresConfirmation) {
+        await client.query("begin");
+        transactionOpen = true;
+      } else {
+        await client.query("begin read only");
+        transactionOpen = true;
+      }
+      const result = await client.query(sql);
+      await client.query("commit");
+      transactionOpen = false;
+      respond(response, 200, {
+        command: inspection.command,
+        rowCount: result.rowCount ?? result.rows.length,
+        fields: result.fields.map((field) => field.name),
+        rows: result.rows.slice(0, 100),
+      });
+      return;
+    }
+
     const requestUrl = new URL(request.url ?? "/", `https://${request.headers.host ?? "localhost"}`);
     const table = requestUrl.searchParams.get("table");
     const requestedOffset = Number(requestUrl.searchParams.get("offset") ?? 0);
@@ -207,12 +287,25 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       offset,
     });
   } catch (caught) {
+    if (client && transactionOpen) {
+      try {
+        await client.query("rollback");
+      } catch (rollbackError) {
+        const rollbackCode = typeof rollbackError === "object" && rollbackError !== null && "code" in rollbackError
+          ? rollbackError.code : "unknown";
+        console.error("Database manager SQL rollback failed:", rollbackCode);
+      }
+    }
+    const configError = caught instanceof Error &&
+      (caught.message.startsWith("Set SUPABASE_DB_URL") || caught.message.startsWith("SUPABASE_DB_URL must"));
+    if (caught instanceof Error && !("code" in caught) && !configError) {
+      respond(response, 400, { error: caught.message });
+      return;
+    }
     const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
       ? caught.code : undefined;
     console.error("Database manager request failed:", code ?? "unknown database error");
-    const configError = caught instanceof Error &&
-      (caught.message.startsWith("Set SUPABASE_DB_URL") || caught.message.startsWith("SUPABASE_DB_URL must"));
-    respond(response, configError ? 503 : code === "23503" ? 409 : 500, {
+    respond(response, configError ? 503 : 500, {
       error: configError ? caught.message : "The database request failed. Check the server logs and database connection settings.",
     });
   } finally {

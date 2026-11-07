@@ -498,6 +498,20 @@ body{background:#f3f5ef}
 
 .database-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .database-browser{min-width:0}
+.database-sql-console{display:grid;gap:12px}
+.database-sql-editor,.database-sql-preview{font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;tab-size:2}
+.database-sql-editor{min-height:180px}
+.database-sql-preview{max-height:300px;overflow:auto;margin:12px 0;padding:12px;border:1px solid #e4e8e2;border-radius:8px;background:#f8f9f7;color:#394139;white-space:pre-wrap;overflow-wrap:anywhere}
+.database-sql-actions{display:flex;justify-content:flex-end}
+.database-sql-acknowledge{display:flex;align-items:flex-start;gap:8px;margin:12px 0;color:#816b40;font-size:11px;line-height:1.5}
+.database-sql-acknowledge input{margin-top:2px;flex:none}
+.database-sql-result{min-width:0;margin-top:8px;padding-top:16px;border-top:1px solid #eef0ec}
+.database-sql-result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.database-sql-result-table{max-width:100%;overflow:auto}
+.database-sql-result-table table{width:100%;border-collapse:collapse;font-size:11px}
+.database-sql-result-table th,.database-sql-result-table td{padding:8px;border:1px solid #eef0ec;text-align:left;vertical-align:top}
+.database-sql-result-table th{position:sticky;top:0;background:#f8f9f7}
+.database-sql-result-table pre{max-width:320px;max-height:150px;overflow:auto;margin:0;font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .database-table-select{display:flex;align-items:flex-end;gap:12px}
 .database-table-select .field-wrap{flex:1;min-width:0}
 .database-column-list{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:18px}
@@ -521,6 +535,8 @@ body{background:#f3f5ef}
 .app-shell.dark .database-fields>div{border-color:#343d35}
 .app-shell.dark .database-fields pre{color:#d4ddd4}
 .app-shell.dark .database-object>pre{background:#202720;border-color:#343d35}
+.app-shell.dark .database-sql-preview,.app-shell.dark .database-sql-result-table th{background:#202720;border-color:#343d35;color:#d4ddd4}
+.app-shell.dark .database-sql-result,.app-shell.dark .database-sql-result-table th,.app-shell.dark .database-sql-result-table td{border-color:#343d35}
 @media(max-width:600px){
   .database-table-select{align-items:flex-start;flex-direction:column}
   .database-table-select .field-wrap{width:100%}

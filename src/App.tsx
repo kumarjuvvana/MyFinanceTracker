@@ -12,7 +12,7 @@ import { createId, exportCsv, formatCurrency as formatMoney, isSafeExternalLink,
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
-import { loadDatabaseCatalog, loadDatabaseRows, type DatabaseCatalog, type DatabaseRows } from "./lib/databaseApi";
+import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
@@ -2570,10 +2570,17 @@ function DatabaseManagerPage() {
   const [catalog, setCatalog] = useState<DatabaseCatalog | null>(null);
   const [rows, setRows] = useState<DatabaseRows | null>(null);
   const [selectedTable, setSelectedTable] = useState("");
-  const [view, setView] = useState<"tables" | "routines" | "triggers">("tables");
+  const [view, setView] = useState<"tables" | "routines" | "triggers" | "sql">("tables");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [sqlStatement, setSqlStatement] = useState("");
+  const [sqlReview, setSqlReview] = useState<SqlReview | null>(null);
+  const [sqlReviewedText, setSqlReviewedText] = useState("");
+  const [sqlConfirmation, setSqlConfirmation] = useState("");
+  const [sqlWriteAcknowledged, setSqlWriteAcknowledged] = useState(false);
+  const [sqlResult, setSqlResult] = useState<SqlExecutionResult | null>(null);
 
   async function refreshCatalog() {
     setLoading(true);
@@ -2602,6 +2609,58 @@ function DatabaseManagerPage() {
     }
   }
 
+  async function reviewSql() {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    setSqlResult(null);
+    try {
+      const review = await reviewDatabaseSql(sqlStatement);
+      setSqlReview(review);
+      setSqlReviewedText(sqlStatement);
+      setSqlConfirmation("");
+      setSqlWriteAcknowledged(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The SQL statement could not be reviewed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeReviewedSql() {
+    if (!sqlReview) return;
+    if (sqlReview.requiresConfirmation &&
+      (!sqlWriteAcknowledged || sqlConfirmation !== sqlReview.confirmationPhrase)) {
+      setError(`Acknowledge the warning and type "${sqlReview.confirmationPhrase}" to continue.`);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const result = await executeDatabaseSql(
+        sqlReviewedText,
+        sqlReview.requiresConfirmation ? sqlConfirmation : "",
+        sqlReview.statementHash,
+      );
+      setSqlResult(result);
+      setSqlReview(null);
+      setSqlReviewedText("");
+      setSqlConfirmation("");
+      setSqlWriteAcknowledged(false);
+      setNotice(result.command === "select"
+        ? `SELECT completed. ${result.rowCount} row(s) returned.`
+        : `${result.command.toUpperCase()} committed. ${result.rowCount} row(s) affected. This change is permanent.`);
+      if (result.command !== "select") {
+        setRows(null);
+        await refreshCatalog();
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "SQL execution failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     void refreshCatalog();
   }, []);
@@ -2611,11 +2670,12 @@ function DatabaseManagerPage() {
   }, [selectedTable, view, rows]);
 
   return <>
-    <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Read-only inspection of public tables, rows, functions, procedures, and triggers." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy}><RefreshCw size={14} />Refresh</Button>} />
-    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>Read-only screen: it runs SELECT queries to display database metadata and table rows. It has no SQL editor and cannot create, update, insert, or delete database records. Function and trigger definitions are displayed as text only and are never executed here.</span></div>
+    <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Inspect database objects and run reviewed SQL against eligible public tables." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy}><RefreshCw size={14} />Refresh</Button>} />
+    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>SQL console accepts one SELECT, INSERT, UPDATE, or DELETE statement. DDL, transactions, protected core tables, functions, subqueries, multi-statement scripts, and unbounded SELECTs are blocked. Every write needs a typed confirmation; writes are permanent, bypass the archive, and database triggers or foreign-key cascades may affect linked data. The confirmation helps prevent mistakes; it is not separate authorization. Anyone with the shared Daybook password can use this screen.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
-    <div className="database-tabs" role="tablist" aria-label="Database objects">
-      {(["tables", "routines", "triggers"] as const).map((tab) => <Button key={tab} variant={view === tab ? "primary" : "outline"} role="tab" aria-selected={view === tab} onClick={() => setView(tab)}>{tab === "tables" ? "Tables & rows" : tab === "routines" ? "Functions & procedures" : "Triggers"}</Button>)}
+    {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    <div className="database-tabs" role="tablist" aria-label="Database tools">
+      {(["tables", "routines", "triggers", "sql"] as const).map((tab) => <Button key={tab} variant={view === tab ? "primary" : "outline"} role="tab" aria-selected={view === tab} onClick={() => setView(tab)}>{tab === "tables" ? "Tables & rows" : tab === "routines" ? "Functions & procedures" : tab === "triggers" ? "Triggers" : "SQL console"}</Button>)}
     </div>
     {loading && !catalog ? <Card><p className="section-description">Loading database objects...</p></Card> : catalog && view === "tables" && <>
       <Card className="database-browser"><div className="database-table-select"><Field label="Public table"><Select value={selectedTable} onChange={(event) => { setRows(null); setSelectedTable(event.target.value); }}>{catalog.tables.map((table) => <option value={table.name} key={table.name}>{table.name} · ~{table.estimated_rows} rows · {table.column_count} columns</option>)}</Select></Field><Badge>{catalog.tables.length} tables</Badge></div>
@@ -2629,8 +2689,30 @@ function DatabaseManagerPage() {
         </>}
       </Card>
     </>}
+    {catalog && view === "sql" && <Card className="database-sql-console">
+      <Field label="SQL statement"><textarea className="field textarea database-sql-editor" rows={9} maxLength={16000} spellCheck={false} value={sqlStatement} onChange={(event) => setSqlStatement(event.target.value)} placeholder={"SELECT * FROM public.your_table LIMIT 50;\n\nOnly one statement is accepted."} /></Field>
+      <p className="section-description">Qualify table names with <code>public.</code>. SELECT runs in a read-only transaction and requires LIMIT 1–100. UPDATE and DELETE require a WHERE clause. INSERT is limited to 100 VALUES rows. Use the review step to inspect the exact statement before execution.</p>
+      <div className="database-sql-actions"><Button type="button" disabled={busy || !sqlStatement.trim()} onClick={() => void reviewSql()}>{busy ? "Reviewing..." : "Review statement"}</Button></div>
+      {sqlResult && <div className="database-sql-result">
+        <div className="database-sql-result-head"><h2 className="section-title">Last result</h2><Badge tone={sqlResult.command === "select" ? "blue" : "amber"}>{sqlResult.command.toUpperCase()} · {sqlResult.rowCount} row(s)</Badge></div>
+        {sqlResult.fields.length > 0 && <div className="database-sql-result-table"><table><thead><tr>{sqlResult.fields.map((field) => <th key={field}>{field}</th>)}</tr></thead><tbody>{sqlResult.rows.map((row, index) => <tr key={index}>{sqlResult.fields.map((field) => <td key={field}><pre>{formatDatabaseValue(row[field])}</pre></td>)}</tr>)}</tbody></table>{!sqlResult.rows.length && <p className="section-description">The query returned no rows.</p>}</div>}
+      </div>}
+    </Card>}
     {catalog && view === "routines" && <div className="database-object-list">{catalog.routines.map((routine) => <Card className="database-object" key={routine.id}><div className="card-head"><div><h2 className="section-title">{routine.name}</h2><p className="section-description">{routine.kind}{routine.arguments ? ` · ${routine.arguments}` : ""}</p></div><Badge>Read only</Badge></div><pre>{routine.definition}</pre></Card>)}{!catalog.routines.length && <Card><EmptyState icon={<Database size={18} />} title="No public functions or procedures" description="No routines were found in the public schema." /></Card>}</div>}
     {catalog && view === "triggers" && <div className="database-object-list">{catalog.triggers.map((trigger) => <Card className="database-object" key={`${trigger.table_name}:${trigger.name}`}><div className="card-head"><div><h2 className="section-title">{trigger.name}</h2><p className="section-description">Table: {trigger.table_name}</p></div><Badge>Read only</Badge></div><pre>{trigger.definition}</pre></Card>)}{!catalog.triggers.length && <Card><EmptyState icon={<Database size={18} />} title="No public triggers" description="No non-internal triggers were found in the public schema." /></Card>}</div>}
+    {sqlReview && <Modal title={`Review ${sqlReview.command.toUpperCase()} statement`} onClose={() => { if (!busy) { setSqlReview(null); setSqlReviewedText(""); } }} wide>
+      <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>{sqlReview.requiresConfirmation
+        ? `This write will be committed permanently. It cannot be undone here and bypasses the Daybook archive. Existing triggers and foreign-key rules may also change related data.`
+        : "This SELECT will run without changing rows. It is limited to 100 results and cannot call database functions."}</span></div>
+      <p className="section-description">Command: <strong>{sqlReview.command.toUpperCase()}</strong>{sqlReview.tables.length ? ` · Public table(s): ${sqlReview.tables.join(", ")}` : ""}</p>
+      <pre className="database-sql-preview">{sqlReviewedText.trim()}</pre>
+      {sqlReview.requiresConfirmation && <>
+        <label className="database-sql-acknowledge"><input type="checkbox" checked={sqlWriteAcknowledged} onChange={(event) => setSqlWriteAcknowledged(event.target.checked)} /><span>I reviewed this exact SQL and understand that the change may be permanent and may affect linked data.</span></label>
+        <Field label={`Type ${sqlReview.confirmationPhrase} to confirm`}><Input autoComplete="off" value={sqlConfirmation} onChange={(event) => setSqlConfirmation(event.target.value)} /></Field>
+      </>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={() => { setSqlReview(null); setSqlReviewedText(""); }}>Cancel</Button><Button type="button" variant={sqlReview.requiresConfirmation ? "danger" : "primary"} disabled={busy || (sqlReview.requiresConfirmation && (!sqlWriteAcknowledged || sqlConfirmation !== sqlReview.confirmationPhrase))} onClick={() => void executeReviewedSql()}>{busy ? "Executing..." : `Execute ${sqlReview.command.toUpperCase()}`}</Button></div>
+    </Modal>}
   </>;
 }
 

@@ -39,9 +39,29 @@ export interface DatabaseRows {
   offset: number;
 }
 
-async function request(path: string): Promise<Response> {
+export interface SqlReview {
+  command: "select" | "insert" | "update" | "delete";
+  tables: string[];
+  requiresConfirmation: boolean;
+  confirmationPhrase: string;
+  statementHash: string;
+}
+
+export interface SqlExecutionResult {
+  command: SqlReview["command"];
+  rowCount: number;
+  fields: string[];
+  rows: Record<string, unknown>[];
+}
+
+async function request(path: string, body?: Record<string, unknown>): Promise<Response> {
   const response = await fetch(path, {
-    headers: { Accept: "application/json" },
+    method: body ? "POST" : "GET",
+    headers: {
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
     cache: "no-store",
     credentials: "same-origin",
   });
@@ -67,4 +87,12 @@ export async function loadDatabaseCatalog(): Promise<DatabaseCatalog> {
 export function loadDatabaseRows(table: string, offset: number): Promise<DatabaseRows> {
   const query = new URLSearchParams({ table, offset: String(offset), limit: "50" });
   return request(`/api/database?${query.toString()}`).then((response) => response.json() as Promise<DatabaseRows>);
+}
+
+export async function reviewDatabaseSql(sql: string): Promise<SqlReview> {
+  return await (await request("/api/database", { action: "review-sql", sql })).json() as SqlReview;
+}
+
+export async function executeDatabaseSql(sql: string, confirmation: string, statementHash: string): Promise<SqlExecutionResult> {
+  return await (await request("/api/database", { action: "execute-sql", sql, confirmation, statementHash })).json() as SqlExecutionResult;
 }
