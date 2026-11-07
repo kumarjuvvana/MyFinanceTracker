@@ -2418,6 +2418,27 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
               </tr>)}</tbody>
             </table>
             </div>
+            <div className="education-results-mobile">
+              {examSubjectRows.map((subject) => {
+                const subjectResults = examAssessmentColumns.flatMap((assessment) => exams
+                  .filter((exam) => normalizeEducationSubjectName(examSubjectName(exam)) === normalizeEducationSubjectName(subject) &&
+                    exam.name === assessment.name && exam.assessmentType === assessment.type)
+                  .map((result) => ({ assessment, result })));
+                return <article className="education-result-subject-card" key={subject}>
+                  <h4>{subject}</h4>
+                  <div className="education-result-subject-assessments">
+                    {subjectResults.map(({ assessment, result }) => <div className="education-result-subject-assessment" key={result.id}>
+                      <span>{assessment.name}<small>{assessment.type}</small></span>
+                      <strong>{result.marksObtained !== null && result.maximumMarks !== null
+                        ? `${result.marksObtained} / ${result.maximumMarks}`
+                        : result.resultStatus ?? "Result"}</strong>
+                      {(result.grade || result.resultStatus && result.resultStatus !== "Scored" || result.date) &&
+                        <small>{[result.grade, result.resultStatus && result.resultStatus !== "Scored" ? result.resultStatus : "", result.date ? dateLabel(result.date) : ""].filter(Boolean).join(" · ")}</small>}
+                    </div>)}
+                  </div>
+                </article>;
+              })}
+            </div>
             {iitOverallResults.length > 0 && <div className="education-iit-summary" aria-label="IIT assessment overall results">
               <strong>IIT overall</strong>
               {iitOverallResults.map((result) => <div className="education-iit-summary-result" key={result.id}>
