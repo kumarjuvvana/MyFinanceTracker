@@ -253,7 +253,7 @@ export function validateData(value: unknown): value is TrackerData {
         entry.billingType === "Recurring" || entry.billingType === "One-time") &&
       CURRENCIES.some((currency) => currency === entry.currency) &&
       typeof entry.accountReference === "string" && entry.accountReference.length <= 160 &&
-      typeof entry.notes === "string" && entry.notes.length <= 2000 &&
+      typeof entry.notes === "string" && entry.notes.length <= 5000 &&
       Array.isArray(entry.transactions) && entry.transactions.every((transaction) =>
         isRecord(transaction) && typeof transaction.id === "string" && transaction.id.length > 0 &&
         (transaction.type === "Recharge" || transaction.type === "Bill" || transaction.type === "Booking" ||
@@ -268,7 +268,7 @@ export function validateData(value: unknown): value is TrackerData {
         typeof transaction.paymentDate === "string" && (transaction.paymentDate === "" || !Number.isNaN(Date.parse(transaction.paymentDate))) &&
         (!transaction.paid || transaction.paymentDate !== "") &&
         typeof transaction.reference === "string" && transaction.reference.length <= 160 &&
-        typeof transaction.notes === "string" && transaction.notes.length <= 2000)));
+        typeof transaction.notes === "string" && transaction.notes.length <= 5000)));
   const devotionalEntriesOk = value.devotionalEntries === undefined ||
     (Array.isArray(value.devotionalEntries) && value.devotionalEntries.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -281,7 +281,7 @@ export function validateData(value: unknown): value is TrackerData {
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
       typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 160 &&
       typeof entry.link === "string" && entry.link.length <= 2048 && isSafeExternalLink(entry.link) && entry.link.length > 0 &&
-      typeof entry.description === "string" && entry.description.length <= 2000 &&
+      typeof entry.description === "string" && entry.description.length <= 5000 &&
       typeof entry.source === "string" && entry.source.length <= 120));
   const prayerRequestsOk = value.prayerRequests === undefined ||
     (Array.isArray(value.prayerRequests) && value.prayerRequests.every((entry) =>
@@ -408,7 +408,7 @@ export function validateData(value: unknown): value is TrackerData {
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
     typeof entry.personName === "string" && entry.personName.length <= 120 &&
-    typeof entry.notes === "string" && entry.notes.length <= 2000 &&
+    typeof entry.notes === "string" && entry.notes.length <= 5000 &&
     typeof entry.fileName === "string" && entry.fileName.length <= 255 &&
     typeof entry.contentType === "string" && (entry.contentType === "" || Object.values(DOCUMENT_FILE_TYPES).some((type) => type === entry.contentType)) &&
     typeof entry.sizeBytes === "number" && Number.isInteger(entry.sizeBytes) && entry.sizeBytes >= 0 && entry.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
@@ -420,7 +420,7 @@ export function validateData(value: unknown): value is TrackerData {
   const promptRecordsOk = value.promptRecords === undefined || (Array.isArray(value.promptRecords) && value.promptRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
-    typeof entry.description === "string" && entry.description.length <= 2000 &&
+    typeof entry.description === "string" && entry.description.length <= 5000 &&
     typeof entry.prompt === "string" && entry.prompt.trim().length > 0 && entry.prompt.length <= 20000 &&
     typeof entry.tool === "string" && entry.tool.length <= 120 &&
     (entry.type === "" || entry.type === "System" || entry.type === "Developer" || entry.type === "User" || entry.type === "Task" || entry.type === "Other") &&
@@ -428,17 +428,17 @@ export function validateData(value: unknown): value is TrackerData {
   const mindfulHabitsOk = value.mindfulHabits === undefined || (Array.isArray(value.mindfulHabits) && value.mindfulHabits.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
-    typeof entry.description === "string" && entry.description.length <= 1000));
+    typeof entry.description === "string" && entry.description.length <= 5000));
   const mindfulnessLogsOk = value.mindfulnessLogs === undefined || (Array.isArray(value.mindfulnessLogs) && value.mindfulnessLogs.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
     (entry.emotion === "Anger" || entry.emotion === "Frustration" || entry.emotion === "Stress" || entry.emotion === "Calm" ||
       entry.emotion === "Love / kindness" || entry.emotion === "Gratitude" || entry.emotion === "Other") &&
     typeof entry.intensity === "number" && Number.isInteger(entry.intensity) && entry.intensity >= 1 && entry.intensity <= 5 &&
-    typeof entry.trigger === "string" && entry.trigger.length <= 1000 &&
-    typeof entry.response === "string" && entry.response.length <= 2000 &&
-    typeof entry.positiveAction === "string" && entry.positiveAction.length <= 2000 &&
-    typeof entry.reflection === "string" && entry.reflection.length <= 3000 &&
+    typeof entry.trigger === "string" && entry.trigger.length <= 5000 &&
+    typeof entry.response === "string" && entry.response.length <= 5000 &&
+    typeof entry.positiveAction === "string" && entry.positiveAction.length <= 5000 &&
+    typeof entry.reflection === "string" && entry.reflection.length <= 5000 &&
     Array.isArray(entry.completedHabitIds) && entry.completedHabitIds.every((id) => typeof id === "string")));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",

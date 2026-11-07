@@ -425,7 +425,7 @@ function TripEditor({ initial, onClose, onSave }: { initial: ShoppingTrip; onClo
   return <Modal title={`Edit shopping trip · ${initial.store}`} onClose={onClose}><form onSubmit={(event) => { event.preventDefault(); onSave({ ...initial, date, store: store.trim(), notes: notes.trim() }); }}><div className="form-grid">
     <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
     <Field label="Store"><Input required maxLength={120} value={store} onChange={(event) => setStore(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div><div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">Save changes</Button></div></form></Modal>;
 }
 
@@ -540,7 +540,7 @@ function ReminderCard({ reminder, categories, onSave, onDelete, onToggle }: {
       <Field label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
       <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
-      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={1000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
+      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={5000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
       <div className="reminder-form-actions full"><Button type="submit"><Check size={14} />Save changes</Button><Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button></div>
     </form>
@@ -1578,7 +1578,7 @@ function AssetModal({ initial, onClose, onSave }: {
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
       <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details, terms, or reminders" value={asset.notes} onChange={(event) => setAsset((current) => ({ ...current, notes: event.target.value }))} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional details, terms, or reminders" value={asset.notes} onChange={(event) => setAsset((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
     <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank; the asset manager does not fetch or verify valuations.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -1791,7 +1791,7 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="School contact name"><Input maxLength={120} placeholder="Optional" value={record.contactName} onChange={(event) => setRecord((current) => ({ ...current, contactName: event.target.value }))} /></Field>
       <Field label="Contact details"><Input maxLength={160} placeholder="Optional phone or email" value={record.contact} onChange={(event) => setRecord((current) => ({ ...current, contact: event.target.value }))} /></Field>
       <Field className="full" label="Portal / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={record.link} onChange={(event) => setRecord((current) => ({ ...current, link: event.target.value }))} /></Field>
-      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional academic notes, achievements, or reminders" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional academic notes, achievements, or reminders" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
     <p className="section-description" style={{ marginTop: 12 }}>Enter tuition, admission, school van / transport, and other charges separately. For older records whose tuition amount included admission or transport, adjust it to tuition-only before adding separate charges. Payments are checked against combined fees. Only student name and school/college are required.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -1824,7 +1824,7 @@ function EducationSubjectModal({ initial, onClose, onSave }: {
     <Field className="full" label="Subject / course (required)"><Input autoFocus required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} /></Field>
     <Field label="Code"><Input maxLength={40} placeholder="Optional" value={code} onChange={(event) => setCode(event.target.value)} /></Field>
     <Field label="Credits (college)"><Input type="number" min="0" step="any" placeholder="Optional" value={credits} onChange={(event) => setCredits(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={500} placeholder="Optional" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save subject" : "Add subject"}</Button></div></form></Modal>;
 }
 
@@ -1870,7 +1870,7 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
     <Field label="Marks obtained"><Input type="number" min="0" step="any" placeholder="Optional" value={marksObtained} onChange={(event) => setMarksObtained(event.target.value)} /></Field>
     <Field label="Maximum marks"><Input type="number" min="0.01" step="any" placeholder="Optional" value={maximumMarks} onChange={(event) => setMaximumMarks(event.target.value)} /></Field>
     <Field label="Grade / GPA"><Input maxLength={40} placeholder="Optional (e.g. A, 3.8 GPA, Pass)" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Optional feedback or result notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional feedback or result notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div><p className="section-description" style={{ marginTop: 12 }}>Record numeric marks with a maximum, or use grade/GPA for college grading systems.</p>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save result" : "Add result"}</Button></div></form></Modal>;
 }
 
@@ -1914,7 +1914,7 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
     <Field label="Payment date"><DateInput required value={date} onValueChange={setDate} /></Field>
     <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Bank transfer</option><option>UPI</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Online portal</option><option>Other</option></Select></Field>
     <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={500} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{maxAmount === null ? <div className="alert" style={{ marginTop: 12 }} role="status">Add the tuition, admission, school van / transport, or other fee charges to this education record before recording a payment.</div> : <div className={`alert${maxAmount <= 0 && !initial ? " alert-error" : ""}`} style={{ marginTop: 12 }} role="status">{maxAmount <= 0 && !initial ? "No balance is available. Review the fee charges and existing payments before adding another payment." : `Remaining fees available for payment: ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.`}</div>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)} title={!initial && (maxAmount === null || maxAmount <= 0) ? "Set fee charges and a positive remaining balance first" : undefined}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
 
@@ -2202,7 +2202,7 @@ function LearningRecordModal({ initial, onClose, onSave }: {
       <Field label="Completion date"><DateInput value={record.completedDate} onValueChange={(completedDate) => setRecord((current) => ({ ...current, completedDate }))} /></Field>
       <Field className="full" label="Course / learning resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={record.resourceLink} onChange={(event) => setRecord((current) => ({ ...current, resourceLink: event.target.value }))} /></Field>
       <Field className="full" label="AI tool / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link to an AI tutor, tool, or learning resource" value={record.aiLink} onChange={(event) => setRecord((current) => ({ ...current, aiLink: event.target.value }))} /></Field>
-      <Field className="full" label="Notes / next steps"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Key ideas, practice tasks, or what to learn next" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
+      <Field className="full" label="Notes / next steps"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Key ideas, practice tasks, or what to learn next" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add learning record"}</Button></div></form>
@@ -2275,7 +2275,7 @@ function PromptRecordModal({ initial, onClose, onSave }: {
   return <Modal title={initial ? "Edit AI prompt" : "Add AI prompt"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Review a pull request" value={record.title} onChange={(event) => setRecord((current) => ({ ...current, title: event.target.value }))} /></Field>
-      <Field className="full" label="Description / when to use it"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Describe the goal, context, intended audience, or when this prompt is useful." value={record.description} onChange={(event) => setRecord((current) => ({ ...current, description: event.target.value }))} /></Field>
+      <Field className="full" label="Description / when to use it"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Describe the goal, context, intended audience, or when this prompt is useful." value={record.description} onChange={(event) => setRecord((current) => ({ ...current, description: event.target.value }))} /></Field>
       <Field label="AI tool / platform"><Input maxLength={120} placeholder="e.g. ChatGPT, Copilot, Claude" value={record.tool} onChange={(event) => setRecord((current) => ({ ...current, tool: event.target.value }))} /></Field>
       <Field label="Prompt type"><Select value={record.type} onChange={(event) => setRecord((current) => ({ ...current, type: event.target.value as PromptType | "" }))}><option value="">Not specified</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field>
       <Field className="full" label="Category"><Input maxLength={80} placeholder="e.g. DevOps, Coding, Writing, Research" value={record.category} onChange={(event) => setRecord((current) => ({ ...current, category: event.target.value }))} /></Field>
@@ -2348,7 +2348,7 @@ function MindfulHabitModal({ initial, onClose, onSave }: {
   return <Modal title={initial ? "Edit positive habit" : "Add positive habit"} onClose={onClose}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Habit (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Pause before replying when upset" value={habit.title} onChange={(event) => setHabit((current) => ({ ...current, title: event.target.value }))} /></Field>
-      <Field className="full" label="What does this look like for you?"><textarea className="field textarea" rows={3} maxLength={1000} placeholder="Optional reminder or description" value={habit.description} onChange={(event) => setHabit((current) => ({ ...current, description: event.target.value }))} /></Field>
+      <Field className="full" label="What does this look like for you?"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional reminder or description" value={habit.description} onChange={(event) => setHabit((current) => ({ ...current, description: event.target.value }))} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add habit"}</Button></div>
     </form>
@@ -2404,10 +2404,10 @@ function MindfulnessLogModal({ initial, habits, onClose, onSave }: {
       <Field label="Date"><DateInput required value={log.date} onValueChange={(date) => setLog((current) => ({ ...current, date }))} /></Field>
       <Field label="Emotion"><Select value={log.emotion} onChange={(event) => setLog((current) => ({ ...current, emotion: event.target.value as MindfulnessEmotion }))}><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select></Field>
       <Field label="Intensity (1–5)"><Select value={log.intensity} onChange={(event) => setLog((current) => ({ ...current, intensity: Number(event.target.value) }))}>{[1, 2, 3, 4, 5].map((level) => <option value={level} key={level}>{level}{level === 1 ? " · gentle" : level === 5 ? " · very strong" : ""}</option>)}</Select></Field>
-      <Field className="full" label="What was happening?"><textarea className="field textarea" rows={2} maxLength={1000} placeholder="Optional trigger or situation" value={log.trigger} onChange={(event) => setLog((current) => ({ ...current, trigger: event.target.value }))} /></Field>
-      <Field className="full" label="How did you respond?"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Notice what you did without judging yourself." value={log.response} onChange={(event) => setLog((current) => ({ ...current, response: event.target.value }))} /></Field>
-      <Field className="full" label="Positive action / kindness"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="A pause, a kind word, gratitude, or another helpful choice" value={log.positiveAction} onChange={(event) => setLog((current) => ({ ...current, positiveAction: event.target.value }))} /></Field>
-      <Field className="full" label="Reflection / what might help next time?"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional notes to help you learn from the moment" value={log.reflection} onChange={(event) => setLog((current) => ({ ...current, reflection: event.target.value }))} /></Field>
+      <Field className="full" label="What was happening?"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Optional trigger or situation" value={log.trigger} onChange={(event) => setLog((current) => ({ ...current, trigger: event.target.value }))} /></Field>
+      <Field className="full" label="How did you respond?"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Notice what you did without judging yourself." value={log.response} onChange={(event) => setLog((current) => ({ ...current, response: event.target.value }))} /></Field>
+      <Field className="full" label="Positive action / kindness"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="A pause, a kind word, gratitude, or another helpful choice" value={log.positiveAction} onChange={(event) => setLog((current) => ({ ...current, positiveAction: event.target.value }))} /></Field>
+      <Field className="full" label="Reflection / what might help next time?"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional notes to help you learn from the moment" value={log.reflection} onChange={(event) => setLog((current) => ({ ...current, reflection: event.target.value }))} /></Field>
       {habits.length > 0 && <fieldset className="mindful-habit-checklist full"><legend>Positive habits practiced</legend><div>{habits.map((habit) => <label key={habit.id}><input type="checkbox" checked={log.completedHabitIds.includes(habit.id)} onChange={() => toggleHabit(habit.id)} /><span><strong>{habit.title}</strong>{habit.description && <small>{habit.description}</small>}</span></label>)}</div></fieldset>}
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save reflection" : "Save reflection"}</Button></div>
@@ -2777,7 +2777,7 @@ function TrainingSessionModal({ initial, onClose, onSave }: {
       <Field className="full" label="Class topic"><Input maxLength={180} placeholder="e.g. Docker images and containers" value={topic} onChange={(event) => setTopic(event.target.value)} /></Field>
       <Field className="full" label="What did you learn? (required)"><textarea className="field textarea" rows={4} required maxLength={5000} placeholder="Capture the key concepts, commands, exercises, or takeaways from this date..." value={learned} onChange={(event) => setLearned(event.target.value)} /></Field>
       <Field className="full" label="Class materials / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link to class notes, slides, or recording" value={resourceLink} onChange={(event) => setResourceLink(event.target.value)} /></Field>
-      <Field className="full" label="Additional notes"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Questions to revisit, homework, or next steps" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Additional notes"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Questions to revisit, homework, or next steps" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save session"}</Button></div></form>
@@ -2847,7 +2847,7 @@ function VehicleModal({ initial, onClose, onSave }: {
     <Field label="Year"><Input type="number" min="1886" max={new Date().getFullYear() + 1} step="1" placeholder="Optional" value={year} onChange={(event) => setYear(event.target.value)} /></Field>
     <Field label="Registration number"><Input maxLength={30} placeholder="Optional" value={registration} onChange={(event) => setRegistration(event.target.value)} /></Field>
     <Field label="Fuel type"><Input maxLength={40} placeholder="Petrol, diesel, EV..." value={fuelType} onChange={(event) => setFuelType(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Anything to remember about this vehicle" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Anything to remember about this vehicle" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save vehicle" : "Add vehicle"}</Button></div></form></Modal>;
 }
 
@@ -2892,7 +2892,7 @@ function VehicleJourneyModal({ vehicle, initial, onClose, onSave }: {
     <Field label="Odometer at start (km)"><Input type="number" min="0" step="any" placeholder="Optional" value={odometerStart} onChange={(event) => setOdometerStart(event.target.value)} /></Field>
     <Field label="Odometer at end (km)"><Input type="number" min="0" step="any" placeholder="Optional" value={odometerEnd} onChange={(event) => setOdometerEnd(event.target.value)} /></Field>
     <Field label="Travel cost"><Input type="number" min="0" step="0.01" value={cost} onChange={(event) => setCost(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save travel log" : "Add travel log"}</Button></div></form></Modal>;
 }
 
@@ -2936,7 +2936,7 @@ function VehicleMaintenanceModal({ vehicle, initial, onClose, onSave }: {
     <Field label="Service provider"><Input maxLength={120} placeholder="Garage or service center" value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
     <Field label="Next due date"><DateInput value={nextDueDate} onValueChange={setNextDueDate} /></Field>
     <Field label="Next due odometer (km)"><Input type="number" min="0" step="any" placeholder="Optional" value={nextDueOdometer} onChange={(event) => setNextDueOdometer(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Parts, warranty, or other details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Parts, warranty, or other details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save record" : "Add record"}</Button></div></form></Modal>;
 }
 
@@ -3087,7 +3087,7 @@ function ElectricityReadingModal({ initial, copyMode = false, readings, onClose,
         if (!isPaid) setPaidDate("");
       }}><option value="unpaid">Unpaid</option><option value="paid">Paid</option></Select></Field>
       <Field label="Payment date"><DateInput disabled={!paid} required={paid} value={paidDate} onValueChange={setPaidDate} /></Field>
-      <Field className="full" label="Notes"><Input maxLength={1000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add reading"}</Button></div>
     </form>
@@ -3177,7 +3177,7 @@ function SubscriptionAccountModal({ initial, onClose, onSave }: {
       <Field label="Billing type"><Select value={billingType} onChange={(event) => setBillingType(event.target.value as SubscriptionBillingType)}>{(["Prepaid", "Postpaid", "Recurring", "One-time"] as SubscriptionBillingType[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
       <Field label="Currency"><Select value={currency} onChange={(event) => setCurrency(event.target.value as Currency)}>{CURRENCIES.map((value) => <option key={value}>{value}</option>)}</Select></Field>
       <Field label="Account, phone, or booking reference"><Input maxLength={160} placeholder="Optional reference" value={accountReference} onChange={(event) => setAccountReference(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><Input maxLength={2000} placeholder="Optional account details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional account details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div><div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add service"}</Button></div></form>
   </Modal>;
 }
@@ -3238,7 +3238,7 @@ function SubscriptionTransactionModal({ initial, currency, onClose, onSave }: {
       }}><option value="pending">Pending</option><option value="paid">Paid</option></Select></Field>
       <Field label="Payment date"><DateInput disabled={!paid} required={paid} value={paymentDate} onValueChange={setPaymentDate} /></Field>
       <Field label="Receipt or booking reference"><Input maxLength={160} placeholder="Optional reference" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><Input maxLength={2000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional details" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add transaction"}</Button></div>
     </form>
@@ -3343,9 +3343,9 @@ function DevotionalEntryModal({ initial, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Bible passage reference"><Input required maxLength={120} placeholder="e.g. Psalm 23:1–6" value={scriptureReference} onChange={(event) => setScriptureReference(event.target.value)} /></Field>
-      <Field className="full" label="Message or takeaway"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="What stood out in this passage?" value={takeaway} onChange={(event) => setTakeaway(event.target.value)} /></Field>
-      <Field className="full" label="Personal reflection"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Record your thoughts, questions, or how you want to apply it." value={reflection} onChange={(event) => setReflection(event.target.value)} /></Field>
-      <Field className="full" label="Prayer notes"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Optional prayer inspired by this reading" value={prayerNotes} onChange={(event) => setPrayerNotes(event.target.value)} /></Field>
+      <Field className="full" label="Message or takeaway"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="What stood out in this passage?" value={takeaway} onChange={(event) => setTakeaway(event.target.value)} /></Field>
+      <Field className="full" label="Personal reflection"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Record your thoughts, questions, or how you want to apply it." value={reflection} onChange={(event) => setReflection(event.target.value)} /></Field>
+      <Field className="full" label="Prayer notes"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Optional prayer inspired by this reading" value={prayerNotes} onChange={(event) => setPrayerNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add entry"}</Button></div>
     </form>
@@ -3392,7 +3392,7 @@ function PrayerRequestModal({ initial, onClose, onSave }: {
         if (nextStatus === "Ongoing") setAnsweredDate("");
       }}><option>Ongoing</option><option>Answered</option></Select></Field>
       {status === "Answered" && <Field label="Answered date"><DateInput required value={answeredDate} onValueChange={setAnsweredDate} /></Field>}
-      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional context or updates" value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
+      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional context or updates" value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add request"}</Button></div>
     </form>
@@ -3430,7 +3430,7 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="Song, sermon, video, audio, Scripture study..." value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field className="full" label="Link (HTTPS)"><Input type="url" required maxLength={2048} placeholder="https://..." value={link} onChange={(event) => setLink(event.target.value)} /></Field>
-      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="What is this resource or why did you save it?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What is this resource or why did you save it?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
       <Field label="Source (optional)"><Input maxLength={120} placeholder="Church, artist, channel, website..." value={source} onChange={(event) => setSource(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save resource"}</Button></div>
@@ -3595,9 +3595,9 @@ function CookingRecipeModal({ initial, onClose, onSave }: {
       <Field label="Cooking time (minutes)"><Input type="number" min="0" step="1" value={cookMinutes} onChange={(event) => setCookMinutes(event.target.value)} /></Field>
       <Field label="Dietary tags (comma-separated)"><Input maxLength={300} placeholder="Vegetarian, dairy-free" value={dietaryTags} onChange={(event) => setDietaryTags(event.target.value)} /></Field>
       <Field label="Allergens (comma-separated)"><Input maxLength={300} placeholder="Peanuts, milk" value={allergens} onChange={(event) => setAllergens(event.target.value)} /></Field>
-      <Field className="full" label="Nutrition / vitamins (your notes)"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Optional notes or estimates you entered" value={nutritionNotes} onChange={(event) => setNutritionNotes(event.target.value)} /></Field>
-      <Field className="full" label="Health benefits (your notes)"><textarea className="field textarea" rows={2} maxLength={2000} placeholder="Personal notes only; not medical or nutrition advice" value={healthNotes} onChange={(event) => setHealthNotes(event.target.value)} /></Field>
-      <Field className="full" label="Variations and other notes"><textarea className="field textarea" rows={2} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Nutrition / vitamins (your notes)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Optional notes or estimates you entered" value={nutritionNotes} onChange={(event) => setNutritionNotes(event.target.value)} /></Field>
+      <Field className="full" label="Health benefits (your notes)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Personal notes only; not medical or nutrition advice" value={healthNotes} onChange={(event) => setHealthNotes(event.target.value)} /></Field>
+      <Field className="full" label="Variations and other notes"><textarea className="field textarea" rows={2} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add to recipe book"}</Button></div>
     </form>
@@ -3660,8 +3660,8 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       <Field className="full" label="Add a one-off dish, drink, or prepared item"><div className="cooking-add-dish"><Input maxLength={120} placeholder="e.g. Fresh lime juice" value={customDish} onChange={(event) => setCustomDish(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomDish(); } }} /><Button type="button" variant="outline" disabled={!customDish.trim()} onClick={addCustomDish}><Plus size={13} /> Add item</Button></div></Field>
       {dishes.length > 0 && <div className="full cooking-selected-dishes"><strong>Prepared today</strong>{dishes.map((dish, index) => <div key={`${dish.recipeId ?? "custom"}-${index}`}><span>{dish.name}</span><button className="icon-button" type="button" aria-label={`Remove ${dish.name}`} onClick={() => setDishes((current) => current.filter((_, dishIndex) => dishIndex !== index))}><X size={13} /></button></div>)}</div>}
       <Field label="How did it turn out?"><Select value={rating} onChange={(event) => setRating(event.target.value)}><option value="">Not rated</option><option value="1">1 · Needs practice</option><option value="2">2 · Fair</option><option value="3">3 · Good</option><option value="4">4 · Very good</option><option value="5">5 · Excellent</option></Select></Field>
-      <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
-      <Field className="full" label="Daily notes"><textarea className="field textarea" rows={2} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
+      <Field className="full" label="Daily notes"><textarea className="field textarea" rows={2} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save daily log"}</Button></div>
     </form>
@@ -3799,8 +3799,8 @@ function IssueRecordModal({ initial, onClose, onSave }: {
       <Field label="Repair provider / contact"><Input maxLength={120} placeholder="Mechanic, electrician, service center..." value={provider} onChange={(event) => setProvider(event.target.value)} /></Field>
       <Field label={`Estimated cost (${currency})`}><Input type="number" min="0" step="0.01" value={estimatedCost} onChange={(event) => setEstimatedCost(event.target.value)} /></Field>
       <Field label={`Actual cost (${currency})`}><Input type="number" min="0" step="0.01" value={actualCost} onChange={(event) => setActualCost(event.target.value)} /></Field>
-      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Describe the problem, task, or work needed" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
-      <Field className="full" label="Updates / resolution notes"><textarea className="field textarea" rows={3} maxLength={4000} placeholder="Record progress, work performed, parts used, or how it was resolved" value={updates} onChange={(event) => setUpdates(event.target.value)} /></Field>
+      <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Describe the problem, task, or work needed" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+      <Field className="full" label="Updates / resolution notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Record progress, work performed, parts used, or how it was resolved" value={updates} onChange={(event) => setUpdates(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add record"}</Button></div>
     </form>
@@ -3922,7 +3922,7 @@ function PersonalEducationModal({ initial, onClose, onSave }: {
       <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as PersonalEducationRecord["status"])}><option>Completed</option><option>In progress</option><option>On hold</option></Select></Field>
       <Field label="Grade / result"><Input maxLength={80} placeholder="Optional" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
       <Field className="full" label="Certificate / institution link (HTTPS)"><ExternalLinkInput maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add education"}</Button></div></form>
   </Modal>;
 }
@@ -3966,7 +3966,7 @@ function ProfessionalQualificationModal({ initial, onClose, onSave }: {
       <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
       <Field label="Expiry date (optional)"><DateInput value={expiryDate} onValueChange={setExpiryDate} /></Field>
       <Field className="full" label="Credential / verification link (HTTPS)"><ExternalLinkInput maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add qualification"}</Button></div></form>
   </Modal>;
 }
@@ -4047,7 +4047,7 @@ function ProfessionalSkillModal({ initial, onClose, onSave }: {
       <Field label="Category"><Input maxLength={80} placeholder="Technical, leadership, language..." value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
       <Field label="Proficiency"><Select value={proficiency} onChange={(event) => setProficiency(event.target.value as ProfessionalSkill["proficiency"])}><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option></Select></Field>
       <Field label="Years of experience"><Input type="number" min="0" step="0.5" value={yearsExperience} onChange={(event) => setYearsExperience(event.target.value)} /></Field>
-      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add skill"}</Button></div></form>
   </Modal>;
 }
@@ -4312,7 +4312,7 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
     <Field label="Expiry / renewal date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
     <Field label="Remind me"><Select value={reminderDays} onChange={(event) => setReminderDays(Number(event.target.value))}><option value={0}>On the due date</option><option value={7}>7 days before</option><option value={30}>30 days before</option><option value={60}>60 days before</option><option value={90}>90 days before</option></Select></Field>
     <Field className="full" label="Shared document link"><ExternalLinkInput maxLength={2000} placeholder="https://... (use a private link with appropriate sharing access)" value={documentLink} onChange={(event) => setDocumentLink(event.target.value)} /></Field>
-    <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Additional information, renewal instructions, contacts..." value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Additional information, renewal instructions, contacts..." value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     <div className="personal-fields full"><div className="personal-fields-head"><div><span className="field-label">Additional details</span><p className="section-description">Add any extra label and value for this record.</p></div><Button type="button" variant="outline" onClick={() => setAdditionalFields((fields) => [...fields, { label: "", value: "" }])}><Plus size={13} />Add field</Button></div>
       {additionalFields.map((field, index) => <div className="personal-field-row" key={index}><Input aria-label={`Additional field ${index + 1} name`} maxLength={80} placeholder="Field name" value={field.label} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, label: event.target.value } : entry))} /><Input aria-label={`Additional field ${index + 1} value`} maxLength={500} placeholder="Value" value={field.value} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, value: event.target.value } : entry))} /><button type="button" className="icon-button" aria-label="Remove additional field" onClick={() => setAdditionalFields((fields) => fields.filter((_, fieldIndex) => fieldIndex !== index))}><Trash2 size={14} /></button></div>)}
     </div>
@@ -4577,7 +4577,7 @@ function CredentialModal({ initial, onClose, onSave }: {
         <div className="field-wrap"><label className="field-label" htmlFor="credential-password">Password</label><div className="credential-secret-field"><Input id="credential-password" aria-label="Account password" type={showPassword ? "text" : "password"} maxLength={2000} autoComplete="new-password" value={record.password} onChange={(event) => setRecord((current) => ({ ...current, password: event.target.value }))} /><button className="icon-button" type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
         <Field className="full" label="Recovery information"><Input maxLength={500} autoComplete="off" placeholder="Optional recovery contact or instructions" value={record.recoveryInfo} onChange={(event) => setRecord((current) => ({ ...current, recoveryInfo: event.target.value }))} /></Field>
         <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="personal, family, work" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
-        <Field className="full" label="Additional notes"><textarea className="field textarea" rows={3} maxLength={3000} value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
+        <Field className="full" label="Additional notes"><textarea className="field textarea" rows={3} maxLength={5000} value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
         <div className="personal-fields full"><div className="personal-fields-head"><div><span className="field-label">Custom fields</span><p className="section-description">Searchable once the vault is unlocked.</p></div><Button type="button" variant="outline" size="sm" onClick={() => setRecord((current) => ({ ...current, additionalFields: [...current.additionalFields, { label: "", value: "" }] }))}><Plus size={13} />Add field</Button></div>
           {record.additionalFields.map((field, index) => <div className="personal-field-row" key={index}><Input aria-label={`Custom field ${index + 1} name`} maxLength={80} placeholder="Field name" value={field.label} onChange={(event) => setRecord((current) => ({ ...current, additionalFields: current.additionalFields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, label: event.target.value } : entry) }))} /><Input aria-label={`Custom field ${index + 1} value`} maxLength={500} placeholder="Value" value={field.value} onChange={(event) => setRecord((current) => ({ ...current, additionalFields: current.additionalFields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, value: event.target.value } : entry) }))} /><button type="button" className="icon-button" aria-label="Remove custom field" onClick={() => setRecord((current) => ({ ...current, additionalFields: current.additionalFields.filter((_, fieldIndex) => fieldIndex !== index) }))}><Trash2 size={14} /></button></div>)}
         </div>
