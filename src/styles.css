@@ -855,6 +855,23 @@ body{background:#f3f5ef}
 .education-section-head h3{display:flex;align-items:center;gap:7px;font:700 12px Manrope,sans-serif;color:#3d493e;margin:0}
 .education-section-head h3 svg{color:#648568;flex:none}
 .education-section-head p{font-size:10px;color:#92998f;margin:4px 0 0;overflow-wrap:anywhere}
+.education-result-tabs{display:flex;gap:6px;margin-top:12px;border-bottom:1px solid #eef0ec}
+.education-result-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;color:#858d83;padding:8px 11px;font:600 10px Inter,"Aptos","Segoe UI",sans-serif;cursor:pointer}
+.education-result-tabs button[aria-selected="true"]{border-bottom-color:var(--user-accent,#56815d);color:var(--user-accent,#56815d)}
+.education-result-tabs button:focus-visible,.education-results-scroll:focus-visible{outline:2px solid var(--user-accent,#56815d);outline-offset:2px}
+.education-results-scroll{max-width:100%;margin-top:8px;overflow:auto;border:1px solid #eef0ec;border-radius:9px}
+.education-results-table{table-layout:fixed}
+.education-results-table th,.education-results-table td{min-width:120px;padding:10px 12px;border-bottom:1px solid #eef0ec;border-right:1px solid #eef0ec;vertical-align:top}
+.education-results-table thead th{height:auto;white-space:normal;text-align:center}
+.education-results-table thead th:first-child,.education-results-table tbody th{position:sticky;left:0;z-index:1;min-width:160px;background:#fafbf9;text-align:left}
+.education-results-table thead th:first-child{z-index:2}
+.education-results-table thead th small{display:block;margin-top:4px;font-size:9px;font-weight:500;letter-spacing:0;text-transform:none;white-space:normal}
+.education-results-table tbody th{font-size:10px;font-weight:700;color:#414a42;overflow-wrap:anywhere}
+.education-results-table tbody td{font-size:10px}
+.education-result-cell{display:grid;justify-items:center;gap:3px;text-align:center}
+.education-result-cell strong{font-size:11px;color:#414a42;white-space:nowrap}
+.education-result-cell span,.education-result-cell small{font-size:9px;color:#858d83;line-height:1.35}
+.education-result-missing{display:block;text-align:center;color:#a0a59e}
 .education-entry-list{display:grid;margin-top:8px}
 .education-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:10px 0;border-bottom:1px solid #f0f1ee}
 .education-entry:last-child{border-bottom:0}
@@ -873,6 +890,13 @@ body{background:#f3f5ef}
 .app-shell.dark .education-section-head h3 svg{color:#a6c1a8}
 .app-shell.dark .education-section-head p,.app-shell.dark .education-entry span,.app-shell.dark .education-entry small,.app-shell.dark .education-empty{color:#a7b0a7}
 .app-shell.dark .education-entry{border-color:#343d35}
+.app-shell.dark .education-result-tabs{border-color:#343d35}
+.app-shell.dark .education-result-tabs button{color:#a7b0a7}
+.app-shell.dark .education-result-tabs button[aria-selected="true"]{color:#a6c1a8;border-bottom-color:#a6c1a8}
+.app-shell.dark .education-results-scroll,.app-shell.dark .education-results-table th,.app-shell.dark .education-results-table td{border-color:#343d35}
+.app-shell.dark .education-results-table thead th:first-child,.app-shell.dark .education-results-table tbody th{background:#252d26}
+.app-shell.dark .education-results-table tbody th,.app-shell.dark .education-result-cell strong{color:#e3e8e2}
+.app-shell.dark .education-result-cell span,.app-shell.dark .education-result-cell small,.app-shell.dark .education-result-missing{color:#a7b0a7}
 @media(max-width:600px){
   .learning-card{padding:14px}
   .learning-card-head{align-items:flex-start;flex-wrap:wrap}

@@ -2182,8 +2182,15 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     | null
   >(null);
   const [expanded, setExpanded] = useState(false);
+  const [examView, setExamView] = useState<"table" | "list">("table");
   const subjects = record.subjects ?? [];
   const exams = record.exams ?? [];
+  const examAssessmentColumns = [...new Map(exams.map((exam) => [
+    `${exam.assessmentType}\u0000${exam.name}`,
+    { key: `${exam.assessmentType}\u0000${exam.name}`, name: exam.name, type: exam.assessmentType },
+  ])).values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+  const examSubjectRows = [...new Set(exams.map((exam) => exam.subject.trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   const payments = record.payments ?? [];
   const feeCharges = record.feeCharges ?? [];
   const monthlyAttendance = record.monthlyAttendance ?? [];
@@ -2276,7 +2283,36 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div>
-      {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
+      {exams.length ? <>
+        <div className="education-result-tabs" role="tablist" aria-label={`Result views for ${record.studentName} ${record.academicYear}`}>
+          <button type="button" role="tab" aria-selected={examView === "table"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("table")}>Results table</button>
+          <button type="button" role="tab" aria-selected={examView === "list"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("list")}>List</button>
+        </div>
+        <div id={`education-result-panel-${record.id}`} className="education-result-panel" role="tabpanel">
+          {examView === "table" ? <div className="education-results-scroll" role="region" aria-label={`Subject results for ${record.studentName} ${record.academicYear}`} tabIndex={0}>
+            <table className="data-table education-results-table" style={{ minWidth: `${180 + examAssessmentColumns.length * 130}px` }}>
+              <thead><tr><th scope="col">Subject</th>{examAssessmentColumns.map((assessment) => <th scope="col" key={assessment.key}><span>{assessment.name}</span><small>{assessment.type}</small></th>)}</tr></thead>
+              <tbody>{examSubjectRows.map((subject) => <tr key={subject}>
+                <th scope="row">{subject}</th>
+                {examAssessmentColumns.map((assessment) => {
+                  const results = exams.filter((exam) => exam.subject.trim() === subject &&
+                    exam.name === assessment.name && exam.assessmentType === assessment.type);
+                  return <td key={assessment.key}>
+                    {results.length ? results.map((result) => <div className="education-result-cell" key={result.id}>
+                      {result.marksObtained !== null && result.maximumMarks !== null
+                        ? <strong>{result.marksObtained} / {result.maximumMarks}</strong>
+                        : <strong>{result.resultStatus ?? "Result"}</strong>}
+                      {result.grade && <span>{result.grade}</span>}
+                      {result.resultStatus && result.resultStatus !== "Scored" && <small>{result.resultStatus}</small>}
+                      {result.date && <small>{dateLabel(result.date)}</small>}
+                    </div>) : <span className="education-result-missing">—</span>}
+                  </td>;
+                })}
+              </tr>)}</tbody>
+            </table>
+          </div> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
+        </div>
+      </> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
