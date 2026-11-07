@@ -4879,8 +4879,8 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
       <div className="theme-picker" role="group" aria-label="Visual theme">
         {VISUAL_THEMES.map((theme) => <button key={theme} type="button" className={`theme-option ${visualTheme === theme ? "selected" : ""}`} aria-pressed={visualTheme === theme} onClick={() => onVisualThemeChange(theme)}>
           <span className={`theme-preview theme-preview-${theme}`} aria-hidden="true"><span className="theme-preview-rail" /><span className="theme-preview-content"><i /><i /><i /></span><span className="theme-preview-accent" /></span>
-          <span className="theme-option-label">{theme === "sage" ? "Sage studio" : theme === "cloud" ? "Cloud canvas" : "Warm sand"}</span>
-          <span className="theme-option-description">{theme === "sage" ? "Fresh, balanced greens" : theme === "cloud" ? "Cool, crisp neutrals" : "Soft, warm neutrals"}</span>
+          <span className="theme-option-label">{theme === "sage" ? "Sage studio" : theme === "cloud" ? "Cloud canvas" : theme === "sand" ? "Warm sand" : "Blush pink"}</span>
+          <span className="theme-option-description">{theme === "sage" ? "Fresh, balanced greens" : theme === "cloud" ? "Cool, crisp neutrals" : theme === "sand" ? "Soft, warm neutrals" : "Soft pink, with your chosen accent"}</span>
           {visualTheme === theme && <Check size={15} className="theme-option-check" aria-label="Selected" />}
         </button>)}
       </div>

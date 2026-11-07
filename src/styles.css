@@ -372,6 +372,20 @@ body{background:#f3f5ef}
 .app-shell.style-sage:not(.dark){--canvas:#f3f6f1;--panel:#fff;--panel-line:#e4eae2;--text-main:#202d24;--text-muted:#77847a;background:radial-gradient(ellipse at 80% -8%,#e5f0e2 0,transparent 36%),var(--canvas)}
 .app-shell.style-cloud:not(.dark){--canvas:#f2f6fa;--panel:#fff;--panel-line:#e1e8ef;--text-main:#202b39;--text-muted:#738092;background:radial-gradient(ellipse at 80% -8%,#e2edf7 0,transparent 36%),var(--canvas)}
 .app-shell.style-sand:not(.dark){--canvas:#f7f4ee;--panel:#fffefa;--panel-line:#eae5da;--text-main:#342c25;--text-muted:#82796e;background:radial-gradient(ellipse at 80% -8%,#f1e8d9 0,transparent 36%),var(--canvas)}
+.app-shell.style-pink:not(.dark){--canvas:#fbf2f5;--panel:#fffcfd;--panel-line:#eedde4;--text-main:#392a31;--text-muted:#88747d;background:radial-gradient(ellipse at 80% -8%,#f4dfe7 0,transparent 38%),var(--canvas)}
+.app-shell.dark.style-pink{--surface:#2d2228;--surface-raised:#392a32;--line:#57414b;--ink:#f7edf1;--muted:#cbb6bf;background:radial-gradient(ellipse at 85% 0%,#482d39 0,transparent 36%),#20191d}
+.app-shell.dark.style-pink .sidebar{background:linear-gradient(165deg,#33232b,#281b22);border-color:#503640}
+.app-shell.dark.style-pink .topbar{background:#2b2027e8;border-color:#503640}
+.app-shell.dark.style-pink .card{background:var(--surface);border-color:#503943;box-shadow:0 12px 32px #160d1238}
+.app-shell.dark.style-pink .field{background:#251b20;border-color:#5a424c;color:var(--ink)}
+.app-shell.dark.style-pink .button-outline,.app-shell.dark.style-pink .theme-toggle{background:#382831;border-color:#5a424c;color:#f0e2e8}
+.app-shell.dark.style-pink .button-outline:hover,.app-shell.dark.style-pink .theme-toggle:hover{background:#49323d}
+.app-shell.dark.style-pink .data-table th{background:#3a2a32;border-color:#57414b;color:#d4c0c8}
+.app-shell.dark.style-pink .data-table td{border-color:#49353e}
+.app-shell.dark.style-pink .table-secondary,.app-shell.dark.style-pink .table-actions .icon-button{color:#c3aeb8}
+.app-shell.dark.style-pink .bar-chart{border-color:#503943}
+.app-shell.dark.style-pink .bar{background:#533843}
+.app-shell.dark.style-pink .side-note{background:#ffffff0a;border-color:#ffffff18}
 .app-shell:not(.dark) .sidebar{background:var(--panel);border-color:var(--panel-line);box-shadow:8px 0 30px #18261808}
 .app-shell:not(.dark) .brand-name{color:var(--text-main)}
 .app-shell:not(.dark) .brand-caption,.app-shell:not(.dark) .nav-label{color:var(--text-muted)}
@@ -390,7 +404,7 @@ body{background:#f3f5ef}
 .theme-picker-card{margin:0 0 18px}
 .theme-picker-card>.card-head{margin-bottom:15px}
 .theme-picker-card>.card-head>svg{color:var(--user-accent);flex:none}
-.theme-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.theme-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .theme-option{position:relative;display:grid;gap:8px;text-align:left;padding:10px;border:1px solid var(--panel-line,#e4e9e1);border-radius:14px;background:var(--panel,#fff);color:inherit;transition:border-color .18s,box-shadow .18s,transform .18s}
 .theme-option:hover{transform:translateY(-2px);box-shadow:0 8px 22px #1f382012}
 .theme-option.selected{border-color:var(--user-accent);box-shadow:0 0 0 2px var(--user-accent-soft)}
@@ -407,6 +421,9 @@ body{background:#f3f5ef}
 .theme-preview-sand{background:#f7f4ee;border-color:#eae5da}
 .theme-preview-sand .theme-preview-rail,.theme-preview-sand .theme-preview-content i{background:#fffefa;border-color:#eae5da}
 .theme-preview-sand .theme-preview-accent{background:#a77b45}
+.theme-preview-pink{background:#fbf2f5;border-color:#eedde4}
+.theme-preview-pink .theme-preview-rail,.theme-preview-pink .theme-preview-content i{background:#fffcfd;border-color:#eedde4}
+.theme-preview-pink .theme-preview-accent{background:#a64e67}
 .theme-option-label{font-size:12px;font-weight:700;color:var(--text-main,#253229)}
 .theme-option-description{font-size:10px;color:var(--text-muted,#78857b)}
 .theme-option-check{position:absolute;right:11px;bottom:12px;color:var(--user-accent)}
