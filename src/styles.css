@@ -852,6 +852,12 @@ body{background:#f3f5ef}
 .education-section{min-width:0;margin-top:18px;border-top:1px solid #eef0ec;padding-top:15px}
 .education-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .education-section-head>div{min-width:0}
+.education-section-toggle{display:flex;align-items:center;gap:7px;min-width:0;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.education-section-toggle>svg{flex:none;color:#858d83;transition:transform .15s ease}
+.education-section-toggle>svg.is-expanded{transform:rotate(90deg)}
+.education-section-toggle>span{display:grid;gap:4px;min-width:0}
+.education-section-toggle:focus-visible{outline:2px solid var(--user-accent,#56815d);outline-offset:3px;border-radius:3px}
+.education-section-toggle h3{margin:0}
 .education-section-head h3{display:flex;align-items:center;gap:7px;font:700 12px Manrope,sans-serif;color:#3d493e;margin:0}
 .education-section-head h3 svg{color:#648568;flex:none}
 .education-section-head p{font-size:10px;color:#92998f;margin:4px 0 0;overflow-wrap:anywhere}
