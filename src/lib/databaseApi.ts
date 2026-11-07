@@ -30,15 +30,6 @@ export interface DatabaseColumn {
   is_nullable: "YES" | "NO";
 }
 
-export interface ForeignKeyDependency {
-  constraint: string;
-  table: string;
-  columns: string[];
-  referencedColumns: string[];
-  onDelete: string;
-  count: number;
-}
-
 export interface DatabaseRows {
   table: string;
   columns: DatabaseColumn[];
@@ -48,20 +39,9 @@ export interface DatabaseRows {
   offset: number;
 }
 
-export interface DeletePreview {
-  table: string;
-  row: Record<string, unknown>;
-  dependencies: ForeignKeyDependency[];
-}
-
-async function request(path: string, init?: RequestInit): Promise<Response> {
+async function request(path: string): Promise<Response> {
   const response = await fetch(path, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
+    headers: { Accept: "application/json" },
     cache: "no-store",
     credentials: "same-origin",
   });
@@ -84,22 +64,7 @@ export async function loadDatabaseCatalog(): Promise<DatabaseCatalog> {
   return await (await request("/api/database")).json() as DatabaseCatalog;
 }
 
-async function post<T>(body: Record<string, unknown>): Promise<T> {
-  return await (await request("/api/database", { method: "POST", body: JSON.stringify(body) })).json() as T;
-}
-
 export function loadDatabaseRows(table: string, offset: number): Promise<DatabaseRows> {
-  return post({ action: "rows", table, offset, limit: 50 });
-}
-
-export function previewDatabaseDelete(table: string, keys: Record<string, unknown>): Promise<DeletePreview> {
-  return post({ action: "preview-delete", table, keys });
-}
-
-export function deleteDatabaseRow(
-  table: string,
-  keys: Record<string, unknown>,
-  confirmLinkedChanges: boolean,
-): Promise<{ deleted: boolean; dependencies: ForeignKeyDependency[] }> {
-  return post({ action: "delete", table, keys, confirmLinkedChanges });
+  const query = new URLSearchParams({ table, offset: String(offset), limit: "50" });
+  return request(`/api/database?${query.toString()}`).then((response) => response.json() as Promise<DatabaseRows>);
 }
