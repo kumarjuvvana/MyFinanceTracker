@@ -2166,6 +2166,10 @@ function EducationPaymentModal({ initial, currency, maxAmount, charges, payments
   </div>{maxAmount === null ? <div className="alert" style={{ marginTop: 12 }} role="status">Add the tuition, admission, school van / transport, or other fee charges to this education record before recording a payment.</div> : <div className={`alert${maxAmount <= 0 && !initial ? " alert-error" : ""}`} style={{ marginTop: 12 }} role="status">{maxAmount <= 0 && !initial ? "No balance is available. Review the fee charges and existing payments before adding another payment." : `Remaining fees available for payment: ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.`}</div>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)} title={!initial && (maxAmount === null || maxAmount <= 0) ? "Set fee charges and a positive remaining balance first" : undefined}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
 
+function normalizeEducationSubjectName(name: string) {
+  return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
 function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   record: EducationRecord;
   onEdit: () => void;
@@ -2183,15 +2187,23 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   >(null);
   const [expanded, setExpanded] = useState(false);
   const [examView, setExamView] = useState<"table" | "list">("table");
-  const [attendanceView, setAttendanceView] = useState<"list" | "calendar">("list");
+  const [attendanceView, setAttendanceView] = useState<"list" | "calendar">("calendar");
   const subjects = record.subjects ?? [];
   const exams = record.exams ?? [];
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+  const examSubjectName = (exam: EducationExam) => subjectById.get(exam.subjectId ?? "")?.name ?? exam.subject.trim();
   const examAssessmentColumns = [...new Map(exams.map((exam) => [
     `${exam.assessmentType}\u0000${exam.name}`,
     { key: `${exam.assessmentType}\u0000${exam.name}`, name: exam.name, type: exam.assessmentType },
   ])).values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  const examSubjectRows = [...new Set(exams.map((exam) => exam.subject.trim()).filter(Boolean))]
+  const examSubjectRows = [...new Map(exams.map(examSubjectName).filter(Boolean)
+    .map((name) => [normalizeEducationSubjectName(name), name])).values()]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  const unmappedSubjectCount = new Set(exams.filter((exam) => {
+    const linkedSubject = subjectById.get(exam.subjectId ?? "");
+    return exam.subject.trim() && (!linkedSubject ||
+      normalizeEducationSubjectName(linkedSubject.name) !== normalizeEducationSubjectName(exam.subject));
+  }).map((exam) => normalizeEducationSubjectName(exam.subject)).filter(Boolean)).size;
   const payments = record.payments ?? [];
   const feeCharges = record.feeCharges ?? [];
   const monthlyAttendance = record.monthlyAttendance ?? [];
@@ -2214,8 +2226,31 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
 
   function removeSubject(subject: EducationSubject) {
     if (window.confirm(`Move ${subject.name} to the archive?`)) {
-      onUpdate({ ...record, subjects: subjects.filter((entry) => entry.id !== subject.id) });
+      onUpdate({
+        ...record,
+        subjects: subjects.filter((entry) => entry.id !== subject.id),
+        exams: exams.map((exam) => exam.subjectId === subject.id ? { ...exam, subjectId: undefined } : exam),
+      });
     }
+  }
+
+  function linkExamSubjects() {
+    const nextSubjects = [...subjects];
+    const subjectByName = new Map(nextSubjects.map((subject) => [normalizeEducationSubjectName(subject.name), subject]));
+    const nextExams = exams.map((exam) => {
+      const currentSubject = subjectById.get(exam.subjectId ?? "");
+      const name = (currentSubject?.name ?? exam.subject).trim();
+      if (!name) return exam;
+      const key = normalizeEducationSubjectName(name);
+      let subject = subjectByName.get(key);
+      if (!subject) {
+        subject = { id: createId(), name, code: "", credits: null, notes: "" };
+        nextSubjects.push(subject);
+        subjectByName.set(key, subject);
+      }
+      return { ...exam, subject: subject.name, subjectId: subject.id };
+    });
+    onUpdate({ ...record, subjects: nextSubjects, exams: nextExams });
   }
 
   function removeExam(exam: EducationExam) {
@@ -2289,7 +2324,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {subjects.length ? <div className="education-entry-list">{subjects.map((subject) => <div className="education-entry" key={subject.id}><div><strong>{subject.name}</strong><span><LinkifiedText>{[subject.code, subject.credits !== null ? `${subject.credits} credits` : "", subject.notes].filter(Boolean).join(" · ")}</LinkifiedText></span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${subject.name}`} onClick={() => setEditor({ kind: "subject", initial: subject })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${subject.name}`} onClick={() => onUpdate({ ...record, subjects: [{ ...subject, id: createId() }, ...subjects] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${subject.name}`} onClick={() => removeSubject(subject)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Add subjects for this class, term, or course.</p>}
     </section>
     <section className="education-section">
-      <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div>
+      <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><div className="table-actions">{unmappedSubjectCount > 0 && <Button size="sm" variant="outline" onClick={linkExamSubjects}>Link {unmappedSubjectCount} subject{unmappedSubjectCount === 1 ? "" : "s"}</Button>}<Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div></div>
       {exams.length ? <>
         <div className="education-result-tabs" role="tablist" aria-label={`Result views for ${record.studentName} ${record.academicYear}`}>
           <button type="button" role="tab" aria-selected={examView === "table"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("table")}>Results table</button>
@@ -2302,7 +2337,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
               <tbody>{examSubjectRows.map((subject) => <tr key={subject}>
                 <th scope="row">{subject}</th>
                 {examAssessmentColumns.map((assessment) => {
-                  const results = exams.filter((exam) => exam.subject.trim() === subject &&
+                  const results = exams.filter((exam) => normalizeEducationSubjectName(examSubjectName(exam)) === normalizeEducationSubjectName(subject) &&
                     exam.name === assessment.name && exam.assessmentType === assessment.type);
                   return <td key={assessment.key}>
                     {results.length ? results.map((result) => <div className="education-result-cell" key={result.id}>
@@ -2317,7 +2352,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
                 })}
               </tr>)}</tbody>
             </table>
-          </div> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
+          </div> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, examSubjectName(exam), exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
         </div>
       </> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
     </section>
@@ -2388,12 +2423,45 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     </div>
     {editor?.kind === "subject" && <EducationSubjectModal key={editor.initial?.id ?? "new-subject"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(subject) => {
       const current = editor.initial;
-      onUpdate({ ...record, subjects: current ? subjects.map((entry) => entry.id === current.id ? { ...subject, id: current.id } : entry) : [{ ...subject, id: createId() }, ...subjects] });
+      const duplicate = subjects.find((entry) => entry.id !== current?.id &&
+        normalizeEducationSubjectName(entry.name) === normalizeEducationSubjectName(subject.name));
+      if (duplicate) {
+        window.alert(`A subject named "${duplicate.name}" already exists for this academic year.`);
+        return;
+      }
+      const updatedSubject = { ...subject, id: current?.id ?? createId() };
+      const nextSubjects = current
+        ? subjects.map((entry) => entry.id === current.id ? updatedSubject : entry)
+        : [updatedSubject, ...subjects];
+      const nextExams = current ? exams.map((exam) =>
+        exam.subjectId === current.id ||
+        (!exam.subjectId && normalizeEducationSubjectName(exam.subject) === normalizeEducationSubjectName(current.name))
+          ? { ...exam, subject: updatedSubject.name, subjectId: current.id }
+          : exam) : exams;
+      onUpdate({ ...record, subjects: nextSubjects, exams: nextExams });
       setEditor(null);
     }} />}
     {editor?.kind === "exam" && <EducationExamModal key={editor.initial?.id ?? "new-exam"} initial={editor.initial} subjects={subjects} onClose={() => setEditor(null)} onSave={(exam) => {
       const current = editor.initial;
-      onUpdate({ ...record, exams: current ? exams.map((entry) => entry.id === current.id ? { ...exam, id: current.id } : entry) : [{ ...exam, id: createId() }, ...exams] });
+      const enteredSubject = exam.subject.trim();
+      const matchedSubject = subjects.find((subject) =>
+        normalizeEducationSubjectName(subject.name) === normalizeEducationSubjectName(enteredSubject));
+      const subject = matchedSubject ?? (enteredSubject
+        ? { id: createId(), name: enteredSubject, code: "", credits: null, notes: "" }
+        : undefined);
+      const nextSubjects = subject && !matchedSubject ? [subject, ...subjects] : subjects;
+      const linkedExam = {
+        ...exam,
+        subject: subject?.name ?? enteredSubject,
+        subjectId: subject?.id,
+      };
+      onUpdate({
+        ...record,
+        subjects: nextSubjects,
+        exams: current
+          ? exams.map((entry) => entry.id === current.id ? { ...linkedExam, id: current.id } : entry)
+          : [{ ...linkedExam, id: createId() }, ...exams],
+      });
       setEditor(null);
     }} />}
     {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} charges={feeCharges} payments={payments} maxAmount={totalDue === null ? null : Math.max(0, totalDue - (totalPaid - (editor.initial?.amount ?? 0)))} onClose={() => setEditor(null)} onSave={(payment) => {

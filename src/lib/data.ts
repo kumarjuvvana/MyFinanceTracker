@@ -101,6 +101,8 @@ function isEducationRecord(value: unknown): boolean {
       typeof exam.name !== "string" || !exam.name.trim() ||
       typeof exam.assessmentType !== "string" || !exam.assessmentType.trim() ||
       typeof exam.subject !== "string" || typeof exam.date !== "string" ||
+      (exam.subjectId !== undefined && (typeof exam.subjectId !== "string" || !Array.isArray(value.subjects) ||
+        !value.subjects.some((subject) => isRecord(subject) && subject.id === exam.subjectId))) ||
       (exam.date !== "" && Number.isNaN(Date.parse(exam.date))) ||
       !(exam.marksObtained === null || isNonNegativeNumber(exam.marksObtained)) ||
       !(exam.maximumMarks === null || (typeof exam.maximumMarks === "number" && Number.isFinite(exam.maximumMarks) && exam.maximumMarks > 0)) ||
@@ -262,6 +264,8 @@ export function validateData(value: unknown): value is TrackerData {
       typeof exam.name === "string" && exam.name.trim().length > 0 &&
       typeof exam.assessmentType === "string" && exam.assessmentType.trim().length > 0 &&
       typeof exam.subject === "string" &&
+      (exam.subjectId === undefined || (typeof exam.subjectId === "string" && exam.subjectId.length > 0 &&
+        Array.isArray(entry.subjects) && entry.subjects.some((subject) => isRecord(subject) && subject.id === exam.subjectId))) &&
       typeof exam.date === "string" && (exam.date === "" || !Number.isNaN(Date.parse(exam.date))) &&
       (exam.marksObtained === null || (typeof exam.marksObtained === "number" && Number.isFinite(exam.marksObtained) && exam.marksObtained >= 0)) &&
       (exam.maximumMarks === null || (typeof exam.maximumMarks === "number" && Number.isFinite(exam.maximumMarks) && exam.maximumMarks > 0)) &&

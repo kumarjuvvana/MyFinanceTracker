@@ -180,6 +180,7 @@ export interface EducationSubject {
 
 export interface EducationExam {
   id: string;
+  subjectId?: string;
   name: string;
   assessmentType: string;
   subject: string;
