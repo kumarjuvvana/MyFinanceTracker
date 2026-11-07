@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -131,6 +131,15 @@ function isEducationRecord(value: unknown): boolean {
       charges.some((charge) => isRecord(charge) && charge.id === allocation.chargeId)) &&
       Math.abs(payment.allocations.reduce<number>((sum, allocation) => sum + (isRecord(allocation) && typeof allocation.amount === "number" ? allocation.amount : 0), 0) - payment.amount) < 0.005;
   }))) return false;
+
+  if (value.educationExpenses !== undefined && (!Array.isArray(value.educationExpenses) || !value.educationExpenses.every((expense) =>
+    isRecord(expense) && typeof expense.id === "string" && Boolean(expense.id) &&
+    EDUCATION_EXPENSE_TYPES.some((type) => type === expense.type) &&
+    typeof expense.description === "string" && Boolean(expense.description.trim()) &&
+    typeof expense.amount === "number" && Number.isFinite(expense.amount) && expense.amount > 0 &&
+    typeof expense.date === "string" && !Number.isNaN(Date.parse(expense.date)) &&
+    typeof expense.vendor === "string" && typeof expense.method === "string" &&
+    typeof expense.reference === "string" && typeof expense.notes === "string"))) return false;
 
   if (value.reportSummary !== undefined) {
     const summary = value.reportSummary;
@@ -650,7 +659,8 @@ export function validateData(value: unknown): value is TrackerData {
     for (const record of value.educationRecords as EducationRecord[]) {
       if (new Set((record.subjects ?? []).map((subject) => subject.id)).size !== (record.subjects ?? []).length ||
         new Set((record.exams ?? []).map((exam) => exam.id)).size !== (record.exams ?? []).length ||
-        new Set((record.payments ?? []).map((payment) => payment.id)).size !== (record.payments ?? []).length) return false;
+        new Set((record.payments ?? []).map((payment) => payment.id)).size !== (record.payments ?? []).length ||
+        new Set((record.educationExpenses ?? []).map((expense) => expense.id)).size !== (record.educationExpenses ?? []).length) return false;
     }
   }
   if (Array.isArray(value.stockQuotes) && new Set((value.stockQuotes as StockQuoteSnapshot[]).map((quote) => quote.id)).size !== value.stockQuotes.length) return false;

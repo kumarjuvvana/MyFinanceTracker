@@ -247,6 +247,21 @@ export interface EducationPayment {
   allocations?: EducationPaymentAllocation[];
 }
 
+export const EDUCATION_EXPENSE_TYPES = ["Books", "Uniform", "Stationery", "Transport", "Exam / activity", "Other"] as const;
+export type EducationExpenseType = (typeof EDUCATION_EXPENSE_TYPES)[number];
+
+export interface EducationExpense {
+  id: string;
+  type: EducationExpenseType;
+  description: string;
+  amount: number;
+  date: string;
+  vendor: string;
+  method: string;
+  reference: string;
+  notes: string;
+}
+
 export interface EducationRecord {
   id: string;
   studentName: string;
@@ -273,6 +288,7 @@ export interface EducationRecord {
   subjects?: EducationSubject[];
   exams?: EducationExam[];
   payments?: EducationPayment[];
+  educationExpenses?: EducationExpense[];
   reportSummary?: EducationReportSummary;
   monthlyAttendance?: EducationMonthlyAttendance[];
   dailyAttendance?: EducationDailyAttendance[];

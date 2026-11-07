@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -786,6 +786,7 @@ function restoreEducationRecords(current: EducationRecord[] | undefined, archive
         subjects: mergeArchivedRows(active.subjects, record.subjects),
         exams: mergeArchivedRows(active.exams, record.exams),
         payments: mergeArchivedRows(active.payments, record.payments),
+        educationExpenses: mergeArchivedRows(active.educationExpenses, record.educationExpenses),
       };
     }
   }
@@ -2166,6 +2167,44 @@ function EducationPaymentModal({ initial, currency, maxAmount, charges, payments
   </div>{maxAmount === null ? <div className="alert" style={{ marginTop: 12 }} role="status">Add the tuition, admission, school van / transport, or other fee charges to this education record before recording a payment.</div> : <div className={`alert${maxAmount <= 0 && !initial ? " alert-error" : ""}`} style={{ marginTop: 12 }} role="status">{maxAmount <= 0 && !initial ? "No balance is available. Review the fee charges and existing payments before adding another payment." : `Remaining fees available for payment: ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.`}</div>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)} title={!initial && (maxAmount === null || maxAmount <= 0) ? "Set fee charges and a positive remaining balance first" : undefined}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
 
+function EducationExpenseModal({ initial, currency, onClose, onSave }: {
+  initial: EducationExpense | null;
+  currency: Currency;
+  onClose: () => void;
+  onSave: (expense: Omit<EducationExpense, "id">) => void;
+}) {
+  const [type, setType] = useState<EducationExpenseType>(initial?.type ?? "Books");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [vendor, setVendor] = useState(initial?.vendor ?? "");
+  const [method, setMethod] = useState(initial?.method ?? "Card");
+  const [reference, setReference] = useState(initial?.reference ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const parsedAmount = Number(amount);
+    if (!description.trim() || !date || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError("Enter a description, purchase date, and amount greater than zero.");
+      return;
+    }
+    onSave({ type, description: description.trim(), amount: parsedAmount, date, vendor: vendor.trim(), method, reference: reference.trim(), notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit school purchase" : "Add school purchase"} onClose={onClose}><form onSubmit={submit}><div className="form-grid">
+    <Field label="Purchase type"><Select value={type} onChange={(event) => setType(event.target.value as EducationExpenseType)}>{EDUCATION_EXPENSE_TYPES.map((expenseType) => <option key={expenseType}>{expenseType}</option>)}</Select></Field>
+    <Field className="full" label="Description"><Input autoFocus required maxLength={160} placeholder="e.g. Class 3 textbooks" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+    <Field label={`Amount (${currency})`}><Input required type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
+    <Field label="Purchase date"><DateInput required value={date} onValueChange={setDate} /></Field>
+    <Field label="Vendor / store"><Input maxLength={160} placeholder="Optional" value={vendor} onChange={(event) => setVendor(event.target.value)} /></Field>
+    <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Card</option><option>Cash</option><option>UPI</option><option>Bank transfer</option><option>Cheque</option><option>Other</option></Select></Field>
+    <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
+    <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional purchase notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+  </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save purchase" : "Add purchase"}</Button></div></form></Modal>;
+}
+
 function normalizeEducationSubjectName(name: string) {
   return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
@@ -2181,6 +2220,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     | { kind: "subject"; initial: EducationSubject | null }
     | { kind: "exam"; initial: EducationExam | null }
     | { kind: "payment"; initial: EducationPayment | null }
+    | { kind: "expense"; initial: EducationExpense | null }
     | { kind: "attendance"; mode: "monthly" | "daily"; initial: EducationMonthlyAttendance | EducationDailyAttendance | null }
     | { kind: "charge"; initial: EducationFeeCharge | null }
     | null
@@ -2205,6 +2245,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       normalizeEducationSubjectName(linkedSubject.name) !== normalizeEducationSubjectName(exam.subject));
   }).map((exam) => normalizeEducationSubjectName(exam.subject)).filter(Boolean)).size;
   const payments = record.payments ?? [];
+  const educationExpenses = record.educationExpenses ?? [];
   const feeCharges = record.feeCharges ?? [];
   const monthlyAttendance = record.monthlyAttendance ?? [];
   const dailyAttendance = record.dailyAttendance ?? [];
@@ -2215,6 +2256,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   const attendanceByDate = new Map(dailyAttendance.map((entry) => [entry.date, entry]));
   const monthlyAttendanceByMonth = new Map(monthlyAttendance.map((entry) => [entry.month, entry]));
   const loggedPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const purchaseTotal = educationExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const totalPaid = educationTotalPaid(record);
   const totalDue = educationTotalDue(record);
   const balance = totalDue === null ? null : Math.max(0, totalDue - totalPaid);
@@ -2265,6 +2307,12 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     }
   }
 
+  function removeEducationExpense(expense: EducationExpense) {
+    if (window.confirm(`Move the ${expense.description} purchase of ${formatAmount(expense.amount)} to the archive?`)) {
+      onUpdate({ ...record, educationExpenses: educationExpenses.filter((entry) => entry.id !== expense.id) });
+    }
+  }
+
   function allocatedToCharge(chargeId: string, exceptPaymentId?: string) {
     return payments.reduce((total, payment) => payment.id === exceptPaymentId ? total :
       total + (payment.allocations ?? []).filter((allocation) => allocation.chargeId === chargeId).reduce((sum, allocation) => sum + allocation.amount, 0), 0);
@@ -2305,7 +2353,9 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {record.otherFee != null && <div><span>Other fees</span><strong>{formatAmount(record.otherFee)}</strong></div>}
       {totalDue !== null && <div><span>Total fees due</span><strong>{formatAmount(totalDue)}</strong></div>}
       {record.paidFee !== null && <div><span>Previously recorded paid fee</span><strong>{formatAmount(record.paidFee)}</strong></div>}
-      {payments.length > 0 && <div><span>Logged payments (all fee types)</span><strong>{formatAmount(loggedPaid)}</strong></div>}
+      {payments.length > 0 && <div><span>Logged fee payments</span><strong>{formatAmount(loggedPaid)}</strong></div>}
+      {educationExpenses.length > 0 && <div><span>School-related purchases</span><strong>{formatAmount(purchaseTotal)}</strong></div>}
+      {payments.length + educationExpenses.length > 0 && <div><span>Recorded school spending</span><strong>{formatAmount(loggedPaid + purchaseTotal)}</strong></div>}
       {totalPaid > 0 && <div><span>Total paid (legacy + logged)</span><strong>{formatAmount(totalPaid)}</strong></div>}
       {(totalDue !== null || totalPaid > 0) && <div><span>{remainingOwing !== null && remainingOwing < 0 ? "Overpaid (total fees)" : "Remaining total fees"}</span><strong>{totalDue === null ? "Add fee amounts to calculate" : formatAmount(Math.abs(remainingOwing ?? balance ?? 0))}</strong></div>}
       {record.contactName && <div><span>School contact</span><strong>{record.contactName}</strong></div>}
@@ -2415,8 +2465,15 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       })}</div> : <p className="education-empty">Add itemized tuition, transport, admission, or other charges. Older annual totals remain supported.</p>}
     </section>
     <section className="education-section">
-      <div className="education-section-head"><div><h3><Wallet size={14} />Fee payments</h3><p>{payments.length} logged · {formatAmount(loggedPaid)} paid across all fee types</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record payment</Button></div>
-      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}{payment.allocations?.length ? ` · Allocated to ${payment.allocations.map((allocation) => feeCharges.find((charge) => charge.id === allocation.chargeId)?.description ?? "charge").join(", ")}` : ""}</span>{payment.notes && <small><LinkifiedText>{payment.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${payment.period} payment`} onClick={() => removePayment(payment)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
+      <div className="education-section-head"><div><h3><Wallet size={14} />Payments &amp; school purchases</h3><p>{payments.length} fee payments · {educationExpenses.length} purchases · {formatAmount(loggedPaid + purchaseTotal)} recorded spending</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "expense", initial: null })}><Plus size={12} />Add purchase</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record fee payment</Button></div></div>
+      {payments.length + educationExpenses.length > 0 ? <div className="education-entry-list">{[
+        ...payments.map((entry) => ({ kind: "payment" as const, entry })),
+        ...educationExpenses.map((entry) => ({ kind: "expense" as const, entry })),
+      ].sort((a, b) => b.entry.date.localeCompare(a.entry.date)).map((transaction) => transaction.kind === "payment"
+        ? <div className="education-entry" key={`payment-${transaction.entry.id}`}><div><strong>Fee payment · {transaction.entry.feeType ?? inferPaymentFeeType(transaction.entry.period)} · {transaction.entry.period} · {formatAmount(transaction.entry.amount)}</strong><span>{dateLabel(transaction.entry.date)} · {transaction.entry.method}{transaction.entry.reference ? ` · Ref: ${transaction.entry.reference}` : ""}{transaction.entry.allocations?.length ? ` · Allocated to ${transaction.entry.allocations.map((allocation) => feeCharges.find((charge) => charge.id === allocation.chargeId)?.description ?? "charge").join(", ")}` : ""}</span>{transaction.entry.notes && <small><LinkifiedText>{transaction.entry.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${transaction.entry.period} payment`} onClick={() => setEditor({ kind: "payment", initial: transaction.entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${transaction.entry.period} payment`} onClick={() => removePayment(transaction.entry)}><Archive size={13} /></button></div></div>
+        : <div className="education-entry" key={`expense-${transaction.entry.id}`}><div><strong>School purchase · {transaction.entry.type} · {transaction.entry.description} · {formatAmount(transaction.entry.amount)}</strong><span>{dateLabel(transaction.entry.date)} · {transaction.entry.method}{transaction.entry.vendor ? ` · ${transaction.entry.vendor}` : ""}{transaction.entry.reference ? ` · Ref: ${transaction.entry.reference}` : ""}</span>{transaction.entry.notes && <small><LinkifiedText>{transaction.entry.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${transaction.entry.description} purchase`} onClick={() => setEditor({ kind: "expense", initial: transaction.entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${transaction.entry.description} purchase`} onClick={() => removeEducationExpense(transaction.entry)}><Archive size={13} /></button></div></div>
+      )}</div> : <p className="education-empty">Record school fee payments and purchases such as uniforms, books, or stationery in this shared ledger.</p>}
+      <p className="section-description">Fee payments affect the outstanding school-fee balance. Outside purchases are tracked here as spending and do not reduce that balance.</p>
     </section>
     {record.link && <a className="personal-document-link" href={record.link} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
     {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
@@ -2467,6 +2524,11 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} charges={feeCharges} payments={payments} maxAmount={totalDue === null ? null : Math.max(0, totalDue - (totalPaid - (editor.initial?.amount ?? 0)))} onClose={() => setEditor(null)} onSave={(payment) => {
       const current = editor.initial;
       onUpdate({ ...record, payments: current ? payments.map((entry) => entry.id === current.id ? { ...payment, id: current.id } : entry) : [{ ...payment, id: createId() }, ...payments] });
+      setEditor(null);
+    }} />}
+    {editor?.kind === "expense" && <EducationExpenseModal key={editor.initial?.id ?? "new-school-purchase"} initial={editor.initial} currency={record.currency} onClose={() => setEditor(null)} onSave={(expense) => {
+      const current = editor.initial;
+      onUpdate({ ...record, educationExpenses: current ? educationExpenses.map((entry) => entry.id === current.id ? { ...expense, id: current.id } : entry) : [{ ...expense, id: createId() }, ...educationExpenses] });
       setEditor(null);
     }} />}
     {editor?.kind === "attendance" && <EducationAttendanceModal key={editor.initial?.id ?? `new-${editor.mode}-attendance`} initial={editor.initial} mode={editor.mode} onClose={() => setEditor(null)} onSave={(entry) => {
@@ -2576,7 +2638,8 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       ...(record.monthlyAttendance ?? []).flatMap((entry) => [entry.month, entry.notes]),
       ...(record.dailyAttendance ?? []).flatMap((entry) => [entry.date, entry.status, entry.notes]),
       ...(record.feeCharges ?? []).flatMap((charge) => [charge.feeType, charge.description, charge.period, charge.notes]),
-      ...(record.payments ?? []).flatMap((payment) => [payment.feeType ?? "", payment.period, payment.method, payment.reference, payment.notes])]
+      ...(record.payments ?? []).flatMap((payment) => [payment.feeType ?? "", payment.period, payment.method, payment.reference, payment.notes]),
+      ...(record.educationExpenses ?? []).flatMap((expense) => [expense.type, expense.description, expense.vendor, expense.method, expense.reference, expense.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort(compareEducationRecords);
 
@@ -2599,6 +2662,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
         subjects: [],
         exams: [],
         payments: [],
+        educationExpenses: [],
         section: "",
         rollNumber: "",
         reportSummary: undefined,
@@ -2610,7 +2674,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   }
 
   return <>
-    <PageHeading eyebrow="Growing and learning" title="Schools & Colleges" subtitle="Select a student to review their academic years, subjects, results, and term payments." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
+    <PageHeading eyebrow="Growing and learning" title="Schools & Colleges" subtitle="Review academic years, results, fee balances, and school-related spending for each student." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
     <div className="alert"><GraduationCap size={15} style={{ flex: "none", marginTop: 1 }} /><span>Each record represents one academic year at a school, college, or university. Add flexible terms, quarters, semesters, or installments as separate payments; assessment types and grading systems can vary by institution. Records are readable in the private GitHub repository by collaborators and remain in its history; avoid storing student ID numbers or sensitive health information.</span></div>
     <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, attendance, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
     <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
@@ -6290,9 +6354,10 @@ export default function App() {
       const removedSubjects = (current.subjects ?? []).filter((entry) => !(record.subjects ?? []).some((updated) => updated.id === entry.id));
       const removedExams = (current.exams ?? []).filter((entry) => !(record.exams ?? []).some((updated) => updated.id === entry.id));
       const removedPayments = (current.payments ?? []).filter((entry) => !(record.payments ?? []).some((updated) => updated.id === entry.id));
-      const next = removedSubjects.length || removedExams.length || removedPayments.length
+      const removedEducationExpenses = (current.educationExpenses ?? []).filter((entry) => !(record.educationExpenses ?? []).some((updated) => updated.id === entry.id));
+      const next = removedSubjects.length || removedExams.length || removedPayments.length || removedEducationExpenses.length
         ? withArchivedRecord(previous, `${current.studentName} education details`, {
-          educationRecords: [{ ...current, subjects: removedSubjects, exams: removedExams, payments: removedPayments }],
+          educationRecords: [{ ...current, subjects: removedSubjects, exams: removedExams, payments: removedPayments, educationExpenses: removedEducationExpenses }],
         })
         : previous;
       return {
