@@ -2419,28 +2419,28 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
             {monthlyAttendance.length > 0 && <div className="education-entry-list">{[...monthlyAttendance].sort((a, b) => b.month.localeCompare(a.month)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>{entry.daysPresent} / {entry.workingDays} days present{entry.workingDays ? ` · ${(entry.daysPresent / entry.workingDays * 100).toFixed(1)}%` : ""}</span>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit monthly attendance" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive monthly attendance" onClick={() => { if (window.confirm(`Move the ${entry.month} attendance summary to the archive?`)) onUpdate({ ...record, monthlyAttendance: monthlyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
             {dailyAttendance.length > 0 && <div className="education-entry-list">{[...dailyAttendance].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{dateLabel(entry.date)} · {entry.status}</strong>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit daily attendance" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive daily attendance" onClick={() => { if (window.confirm(`Move ${dateLabel(entry.date)} attendance to the archive?`)) onUpdate({ ...record, dailyAttendance: dailyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
           </> : attendanceView === "calendar-days" ? <>
-            <p className="education-calendar-note">Counts dated attendance entries for each month against its calendar days. Monthly report-card totals are shown separately and are not treated as specific dated entries.</p>
+            <p className="education-calendar-note">Uses the monthly report-card count when available; otherwise, it counts day-wise entries. If both are recorded, the report-card count is primary and day-wise details are shown separately to avoid double-counting. Months without either type of attendance data are not shown.</p>
             <div className="education-calendar-grid education-calendar-count-grid">
               {attendanceCalendarMonths.map((month) => {
                 const [yearText, monthText] = month.split("-");
                 const year = Number(yearText);
                 const monthIndex = Number(monthText) - 1;
-                const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
                 const entries = [...attendanceByDate].filter(([date]) => date.startsWith(month)).map(([, entry]) => entry);
                 const countStatus = (status: EducationAttendanceStatus) => entries.filter((entry) => entry.status === status).length;
                 const summary = monthlyAttendanceByMonth.get(month);
+                const count = summary ? `${summary.daysPresent} / ${summary.workingDays}` : `${countStatus("Present")} / ${entries.length}`;
                 return <div className="education-calendar-month education-calendar-count-card" key={month}>
                   <div className="education-calendar-month-head">
                     <strong>{new Date(year, monthIndex, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
                   </div>
-                  <strong className="education-calendar-count">{entries.length} / {daysInMonth}</strong>
-                  <span className="education-calendar-count-label">calendar days recorded</span>
+                  <strong className="education-calendar-count">{count}</strong>
+                  <span className="education-calendar-count-label">{summary ? "days present / working days (monthly)" : "present / dated entries"}</span>
                   <div className="education-calendar-status-counts">
                     {(["Present", "Absent", "Leave", "Late", "Other"] as const).filter((status) => countStatus(status) > 0)
                       .map((status) => <span key={status}><i className={`education-calendar-key status-${status.toLowerCase()}`} />{status}: {countStatus(status)}</span>)}
-                    {!entries.length && <span>No dated attendance entries</span>}
+                    {!entries.length && <span>No dated entries for this month</span>}
                   </div>
-                  {summary && <span className="education-calendar-month-summary">Report card: {summary.daysPresent}/{summary.workingDays} days present</span>}
+                  {summary && entries.length > 0 && <span className="education-calendar-month-summary">Day-wise entries: {entries.length} (shown separately)</span>}
                 </div>;
               })}
             </div>
