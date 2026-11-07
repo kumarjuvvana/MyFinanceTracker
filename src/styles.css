@@ -846,6 +846,7 @@ body{background:#f3f5ef}
 .app-shell.dark .learning-card-title h2{color:#e3e8e2}
 .app-shell.dark .learning-card-title p,.app-shell.dark .learning-card-meta,.app-shell.dark .learning-notes{color:#a7b0a7}
 .education-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+.education-details[hidden]{display:none}
 .education-details>div{display:grid;gap:4px;min-width:0;padding:10px;border:1px solid #eef0ec;border-radius:9px}
 .education-details span{font-size:9px;color:#92998f}
 .education-details strong{font-size:11px;color:#414a42;overflow-wrap:anywhere;word-break:break-word}
@@ -878,6 +879,11 @@ body{background:#f3f5ef}
 .education-result-cell strong{font-size:11px;color:#414a42;white-space:nowrap}
 .education-result-cell span,.education-result-cell small{font-size:9px;color:#858d83;line-height:1.35}
 .education-result-missing{display:block;text-align:center;color:#a0a59e}
+.education-iit-summary{display:grid;gap:8px;margin-top:10px;padding:11px 13px;border:1px solid #eef0ec;border-radius:9px;background:#fafbf9}
+.education-iit-summary>strong{font-size:10px;color:#414a42}
+.education-iit-summary-result{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:10px}
+.education-iit-summary-result span,.education-iit-summary-result small{color:#858d83}
+.education-iit-summary-result b{font-size:11px;color:#414a42}
 .education-calendar-note{margin:11px 0 0;font-size:10px;line-height:1.5;color:#858d83}
 .education-calendar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px;margin-top:12px}
 .education-calendar-month{min-width:0;padding:11px;border:1px solid #eef0ec;border-radius:10px}
@@ -928,6 +934,9 @@ body{background:#f3f5ef}
 .app-shell.dark .education-results-table thead th:first-child,.app-shell.dark .education-results-table tbody th{background:#252d26}
 .app-shell.dark .education-results-table tbody th,.app-shell.dark .education-result-cell strong{color:#e3e8e2}
 .app-shell.dark .education-result-cell span,.app-shell.dark .education-result-cell small,.app-shell.dark .education-result-missing{color:#a7b0a7}
+.app-shell.dark .education-iit-summary{background:#252d26;border-color:#343d35}
+.app-shell.dark .education-iit-summary>strong,.app-shell.dark .education-iit-summary-result b{color:#e3e8e2}
+.app-shell.dark .education-iit-summary-result span,.app-shell.dark .education-iit-summary-result small{color:#a7b0a7}
 .app-shell.dark .education-calendar-note,.app-shell.dark .education-calendar-month-head span,.app-shell.dark .education-calendar-legend>span{color:#a7b0a7}
 .app-shell.dark .education-calendar-month{border-color:#343d35}
 .app-shell.dark .education-calendar-month-head strong{color:#e3e8e2}

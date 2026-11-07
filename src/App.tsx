@@ -2225,7 +2225,10 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     | { kind: "charge"; initial: EducationFeeCharge | null }
     | null
   >(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  const [mainDetailsExpanded, setMainDetailsExpanded] = useState(true);
+  const [examsExpanded, setExamsExpanded] = useState(true);
+  const [attendanceExpanded, setAttendanceExpanded] = useState(true);
   const [subjectsExpanded, setSubjectsExpanded] = useState(false);
   const [feeChargesExpanded, setFeeChargesExpanded] = useState(false);
   const [spendingExpanded, setSpendingExpanded] = useState(false);
@@ -2235,11 +2238,15 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   const exams = record.exams ?? [];
   const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
   const examSubjectName = (exam: EducationExam) => subjectById.get(exam.subjectId ?? "")?.name ?? exam.subject.trim();
+  const iitOverallResults = exams.filter((exam) =>
+    normalizeEducationSubjectName(exam.assessmentType) === "iit assessment" &&
+    normalizeEducationSubjectName(examSubjectName(exam)) === "overall");
+  const iitOverallResultIds = new Set(iitOverallResults.map((exam) => exam.id));
   const examAssessmentColumns = [...new Map(exams.map((exam) => [
     `${exam.assessmentType}\u0000${exam.name}`,
     { key: `${exam.assessmentType}\u0000${exam.name}`, name: exam.name, type: exam.assessmentType },
   ])).values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  const examSubjectRows = [...new Map(exams.map(examSubjectName).filter(Boolean)
+  const examSubjectRows = [...new Map(exams.filter((exam) => !iitOverallResultIds.has(exam.id)).map(examSubjectName).filter(Boolean)
     .map((name) => [normalizeEducationSubjectName(name), name])).values()]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   const unmappedSubjectCount = new Set(exams.filter((exam) => {
@@ -2343,7 +2350,9 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       </div>
     </div>
     <div className="education-expanded" id={`education-details-${record.id}`} hidden={!expanded}>
-    <div className="education-details">
+    <section className="education-section education-main-section">
+      <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={mainDetailsExpanded} aria-controls={`education-main-details-${record.id}`} onClick={() => setMainDetailsExpanded((value) => !value)}><ChevronRight size={14} className={mainDetailsExpanded ? "is-expanded" : ""} /><span><h3><GraduationCap size={14} />Main details</h3><p>{mainDetailsExpanded ? "Hide details" : "Show details"}</p></span></button></div>
+      <div className="education-details" id={`education-main-details-${record.id}`} hidden={!mainDetailsExpanded}>
       <div><span>Education level</span><strong>{record.level}</strong></div>
       {record.boardUniversity && <div><span>Board / university</span><strong>{record.boardUniversity}</strong></div>}
       {record.section && <div><span>Section</span><strong>{record.section}</strong></div>}
@@ -2371,20 +2380,23 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
         {record.reportSummary.result && <div><span>Result / promotion</span><strong>{record.reportSummary.result}</strong></div>}
         {record.reportSummary.teacherRemark && <div><span>Teacher remark</span><strong>{record.reportSummary.teacherRemark}</strong></div>}
       </>}
-    </div>
+      </div>
+    </section>
     <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={subjectsExpanded} onClick={() => setSubjectsExpanded((value) => !value)}><ChevronRight size={14} className={subjectsExpanded ? "is-expanded" : ""} /><span><h3><BookOpen size={14} />Subjects / courses</h3><p>{subjects.length} recorded · {subjectsExpanded ? "Hide details" : "Show details"}</p></span></button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "subject", initial: null })}><Plus size={12} />Add subject</Button></div>
       {subjectsExpanded && (subjects.length ? <div className="education-entry-list">{subjects.map((subject) => <div className="education-entry" key={subject.id}><div><strong>{subject.name}</strong><span><LinkifiedText>{[subject.code, subject.credits !== null ? `${subject.credits} credits` : "", subject.notes].filter(Boolean).join(" · ")}</LinkifiedText></span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${subject.name}`} onClick={() => setEditor({ kind: "subject", initial: subject })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${subject.name}`} onClick={() => onUpdate({ ...record, subjects: [{ ...subject, id: createId() }, ...subjects] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${subject.name}`} onClick={() => removeSubject(subject)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Add subjects for this class, term, or course.</p>)}
     </section>
     <section className="education-section">
-      <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><div className="table-actions">{unmappedSubjectCount > 0 && <Button size="sm" variant="outline" onClick={linkExamSubjects}>Link {unmappedSubjectCount} subject{unmappedSubjectCount === 1 ? "" : "s"}</Button>}<Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div></div>
+      <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={examsExpanded} aria-controls={`education-exams-${record.id}`} onClick={() => setExamsExpanded((value) => !value)}><ChevronRight size={14} className={examsExpanded ? "is-expanded" : ""} /><span><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded · {examsExpanded ? "Hide details" : "Show details"}</p></span></button><div className="table-actions">{unmappedSubjectCount > 0 && <Button size="sm" variant="outline" onClick={linkExamSubjects}>Link {unmappedSubjectCount} subject{unmappedSubjectCount === 1 ? "" : "s"}</Button>}<Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div></div>
+      <div id={`education-exams-${record.id}`} hidden={!examsExpanded}>
       {exams.length ? <>
         <div className="education-result-tabs" role="tablist" aria-label={`Result views for ${record.studentName} ${record.academicYear}`}>
           <button type="button" role="tab" aria-selected={examView === "table"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("table")}>Results table</button>
           <button type="button" role="tab" aria-selected={examView === "list"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("list")}>List</button>
         </div>
         <div id={`education-result-panel-${record.id}`} className="education-result-panel" role="tabpanel">
-          {examView === "table" ? <div className="education-results-scroll" role="region" aria-label={`Subject results for ${record.studentName} ${record.academicYear}`} tabIndex={0}>
+          {examView === "table" ? <>
+            <div className="education-results-scroll" role="region" aria-label={`Subject results for ${record.studentName} ${record.academicYear}`} tabIndex={0}>
             <table className="data-table education-results-table" style={{ minWidth: `${180 + examAssessmentColumns.length * 130}px` }}>
               <thead><tr><th scope="col">Subject</th>{examAssessmentColumns.map((assessment) => <th scope="col" key={assessment.key}><span>{assessment.name}</span><small>{assessment.type}</small></th>)}</tr></thead>
               <tbody>{examSubjectRows.map((subject) => <tr key={subject}>
@@ -2405,12 +2417,23 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
                 })}
               </tr>)}</tbody>
             </table>
-          </div> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, examSubjectName(exam), exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
+            </div>
+            {iitOverallResults.length > 0 && <div className="education-iit-summary" aria-label="IIT assessment overall results">
+              <strong>IIT overall</strong>
+              {iitOverallResults.map((result) => <div className="education-iit-summary-result" key={result.id}>
+                <span>{result.name}{result.date ? ` · ${dateLabel(result.date)}` : ""}</span>
+                <b>{result.marksObtained !== null && result.maximumMarks !== null ? `${result.marksObtained} / ${result.maximumMarks}` : result.resultStatus ?? "Result"}</b>
+                {result.notes && <small><LinkifiedText>{result.notes}</LinkifiedText></small>}
+              </div>)}
+            </div>}
+          </> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, examSubjectName(exam), exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
         </div>
       </> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
+      </div>
     </section>
     <section className="education-section">
-      <div className="education-section-head"><div><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
+      <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={attendanceExpanded} aria-controls={`education-attendance-${record.id}`} onClick={() => setAttendanceExpanded((value) => !value)}><ChevronRight size={14} className={attendanceExpanded ? "is-expanded" : ""} /><span><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries · {attendanceExpanded ? "Hide details" : "Show details"}</p></span></button><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
+      <div id={`education-attendance-${record.id}`} hidden={!attendanceExpanded}>
       {(monthlyAttendance.length > 0 || dailyAttendance.length > 0) && <>
         <div className="education-result-tabs" role="tablist" aria-label={`Attendance views for ${record.studentName} ${record.academicYear}`}>
           <button type="button" role="tab" aria-selected={attendanceView === "calendar-days"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar-days")}>Calendar Days</button>
@@ -2485,6 +2508,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       </>}
       {!monthlyAttendance.length && !dailyAttendance.length && <p className="education-empty">Enter monthly report-card totals or individual dated attendance.</p>}
       {monthlyAttendance.some((month) => dailyAttendance.some((day) => day.date.startsWith(month.month))) && <p className="section-description">Monthly summaries include months that also have daily entries; avoid adding the same attendance twice to any totals.</p>}
+      </div>
     </section>
     <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={feeChargesExpanded} onClick={() => setFeeChargesExpanded((value) => !value)}><ChevronRight size={14} className={feeChargesExpanded ? "is-expanded" : ""} /><span><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed · {feeChargesExpanded ? "Hide details" : "Show details"}</p></span></button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
