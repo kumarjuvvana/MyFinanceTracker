@@ -187,7 +187,51 @@ export interface EducationExam {
   marksObtained: number | null;
   maximumMarks: number | null;
   grade: string;
+  resultStatus?: "Scored" | "Absent" | "Not assessed";
+  teacherRemark?: string;
   notes: string;
+}
+
+export interface EducationReportSummary {
+  totalMarksObtained: number | null;
+  totalMaximumMarks: number | null;
+  percentage: number | null;
+  grade: string;
+  rank: string;
+  result: string;
+  teacherRemark: string;
+}
+
+export type EducationAttendanceStatus = "Present" | "Absent" | "Leave" | "Late" | "Other";
+
+export interface EducationMonthlyAttendance {
+  id: string;
+  month: string;
+  workingDays: number;
+  daysPresent: number;
+  notes: string;
+}
+
+export interface EducationDailyAttendance {
+  id: string;
+  date: string;
+  status: EducationAttendanceStatus;
+  notes: string;
+}
+
+export interface EducationFeeCharge {
+  id: string;
+  feeType: EducationFeeType;
+  description: string;
+  period: string;
+  amount: number;
+  dueDate: string;
+  notes: string;
+}
+
+export interface EducationPaymentAllocation {
+  chargeId: string;
+  amount: number;
 }
 
 export interface EducationPayment {
@@ -199,6 +243,7 @@ export interface EducationPayment {
   method: string;
   reference: string;
   notes: string;
+  allocations?: EducationPaymentAllocation[];
 }
 
 export interface EducationRecord {
@@ -208,6 +253,8 @@ export interface EducationRecord {
   level: EducationLevel;
   gradeCourse: string;
   academicYear: string;
+  section?: string;
+  rollNumber?: string;
   status: EducationStatus;
   boardUniversity: string;
   startDate: string;
@@ -225,6 +272,10 @@ export interface EducationRecord {
   subjects?: EducationSubject[];
   exams?: EducationExam[];
   payments?: EducationPayment[];
+  reportSummary?: EducationReportSummary;
+  monthlyAttendance?: EducationMonthlyAttendance[];
+  dailyAttendance?: EducationDailyAttendance[];
+  feeCharges?: EducationFeeCharge[];
 }
 
 export type LearningLevel = "Beginner" | "Basic" | "Intermediate" | "Advanced" | "Expert";

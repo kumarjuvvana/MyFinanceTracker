@@ -56,6 +56,107 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isEducationRecord(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.id !== "string" || !value.id ||
+    typeof value.studentName !== "string" || !value.studentName.trim() ||
+    typeof value.institution !== "string" || !value.institution.trim() ||
+    typeof value.level !== "string" || !EDUCATION_LEVELS.some((level) => level === value.level) ||
+    typeof value.gradeCourse !== "string" || typeof value.academicYear !== "string" ||
+    (value.section !== undefined && typeof value.section !== "string") ||
+    (value.rollNumber !== undefined && typeof value.rollNumber !== "string") ||
+    (value.status !== "Current" && value.status !== "Completed" && value.status !== "On hold") ||
+    typeof value.boardUniversity !== "string" ||
+    typeof value.startDate !== "string" || (value.startDate !== "" && Number.isNaN(Date.parse(value.startDate))) ||
+    typeof value.endDate !== "string" || (value.endDate !== "" && Number.isNaN(Date.parse(value.endDate))) ||
+    !(value.annualFee === null || isNonNegativeNumber(value.annualFee)) ||
+    !(value.admissionFee === undefined || value.admissionFee === null || isNonNegativeNumber(value.admissionFee)) ||
+    !(value.schoolVanFee === undefined || value.schoolVanFee === null || isNonNegativeNumber(value.schoolVanFee)) ||
+    !(value.otherFee === undefined || value.otherFee === null || isNonNegativeNumber(value.otherFee)) ||
+    !(value.paidFee === null || isNonNegativeNumber(value.paidFee)) ||
+    typeof value.currency !== "string" || !CURRENCIES.some((currency) => currency === value.currency) ||
+    typeof value.contactName !== "string" || typeof value.contact !== "string" ||
+    typeof value.link !== "string" || !isSafeExternalLink(value.link) ||
+    typeof value.notes !== "string") return false;
+
+  const charges = value.feeCharges === undefined ? [] : value.feeCharges;
+  if (!Array.isArray(charges) || !charges.every((charge) =>
+    isRecord(charge) && typeof charge.id === "string" && Boolean(charge.id) &&
+    EDUCATION_FEE_TYPES.some((feeType) => feeType === charge.feeType) &&
+    typeof charge.description === "string" && Boolean(charge.description.trim()) &&
+    typeof charge.period === "string" && typeof charge.amount === "number" && Number.isFinite(charge.amount) && charge.amount > 0 &&
+    typeof charge.dueDate === "string" && (charge.dueDate === "" || !Number.isNaN(Date.parse(charge.dueDate))) &&
+    typeof charge.notes === "string")) return false;
+
+  if (value.subjects !== undefined && (!Array.isArray(value.subjects) || !value.subjects.every((subject) =>
+    isRecord(subject) && typeof subject.id === "string" && Boolean(subject.id) &&
+    typeof subject.name === "string" && Boolean(subject.name.trim()) && typeof subject.code === "string" &&
+    (subject.credits === null || isNonNegativeNumber(subject.credits)) && typeof subject.notes === "string"))) return false;
+
+  if (value.exams !== undefined && (!Array.isArray(value.exams) || !value.exams.every((exam) => {
+    if (!isRecord(exam) || typeof exam.id !== "string" || !exam.id ||
+      typeof exam.name !== "string" || !exam.name.trim() ||
+      typeof exam.assessmentType !== "string" || !exam.assessmentType.trim() ||
+      typeof exam.subject !== "string" || typeof exam.date !== "string" ||
+      (exam.date !== "" && Number.isNaN(Date.parse(exam.date))) ||
+      !(exam.marksObtained === null || isNonNegativeNumber(exam.marksObtained)) ||
+      !(exam.maximumMarks === null || (typeof exam.maximumMarks === "number" && Number.isFinite(exam.maximumMarks) && exam.maximumMarks > 0)) ||
+      ((exam.marksObtained === null) !== (exam.maximumMarks === null)) ||
+      (exam.marksObtained !== null && exam.maximumMarks !== null && exam.marksObtained > exam.maximumMarks) ||
+      typeof exam.grade !== "string" || typeof exam.notes !== "string" ||
+      (exam.resultStatus !== undefined && exam.resultStatus !== "Scored" && exam.resultStatus !== "Absent" && exam.resultStatus !== "Not assessed") ||
+      (exam.teacherRemark !== undefined && typeof exam.teacherRemark !== "string")) return false;
+    if (exam.resultStatus === "Absent" || exam.resultStatus === "Not assessed") {
+      return exam.marksObtained === null && exam.maximumMarks === null;
+    }
+    return exam.marksObtained !== null || Boolean(exam.grade.trim());
+  }))) return false;
+
+  if (value.payments !== undefined && (!Array.isArray(value.payments) || !value.payments.every((payment) => {
+    if (!isRecord(payment) || typeof payment.id !== "string" || !payment.id ||
+      typeof payment.period !== "string" || !payment.period.trim() ||
+      typeof payment.amount !== "number" || !Number.isFinite(payment.amount) || payment.amount <= 0 ||
+      typeof payment.date !== "string" || Number.isNaN(Date.parse(payment.date)) ||
+      typeof payment.method !== "string" || typeof payment.reference !== "string" || typeof payment.notes !== "string" ||
+      (payment.feeType !== undefined && !EDUCATION_FEE_TYPES.some((feeType) => feeType === payment.feeType))) return false;
+    if (payment.allocations === undefined) return true;
+    return Array.isArray(payment.allocations) && payment.allocations.every((allocation) =>
+      isRecord(allocation) && typeof allocation.chargeId === "string" && Boolean(allocation.chargeId) &&
+      typeof allocation.amount === "number" && Number.isFinite(allocation.amount) && allocation.amount > 0 &&
+      charges.some((charge) => isRecord(charge) && charge.id === allocation.chargeId)) &&
+      Math.abs(payment.allocations.reduce<number>((sum, allocation) => sum + (isRecord(allocation) && typeof allocation.amount === "number" ? allocation.amount : 0), 0) - payment.amount) < 0.005;
+  }))) return false;
+
+  if (value.reportSummary !== undefined) {
+    const summary = value.reportSummary;
+    if (!isRecord(summary) ||
+      !(summary.totalMarksObtained === null || isNonNegativeNumber(summary.totalMarksObtained)) ||
+      !(summary.totalMaximumMarks === null || (typeof summary.totalMaximumMarks === "number" && Number.isFinite(summary.totalMaximumMarks) && summary.totalMaximumMarks > 0)) ||
+      (summary.totalMarksObtained !== null && summary.totalMaximumMarks !== null && summary.totalMarksObtained > summary.totalMaximumMarks) ||
+      !(summary.percentage === null || (typeof summary.percentage === "number" && Number.isFinite(summary.percentage) && summary.percentage >= 0 && summary.percentage <= 100)) ||
+      typeof summary.grade !== "string" || typeof summary.rank !== "string" ||
+      typeof summary.result !== "string" || typeof summary.teacherRemark !== "string") return false;
+  }
+
+  if (value.monthlyAttendance !== undefined && (!Array.isArray(value.monthlyAttendance) || !value.monthlyAttendance.every((attendance) =>
+    isRecord(attendance) && typeof attendance.id === "string" && Boolean(attendance.id) &&
+    typeof attendance.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(attendance.month) &&
+    Number.isInteger(attendance.workingDays) && Number(attendance.workingDays) >= 0 &&
+    Number.isInteger(attendance.daysPresent) && Number(attendance.daysPresent) >= 0 && Number(attendance.daysPresent) <= Number(attendance.workingDays) &&
+    typeof attendance.notes === "string"))) return false;
+
+  if (value.dailyAttendance !== undefined && (!Array.isArray(value.dailyAttendance) || !value.dailyAttendance.every((attendance) =>
+    isRecord(attendance) && typeof attendance.id === "string" && Boolean(attendance.id) &&
+    typeof attendance.date === "string" && !Number.isNaN(Date.parse(attendance.date)) &&
+    (attendance.status === "Present" || attendance.status === "Absent" || attendance.status === "Leave" || attendance.status === "Late" || attendance.status === "Other") &&
+    typeof attendance.notes === "string"))) return false;
+
+  return true;
+}
+
 function inferLegacyEducationFeeType(period: string): EducationFeeType {
   const normalized = period.toLocaleLowerCase();
   if (/\badmission\b|\bapplication\b|\benrollment\b/.test(normalized)) return "Admission";
@@ -135,6 +236,8 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.institution === "string" && entry.institution.trim().length > 0 &&
     typeof entry.level === "string" && EDUCATION_LEVELS.some((level) => level === entry.level) &&
     typeof entry.gradeCourse === "string" && typeof entry.academicYear === "string" &&
+    (entry.section === undefined || typeof entry.section === "string") &&
+    (entry.rollNumber === undefined || typeof entry.rollNumber === "string") &&
     (entry.status === "Current" || entry.status === "Completed" || entry.status === "On hold") &&
     typeof entry.boardUniversity === "string" &&
     typeof entry.startDate === "string" && (entry.startDate === "" || !Number.isNaN(Date.parse(entry.startDate))) &&
@@ -164,7 +267,12 @@ export function validateData(value: unknown): value is TrackerData {
       (exam.maximumMarks === null || (typeof exam.maximumMarks === "number" && Number.isFinite(exam.maximumMarks) && exam.maximumMarks > 0)) &&
       ((exam.marksObtained === null) === (exam.maximumMarks === null)) &&
       (exam.marksObtained === null || exam.maximumMarks === null || exam.marksObtained <= exam.maximumMarks) &&
-      typeof exam.grade === "string" && (exam.marksObtained !== null || exam.grade.trim().length > 0) &&
+      typeof exam.grade === "string" &&
+      (exam.resultStatus === undefined || exam.resultStatus === "Scored" || exam.resultStatus === "Absent" || exam.resultStatus === "Not assessed") &&
+      (exam.teacherRemark === undefined || typeof exam.teacherRemark === "string") &&
+      (exam.resultStatus === "Absent" || exam.resultStatus === "Not assessed"
+        ? exam.marksObtained === null && exam.maximumMarks === null
+        : exam.marksObtained !== null || exam.grade.trim().length > 0) &&
       typeof exam.notes === "string"))) &&
     (entry.payments === undefined || (Array.isArray(entry.payments) && entry.payments.every((payment) =>
       isRecord(payment) && typeof payment.id === "string" && payment.id.length > 0 &&
@@ -173,7 +281,39 @@ export function validateData(value: unknown): value is TrackerData {
       typeof payment.date === "string" && !Number.isNaN(Date.parse(payment.date)) &&
       typeof payment.method === "string" && typeof payment.reference === "string" &&
       (payment.feeType === undefined || EDUCATION_FEE_TYPES.some((feeType) => feeType === payment.feeType)) &&
-      typeof payment.notes === "string")))));
+      typeof payment.notes === "string" &&
+      (payment.allocations === undefined || (Array.isArray(payment.allocations) && payment.allocations.every((allocation) =>
+        isRecord(allocation) && typeof allocation.chargeId === "string" && allocation.chargeId.length > 0 &&
+        typeof allocation.amount === "number" && Number.isFinite(allocation.amount) && allocation.amount > 0 &&
+        Array.isArray(entry.feeCharges) && entry.feeCharges.some((charge) => isRecord(charge) && charge.id === allocation.chargeId)) &&
+        Math.abs(payment.allocations.reduce((sum, allocation) => sum + allocation.amount, 0) - payment.amount) < 0.005)))) &&
+    (entry.reportSummary === undefined || (isRecord(entry.reportSummary) &&
+      (entry.reportSummary.totalMarksObtained === null || (typeof entry.reportSummary.totalMarksObtained === "number" && Number.isFinite(entry.reportSummary.totalMarksObtained) && entry.reportSummary.totalMarksObtained >= 0)) &&
+      (entry.reportSummary.totalMaximumMarks === null || (typeof entry.reportSummary.totalMaximumMarks === "number" && Number.isFinite(entry.reportSummary.totalMaximumMarks) && entry.reportSummary.totalMaximumMarks > 0)) &&
+      (entry.reportSummary.totalMarksObtained === null || entry.reportSummary.totalMaximumMarks === null || entry.reportSummary.totalMarksObtained <= entry.reportSummary.totalMaximumMarks) &&
+      (entry.reportSummary.percentage === null || (typeof entry.reportSummary.percentage === "number" && Number.isFinite(entry.reportSummary.percentage) && entry.reportSummary.percentage >= 0 && entry.reportSummary.percentage <= 100)) &&
+      typeof entry.reportSummary.grade === "string" && typeof entry.reportSummary.rank === "string" &&
+      typeof entry.reportSummary.result === "string" && typeof entry.reportSummary.teacherRemark === "string")) &&
+    (entry.monthlyAttendance === undefined || (Array.isArray(entry.monthlyAttendance) && entry.monthlyAttendance.every((attendance) =>
+      isRecord(attendance) && typeof attendance.id === "string" && attendance.id.length > 0 &&
+      typeof attendance.month === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(attendance.month) &&
+      typeof attendance.workingDays === "number" && Number.isInteger(attendance.workingDays) && attendance.workingDays >= 0 &&
+      typeof attendance.daysPresent === "number" && Number.isInteger(attendance.daysPresent) && attendance.daysPresent >= 0 && attendance.daysPresent <= attendance.workingDays &&
+      typeof attendance.notes === "string"))) &&
+    (entry.dailyAttendance === undefined || (Array.isArray(entry.dailyAttendance) && entry.dailyAttendance.every((attendance) =>
+      isRecord(attendance) && typeof attendance.id === "string" && attendance.id.length > 0 &&
+      typeof attendance.date === "string" && !Number.isNaN(Date.parse(attendance.date)) &&
+      (attendance.status === "Present" || attendance.status === "Absent" || attendance.status === "Leave" || attendance.status === "Late" || attendance.status === "Other") &&
+      typeof attendance.notes === "string"))) &&
+    (entry.feeCharges === undefined || (Array.isArray(entry.feeCharges) && entry.feeCharges.every((charge) =>
+      isRecord(charge) && typeof charge.id === "string" && charge.id.length > 0 &&
+      EDUCATION_FEE_TYPES.some((feeType) => feeType === charge.feeType) &&
+      typeof charge.description === "string" && charge.description.trim().length > 0 &&
+      typeof charge.period === "string" && typeof charge.amount === "number" && Number.isFinite(charge.amount) && charge.amount > 0 &&
+      typeof charge.dueDate === "string" && (charge.dueDate === "" || !Number.isNaN(Date.parse(charge.dueDate))) &&
+      typeof charge.notes === "string"))))));
+  const educationRecordDetailsOk = value.educationRecords === undefined ||
+    (Array.isArray(value.educationRecords) && value.educationRecords.every(isEducationRecord));
   const learningRecordsOk = value.learningRecords === undefined || (Array.isArray(value.learningRecords) && value.learningRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 &&
@@ -488,7 +628,7 @@ export function validateData(value: unknown): value is TrackerData {
     trip.purchaseIds.every((id) => typeof id === "string"));
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
-    !assetsOk || !educationRecordsOk || !learningRecordsOk || !trainingSessionsOk ||
+    !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
     !devotionalEntriesOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||

@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationExam, type EducationFeeType, type EducationLevel, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -1712,7 +1712,9 @@ function AssetManager({ assets, onSave, onDelete }: {
   </>;
 }
 
-function educationTotalDue(record: Pick<EducationRecord, "annualFee" | "admissionFee" | "schoolVanFee" | "otherFee">) {
+function educationTotalDue(record: Pick<EducationRecord, "annualFee" | "admissionFee" | "schoolVanFee" | "otherFee" | "feeCharges">) {
+  const charges = record.feeCharges ?? [];
+  if (charges.length) return charges.reduce((total, charge) => total + charge.amount, 0);
   const amounts = [record.annualFee, record.admissionFee ?? null, record.schoolVanFee ?? null, record.otherFee ?? null]
     .filter((amount): amount is number => amount !== null);
   return amounts.length ? amounts.reduce((total, amount) => total + amount, 0) : null;
@@ -1736,6 +1738,8 @@ const emptyEducationRecord = (): Omit<EducationRecord, "id"> => ({
   level: "Primary (Grades 1–5)",
   gradeCourse: "",
   academicYear: "",
+  section: "",
+  rollNumber: "",
   status: "Current",
   boardUniversity: "",
   startDate: "",
@@ -1764,6 +1768,13 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
   const [schoolVanFee, setSchoolVanFee] = useState(initial?.schoolVanFee == null ? "" : String(initial.schoolVanFee));
   const [otherFee, setOtherFee] = useState(initial?.otherFee == null ? "" : String(initial.otherFee));
   const [paidFee, setPaidFee] = useState(initial?.paidFee == null ? "" : String(initial.paidFee));
+  const [summaryMarks, setSummaryMarks] = useState(initial?.reportSummary?.totalMarksObtained == null ? "" : String(initial.reportSummary.totalMarksObtained));
+  const [summaryMaximum, setSummaryMaximum] = useState(initial?.reportSummary?.totalMaximumMarks == null ? "" : String(initial.reportSummary.totalMaximumMarks));
+  const [summaryPercentage, setSummaryPercentage] = useState(initial?.reportSummary?.percentage == null ? "" : String(initial.reportSummary.percentage));
+  const [summaryGrade, setSummaryGrade] = useState(initial?.reportSummary?.grade ?? "");
+  const [summaryRank, setSummaryRank] = useState(initial?.reportSummary?.rank ?? "");
+  const [summaryResult, setSummaryResult] = useState(initial?.reportSummary?.result ?? "");
+  const [summaryRemark, setSummaryRemark] = useState(initial?.reportSummary?.teacherRemark ?? "");
   const [error, setError] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -1796,10 +1807,14 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       setError("Fees must be valid non-negative amounts, or left blank.");
       return;
     }
-    const proposedTotalDue = [parsedAnnualFee, parsedAdmissionFee, parsedSchoolVanFee, parsedOtherFee]
+    const proposedLegacyTotalDue = [parsedAnnualFee, parsedAdmissionFee, parsedSchoolVanFee, parsedOtherFee]
       .filter((amount): amount is number => amount !== null)
       .reduce((total, amount) => total + amount, 0);
-    const hasFeeAmounts = [annualFee, admissionFee, schoolVanFee, otherFee].some((value) => value.trim() !== "");
+    const hasLegacyFeeAmounts = [annualFee, admissionFee, schoolVanFee, otherFee].some((value) => value.trim() !== "");
+    const hasFeeAmounts = Boolean(initial?.feeCharges?.length) || hasLegacyFeeAmounts;
+    const proposedTotalDue = initial?.feeCharges?.length
+      ? initial.feeCharges.reduce((total, charge) => total + charge.amount, 0)
+      : proposedLegacyTotalDue;
     const proposedPaid = (parsedPaidFee ?? 0) +
       (initial?.payments ?? []).reduce((total, payment) => total + payment.amount, 0);
     const previousDue = initial ? educationTotalDue(initial) : null;
@@ -1814,12 +1829,36 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       setError("The end date cannot be before the start date.");
       return;
     }
+    const parseOptionalNumber = (value: string): number | null => value.trim() ? Number(value) : null;
+    const parsedSummaryMarks = parseOptionalNumber(summaryMarks);
+    const parsedSummaryMaximum = parseOptionalNumber(summaryMaximum);
+    const parsedSummaryPercentage = parseOptionalNumber(summaryPercentage);
+    if ([parsedSummaryMarks, parsedSummaryMaximum, parsedSummaryPercentage].some((value) => value !== null && (!Number.isFinite(value) || value < 0)) ||
+      (parsedSummaryMaximum !== null && parsedSummaryMaximum <= 0) ||
+      (parsedSummaryMarks !== null && parsedSummaryMaximum !== null && parsedSummaryMarks > parsedSummaryMaximum) ||
+      (parsedSummaryPercentage !== null && parsedSummaryPercentage > 100) ||
+      ((parsedSummaryMarks === null) !== (parsedSummaryMaximum === null))) {
+      setError("Enter a valid overall marks total and maximum together, and a percentage from 0 to 100.");
+      return;
+    }
+    const hasSummary = [summaryMarks, summaryMaximum, summaryPercentage, summaryGrade, summaryRank, summaryResult, summaryRemark].some((value) => value.trim() !== "");
+    const reportSummary = hasSummary ? {
+      totalMarksObtained: parsedSummaryMarks,
+      totalMaximumMarks: parsedSummaryMaximum,
+      percentage: parsedSummaryPercentage,
+      grade: summaryGrade.trim(),
+      rank: summaryRank.trim(),
+      result: summaryResult.trim(),
+      teacherRemark: summaryRemark.trim(),
+    } : undefined;
     onSave({
       ...record,
       studentName: record.studentName.trim(),
       institution: record.institution.trim(),
       gradeCourse: record.gradeCourse.trim(),
       academicYear: record.academicYear.trim(),
+      section: record.section?.trim() ?? "",
+      rollNumber: record.rollNumber?.trim() ?? "",
       boardUniversity: record.boardUniversity.trim(),
       annualFee: parsedAnnualFee,
       admissionFee: parsedAdmissionFee,
@@ -1830,6 +1869,7 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       contact: record.contact.trim(),
       link: record.link.trim(),
       notes: record.notes.trim(),
+      reportSummary,
     });
   }
 
@@ -1841,6 +1881,8 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="Status"><Select value={record.status} onChange={(event) => setRecord((current) => ({ ...current, status: event.target.value as EducationStatus }))}><option>Current</option><option>Completed</option><option>On hold</option></Select></Field>
       <Field label="Grade / class / course"><Input maxLength={120} placeholder="e.g. Grade 3, Class 10, B.Sc. Computer Science" value={record.gradeCourse} onChange={(event) => setRecord((current) => ({ ...current, gradeCourse: event.target.value }))} /></Field>
       <Field label="Academic year"><Input maxLength={40} placeholder="e.g. 2026–2027" value={record.academicYear} onChange={(event) => setRecord((current) => ({ ...current, academicYear: event.target.value }))} /></Field>
+      <Field label="Section"><Input maxLength={40} placeholder="Optional" value={record.section ?? ""} onChange={(event) => setRecord((current) => ({ ...current, section: event.target.value }))} /></Field>
+      <Field label="Roll number"><Input maxLength={40} placeholder="Optional" value={record.rollNumber ?? ""} onChange={(event) => setRecord((current) => ({ ...current, rollNumber: event.target.value }))} /></Field>
       <Field label="Board / university"><Input maxLength={120} placeholder="Optional" value={record.boardUniversity} onChange={(event) => setRecord((current) => ({ ...current, boardUniversity: event.target.value }))} /></Field>
       <Field label="Currency"><Select value={record.currency} onChange={(event) => setRecord((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
       <Field label="Start date"><DateInput value={record.startDate} onValueChange={(startDate) => setRecord((current) => ({ ...current, startDate }))} /></Field>
@@ -1852,6 +1894,14 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="Previously paid fee (legacy)"><Input type="number" min="0" step="0.01" placeholder="Optional; avoid duplicate entries" value={paidFee} onChange={(event) => setPaidFee(event.target.value)} /></Field>
       <Field label="School contact name"><Input maxLength={120} placeholder="Optional" value={record.contactName} onChange={(event) => setRecord((current) => ({ ...current, contactName: event.target.value }))} /></Field>
       <Field label="Contact details"><Input maxLength={160} placeholder="Optional phone or email" value={record.contact} onChange={(event) => setRecord((current) => ({ ...current, contact: event.target.value }))} /></Field>
+      <div className="full"><h3>Official report summary (optional)</h3><p className="section-description">Enter the overall figures as printed; they are kept separate from subject results.</p></div>
+      <Field label="Total marks obtained"><Input type="number" min="0" step="any" value={summaryMarks} onChange={(event) => setSummaryMarks(event.target.value)} /></Field>
+      <Field label="Total maximum marks"><Input type="number" min="0.01" step="any" value={summaryMaximum} onChange={(event) => setSummaryMaximum(event.target.value)} /></Field>
+      <Field label="Overall percentage"><Input type="number" min="0" max="100" step="any" value={summaryPercentage} onChange={(event) => setSummaryPercentage(event.target.value)} /></Field>
+      <Field label="Overall grade"><Input maxLength={40} value={summaryGrade} onChange={(event) => setSummaryGrade(event.target.value)} /></Field>
+      <Field label="Rank"><Input maxLength={40} value={summaryRank} onChange={(event) => setSummaryRank(event.target.value)} /></Field>
+      <Field label="Result / promotion"><Input maxLength={80} placeholder="e.g. Promoted" value={summaryResult} onChange={(event) => setSummaryResult(event.target.value)} /></Field>
+      <Field className="full" label="Teacher remark"><Input maxLength={5000} value={summaryRemark} onChange={(event) => setSummaryRemark(event.target.value)} /></Field>
       <Field className="full" label="Portal / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={record.link} onChange={(event) => setRecord((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional academic notes, achievements, or reminders" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
@@ -1903,6 +1953,8 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
   const [marksObtained, setMarksObtained] = useState(initial?.marksObtained == null ? "" : String(initial.marksObtained));
   const [maximumMarks, setMaximumMarks] = useState(initial?.maximumMarks == null ? "" : String(initial.maximumMarks));
   const [grade, setGrade] = useState(initial?.grade ?? "");
+  const [resultStatus, setResultStatus] = useState<EducationExam["resultStatus"]>(initial?.resultStatus ?? "Scored");
+  const [teacherRemark, setTeacherRemark] = useState(initial?.teacherRemark ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [error, setError] = useState("");
 
@@ -1918,10 +1970,13 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
       ((marks === null) !== (maximum === null)) || (marks !== null && maximum !== null && marks > maximum)) {
       setError("Enter both valid marks and a maximum score (marks cannot exceed the maximum), or leave both blank and enter a grade."); return;
     }
-    if (marks === null && !grade.trim()) {
-      setError("Enter marks with a maximum score, or provide a grade / GPA."); return;
+    if (resultStatus === "Scored" && marks === null && !grade.trim()) {
+      setError("For a scored result, enter marks and a maximum score or provide a grade / GPA."); return;
     }
-    onSave({ name: name.trim(), assessmentType: assessmentType.trim(), subject: subject.trim(), date, marksObtained: marks, maximumMarks: maximum, grade: grade.trim(), notes: notes.trim() });
+    if (resultStatus !== "Scored" && (marks !== null || maximum !== null || grade.trim())) {
+      setError("Absent and Not assessed results cannot include marks or a grade."); return;
+    }
+    onSave({ name: name.trim(), assessmentType: assessmentType.trim(), subject: subject.trim(), date, marksObtained: marks, maximumMarks: maximum, grade: grade.trim(), resultStatus, teacherRemark: teacherRemark.trim(), notes: notes.trim() });
   }
 
   return <Modal title={initial ? "Edit exam / assessment" : "Add exam / assessment"} onClose={onClose} wide><form onSubmit={submit}><div className="form-grid">
@@ -1929,17 +1984,114 @@ function EducationExamModal({ initial, subjects, onClose, onSave }: {
     <Field label="Assessment type"><Input required maxLength={80} list="education-assessment-types" placeholder="e.g. Term exam, semester, lab" value={assessmentType} onChange={(event) => setAssessmentType(event.target.value)} /><datalist id="education-assessment-types">{["Unit test", "Assignment", "Quiz", "Practical", "Laboratory", "Midterm", "Term exam", "Semester exam", "Final exam", "Viva", "Project", "Other"].map((type) => <option key={type} value={type} />)}</datalist></Field>
     <Field label="Subject / course"><Input maxLength={120} list="education-subjects" placeholder="Optional" value={subject} onChange={(event) => setSubject(event.target.value)} /><datalist id="education-subjects">{subjects.map((entry) => <option key={entry.id} value={entry.name} />)}</datalist></Field>
     <Field label="Exam date"><DateInput value={date} onValueChange={setDate} /></Field>
-    <Field label="Marks obtained"><Input type="number" min="0" step="any" placeholder="Optional" value={marksObtained} onChange={(event) => setMarksObtained(event.target.value)} /></Field>
-    <Field label="Maximum marks"><Input type="number" min="0.01" step="any" placeholder="Optional" value={maximumMarks} onChange={(event) => setMaximumMarks(event.target.value)} /></Field>
-    <Field label="Grade / GPA"><Input maxLength={40} placeholder="Optional (e.g. A, 3.8 GPA, Pass)" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
+    <Field label="Result status"><Select value={resultStatus ?? "Scored"} onChange={(event) => {
+      const next = event.target.value as EducationExam["resultStatus"];
+      setResultStatus(next);
+      if (next !== "Scored") {
+        setMarksObtained("");
+        setMaximumMarks("");
+        setGrade("");
+      }
+    }}><option>Scored</option><option>Absent</option><option>Not assessed</option></Select></Field>
+    <Field label="Marks obtained"><Input disabled={resultStatus !== "Scored"} type="number" min="0" step="any" placeholder="Optional" value={marksObtained} onChange={(event) => setMarksObtained(event.target.value)} /></Field>
+    <Field label="Maximum marks"><Input disabled={resultStatus !== "Scored"} type="number" min="0.01" step="any" placeholder="Optional" value={maximumMarks} onChange={(event) => setMaximumMarks(event.target.value)} /></Field>
+    <Field label="Grade / GPA"><Input disabled={resultStatus !== "Scored"} maxLength={40} placeholder="Optional (e.g. A, 3.8 GPA)" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
+    <Field className="full" label="Teacher remark"><Input maxLength={5000} placeholder="Optional remark for this subject and assessment" value={teacherRemark} onChange={(event) => setTeacherRemark(event.target.value)} /></Field>
     <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional feedback or result notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div><p className="section-description" style={{ marginTop: 12 }}>Record numeric marks with a maximum, or use grade/GPA for college grading systems.</p>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save result" : "Add result"}</Button></div></form></Modal>;
 }
 
-function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }: {
+function EducationAttendanceModal({ initial, mode, onClose, onSave }: {
+  initial: EducationMonthlyAttendance | EducationDailyAttendance | null;
+  mode: "monthly" | "daily";
+  onClose: () => void;
+  onSave: (attendance: Omit<EducationMonthlyAttendance, "id"> | Omit<EducationDailyAttendance, "id">) => void;
+}) {
+  const isDaily = mode === "daily";
+  const dailyInitial = initial && "date" in initial ? initial : null;
+  const monthlyInitial = initial && "month" in initial ? initial : null;
+  const [month, setMonth] = useState(monthlyInitial?.month ?? monthKey(today()));
+  const [workingDays, setWorkingDays] = useState(monthlyInitial ? String(monthlyInitial.workingDays) : "");
+  const [daysPresent, setDaysPresent] = useState(monthlyInitial ? String(monthlyInitial.daysPresent) : "");
+  const [date, setDate] = useState(dailyInitial?.date ?? today());
+  const [status, setStatus] = useState<EducationAttendanceStatus>(dailyInitial?.status ?? "Present");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (isDaily) {
+      if (!date) { setError("Choose an attendance date."); return; }
+      onSave({ date, status, notes: notes.trim() });
+      return;
+    }
+    const working = Number(workingDays);
+    const present = Number(daysPresent);
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Number.isInteger(working) || working < 0 ||
+      !Number.isInteger(present) || present < 0 || present > working) {
+      setError("Enter a valid month, working-day count, and days present not greater than working days.");
+      return;
+    }
+    onSave({ month, workingDays: working, daysPresent: present, notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit attendance" : isDaily ? "Add day-wise attendance" : "Add monthly attendance"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      {isDaily ? <>
+        <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
+        <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as EducationAttendanceStatus)}>{["Present", "Absent", "Leave", "Late", "Other"].map((item) => <option key={item}>{item}</option>)}</Select></Field>
+      </> : <>
+        <Field label="Month"><Input required type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></Field>
+        <Field label="Working days"><Input required type="number" min="0" step="1" value={workingDays} onChange={(event) => setWorkingDays(event.target.value)} /></Field>
+        <Field label="Days present"><Input required type="number" min="0" step="1" value={daysPresent} onChange={(event) => setDaysPresent(event.target.value)} /></Field>
+      </>}
+      <Field className="full" label="Notes"><Input maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save attendance" : "Add attendance"}</Button></div></form>
+  </Modal>;
+}
+
+function EducationFeeChargeModal({ initial, minimumAmount = 0, onClose, onSave }: {
+  initial: EducationFeeCharge | null;
+  minimumAmount?: number;
+  onClose: () => void;
+  onSave: (charge: Omit<EducationFeeCharge, "id">) => void;
+}) {
+  const [feeType, setFeeType] = useState<EducationFeeType>(initial?.feeType ?? "Tuition");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [period, setPeriod] = useState(initial?.period ?? "");
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const parsedAmount = Number(amount);
+    if (!description.trim() || !Number.isFinite(parsedAmount) || parsedAmount <= 0 || parsedAmount + 0.005 < minimumAmount) {
+      setError(`Enter a description and an amount of at least ${minimumAmount.toFixed(2)}.`);
+      return;
+    }
+    onSave({ feeType, description: description.trim(), period: period.trim(), amount: parsedAmount, dueDate, notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit fee charge" : "Add fee charge / installment"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Fee type"><Select value={feeType} onChange={(event) => setFeeType(event.target.value as EducationFeeType)}>{EDUCATION_FEE_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field>
+      <Field label="Charge description"><Input autoFocus required maxLength={120} placeholder="e.g. Tuition fee" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+      <Field label="Term / installment"><Input maxLength={100} placeholder="e.g. Installment 1" value={period} onChange={(event) => setPeriod(event.target.value)} /></Field>
+      <Field label="Amount"><Input required type="number" min={Math.max(0.01, minimumAmount)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
+      <Field label="Due date (optional)"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
+      <Field className="full" label="Notes"><Input maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save charge" : "Add charge"}</Button></div></form>
+  </Modal>;
+}
+
+function EducationPaymentModal({ initial, currency, maxAmount, charges, payments, onClose, onSave }: {
   initial: EducationPayment | null;
   currency: Currency;
   maxAmount: number | null;
+  charges: EducationFeeCharge[];
+  payments: EducationPayment[];
   onClose: () => void;
   onSave: (payment: Omit<EducationPayment, "id">) => void;
 }) {
@@ -1950,6 +2102,7 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
   const [method, setMethod] = useState(initial?.method ?? "Bank transfer");
   const [reference, setReference] = useState(initial?.reference ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [allocations, setAllocations] = useState((initial?.allocations ?? []).map((allocation) => ({ chargeId: allocation.chargeId, amount: String(allocation.amount) })));
   const [error, setError] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -1966,7 +2119,32 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
       setError(`This payment would exceed the remaining total fees of ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}.`);
       return;
     }
-    onSave({ feeType, period: period.trim(), amount: paid, date, method, reference: reference.trim(), notes: notes.trim() });
+    const parsedAllocations = allocations.map((allocation) => ({ chargeId: allocation.chargeId, amount: Number(allocation.amount) }));
+    if (charges.length && (!parsedAllocations.length || parsedAllocations.some((allocation) => !allocation.chargeId || !Number.isFinite(allocation.amount) || allocation.amount <= 0))) {
+      setError("Allocate this payment to at least one fee charge, using a valid amount for each.");
+      return;
+    }
+    if (parsedAllocations.length) {
+      if (new Set(parsedAllocations.map((allocation) => allocation.chargeId)).size !== parsedAllocations.length ||
+        Math.abs(parsedAllocations.reduce((sum, allocation) => sum + allocation.amount, 0) - paid) >= 0.005) {
+        setError("Allocation amounts must be unique per charge and add up to the payment amount.");
+        return;
+      }
+      const allocationsByCharge = new Map<string, number>();
+      for (const payment of payments) {
+        if (payment.id === initial?.id) continue;
+        for (const allocation of payment.allocations ?? []) allocationsByCharge.set(allocation.chargeId, (allocationsByCharge.get(allocation.chargeId) ?? 0) + allocation.amount);
+      }
+      for (const allocation of parsedAllocations) {
+        const charge = charges.find((entry) => entry.id === allocation.chargeId);
+        const alreadyAllocated = allocationsByCharge.get(allocation.chargeId) ?? 0;
+        if (!charge || alreadyAllocated + allocation.amount > charge.amount + 0.005) {
+          setError("An allocation exceeds the remaining amount on its fee charge.");
+          return;
+        }
+      }
+    }
+    onSave({ feeType, period: period.trim(), amount: paid, date, method, reference: reference.trim(), notes: notes.trim(), ...(parsedAllocations.length ? { allocations: parsedAllocations } : {}) });
   }
 
   return <Modal title={initial ? "Edit fee payment" : "Record fee payment"} onClose={onClose}><form onSubmit={submit}><div className="form-grid">
@@ -1976,6 +2154,14 @@ function EducationPaymentModal({ initial, currency, maxAmount, onClose, onSave }
     <Field label="Payment date"><DateInput required value={date} onValueChange={setDate} /></Field>
     <Field label="Payment method"><Select value={method} onChange={(event) => setMethod(event.target.value)}><option>Bank transfer</option><option>UPI</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Online portal</option><option>Other</option></Select></Field>
     <Field label="Receipt / reference"><Input maxLength={120} placeholder="Optional" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
+    {charges.length > 0 && <div className="full"><div className="education-section-head"><strong>Allocate payment to fee charges</strong><Button size="sm" type="button" variant="outline" onClick={() => setAllocations((current) => [...current, { chargeId: "", amount: "" }])}><Plus size={12} />Add allocation</Button></div>
+      {allocations.map((allocation, index) => <div className="form-grid" key={`${index}-${allocation.chargeId}`} style={{ marginTop: 8 }}>
+        <Field label="Fee charge"><Select required value={allocation.chargeId} onChange={(event) => setAllocations((current) => current.map((entry, row) => row === index ? { ...entry, chargeId: event.target.value } : entry))}><option value="">Select charge</option>{charges.map((charge) => <option key={charge.id} value={charge.id}>{charge.description}{charge.period ? ` · ${charge.period}` : ""} · {new Intl.NumberFormat(undefined, { style: "currency", currency }).format(charge.amount)}</option>)}</Select></Field>
+        <Field label={`Allocated amount (${currency})`}><Input required type="number" min="0.01" step="0.01" value={allocation.amount} onChange={(event) => setAllocations((current) => current.map((entry, row) => row === index ? { ...entry, amount: event.target.value } : entry))} /></Field>
+        <Button type="button" variant="outline" onClick={() => setAllocations((current) => current.filter((_, row) => row !== index))}><X size={12} />Remove</Button>
+      </div>)}
+      {!allocations.length && <p className="section-description">Add one or more allocations; together they must equal the payment amount.</p>}
+    </div>}
     <Field className="full" label="Notes"><Input maxLength={5000} placeholder="Optional payment notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
   </div>{maxAmount === null ? <div className="alert" style={{ marginTop: 12 }} role="status">Add the tuition, admission, school van / transport, or other fee charges to this education record before recording a payment.</div> : <div className={`alert${maxAmount <= 0 && !initial ? " alert-error" : ""}`} style={{ marginTop: 12 }} role="status">{maxAmount <= 0 && !initial ? "No balance is available. Review the fee charges and existing payments before adding another payment." : `Remaining fees available for payment: ${new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Math.max(0, maxAmount))}. Admission and van payments count toward the same total due.`}</div>}{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={!initial && (maxAmount === null || maxAmount <= 0)} title={!initial && (maxAmount === null || maxAmount <= 0) ? "Set fee charges and a positive remaining balance first" : undefined}>{initial ? "Save payment" : "Add payment"}</Button></div></form></Modal>;
 }
@@ -1991,12 +2177,17 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     | { kind: "subject"; initial: EducationSubject | null }
     | { kind: "exam"; initial: EducationExam | null }
     | { kind: "payment"; initial: EducationPayment | null }
+    | { kind: "attendance"; mode: "monthly" | "daily"; initial: EducationMonthlyAttendance | EducationDailyAttendance | null }
+    | { kind: "charge"; initial: EducationFeeCharge | null }
     | null
   >(null);
   const [expanded, setExpanded] = useState(false);
   const subjects = record.subjects ?? [];
   const exams = record.exams ?? [];
   const payments = record.payments ?? [];
+  const feeCharges = record.feeCharges ?? [];
+  const monthlyAttendance = record.monthlyAttendance ?? [];
+  const dailyAttendance = record.dailyAttendance ?? [];
   const loggedPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
   const totalPaid = educationTotalPaid(record);
   const totalDue = educationTotalDue(record);
@@ -2025,9 +2216,24 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     }
   }
 
+  function allocatedToCharge(chargeId: string, exceptPaymentId?: string) {
+    return payments.reduce((total, payment) => payment.id === exceptPaymentId ? total :
+      total + (payment.allocations ?? []).filter((allocation) => allocation.chargeId === chargeId).reduce((sum, allocation) => sum + allocation.amount, 0), 0);
+  }
+
+  function removeFeeCharge(charge: EducationFeeCharge) {
+    if (allocatedToCharge(charge.id) > 0) {
+      window.alert("This charge has payment allocations. Reassign or remove those allocations before archiving the charge.");
+      return;
+    }
+    if (window.confirm(`Move the ${charge.description} charge to the archive?`)) {
+      onUpdate({ ...record, feeCharges: feeCharges.filter((entry) => entry.id !== charge.id) });
+    }
+  }
+
   return <Card className={`education-card${expanded ? " expanded" : ""}`}>
     <div className="education-card-head">
-      <div className="education-card-title"><div className="education-icon"><GraduationCap size={17} /></div><div><h2>{record.studentName}</h2><p>{[record.institution, record.gradeCourse, record.academicYear, record.level].filter(Boolean).join(" · ")}</p></div></div>
+      <div className="education-card-title"><div className="education-icon"><GraduationCap size={17} /></div><div><h2>{record.studentName}</h2><p>{[record.institution, record.gradeCourse, record.section ? `Section ${record.section}` : "", record.rollNumber ? `Roll ${record.rollNumber}` : "", record.academicYear, record.level].filter(Boolean).join(" · ")}</p></div></div>
       <div className="education-card-actions">
         <button className="education-toggle" aria-expanded={expanded} aria-controls={`education-details-${record.id}`} onClick={() => setExpanded((value) => !value)}><ChevronRight size={14} /><span>{expanded ? "Hide" : "Show"}</span><span className="sr-only">details for {record.studentName} {record.academicYear}</span></button>
         <Badge tone={record.status === "Current" ? "green" : "neutral"}>{record.status}</Badge>
@@ -2040,6 +2246,8 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     <div className="education-details">
       <div><span>Education level</span><strong>{record.level}</strong></div>
       {record.boardUniversity && <div><span>Board / university</span><strong>{record.boardUniversity}</strong></div>}
+      {record.section && <div><span>Section</span><strong>{record.section}</strong></div>}
+      {record.rollNumber && <div><span>Roll number</span><strong>{record.rollNumber}</strong></div>}
       {record.startDate && <div><span>Start date</span><strong>{dateLabel(record.startDate)}</strong></div>}
       {record.endDate && <div><span>End / completion</span><strong>{dateLabel(record.endDate)}</strong></div>}
       {record.annualFee !== null && <div><span>Annual tuition</span><strong>{formatAmount(record.annualFee)}</strong></div>}
@@ -2053,6 +2261,14 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {(totalDue !== null || totalPaid > 0) && <div><span>{remainingOwing !== null && remainingOwing < 0 ? "Overpaid (total fees)" : "Remaining total fees"}</span><strong>{totalDue === null ? "Add fee amounts to calculate" : formatAmount(Math.abs(remainingOwing ?? balance ?? 0))}</strong></div>}
       {record.contactName && <div><span>School contact</span><strong>{record.contactName}</strong></div>}
       {record.contact && <div><span>Contact details</span><strong>{record.contact}</strong></div>}
+      {record.reportSummary && <>
+        {record.reportSummary.totalMarksObtained !== null && record.reportSummary.totalMaximumMarks !== null && <div><span>Official total</span><strong>{record.reportSummary.totalMarksObtained} / {record.reportSummary.totalMaximumMarks}</strong></div>}
+        {record.reportSummary.percentage !== null && <div><span>Official percentage</span><strong>{record.reportSummary.percentage}%</strong></div>}
+        {record.reportSummary.grade && <div><span>Overall grade</span><strong>{record.reportSummary.grade}</strong></div>}
+        {record.reportSummary.rank && <div><span>Rank</span><strong>{record.reportSummary.rank}</strong></div>}
+        {record.reportSummary.result && <div><span>Result / promotion</span><strong>{record.reportSummary.result}</strong></div>}
+        {record.reportSummary.teacherRemark && <div><span>Teacher remark</span><strong>{record.reportSummary.teacherRemark}</strong></div>}
+      </>}
     </div>
     <section className="education-section">
       <div className="education-section-head"><div><h3><BookOpen size={14} />Subjects / courses</h3><p>{subjects.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "subject", initial: null })}><Plus size={12} />Add subject</Button></div>
@@ -2060,11 +2276,26 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div>
-      {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
+      {exams.length ? <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
+    </section>
+    <section className="education-section">
+      <div className="education-section-head"><div><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
+      {monthlyAttendance.length > 0 && <div className="education-entry-list">{[...monthlyAttendance].sort((a, b) => b.month.localeCompare(a.month)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>{entry.daysPresent} / {entry.workingDays} days present{entry.workingDays ? ` · ${(entry.daysPresent / entry.workingDays * 100).toFixed(1)}%` : ""}</span>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit monthly attendance" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive monthly attendance" onClick={() => { if (window.confirm(`Move the ${entry.month} attendance summary to the archive?`)) onUpdate({ ...record, monthlyAttendance: monthlyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
+      {dailyAttendance.length > 0 && <div className="education-entry-list">{[...dailyAttendance].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{dateLabel(entry.date)} · {entry.status}</strong>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit daily attendance" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive daily attendance" onClick={() => { if (window.confirm(`Move ${dateLabel(entry.date)} attendance to the archive?`)) onUpdate({ ...record, dailyAttendance: dailyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
+      {!monthlyAttendance.length && !dailyAttendance.length && <p className="education-empty">Enter monthly report-card totals or individual dated attendance.</p>}
+      {monthlyAttendance.some((month) => dailyAttendance.some((day) => day.date.startsWith(month.month))) && <p className="section-description">Monthly summaries include months that also have daily entries; avoid adding the same attendance twice to any totals.</p>}
+    </section>
+    <section className="education-section">
+      <div className="education-section-head"><div><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
+      {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
+      {feeCharges.length ? <div className="education-entry-list">{feeCharges.map((charge) => {
+        const allocated = allocatedToCharge(charge.id);
+        return <div className="education-entry" key={charge.id}><div><strong>{charge.feeType} · {charge.description} · {formatAmount(charge.amount)}</strong><span>{[charge.period, charge.dueDate ? `Due ${dateLabel(charge.dueDate)}` : "", `Paid ${formatAmount(allocated)}`, `Balance ${formatAmount(Math.max(0, charge.amount - allocated))}`].filter(Boolean).join(" · ")}</span>{charge.notes && <small>{charge.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${charge.description}`} onClick={() => setEditor({ kind: "charge", initial: charge })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${charge.description}`} onClick={() => removeFeeCharge(charge)}><Archive size={13} /></button></div></div>;
+      })}</div> : <p className="education-empty">Add itemized tuition, transport, admission, or other charges. Older annual totals remain supported.</p>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><div><h3><Wallet size={14} />Fee payments</h3><p>{payments.length} logged · {formatAmount(loggedPaid)} paid across all fee types</p></div><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record payment</Button></div>
-      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}</span>{payment.notes && <small><LinkifiedText>{payment.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${payment.period} payment`} onClick={() => onUpdate({ ...record, payments: [{ ...payment, id: createId() }, ...payments] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${payment.period} payment`} onClick={() => removePayment(payment)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
+      {payments.length ? <div className="education-entry-list">{[...payments].sort((a, b) => b.date.localeCompare(a.date)).map((payment) => <div className="education-entry" key={payment.id}><div><strong>{payment.feeType ?? inferPaymentFeeType(payment.period)} · {payment.period} · {formatAmount(payment.amount)}</strong><span>{dateLabel(payment.date)} · {payment.method}{payment.reference ? ` · Ref: ${payment.reference}` : ""}{payment.allocations?.length ? ` · Allocated to ${payment.allocations.map((allocation) => feeCharges.find((charge) => charge.id === allocation.chargeId)?.description ?? "charge").join(", ")}` : ""}</span>{payment.notes && <small><LinkifiedText>{payment.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${payment.period} payment`} onClick={() => setEditor({ kind: "payment", initial: payment })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${payment.period} payment`} onClick={() => removePayment(payment)}><Archive size={13} /></button></div></div>)}</div> : <p className="education-empty">Record tuition installments, admission charges, school van fees, or other payments.</p>}
     </section>
     {record.link && <a className="personal-document-link" href={record.link} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
     {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
@@ -2079,9 +2310,32 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       onUpdate({ ...record, exams: current ? exams.map((entry) => entry.id === current.id ? { ...exam, id: current.id } : entry) : [{ ...exam, id: createId() }, ...exams] });
       setEditor(null);
     }} />}
-    {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} maxAmount={totalDue === null ? null : Math.max(0, totalDue - (totalPaid - (editor.initial?.amount ?? 0)))} onClose={() => setEditor(null)} onSave={(payment) => {
+    {editor?.kind === "payment" && <EducationPaymentModal key={editor.initial?.id ?? "new-payment"} initial={editor.initial} currency={record.currency} charges={feeCharges} payments={payments} maxAmount={totalDue === null ? null : Math.max(0, totalDue - (totalPaid - (editor.initial?.amount ?? 0)))} onClose={() => setEditor(null)} onSave={(payment) => {
       const current = editor.initial;
       onUpdate({ ...record, payments: current ? payments.map((entry) => entry.id === current.id ? { ...payment, id: current.id } : entry) : [{ ...payment, id: createId() }, ...payments] });
+      setEditor(null);
+    }} />}
+    {editor?.kind === "attendance" && <EducationAttendanceModal key={editor.initial?.id ?? `new-${editor.mode}-attendance`} initial={editor.initial} mode={editor.mode} onClose={() => setEditor(null)} onSave={(entry) => {
+      if ("month" in entry) {
+        const current = editor.initial && "month" in editor.initial ? editor.initial : null;
+        if (monthlyAttendance.some((item) => item.month === entry.month && item.id !== current?.id)) {
+          window.alert("A monthly attendance summary already exists for that month. Edit it instead of adding a duplicate.");
+          return;
+        }
+        onUpdate({ ...record, monthlyAttendance: current ? monthlyAttendance.map((item) => item.id === current.id ? { ...entry, id: current.id } : item) : [{ ...entry, id: createId() }, ...monthlyAttendance] });
+      } else {
+        const current = editor.initial && "date" in editor.initial ? editor.initial : null;
+        if (dailyAttendance.some((item) => item.date === entry.date && item.id !== current?.id)) {
+          window.alert("Daily attendance already exists for that date. Edit it instead of adding a duplicate.");
+          return;
+        }
+        onUpdate({ ...record, dailyAttendance: current ? dailyAttendance.map((item) => item.id === current.id ? { ...entry, id: current.id } : item) : [{ ...entry, id: createId() }, ...dailyAttendance] });
+      }
+      setEditor(null);
+    }} />}
+    {editor?.kind === "charge" && <EducationFeeChargeModal key={editor.initial?.id ?? "new-fee-charge"} initial={editor.initial} minimumAmount={editor.initial ? allocatedToCharge(editor.initial.id) : 0} onClose={() => setEditor(null)} onSave={(charge) => {
+      const current = editor.initial;
+      onUpdate({ ...record, feeCharges: current ? feeCharges.map((entry) => entry.id === current.id ? { ...charge, id: current.id } : entry) : [{ ...charge, id: createId() }, ...feeCharges] });
       setEditor(null);
     }} />}
   </Card>;
@@ -2164,7 +2418,10 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
     [record.studentName, record.institution, record.level, record.gradeCourse,
       record.academicYear, record.boardUniversity, record.contactName, record.contact, record.notes,
       ...(record.subjects ?? []).flatMap((subject) => [subject.name, subject.code, subject.notes]),
-      ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.grade, exam.notes]),
+      ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.grade, exam.teacherRemark ?? "", exam.notes]),
+      ...(record.monthlyAttendance ?? []).flatMap((entry) => [entry.month, entry.notes]),
+      ...(record.dailyAttendance ?? []).flatMap((entry) => [entry.date, entry.status, entry.notes]),
+      ...(record.feeCharges ?? []).flatMap((charge) => [charge.feeType, charge.description, charge.period, charge.notes]),
       ...(record.payments ?? []).flatMap((payment) => [payment.feeType ?? "", payment.period, payment.method, payment.reference, payment.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort(compareEducationRecords);
@@ -2188,6 +2445,12 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
         subjects: [],
         exams: [],
         payments: [],
+        section: "",
+        rollNumber: "",
+        reportSummary: undefined,
+        monthlyAttendance: [],
+        dailyAttendance: [],
+        feeCharges: [],
       },
     });
   }
@@ -2195,7 +2458,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
   return <>
     <PageHeading eyebrow="Growing and learning" title="Schools & Colleges" subtitle="Select a student to review their academic years, subjects, results, and term payments." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
     <div className="alert"><GraduationCap size={15} style={{ flex: "none", marginTop: 1 }} /><span>Each record represents one academic year at a school, college, or university. Add flexible terms, quarters, semesters, or installments as separate payments; assessment types and grading systems can vary by institution. Records are readable in the private GitHub repository by collaborators and remain in its history; avoid storing student ID numbers or sensitive health information.</span></div>
-    <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, payment..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
+    <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, attendance, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
     <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
     {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={records.length ? "No matching records" : "No education records yet"} description={records.length ? "Try another search or filter." : "Add a school or college record to start an education timeline."} /></Card>}
     {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
