@@ -92,7 +92,7 @@ The guarded SQL console is part of the current source changes and is available o
 - `UPDATE` and `DELETE` require a `WHERE` clause.
 - Before a statement runs, the server parses and validates it; the screen shows the exact statement for review.
 - Every write requires checking an acknowledgement and typing its command-specific phrase (`EXECUTE INSERT`, `EXECUTE UPDATE`, or `EXECUTE DELETE`).
-- DDL (including `CREATE TABLE`), transaction commands, multiple statements, CTEs/subqueries, function calls, `RETURNING`, and the protected Daybook core tables are blocked.
+- DDL (including `CREATE TABLE`), transaction commands, multiple statements, CTEs/subqueries, function calls, `RETURNING`, `ON CONFLICT`, and the protected Daybook core tables are blocked.
 - Writes are permanent and bypass the Daybook archive. Database triggers or foreign-key cascades may change linked data. Download a JSON backup before using write statements.
 - The confirmation step helps prevent accidental execution; it is not separate user authorization. Anyone with the shared Daybook password can use the screen.
 
