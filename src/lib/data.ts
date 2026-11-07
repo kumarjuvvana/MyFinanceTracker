@@ -673,7 +673,11 @@ export function monthKey(date: string): string {
 }
 
 export function exportCsv(purchases: Purchase[]): string {
-  const quote = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+  const quote = (value: string | number) => {
+    const text = String(value);
+    const safeText = typeof value === "string" && /^[\s\u0000-\u001f]*[=+\-@]/.test(text) ? `'${text}` : text;
+    return `"${safeText.replace(/"/g, '""')}"`;
+  };
   return [
     ["Date", "Item", "Category", "Quantity", "Unit", "Price", "Store"],
     ...purchases.map((purchase) => [
@@ -686,4 +690,26 @@ export function exportCsv(purchases: Purchase[]): string {
       purchase.store,
     ]),
   ].map((row) => row.map(quote).join(",")).join("\r\n");
+}
+
+export function exportCsvRows<T extends object>(records: readonly T[]): string {
+  const columns = [...new Set(records.flatMap((record) => Object.keys(record)))];
+  if (!columns.length) return "";
+  const quote = (value: unknown) => {
+    const text = value === null || value === undefined
+      ? ""
+      : typeof value === "string"
+        ? value
+        : typeof value === "object"
+          ? JSON.stringify(value)
+          : String(value);
+    const safeText = typeof value === "string" && /^[\s\u0000-\u001f]*[=+\-@]/.test(text)
+      ? `'${text}`
+      : text;
+    return `"${safeText.replace(/"/g, '""')}"`;
+  };
+  return [
+    columns.map(quote).join(","),
+    ...records.map((record) => columns.map((column) => quote(Reflect.get(record, column))).join(",")),
+  ].join("\r\n");
 }

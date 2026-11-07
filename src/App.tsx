@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
-import { createId, exportCsv, formatCurrency as formatMoney, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
+import { createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
@@ -4821,8 +4821,57 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onGroupMenusChange, onMenuSortOrderChange, onImport, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onImport: (file: File) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onGroupMenusChange, onMenuSortOrderChange, onPreviewImport, onRestore, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onPreviewImport: (file: File) => Promise<TrackerData | null>; onRestore: (backup: TrackerData) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [restorePreview, setRestorePreview] = useState<{ backup: TrackerData; fileName: string } | null>(null);
+  const restoreCounts = restorePreview ? [...new Set([...Object.keys(data), ...Object.keys(restorePreview.backup)])]
+    .flatMap((key) => {
+      const currentRows = Reflect.get(data, key);
+      const backupRows = Reflect.get(restorePreview.backup, key);
+      if (!Array.isArray(currentRows) && !Array.isArray(backupRows)) return [];
+      const label = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (character) => character.toLocaleUpperCase());
+      return [{ label, current: Array.isArray(currentRows) ? currentRows.length : 0, backup: Array.isArray(backupRows) ? backupRows.length : 0 }];
+    })
+    .filter((entry) => entry.current || entry.backup) : [];
+  function downloadSectionCsv(filename: string, rows: object[]) {
+    if (!rows.length) return;
+    downloadBlob(new Blob(["\uFEFF", exportCsvRows(rows)], { type: "text/csv;charset=utf-8" }), `daybook-${filename}-${today()}.csv`);
+  }
+  const vehicleNames = new Map((data.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle.name]));
+  const stockNames = new Map((data.stocks ?? []).map((stock) => [stock.id, `${stock.symbol} · ${stock.name}`]));
+  const stockRows: object[] = [
+    ...(data.stocks ?? []).map((stock) => ({ recordType: "Stock", ...stock })),
+    ...(data.stockQuotes ?? []).map((quote) => ({ recordType: "Price quote", stock: stockNames.get(quote.stockId) ?? quote.stockId, ...quote })),
+  ];
+  const subscriptionRows: object[] = [];
+  for (const account of data.subscriptions ?? []) {
+    if (account.transactions.length) {
+      for (const transaction of account.transactions) subscriptionRows.push({
+        accountName: account.name, category: account.category, provider: account.provider,
+        billingType: account.billingType, currency: account.currency, accountReference: account.accountReference,
+        accountNotes: account.notes, transactionType: transaction.type, ...transaction,
+      });
+    } else {
+      subscriptionRows.push({
+        accountName: account.name, category: account.category, provider: account.provider,
+        billingType: account.billingType, currency: account.currency, accountReference: account.accountReference,
+        accountNotes: account.notes, transactionType: "", transactionDate: "", periodStart: "",
+        periodEnd: "", dueDate: "", amount: "", paid: "", paymentDate: "", reference: "", notes: "",
+      });
+    }
+  }
+  const educationRows: object[] = [
+    ...(data.educationRecords ?? []).map((record) => ({ recordType: "School / college", ...record })),
+    ...(data.personalEducation ?? []).map((record) => ({ recordType: "Personal education", ...record })),
+    ...(data.professionalQualifications ?? []).map((record) => ({ recordType: "Professional qualification", ...record })),
+    ...(data.workExperiences ?? []).map((record) => ({ recordType: "Work experience", ...record })),
+    ...(data.professionalSkills ?? []).map((record) => ({ recordType: "Professional skill", ...record })),
+  ];
+  const vehicleRows: object[] = [
+    ...(data.vehicles ?? []).map((vehicle) => ({ recordType: "Vehicle", vehicleName: vehicle.name, ...vehicle })),
+    ...(data.vehicleJourneys ?? []).map((journey) => ({ recordType: "Journey", vehicleName: vehicleNames.get(journey.vehicleId) ?? "", ...journey })),
+    ...(data.vehicleMaintenance ?? []).map((entry) => ({ recordType: entry.type, vehicleName: vehicleNames.get(entry.vehicleId) ?? "", ...entry })),
+  ];
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through Supabase and can be backed up or moved whenever you like." />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records sync to Supabase. Account credentials are encrypted separately; other records remain readable to people with the Daybook password or Supabase service-role access. Sign in with your Daybook access password on each device. Display preferences stay in this browser.</span></div>
     <Card className="settings-card theme-picker-card">
@@ -4840,14 +4889,16 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     <Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card>
     <div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a backup</h3><p>Save your shopping data, product and store master data, and reminders as versioned JSON.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download JSON backup</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a full backup</h3><p>Save all Daybook records, including archive and encrypted credential-vault data, as versioned JSON. Uploaded document files are stored separately and are not included; protect the downloaded backup because it contains your personal records.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download full JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
         const blob = new Blob([exportCsv(data.purchases)], { type: "text/csv;charset=utf-8" });
         downloadBlob(blob, `daybook-purchases-${today()}.csv`);
       }}><ArrowDownToLine size={14} /> Export purchases CSV</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Import a Daybook JSON backup. Your current data will be replaced after validation.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={(event) => { const file = event.target.files?.[0]; if (file) onImport(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export other sections</h3><p>Download spreadsheet-friendly CSV files. Related history is included in each section export; nested education details are preserved in their cells.</p><div className="connector-actions"><Button variant="outline" disabled={!stockRows.length} onClick={() => downloadSectionCsv("stocks", stockRows)}><ArrowDownToLine size={14} />Stocks ({stockRows.length})</Button><Button variant="outline" disabled={!subscriptionRows.length} onClick={() => downloadSectionCsv("subscriptions", subscriptionRows)}><ArrowDownToLine size={14} />Subscriptions ({(data.subscriptions ?? []).length})</Button><Button variant="outline" disabled={!educationRows.length} onClick={() => downloadSectionCsv("education", educationRows)}><ArrowDownToLine size={14} />Education ({educationRows.length})</Button><Button variant="outline" disabled={!vehicleRows.length} onClick={() => downloadSectionCsv("vehicles", vehicleRows)}><ArrowDownToLine size={14} />Vehicles ({vehicleRows.length})</Button></div></Card>
+      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Choose a Daybook JSON backup to validate and preview its section counts before replacing your current shared data.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) { const backup = await onPreviewImport(file); if (backup) setRestorePreview({ backup, fileName: file.name }); } input.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
       <Card className="settings-card danger-card"><div className="settings-icon"><Trash2 size={17} /></div><h3>Clear all data</h3><p>Remove your shopping list, trips and purchase history from this browser. This cannot be undone.</p><Button variant="danger" onClick={onClear}><Trash2 size={14} /> Clear my data</Button></Card></div>
     <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">At a glance</h2><p className="section-description">What's saved in shared data right now</p></div><Database size={16} color="#829080" /></div><div className="stat-grid" style={{ gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}><div><div className="stat-foot">Shopping list items</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.items.length}</div></div><div><div className="stat-foot">Purchases recorded</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.purchases.length}</div></div><div><div className="stat-foot">Shopping trips</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.trips.length}</div></div><div><div className="stat-foot">Saved products</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.products ?? []).length}</div></div><div><div className="stat-foot">Saved stores</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stores ?? []).length}</div></div><div><div className="stat-foot">Notes & reminders</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.reminders ?? []).length}</div></div><div><div className="stat-foot">Tracked stocks</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stocks ?? []).length}</div></div><div><div className="stat-foot">Saved stock prices</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stockQuotes ?? []).length}</div></div></div></Card>
+    {restorePreview && <Modal title="Preview backup restore" onClose={() => setRestorePreview(null)} wide><p className="section-description">File: <strong>{restorePreview.fileName}</strong></p><div className="alert alert-error" role="alert" style={{ marginTop: 14 }}>Continuing will replace your current Daybook data with this backup and save it to Supabase. This cannot be automatically undone. Uploaded document files are not included in JSON backups.</div><div className="backup-preview-table"><div className="backup-preview-row backup-preview-header"><strong>Section</strong><strong>Current</strong><strong>Backup</strong></div>{restoreCounts.map((entry) => <div className="backup-preview-row" key={entry.label}><span>{entry.label}</span><span>{entry.current}</span><span>{entry.backup}</span></div>)}</div><div className="modal-actions"><Button type="button" variant="outline" onClick={() => setRestorePreview(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => { onRestore(restorePreview.backup); setRestorePreview(null); }}>Replace current data</Button></div></Modal>}
   </>;
 }
 
@@ -6339,21 +6390,25 @@ export default function App() {
       setError(caught instanceof Error ? caught.message : "The document record could not be copied.");
     }
   }
-  async function importBackup(file: File) {
+  async function previewBackup(file: File): Promise<TrackerData | null> {
     try {
       const parsed: unknown = JSON.parse(await file.text());
       if (!validateData(parsed)) throw new Error("This file is not a valid Daybook backup (version 1). Your current data has not been changed.");
-      setData(normalizeTrackerData(parsed));
-      setError("");
-      setNotice("Backup loaded. Saving to Supabase. Uploaded file attachments are not included in JSON backups.");
+      return normalizeTrackerData(parsed);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We couldn't read that backup file. Your current data has not been changed.");
+      return null;
     }
+  }
+  function restoreBackup(backup: TrackerData) {
+    setData(backup);
+    setError("");
+    setNotice("Backup restored. Saving to Supabase. Uploaded document files are stored separately and are not included in JSON backups.");
   }
   function exportBackup() {
     if (!data) return;
     downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `daybook-backup-${today()}.json`);
-    setNotice("Your backup is ready to save.");
+    setNotice("Your full backup is ready to save. Keep it private; it contains your personal records and encrypted vault data.");
   }
   function clearData() {
     if (!data) return;
@@ -6453,7 +6508,7 @@ export default function App() {
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onGroupMenusChange={setGroupMenus} onMenuSortOrderChange={setMenuSortOrder} onImport={importBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onGroupMenusChange={setGroupMenus} onMenuSortOrderChange={setMenuSortOrder} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
