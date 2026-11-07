@@ -407,13 +407,34 @@ function TripModal({ data, onClose, onSave }: { data: TrackerData; onClose: () =
 function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: TrackerData; onAdd: () => void; onSave: (trip: ShoppingTrip) => void; onCopy: (trip: ShoppingTrip) => void; onDelete: (trip: ShoppingTrip) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const [editing, setEditing] = useState<ShoppingTrip | null>(null);
-  const trips = [...data.trips].sort((a, b) => b.date.localeCompare(a.date));
+  const [search, setSearch] = useState("");
+  const [store, setStore] = useState("All stores");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("date-newest");
+  const stores = [...new Set(data.trips.map((trip) => trip.store))].sort((a, b) => a.localeCompare(b));
+  const trips = [...data.trips].filter((trip) => {
+    const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
+    const searchable = [trip.store, trip.notes, ...purchases.flatMap((purchase) => [purchase.itemName, purchase.category, purchase.store])]
+      .join(" ").toLocaleLowerCase();
+    return (!search || searchable.includes(search.toLocaleLowerCase())) &&
+      (store === "All stores" || trip.store === store) && (!from || trip.date >= from) && (!to || trip.date <= to);
+  }).sort((a, b) => {
+    if (sortBy === "date-oldest") return a.date.localeCompare(b.date);
+    if (sortBy === "store") return a.store.localeCompare(b.store) || b.date.localeCompare(a.date);
+    if (sortBy === "total-highest") {
+      const total = (trip: ShoppingTrip) => trip.purchaseIds.reduce((sum, id) => sum + (data.purchases.find((purchase) => purchase.id === id)?.price ?? 0), 0);
+      return total(b) - total(a) || b.date.localeCompare(a.date);
+    }
+    return b.date.localeCompare(a.date);
+  });
   return <><PageHeading eyebrow="Make a little plan" title="Shopping trips" subtitle="Your errands, saved in one easy place." action={<Button onClick={onAdd}><Plus size={15} /> Plan a trip</Button>} />
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search shopping trips" placeholder="Search stores, notes, or purchased items..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter trips by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /><Select aria-label="Sort shopping trips" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="store">Store (A–Z)</option><option value="total-highest">Total (highest)</option></Select><Badge>{trips.length} {trips.length === 1 ? "trip" : "trips"}</Badge></div>
     {trips.length ? <div className="trip-grid">{trips.map((trip) => {
       const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
       const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
       return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} title="Copy trip without its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
-    })}</div> : <Card><EmptyState icon={<ShoppingBag size={18} />} title="No trips planned just yet" description="Create a trip, choose a store and add items from your shopping list." /></Card>}
+    })}</div> : <Card><EmptyState icon={<ShoppingBag size={18} />} title={data.trips.length ? "No trips match your filters" : "No trips planned just yet"} description={data.trips.length ? "Try changing the search, store, or date range." : "Create a trip, choose a store and add items from your shopping list."} /></Card>}
     {editing && <TripEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(trip) => { onSave(trip); setEditing(null); }} />}
   </>;
 }
@@ -474,11 +495,30 @@ function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData
 
 function PriceHistory({ data }: { data: TrackerData }) {
   const formatCurrency = useCurrencyFormatter();
+  const [search, setSearch] = useState("");
   const [item, setItem] = useState("All items");
+  const [store, setStore] = useState("All stores");
+  const [category, setCategory] = useState("All categories");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("date-oldest");
   const names = [...new Set(data.purchases.map((purchase) => purchase.itemName))].sort();
-  const purchases = [...data.purchases].filter((purchase) => item === "All items" || purchase.itemName === item).sort((a, b) => a.itemName.localeCompare(b.itemName) || a.date.localeCompare(b.date));
+  const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort((a, b) => a.localeCompare(b));
+  const categories = [...new Set(data.purchases.map((purchase) => purchase.category))].sort((a, b) => a.localeCompare(b));
+  const purchases = [...data.purchases].filter((purchase) =>
+    (!search || [purchase.itemName, purchase.store, purchase.category, purchase.unit].join(" ").toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+    (item === "All items" || purchase.itemName === item) &&
+    (store === "All stores" || purchase.store === store) &&
+    (category === "All categories" || purchase.category === category) &&
+    (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) => {
+    if (sortBy === "date-newest") return b.date.localeCompare(a.date);
+    if (sortBy === "item") return a.itemName.localeCompare(b.itemName) || a.date.localeCompare(b.date);
+    if (sortBy === "price-highest") return b.price - a.price;
+    if (sortBy === "unit-price-highest") return b.price / b.quantity - a.price / a.quantity;
+    return a.date.localeCompare(b.date) || a.itemName.localeCompare(b.itemName);
+  });
   return <><PageHeading eyebrow="A little perspective" title="Item price history" subtitle="See how the things you buy have changed over time." />
-    <div className="toolbar"><div style={{ display: "flex", alignItems: "center", gap: 8, color: "#818980", fontSize: 11 }}><Filter size={14} /> Showing prices for</div><Select aria-label="Filter price history by item" style={{ width: 220 }} value={item} onChange={(e) => setItem(e.target.value)}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select><Badge>{purchases.length} records</Badge></div>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search price history" placeholder="Search items, stores, or categories..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter price history by item" value={item} onChange={(event) => setItem(event.target.value)}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select><Select aria-label="Filter price history by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select><Select aria-label="Filter price history by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /><Select aria-label="Sort price history" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-oldest">Date (oldest)</option><option value="date-newest">Date (newest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Price paid (highest)</option><option value="unit-price-highest">Unit price (highest)</option></Select><Badge>{purchases.length} records</Badge></div>
     <Card className="table-card"><table className="data-table"><thead><tr><th>Item</th><th>Date</th><th>Store</th><th>Quantity</th><th>Price paid</th><th>Unit price</th></tr></thead><tbody>{purchases.map((purchase) => <tr key={purchase.id}><td data-label="Item"><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{purchase.category}</div></td><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Store">{purchase.store}</td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Price paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Unit price">{formatCurrency(purchase.price / purchase.quantity)} <span className="table-secondary">/ {purchase.unit}</span></td></tr>)}</tbody></table>{purchases.length === 0 && <EmptyState icon={<ArrowLeftRight size={18} />} title="No price history yet" description="Record a few purchases to see their price history here." />}</Card>
   </>;
 }
@@ -664,15 +704,37 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
 }
 
 function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: ArchivedRecord[]; onRestore: (id: string) => void; onCopy: (id: string) => void; onDelete: (id: string) => void }) {
-  const sortedRecords = [...records].sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+  const [search, setSearch] = useState("");
+  const [collection, setCollection] = useState("All record types");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("date-newest");
+  const collections = [...new Set(records.flatMap((record) =>
+    Object.entries(record.snapshot).flatMap(([key, rows]) => Array.isArray(rows) && rows.length ? [key] : [])))].sort();
+  const sortedRecords = [...records].filter((record) => {
+    const recordCollections = Object.entries(record.snapshot).flatMap(([key, rows]) => Array.isArray(rows) && rows.length ? [key] : []);
+    const archivedDate = record.archivedAt.slice(0, 10);
+    return (!search || `${record.label} ${recordCollections.join(" ")}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+      (collection === "All record types" || recordCollections.includes(collection)) &&
+      (!from || archivedDate >= from) && (!to || archivedDate <= to);
+  }).sort((a, b) => {
+    if (sortBy === "date-oldest") return a.archivedAt.localeCompare(b.archivedAt);
+    if (sortBy === "label") return a.label.localeCompare(b.label);
+    if (sortBy === "records") {
+      const count = (record: ArchivedRecord) => Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
+      return count(b) - count(a) || b.archivedAt.localeCompare(a.archivedAt);
+    }
+    return b.archivedAt.localeCompare(a.archivedAt);
+  });
   return <><PageHeading eyebrow="Recover or permanently remove" title="Archive" subtitle="Deleted records are kept here until you restore them or permanently delete them. The encrypted credential vault is not included." />
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
     {sortedRecords.length ? <div className="reminder-page-list">{sortedRecords.map((record) => {
       const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) =>
         Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
       const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
       const hasDocuments = (record.snapshot.documents?.length ?? 0) > 0;
       return <Card key={record.id}><div className="card-head"><div><h2 className="section-title">{record.label}</h2><p className="section-description">Archived {new Date(record.archivedAt).toLocaleString()}{contents.length ? ` · ${contents.join(", ")}` : ""}</p></div><Badge>{count} {count === 1 ? "record" : "records"}</Badge></div><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><Button onClick={() => onRestore(record.id)}><ArrowDownToLine size={14} />Restore</Button>{!hasDocuments && <Button variant="outline" onClick={() => onCopy(record.id)}><Copy size={14} />Restore a copy</Button>}<Button variant="outline" onClick={() => { if (window.confirm(`Permanently delete "${record.label}" from the archive? This cannot be undone.`)) onDelete(record.id); }}><Trash2 size={14} />Delete permanently</Button></div></Card>;
-    })}</div> : <Card><EmptyState icon={<Archive size={18} />} title="The archive is empty" description="When you archive a record from any supported screen, it will be available here." /></Card>}
+    })}</div> : <Card><EmptyState icon={<Archive size={18} />} title={records.length ? "No archived records match" : "The archive is empty"} description={records.length ? "Try changing the search, record type, or date range." : "When you archive a record from any supported screen, it will be available here."} /></Card>}
   </>;
 }
 
@@ -2956,13 +3018,41 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
   const [vehicleEditor, setVehicleEditor] = useState<{ initial: Vehicle | null } | null>(null);
   const [journeyEditor, setJourneyEditor] = useState<{ vehicle: Vehicle; initial: VehicleJourney | null } | null>(null);
   const [maintenanceEditor, setMaintenanceEditor] = useState<{ vehicle: Vehicle; initial: VehicleMaintenance | null } | null>(null);
+  const [search, setSearch] = useState("");
+  const [fuelType, setFuelType] = useState("All fuel types");
+  const [recordType, setRecordType] = useState("All records");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const fuelTypes = [...new Set(vehicles.map((vehicle) => vehicle.fuelType).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const vehicleSearchText = (vehicle: Vehicle) => [vehicle.name, vehicle.make, vehicle.model, vehicle.year, vehicle.registration, vehicle.fuelType, vehicle.notes].join(" ").toLocaleLowerCase();
+  const journeySearchText = (journey: VehicleJourney) => [journey.date, journey.startLocation, journey.endLocation, journey.purpose, journey.notes].join(" ").toLocaleLowerCase();
+  const maintenanceSearchText = (entry: VehicleMaintenance) => [entry.date, entry.type, entry.description, entry.provider, entry.notes].join(" ").toLocaleLowerCase();
+  const visibleVehicles = [...vehicles].filter((vehicle) => {
+    const textMatches = !normalizedSearch || vehicleSearchText(vehicle).includes(normalizedSearch);
+    const logMatches = !normalizedSearch ||
+      journeys.some((journey) => journey.vehicleId === vehicle.id && journeySearchText(journey).includes(normalizedSearch)) ||
+      maintenance.some((entry) => entry.vehicleId === vehicle.id && maintenanceSearchText(entry).includes(normalizedSearch));
+    return (fuelType === "All fuel types" || vehicle.fuelType === fuelType) && (textMatches || logMatches);
+  }).sort((a, b) => {
+    if (sortBy === "make") return a.make.localeCompare(b.make) || a.model.localeCompare(b.model) || a.name.localeCompare(b.name);
+    if (sortBy === "year-newest") return (b.year ?? 0) - (a.year ?? 0) || a.name.localeCompare(b.name);
+    return a.name.localeCompare(b.name);
+  });
 
   return <><PageHeading eyebrow="On the road" title="Vehicle management" subtitle="Keep vehicle details, travel logs, and service and repair history together." action={<Button onClick={() => setVehicleEditor({ initial: null })}><Plus size={15} /> Add a vehicle</Button>} />
     <div className="alert"><Car size={15} style={{ flex: "none", marginTop: 1 }} /><span>Travel, service and repair records are saved with your shared Daybook data and sync to your other devices.</span></div>
+    {vehicles.length > 0 && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search vehicles and logs" placeholder="Search vehicles, journeys, services, or notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter vehicles by fuel type" value={fuelType} onChange={(event) => setFuelType(event.target.value)}><option>All fuel types</option>{fuelTypes.map((type) => <option key={type}>{type}</option>)}</Select><Select aria-label="Filter vehicle records by type" value={recordType} onChange={(event) => setRecordType(event.target.value)}><option>All records</option><option>Journeys</option><option>Service</option><option>Repair</option></Select><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /><Select aria-label="Sort vehicles" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="name">Name (A–Z)</option><option value="make">Make / model (A–Z)</option><option value="year-newest">Year (newest)</option></Select><Badge>{visibleVehicles.length} {visibleVehicles.length === 1 ? "vehicle" : "vehicles"}</Badge></div>}
     {!vehicles.length ? <Card><EmptyState icon={<Car size={18} />} title="No vehicles yet" description="Add a vehicle to start recording journeys, services and repairs." /></Card> :
-      <div className="vehicle-list">{vehicles.map((vehicle) => {
-        const vehicleJourneys = journeys.filter((journey) => journey.vehicleId === vehicle.id).sort((a, b) => b.date.localeCompare(a.date));
-        const vehicleMaintenance = maintenance.filter((entry) => entry.vehicleId === vehicle.id).sort((a, b) => b.date.localeCompare(a.date));
+      visibleVehicles.length ? <div className="vehicle-list">{visibleVehicles.map((vehicle) => {
+        const vehicleTextMatches = !normalizedSearch || vehicleSearchText(vehicle).includes(normalizedSearch);
+        const vehicleJourneys = journeys.filter((journey) => journey.vehicleId === vehicle.id &&
+          (recordType === "All records" || recordType === "Journeys") && (!from || journey.date >= from) && (!to || journey.date <= to) &&
+          (vehicleTextMatches || !normalizedSearch || journeySearchText(journey).includes(normalizedSearch))).sort((a, b) => b.date.localeCompare(a.date));
+        const vehicleMaintenance = maintenance.filter((entry) => entry.vehicleId === vehicle.id &&
+          (recordType === "All records" || recordType === entry.type) && (!from || entry.date >= from) && (!to || entry.date <= to) &&
+          (vehicleTextMatches || !normalizedSearch || maintenanceSearchText(entry).includes(normalizedSearch))).sort((a, b) => b.date.localeCompare(a.date));
         const recordedDistance = vehicleJourneys.reduce((total, journey) => total +
           (journey.odometerStart !== null && journey.odometerEnd !== null ? journey.odometerEnd - journey.odometerStart : 0), 0);
         const maintenanceCost = vehicleMaintenance.reduce((total, entry) => total + entry.cost, 0);
@@ -2976,13 +3066,13 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
             {vehicleJourneys.length ? <div className="vehicle-record-list">{vehicleJourneys.map((journey) => {
               const distance = journey.odometerStart !== null && journey.odometerEnd !== null ? journey.odometerEnd - journey.odometerStart : null;
               return <div className="vehicle-record" key={journey.id}><div className="vehicle-record-main"><strong>{journey.startLocation || "Start"} → {journey.endLocation || "Destination"}</strong><span>{dateLabel(journey.date)}{journey.purpose ? ` · ${journey.purpose}` : ""}</span><small><LinkifiedText>{[distance === null ? "Distance not recorded" : `${distance.toLocaleString()} km`, journey.cost ? formatCurrency(journey.cost) : "", journey.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit travel log" onClick={() => setJourneyEditor({ vehicle, initial: journey })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy travel log" onClick={() => { const { id, vehicleId, ...copy } = journey; void id; onSaveJourney(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive travel log" onClick={() => onDeleteJourney(journey)}><Archive size={13} /></button></div></div>;
-            })}</div> : <p className="vehicle-empty">No travel logs yet.</p>}
+            })}</div> : <p className="vehicle-empty">{journeys.some((journey) => journey.vehicleId === vehicle.id) ? "No travel logs match these filters." : "No travel logs yet."}</p>}
           </section>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><Wrench size={14} /></span>Services & repairs</h3><p>{vehicleMaintenance.length} records · {formatCurrency(maintenanceCost)} total</p></div><Button variant="outline" onClick={() => setMaintenanceEditor({ vehicle, initial: null })}><Plus size={13} /> Add record</Button></div>
-            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small><LinkifiedText>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy service or repair record" onClick={() => { const { id, vehicleId, ...copy } = entry; void id; onSaveMaintenance(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive service or repair record" onClick={() => onDeleteMaintenance(entry)}><Archive size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">No service or repair records yet.</p>}
+            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small><LinkifiedText>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy service or repair record" onClick={() => { const { id, vehicleId, ...copy } = entry; void id; onSaveMaintenance(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive service or repair record" onClick={() => onDeleteMaintenance(entry)}><Archive size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">{maintenance.some((entry) => entry.vehicleId === vehicle.id) ? "No service or repair records match these filters." : "No service or repair records yet."}</p>}
           </section>
         </Card>;
-      })}</div>}
+      })}</div> : <Card><EmptyState icon={<Search size={18} />} title="No vehicles match" description="Try changing the search, fuel type, record type, or date range." /></Card>}
     {vehicleEditor && <VehicleModal key={vehicleEditor.initial?.id ?? "new-vehicle"} initial={vehicleEditor.initial} onClose={() => setVehicleEditor(null)} onSave={(vehicle) => { onSaveVehicle(vehicle, vehicleEditor.initial?.id); setVehicleEditor(null); }} />}
     {journeyEditor && <VehicleJourneyModal key={journeyEditor.initial?.id ?? `new-journey-${journeyEditor.vehicle.id}`} vehicle={journeyEditor.vehicle} initial={journeyEditor.initial} onClose={() => setJourneyEditor(null)} onSave={(journey) => { onSaveJourney(journey, journeyEditor.vehicle.id, journeyEditor.initial?.id); setJourneyEditor(null); }} />}
     {maintenanceEditor && <VehicleMaintenanceModal key={maintenanceEditor.initial?.id ?? `new-maintenance-${maintenanceEditor.vehicle.id}`} vehicle={maintenanceEditor.vehicle} initial={maintenanceEditor.initial} onClose={() => setMaintenanceEditor(null)} onSave={(entry) => { onSaveMaintenance(entry, maintenanceEditor.vehicle.id, maintenanceEditor.initial?.id); setMaintenanceEditor(null); }} />}
