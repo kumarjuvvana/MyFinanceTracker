@@ -91,9 +91,16 @@ export function getPool(): pg.Pool {
     throw new Error("SUPABASE_DB_URL must point to the same Supabase project as SUPABASE_URL.");
   }
   if (!pool) {
+    const caCertificate = process.env.SUPABASE_DB_CA_CERT_BASE64
+      ? Buffer.from(process.env.SUPABASE_DB_CA_CERT_BASE64, "base64").toString("utf8")
+      : undefined;
+    if (caCertificate && (!caCertificate.includes("-----BEGIN CERTIFICATE-----") ||
+      !caCertificate.includes("-----END CERTIFICATE-----"))) {
+      throw new Error("SUPABASE_DB_CA_CERT_BASE64 must contain a base64-encoded PEM certificate.");
+    }
     pool = new Pool({
       connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: true },
+      ssl: { rejectUnauthorized: true, ...(caCertificate ? { ca: caCertificate } : {}) },
       max: 2,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 10000,
