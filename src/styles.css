@@ -524,6 +524,8 @@ body{background:#f3f5ef}
 .student-profile-tabs,.student-profile-links,.student-image-actions,.student-interest-editor{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .student-profile-tabs{margin-bottom:13px}
 .student-profile-card,.student-interests-card{padding:18px}
+.student-notes-card{padding:18px}
+.student-notes-input{min-height:240px!important;line-height:1.55}
 .student-profile-heading{display:flex;align-items:center;gap:14px}
 .student-profile-heading h2{margin:0;color:var(--text-main,#303830);font:700 18px Manrope,sans-serif}
 .student-profile-heading p{margin:5px 0 0;color:var(--text-muted,#858d83);font-size:12px}
@@ -552,7 +554,8 @@ body{background:#f3f5ef}
   .student-directory-open{padding:12px}
   .student-directory-open>img,.student-profile-heading>img,.student-directory-avatar{width:54px;height:54px}
   .student-directory-open>strong{font-size:12px}
-  .student-profile-card,.student-interests-card{padding:13px}
+  .student-profile-card,.student-interests-card,.student-notes-card{padding:13px}
+  .student-notes-input{min-height:200px!important}
   .student-profile-details{grid-template-columns:minmax(0,1fr);gap:5px;margin-top:12px}
   .student-profile-details>div.full{grid-column:auto}
   .student-profile-tabs{gap:5px}

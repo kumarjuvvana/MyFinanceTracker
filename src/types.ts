@@ -308,6 +308,7 @@ export interface StudentProfile {
   address: string;
   photoStoragePath: string;
   interests: string[];
+  notes?: string;
 }
 
 export type LearningLevel = "Beginner" | "Basic" | "Intermediate" | "Advanced" | "Expert";

@@ -343,6 +343,7 @@ export function validateData(value: unknown): value is TrackerData {
     typeof profile.bloodGroup === "string" && typeof profile.contactNumber === "string" &&
     typeof profile.address === "string" && typeof profile.photoStoragePath === "string" &&
     (profile.photoStoragePath === "" || isDocumentStoragePath(profile.photoStoragePath)) &&
+    (profile.notes === undefined || typeof profile.notes === "string" && profile.notes.length <= 20000) &&
     Array.isArray(profile.interests) && profile.interests.every((interest) =>
       typeof interest === "string" && interest.trim().length > 0 && interest.length <= 80)));
   const learningRecordsOk = value.learningRecords === undefined || (Array.isArray(value.learningRecords) && value.learningRecords.every((entry) =>
@@ -800,7 +801,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
         feeType: payment.feeType ?? inferLegacyEducationFeeType(payment.period),
       })),
     })),
-    studentProfiles: data.studentProfiles ?? [],
+    studentProfiles: (data.studentProfiles ?? []).map((profile) => ({ ...profile, notes: profile.notes ?? "" })),
     vehicles: data.vehicles ?? [],
     vehicleJourneys: data.vehicleJourneys ?? [],
     vehicleMaintenance: data.vehicleMaintenance ?? [],

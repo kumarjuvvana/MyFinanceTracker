@@ -2697,7 +2697,7 @@ function StudentProfileModal({ initial, onClose, onSave }: {
 }) {
   const [profile, setProfile] = useState<Omit<StudentProfile, "id">>(initial ?? {
     name: "", dateOfBirth: "", fatherName: "", motherName: "", bloodGroup: "",
-    contactNumber: "", address: "", photoStoragePath: "", interests: [],
+    contactNumber: "", address: "", photoStoragePath: "", interests: [], notes: "",
   });
   const [interestDraft, setInterestDraft] = useState("");
   const [error, setError] = useState("");
@@ -2782,7 +2782,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
   const [gradeFilter, setGradeFilter] = useState("All classes / grades");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes">("overview");
   const [sortBy, setSortBy] = useState("student-year");
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
@@ -2918,7 +2918,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
     }
     const profile = selectedEntry.profile ?? {
       id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
-      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [],
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [], notes: "",
     };
     setProfileEditor({
       profile,
@@ -2939,12 +2939,23 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
     if (!selectedEntry) return;
     const existing = selectedEntry.profile ?? {
       id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
-      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [],
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [], notes: "",
     };
     const interests = existing.interests.filter((item) => item.toLocaleLowerCase() !== interest.toLocaleLowerCase());
     const updated = remove ? interests : [...interests, interest];
     const profileId = selectedEntry.profile?.id ?? existing.id;
     onSaveProfile({ ...existing, interests: updated }, profileId, selectedEntry.name);
+    setSelectedStudent(`profile:${profileId}`);
+  }
+
+  function saveStudentNotes(notes: string) {
+    if (!selectedEntry) return;
+    const existing = selectedEntry.profile ?? {
+      id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [], notes: "",
+    };
+    const profileId = selectedEntry.profile?.id ?? existing.id;
+    onSaveProfile({ ...existing, notes }, profileId, selectedEntry.name);
     setSelectedStudent(`profile:${profileId}`);
   }
 
@@ -2975,6 +2986,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
         <Button variant={activeSection === "overview" ? "primary" : "outline"} onClick={() => setActiveSection("overview")}><UsersRound size={14} />Profile</Button>
         <Button variant={activeSection === "education" ? "primary" : "outline"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
         <Button variant={activeSection === "interests" ? "primary" : "outline"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
+        <Button variant={activeSection === "notes" ? "primary" : "outline"} onClick={() => setActiveSection("notes")}><FileText size={14} />Notes</Button>
       </nav>
       {activeSection === "overview" && <Card className="student-profile-card">
         <div className="student-profile-heading">
@@ -3002,6 +3014,10 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
         <div className="student-interest-list">{(shownProfile?.interests ?? []).map((interest) => <Badge key={interest}>{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => saveInterest(interest, true)}><X size={12} /></button></Badge>)}</div>
         <InterestQuickAdd onAdd={(interest) => saveInterest(interest)} />
         {!shownProfile?.interests.length && <p className="education-empty">No hobbies or interests have been added yet.</p>}
+      </Card>}
+      {activeSection === "notes" && <Card className="student-notes-card">
+        <div className="card-head"><div><h2 className="section-title">{selectedEntry.name}'s notes</h2><p className="section-description">Save details, reminders, or other information specific to this student. Notes sync automatically across devices.</p></div><FileText size={17} /></div>
+        <Field label="Student notes"><textarea className="field textarea student-notes-input" maxLength={20000} aria-label={`Notes for ${selectedEntry.name}`} placeholder="Write any details you want to keep for this student..." value={shownProfile?.notes ?? ""} onChange={(event) => saveStudentNotes(event.target.value)} /></Field>
       </Card>}
     </>}
     {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} initialStudentName={editor.mode === "new" ? selectedEntry?.name ?? "" : ""} initialStudentProfileId={editor.mode === "new" ? selectedEntry?.profile?.id : undefined} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave({ ...record, studentProfileId: record.studentProfileId ?? selectedEntry?.profile?.id }, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
