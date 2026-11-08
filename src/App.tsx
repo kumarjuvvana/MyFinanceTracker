@@ -4563,12 +4563,13 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   </>;
 }
 
-function DevotionalEntryModal({ initial, onClose, onSave }: {
+function DevotionalEntryModal({ initial, initialDate, onClose, onSave }: {
   initial: DevotionalEntry | null;
+  initialDate?: string;
   onClose: () => void;
   onSave: (entry: Omit<DevotionalEntry, "id">) => void;
 }) {
-  const [date, setDate] = useState(initial?.date ?? today());
+  const [date, setDate] = useState(initial?.date ?? initialDate ?? today());
   const [scriptureReference, setScriptureReference] = useState(initial?.scriptureReference ?? "");
   const [takeaway, setTakeaway] = useState(initial?.takeaway ?? "");
   const [reflection, setReflection] = useState(initial?.reflection ?? "");
@@ -4740,12 +4741,13 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
   </Modal>;
 }
 
-function DailyPrayerLogModal({ initial, onClose, onSave }: {
+function DailyPrayerLogModal({ initial, initialDate, onClose, onSave }: {
   initial: DailyPrayerLog | null;
+  initialDate?: string;
   onClose: () => void;
   onSave: (log: Omit<DailyPrayerLog, "id">) => void;
 }) {
-  const [date, setDate] = useState(initial?.date ?? today());
+  const [date, setDate] = useState(initial?.date ?? initialDate ?? today());
   const [period, setPeriod] = useState<PrayerPeriod>(initial?.period ?? "Morning");
   const [prayerType, setPrayerType] = useState<DailyPrayerType>(initial?.prayerType ?? "Personal request");
   const [prayerNotes, setPrayerNotes] = useState(initial?.prayerNotes ?? "");
@@ -4772,14 +4774,15 @@ function DailyPrayerLogModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function PrayerRequestModal({ initial, onClose, onSave }: {
+function PrayerRequestModal({ initial, initialDate, onClose, onSave }: {
   initial: PrayerRequest | null;
+  initialDate?: string;
   onClose: () => void;
   onSave: (request: Omit<PrayerRequest, "id">) => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [details, setDetails] = useState(initial?.details ?? "");
-  const [dateAdded, setDateAdded] = useState(initial?.dateAdded ?? today());
+  const [dateAdded, setDateAdded] = useState(initial?.dateAdded ?? initialDate ?? today());
   const [status, setStatus] = useState<PrayerRequestStatus>(initial?.status ?? "Ongoing");
   const [answeredDate, setAnsweredDate] = useState(initial?.answeredDate ?? "");
   const [error, setError] = useState("");
@@ -4875,11 +4878,14 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "progress" | "daily-prayers">("readings");
+  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "calendar" | "daily-prayers">("readings");
   const [progressMonth, setProgressMonth] = useState(() => monthKey(today()));
   const [selectedProgressDate, setSelectedProgressDate] = useState("");
   const [showReadingStreak, setShowReadingStreak] = useState(false);
   const [readingEditorDate, setReadingEditorDate] = useState(today());
+  const [dailyPrayerEditorDate, setDailyPrayerEditorDate] = useState(today());
+  const [entryEditorDate, setEntryEditorDate] = useState(today());
+  const [requestEditorDate, setRequestEditorDate] = useState(today());
   const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
   const [readingEditor, setReadingEditor] = useState<DailyBibleReading | null | undefined>(undefined);
   const [dailyPrayerEditor, setDailyPrayerEditor] = useState<DailyPrayerLog | null | undefined>(undefined);
@@ -4914,6 +4920,16 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   for (const reading of readings) {
     progressReadingDays.set(reading.date, (progressReadingDays.get(reading.date) ?? 0) + 1);
   }
+  const calendarActivityByDate = new Map<string, { readings: number; prayers: number; reflections: number; requests: number }>();
+  function addCalendarActivity(date: string, key: "readings" | "prayers" | "reflections" | "requests") {
+    const activity = calendarActivityByDate.get(date) ?? { readings: 0, prayers: 0, reflections: 0, requests: 0 };
+    activity[key] += 1;
+    calendarActivityByDate.set(date, activity);
+  }
+  for (const reading of readings) addCalendarActivity(reading.date, "readings");
+  for (const log of dailyPrayerLogs) addCalendarActivity(log.date, "prayers");
+  for (const entry of entries) addCalendarActivity(entry.date, "reflections");
+  for (const request of requests) addCalendarActivity(request.dateAdded, "requests");
   const [progressYearText, progressMonthText] = progressMonth.split("-");
   const progressYear = Number(progressYearText);
   const progressMonthIndex = Number(progressMonthText) - 1;
@@ -4922,12 +4938,21 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   const progressCalendarOffset = (progressMonthStart.getDay() + 6) % 7;
   const progressCalendarCellCount = Math.ceil((progressCalendarOffset + progressMonthDays) / 7) * 7;
   const progressMonthReadings = readings.filter((reading) => reading.date.startsWith(`${progressMonth}-`));
-  const progressMonthReadingDays = progressReadingDays.size
-    ? [...progressReadingDays.keys()].filter((date) => date.startsWith(`${progressMonth}-`)).length
-    : 0;
+  const progressMonthPrayers = dailyPrayerLogs.filter((log) => log.date.startsWith(`${progressMonth}-`));
+  const progressMonthReflections = entries.filter((entry) => entry.date.startsWith(`${progressMonth}-`));
+  const progressMonthRequests = requests.filter((request) => request.dateAdded.startsWith(`${progressMonth}-`));
+  const progressMonthActivities = progressMonthReadings.length + progressMonthPrayers.length + progressMonthReflections.length + progressMonthRequests.length;
+  const progressMonthActiveDays = [...calendarActivityByDate.keys()].filter((date) => date.startsWith(`${progressMonth}-`)).length;
   const selectedDateReadings = selectedProgressDate
     ? readings.filter((reading) => reading.date === selectedProgressDate).sort((a, b) => a.fromBook.localeCompare(b.fromBook))
     : [];
+  const selectedDatePrayerLogs = selectedProgressDate
+    ? dailyPrayerLogs.filter((log) => log.date === selectedProgressDate).sort((a, b) =>
+      ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period))
+    : [];
+  const selectedDateReflections = selectedProgressDate ? entries.filter((entry) => entry.date === selectedProgressDate) : [];
+  const selectedDateRequests = selectedProgressDate ? requests.filter((request) => request.dateAdded === selectedProgressDate) : [];
+  const selectedDateActivityCount = selectedDateReadings.length + selectedDatePrayerLogs.length + selectedDateReflections.length + selectedDateRequests.length;
   const sortedReadingDates = [...progressReadingDays.keys()].sort();
   const completedReadingDates = sortedReadingDates.filter((date) => date <= today());
   const latestReadingDate = completedReadingDates[completedReadingDates.length - 1];
@@ -4956,8 +4981,8 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
     bestReadingStreak = Math.max(bestReadingStreak, runningReadingStreak);
     previousReadingDate = currentDate;
   }
-  const activeSectionAction = activeTab === "readings" || activeTab === "progress"
-    ? <Button onClick={() => { setReadingEditorDate(activeTab === "progress" && selectedProgressDate ? selectedProgressDate : today()); setReadingEditor(null); }}><Plus size={15} /> Add reading</Button>
+  const activeSectionAction = activeTab === "readings" || activeTab === "calendar"
+    ? activeTab === "readings" ? <Button onClick={() => { setReadingEditorDate(today()); setReadingEditor(null); }}><Plus size={15} /> Add reading</Button> : undefined
     : activeTab === "reflections"
       ? <Button onClick={() => setEntryEditor(null)}><Plus size={15} /> Add Bible reflection</Button>
       : activeTab === "prayers"
@@ -4965,7 +4990,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
         : activeTab === "resources"
           ? <Button onClick={() => setResourceEditor(null)}><Plus size={15} /> Add resource</Button>
           : activeTab === "daily-prayers"
-            ? <Button onClick={() => setDailyPrayerEditor(null)}><Plus size={15} /> Record prayer</Button>
+            ? <Button onClick={() => { setDailyPrayerEditorDate(today()); setDailyPrayerEditor(null); }}><Plus size={15} /> Record prayer</Button>
           : undefined;
 
   function changeProgressMonth(offset: number) {
@@ -4999,9 +5024,9 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
       <Button variant={activeTab === "prayers" ? "primary" : "outline"} aria-pressed={activeTab === "prayers"} onClick={() => setActiveTab("prayers")}><Heart size={14} />Prayer requests<Badge>{requests.length}</Badge></Button>
       <Button variant={activeTab === "resources" ? "primary" : "outline"} aria-pressed={activeTab === "resources"} onClick={() => setActiveTab("resources")}><PlayCircle size={14} />Music & resources<Badge>{resources.length}</Badge></Button>
       <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => setActiveTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
-      <Button variant={activeTab === "progress" ? "primary" : "outline"} aria-pressed={activeTab === "progress"} onClick={() => setActiveTab("progress")}><CalendarDays size={14} />Reading progress</Button>
+      <Button variant={activeTab === "calendar" ? "primary" : "outline"} aria-pressed={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}><CalendarDays size={14} />Calendar</Button>
     </nav>
-    {activeTab !== "progress" && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
+    {activeTab !== "calendar" && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
     {activeTab === "readings" && <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div></div>
       {visibleReadings.length ? <div className="devotional-reading-list">{visibleReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
         <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
@@ -5040,11 +5065,14 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
         <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
       </Card>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={dailyPrayerLogs.length ? "No matching daily prayers" : "No daily prayers recorded"} description={dailyPrayerLogs.length ? "Try another search." : "Record a prayer by date, time of day, type, and notes."} /></Card>}
     </section>}
-    {activeTab === "progress" && <section className="devotional-progress">
+    {activeTab === "calendar" && <section className="devotional-progress">
       <div className="devotional-progress-summary">
-        <Card><span>Readings this month</span><strong>{progressMonthReadings.length}</strong></Card>
-        <Card><span>Days with reading</span><strong>{progressMonthReadingDays}</strong></Card>
-        <Card><span>Total recorded readings</span><strong>{readings.length}</strong></Card>
+        <Card><span>Activities this month</span><strong>{progressMonthActivities}</strong></Card>
+        <Card><span>Days with activity</span><strong>{progressMonthActiveDays}</strong></Card>
+        <Card><span>Bible readings</span><strong>{progressMonthReadings.length}</strong></Card>
+        <Card><span>Daily prayers</span><strong>{progressMonthPrayers.length}</strong></Card>
+        <Card><span>Bible reflections</span><strong>{progressMonthReflections.length}</strong></Card>
+        <Card><span>Prayer requests added</span><strong>{progressMonthRequests.length}</strong></Card>
       </div>
       <Card className="devotional-calendar">
         <div className="devotional-calendar-head">
@@ -5059,33 +5087,50 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((weekday) => <span className="devotional-calendar-weekday" key={weekday}>{weekday}</span>)}
           {Array.from({ length: progressCalendarCellCount }, (_, index) => {
             const day = index - progressCalendarOffset + 1;
-                if (day < 1 || day > progressMonthDays) return <span className="devotional-calendar-blank" key={`blank-${index}`} />;
+            if (day < 1 || day > progressMonthDays) return <span className="devotional-calendar-blank" key={`blank-${index}`} />;
             const date = `${progressMonth}-${String(day).padStart(2, "0")}`;
-            const count = progressReadingDays.get(date) ?? 0;
+            const activity = calendarActivityByDate.get(date);
+            const count = activity ? activity.readings + activity.prayers + activity.reflections + activity.requests : 0;
             const isToday = date === today();
             const isSelected = date === selectedProgressDate;
-            return <button type="button" aria-label={`${dateLabel(date)}${count ? `, ${count} ${count === 1 ? "reading" : "readings"}` : ", no readings"}`} aria-pressed={isSelected} className={`devotional-calendar-day${count ? " has-reading" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}`} key={date} onClick={() => setSelectedProgressDate(date)}>
-              <span>{day}</span>{count > 0 && <small>{count} {count === 1 ? "reading" : "readings"}</small>}
+            return <button type="button" aria-label={`${dateLabel(date)}${count ? `, ${count} devotional ${count === 1 ? "record" : "records"}` : ", no devotional records"}`} aria-pressed={isSelected} className={`devotional-calendar-day${count ? " has-reading" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}`} key={date} onClick={() => setSelectedProgressDate(date)}>
+          <span>{day}</span>{count > 0 && <small>{activity?.readings ? `B${activity.readings} ` : ""}{activity?.prayers ? `P${activity.prayers} ` : ""}{activity?.reflections ? `R${activity.reflections} ` : ""}{activity?.requests ? `Q${activity.requests}` : ""}</small>}
             </button>;
           })}
         </div>
+        <div className="devotional-calendar-legend"><span><i>B</i>Bible readings</span><span><i>P</i>Daily prayers</span><span><i>R</i>Reflections</span><span><i>Q</i>Prayer requests</span></div>
         {showReadingStreak && <div className="devotional-streak-summary"><div><span>Current streak</span><strong>{currentReadingStreak} {currentReadingStreak === 1 ? "day" : "days"}</strong></div><div><span>Best streak</span><strong>{bestReadingStreak} {bestReadingStreak === 1 ? "day" : "days"}</strong></div></div>}
       </Card>
       <section className="devotional-progress-day">
-        <div className="devotional-section-head"><div><h2><BookOpen size={15} />{selectedProgressDate ? dateLabel(selectedProgressDate) : "Select a date"}</h2><p>{selectedProgressDate ? `${selectedDateReadings.length} ${selectedDateReadings.length === 1 ? "reading" : "readings"} recorded` : "Choose a calendar day to view its readings."}</p></div>{selectedProgressDate && <Button size="sm" variant="outline" onClick={() => { setReadingEditorDate(selectedProgressDate); setReadingEditor(null); }}><Plus size={13} />Add reading</Button>}</div>
-        {selectedProgressDate && (selectedDateReadings.length
-          ? <div className="devotional-list">{selectedDateReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
+        <div className="devotional-section-head"><div><h2><BookOpen size={15} />{selectedProgressDate ? dateLabel(selectedProgressDate) : "Select a date"}</h2><p>{selectedProgressDate ? `${selectedDateActivityCount} ${selectedDateActivityCount === 1 ? "record" : "records"} · ${selectedDateReadings.length} readings · ${selectedDatePrayerLogs.length} prayers · ${selectedDateReflections.length} reflections · ${selectedDateRequests.length} requests` : "Select a date to view Bible readings, daily prayers, reflections, and prayer requests."}</p></div>{selectedProgressDate && <div className="table-actions"><Button size="sm" variant="outline" onClick={() => { setReadingEditorDate(selectedProgressDate); setReadingEditor(null); }}><Plus size={13} />Reading</Button><Button size="sm" variant="outline" onClick={() => { setDailyPrayerEditorDate(selectedProgressDate); setDailyPrayerEditor(null); }}><Plus size={13} />Prayer</Button><Button size="sm" variant="outline" onClick={() => { setEntryEditorDate(selectedProgressDate); setEntryEditor(null); }}><Plus size={13} />Reflection</Button><Button size="sm" variant="outline" onClick={() => { setRequestEditorDate(selectedProgressDate); setRequestEditor(null); }}><Plus size={13} />Request</Button></div>}</div>
+        {selectedProgressDate && selectedDateActivityCount > 0 && <div className="devotional-list">
+          {selectedDateReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
             <div className="devotional-card-head"><div><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament} → {reading.toTestament}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><button type="button" className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button></div>
             {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
-          </Card>)}</div>
-          : <Card><EmptyState icon={<BookOpen size={18} />} title="No readings on this date" description="Add a reading to include it in your progress calendar." /></Card>)}
+          </Card>)}
+          {selectedDatePrayerLogs.map((log) => <Card className="devotional-card devotional-reading-card" key={log.id}>
+            <div className="devotional-card-head"><div><span className="devotional-date">Daily prayer · {log.period}</span><h3>{log.prayerType}</h3></div><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button></div>
+            <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
+          </Card>)}
+          {selectedDateReflections.map((entry) => <Card className="devotional-card" key={entry.id}>
+            <div className="devotional-card-head"><div><span className="devotional-date">Bible reflection</span><h3>{entry.scriptureReference}</h3></div><button type="button" className="icon-button" aria-label="Edit Bible reflection" onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button></div>
+            {entry.takeaway && <p><strong>Message:</strong> <LinkifiedText>{entry.takeaway}</LinkifiedText></p>}
+            {entry.reflection && <p><strong>Reflection:</strong> <LinkifiedText>{entry.reflection}</LinkifiedText></p>}
+            {entry.prayerNotes && <p><strong>Prayer:</strong> <LinkifiedText>{entry.prayerNotes}</LinkifiedText></p>}
+          </Card>)}
+          {selectedDateRequests.map((request) => <Card className="devotional-card" key={request.id}>
+            <div className="devotional-card-head"><div><span className="devotional-date">Prayer request · {request.status}</span><h3>{request.title}</h3></div><button type="button" className="icon-button" aria-label="Edit prayer request" onClick={() => setRequestEditor(request)}><Pencil size={13} /></button></div>
+            {request.details && <p><LinkifiedText>{request.details}</LinkifiedText></p>}
+          </Card>)}
+        </div>}
+        {selectedProgressDate && selectedDateActivityCount === 0 && <Card><EmptyState icon={<BookOpen size={18} />} title="No devotional records on this date" description="Use the buttons above to add a reading, prayer, reflection, or request." /></Card>}
       </section>
     </section>}
-    {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
+    {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} initialDate={entryEditorDate} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
     {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} initialDate={readingEditorDate} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
-    {dailyPrayerEditor !== undefined && <DailyPrayerLogModal key={dailyPrayerEditor?.id ?? "new-daily-prayer"} initial={dailyPrayerEditor} onClose={() => setDailyPrayerEditor(undefined)} onSave={(log) => { onSaveDailyPrayerLog(log, dailyPrayerEditor?.id); setDailyPrayerEditor(undefined); }} />}
+    {dailyPrayerEditor !== undefined && <DailyPrayerLogModal key={dailyPrayerEditor?.id ?? "new-daily-prayer"} initial={dailyPrayerEditor} initialDate={dailyPrayerEditorDate} onClose={() => setDailyPrayerEditor(undefined)} onSave={(log) => { onSaveDailyPrayerLog(log, dailyPrayerEditor?.id); setDailyPrayerEditor(undefined); }} />}
     {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
-    {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
+    {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} initialDate={requestEditorDate} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
 }
 

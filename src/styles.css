@@ -818,6 +818,9 @@ body{background:#f3f5ef}
 .devotional-calendar-day.selected{background:#e8f1e8;border-color:#aac5ad;color:#315b39;font-weight:700}
 .devotional-calendar-day.has-reading>span{font-weight:700}
 .devotional-calendar-day small{max-width:100%;color:#68846a;font-size:8px;line-height:1.15;text-align:center;overflow-wrap:anywhere}
+.devotional-calendar-legend{display:flex;flex-wrap:wrap;gap:7px 14px;color:#778176;font-size:9px}
+.devotional-calendar-legend>span{display:flex;align-items:center;gap:4px}
+.devotional-calendar-legend i{display:grid;width:15px;height:15px;place-items:center;border-radius:4px;background:#e8f1e8;color:#4e7e57;font-size:8px;font-style:normal;font-weight:700}
 .devotional-streak-summary{display:flex;flex-wrap:wrap;gap:24px;padding-top:10px;border-top:1px solid #eef0ec}
 .devotional-streak-summary>div{display:grid;gap:4px}
 .devotional-progress-day{display:grid;gap:10px}
@@ -829,6 +832,8 @@ body{background:#f3f5ef}
 .app-shell.dark .devotional-calendar-day.today{border-color:#526753}
 .app-shell.dark .devotional-calendar-day.selected{background:#304433;border-color:#607c62;color:#e3e8e2}
 .app-shell.dark .devotional-calendar-day small{color:#a6c1a8}
+.app-shell.dark .devotional-calendar-legend{color:#a7b0a7}
+.app-shell.dark .devotional-calendar-legend i{background:#304433;color:#a6c1a8}
 .app-shell.dark .devotional-streak-summary{border-color:#343d35}
 .cooking-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
 .cooking-summary .card{display:grid;gap:6px;padding:14px}
