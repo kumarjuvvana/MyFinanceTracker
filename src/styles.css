@@ -1374,6 +1374,21 @@ body{background:#f3f5ef}
 .mindful-habit-row strong{font-size:12px;color:#424a42}
 .mindful-habit-row p{margin:3px 0 0;color:#8b9388;font-size:11px;white-space:pre-wrap}
 .mindful-empty-habits{margin:0;color:#8b9388;font-size:11px}
+.habit-date-toolbar{align-items:flex-end;justify-content:space-between;gap:12px;margin:0 0 10px}
+.habit-date-toolbar>.field{width:min(100%,240px);margin:0}
+.habit-date-toolbar>span,.habit-progress-meta,.habit-tracker-hint{font-size:10px;color:#858d83}
+.habit-tracker-row{align-items:flex-start}
+.habit-tracker-content{display:grid;gap:7px;min-width:0;flex:1}
+.habit-tracker-content>strong{font-size:12px;color:#414a42;overflow-wrap:anywhere}
+.habit-tracker-content>span{font-size:10px;color:#858d83;white-space:pre-wrap}
+.habit-progress-meta{display:flex;gap:5px 12px;flex-wrap:wrap}
+.habit-progress-track{height:7px;overflow:hidden;border-radius:8px;background:#edf0eb}
+.habit-progress-track>span{display:block;height:100%;border-radius:inherit;background:#5b8b65;transition:width .2s}
+.habit-tracker-hint{line-height:1.4}
+.habit-tracker-actions{display:grid;justify-items:end;gap:5px;flex:none}
+.habit-day-check{display:flex;align-items:center;gap:6px;color:#606a60;font-size:10px;white-space:nowrap}
+.habit-day-check input{accent-color:#4c8059}
+.habit-day-check input:disabled{cursor:not-allowed}
 .mindful-log-list{display:grid;gap:12px}
 .mindful-log-card{display:grid;gap:13px}
 .mindful-log-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -1394,9 +1409,12 @@ body{background:#f3f5ef}
 .mindful-habit-checklist label strong{font-size:11px}
 .mindful-habit-checklist label small{color:#8b9388;font-size:10px}
 .app-shell.dark .mindful-summary span,.app-shell.dark .mindful-habit-row p,.app-shell.dark .mindful-empty-habits,.app-shell.dark .mindful-log-section>span,.app-shell.dark .mindful-practiced>strong,.app-shell.dark .mindful-habit-checklist label small{color:#a7b0a7}
+.app-shell.dark .habit-date-toolbar>span,.app-shell.dark .habit-progress-meta,.app-shell.dark .habit-tracker-hint,.app-shell.dark .habit-tracker-content>span,.app-shell.dark .habit-day-check{color:#a7b0a7}
 .app-shell.dark .mindful-summary strong{color:#a6c1a8}
 .app-shell.dark .mindful-habit-row{border-color:#343d35}
 .app-shell.dark .mindful-habit-row strong,.app-shell.dark .mindful-log-head h2,.app-shell.dark .mindful-log-section p,.app-shell.dark .mindful-habit-checklist legend,.app-shell.dark .mindful-habit-checklist label{color:#e3e8e2}
+.app-shell.dark .habit-tracker-content>strong{color:#e3e8e2}
+.app-shell.dark .habit-progress-track{background:#343d35}
 .app-shell.dark .mindful-log-section.mindful-positive{background:#26352a}
 .app-shell.dark .mindful-log-section.mindful-positive>span{color:#a6c1a8}
 .app-shell.dark .mindful-habit-checklist{border-color:#343d35}
@@ -1410,6 +1428,10 @@ body{background:#f3f5ef}
   .mindful-habit-row{align-items:flex-start}
   .mindful-habit-row>.table-actions{gap:1px;flex:none}
   .mindful-habit-row>.table-actions .icon-button{width:28px;height:28px}
+  .habit-date-toolbar{align-items:stretch}
+  .habit-date-toolbar>.field{width:100%}
+  .habit-tracker-row{display:grid;gap:9px}
+  .habit-tracker-actions{width:100%;display:flex;align-items:center;justify-content:space-between}
 }
 
 .hosting-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}

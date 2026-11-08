@@ -394,6 +394,9 @@ export interface MindfulHabit {
   id: string;
   title: string;
   description: string;
+  startDate?: string;
+  targetDays?: number | null;
+  completedDates?: string[];
 }
 
 export type MindfulnessEmotion = "Anger" | "Frustration" | "Stress" | "Calm" | "Love / kindness" | "Gratitude" | "Other";

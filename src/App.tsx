@@ -3576,7 +3576,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
 }
 
 function emptyMindfulHabit(): Omit<MindfulHabit, "id"> {
-  return { title: "", description: "" };
+  return { title: "", description: "", startDate: today(), targetDays: 30, completedDates: [] };
 }
 
 function MindfulHabitModal({ initial, onClose, onSave }: {
@@ -3593,13 +3593,27 @@ function MindfulHabitModal({ initial, onClose, onSave }: {
       setError("Enter a habit name.");
       return;
     }
-    onSave({ title: habit.title.trim(), description: habit.description.trim() });
+    const targetDays = habit.targetDays ?? null;
+    if (targetDays !== null && (!Number.isInteger(targetDays) || targetDays < 1 || targetDays > 3650)) {
+      setError("The target must be between 1 and 3,650 days, or left blank for an ongoing habit.");
+      return;
+    }
+    onSave({
+      ...habit,
+      title: habit.title.trim(),
+      description: habit.description.trim(),
+      startDate: habit.startDate || today(),
+      targetDays,
+      completedDates: habit.completedDates ?? [],
+    });
   }
 
   return <Modal title={initial ? "Edit positive habit" : "Add positive habit"} onClose={onClose}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Habit (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Pause before replying when upset" value={habit.title} onChange={(event) => setHabit((current) => ({ ...current, title: event.target.value }))} /></Field>
       <Field className="full" label="What does this look like for you?"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional reminder or description" value={habit.description} onChange={(event) => setHabit((current) => ({ ...current, description: event.target.value }))} /></Field>
+      <Field label="Start date"><DateInput required value={habit.startDate || today()} onValueChange={(startDate) => setHabit((current) => ({ ...current, startDate }))} /></Field>
+      <Field label="Target duration (days)"><Input type="number" min={1} max={3650} step={1} placeholder="Leave blank for ongoing" value={habit.targetDays ?? ""} onChange={(event) => setHabit((current) => ({ ...current, targetDays: event.target.value ? Number(event.target.value) : null }))} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add habit"}</Button></div>
     </form>
@@ -3674,8 +3688,10 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   onSaveLog: (log: Omit<MindfulnessLog, "id">, id?: string) => void;
   onArchiveLog: (log: MindfulnessLog) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<"habits" | "reflections">("habits");
   const [habitEditor, setHabitEditor] = useState<MindfulHabit | null | undefined>(undefined);
   const [logEditor, setLogEditor] = useState<MindfulnessLog | null | undefined>(undefined);
+  const [trackingDate, setTrackingDate] = useState(today());
   const [search, setSearch] = useState("");
   const [emotionFilter, setEmotionFilter] = useState("All emotions");
   const query = search.trim().toLocaleLowerCase();
@@ -3689,8 +3705,58 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   const sinceDate = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, "0")}-${String(since.getDate()).padStart(2, "0")}`;
   const recentLogs = logs.filter((log) => log.date >= sinceDate && log.date <= today());
   const recentDays = new Set(recentLogs.map((log) => log.date)).size;
-  const recentHabitPractices = new Set(recentLogs.flatMap((log) => log.completedHabitIds.map((id) => `${log.date}:${id}`))).size;
+  const recentHabitPracticeKeys = new Set([
+    ...habits.flatMap((habit) => (habit.completedDates ?? [])
+      .filter((date) => date >= sinceDate && date <= today())
+      .map((date) => `${date}:${habit.id}`)),
+    ...recentLogs.flatMap((log) => log.completedHabitIds.map((id) => `${log.date}:${id}`)),
+  ]);
+  const recentHabitPractices = recentHabitPracticeKeys.size;
   const habitNames = new Map(habits.map((habit) => [habit.id, habit.title]));
+  const orderedHabits = [...habits].sort((a, b) => a.title.localeCompare(b.title));
+
+  function habitProgress(habit: MindfulHabit) {
+    const startDate = habit.startDate ?? "";
+    const targetDays = habit.targetDays ?? null;
+    const targetEndDate = startDate && targetDays
+      ? (() => {
+        const end = new Date(`${startDate}T12:00:00`);
+        end.setDate(end.getDate() + targetDays - 1);
+        return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+      })()
+      : "";
+    const throughDate = targetEndDate && targetEndDate < today() ? targetEndDate : today();
+    const elapsedDays = startDate && throughDate >= startDate
+      ? Math.floor((Date.parse(`${throughDate}T00:00:00Z`) - Date.parse(`${startDate}T00:00:00Z`)) / 86_400_000) + 1
+      : 0;
+    const reflectedDates = logs.filter((log) => log.completedHabitIds.includes(habit.id)).map((log) => log.date);
+    const completedDates = [...new Set([...(habit.completedDates ?? []), ...reflectedDates])].filter((date) =>
+      date >= startDate && date <= throughDate && (!targetEndDate || date <= targetEndDate));
+    const progressTotal = targetDays ?? elapsedDays;
+    const percent = progressTotal > 0 ? Math.min(100, Math.round(completedDates.length / progressTotal * 100)) : 0;
+    return { startDate, targetDays, targetEndDate, elapsedDays, completedCount: completedDates.length, percent };
+  }
+
+  function toggleHabitDate(habit: MindfulHabit) {
+    const completedDates = habit.completedDates ?? [];
+    const isComplete = completedDates.includes(trackingDate);
+    onSaveHabit({
+      ...habit,
+      startDate: habit.startDate || trackingDate,
+      completedDates: isComplete
+        ? completedDates.filter((date) => date !== trackingDate)
+        : [...completedDates, trackingDate].sort(),
+    }, habit.id);
+  }
+
+  function extendHabitTarget(habit: MindfulHabit) {
+    const { targetDays, elapsedDays } = habitProgress(habit);
+    onSaveHabit({
+      ...habit,
+      startDate: habit.startDate || today(),
+      targetDays: targetDays === null ? Math.max(30, elapsedDays + 30) : Math.min(3650, targetDays + 7),
+    }, habit.id);
+  }
 
   function archiveHabit(habit: MindfulHabit) {
     if (window.confirm(`Move "${habit.title}" to the archive? Past reflections will remain unchanged.`)) onArchiveHabit(habit);
@@ -3701,12 +3767,49 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   }
 
   return <>
-    <PageHeading eyebrow="Practice with patience" title="Mind & habits" subtitle="Notice emotional patterns, reflect on responses, and recognize small actions that build patience, kindness, love, and gratitude." action={<Button onClick={() => setLogEditor(null)}><Plus size={15} /> Add reflection</Button>} />
+    <PageHeading eyebrow="Practice with patience" title="Mind & habits" subtitle="Build daily habits, track progress toward a target, and reflect on emotions and meaningful actions." action={activeTab === "habits" ? <Button onClick={() => setHabitEditor(null)}><Plus size={15} /> Add habit</Button> : <Button onClick={() => setLogEditor(null)}><Plus size={15} /> Add reflection</Button>} />
     <div className="alert"><Heart size={15} style={{ flex: "none", marginTop: 1 }} /><span>A gentle personal journal, not a medical assessment. Progress is about noticing and practicing, not being perfect. These notes are saved in your shared Daybook data.</span></div>
     <div className="mindful-summary"><Card><span>Days reflected · last 7 days</span><strong>{recentDays} / 7</strong></Card><Card><span>Habit practices · last 7 days</span><strong>{recentHabitPractices}</strong></Card><Card><span>Positive habits</span><strong>{habits.length}</strong></Card></div>
-    <Card className="mindful-habits-card"><div className="card-head"><div><h2 className="section-title">Positive habits</h2><p className="section-description">Choose small, repeatable actions that matter to you.</p></div><Button size="sm" variant="outline" onClick={() => setHabitEditor(null)}><Plus size={14} /> Add habit</Button></div>
-      {habits.length ? <div className="mindful-habit-list">{habits.map((habit) => <div className="mindful-habit-row" key={habit.id}><div><strong>{habit.title}</strong>{habit.description && <p>{habit.description}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button></div></div>)}</div> : <p className="mindful-empty-habits">Add a habit such as “Pause and take three breaths” or “Show appreciation to someone.”</p>}
-    </Card>
+    <nav className="student-profile-tabs" aria-label="Mind and habits sections">
+      <Button variant={activeTab === "habits" ? "primary" : "outline"} onClick={() => setActiveTab("habits")}><Heart size={14} />Habit tracker <Badge>{habits.length}</Badge></Button>
+      <Button variant={activeTab === "reflections" ? "primary" : "outline"} onClick={() => setActiveTab("reflections")}><FileText size={14} />Reflections <Badge>{logs.length}</Badge></Button>
+    </nav>
+    {activeTab === "habits" && <>
+      <Card className="mindful-habits-card">
+        <div className="toolbar habit-date-toolbar"><Field label="Track habits for"><DateInput required value={trackingDate} onValueChange={setTrackingDate} /></Field><span>Check a habit when you complete it on that date.</span></div>
+        {orderedHabits.length ? <div className="education-entry-list">{orderedHabits.map((habit) => {
+          const progress = habitProgress(habit);
+          const completedDates = habit.completedDates ?? [];
+          const reflectedOnDate = logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
+          const checked = completedDates.includes(trackingDate) || reflectedOnDate;
+          const targetReached = progress.targetEndDate && trackingDate > progress.targetEndDate;
+          const canCheck = !!progress.startDate && trackingDate >= progress.startDate && trackingDate <= today() && !targetReached && !reflectedOnDate;
+          return <div className="education-entry habit-tracker-row" key={habit.id}>
+            <div className="habit-tracker-content">
+              <strong>{habit.title}</strong>
+              {habit.description && <span>{habit.description}</span>}
+              <div className="habit-progress-meta">
+                <span>{progress.targetDays ? `${progress.completedCount} / ${progress.targetDays} target days completed` : `Day ${progress.elapsedDays} · ${progress.completedCount} active ${progress.completedCount === 1 ? "day" : "days"}`}</span>
+                {progress.startDate && <span>Started {dateLabel(progress.startDate)}{progress.targetEndDate ? ` · Target ends ${dateLabel(progress.targetEndDate)}` : ""}</span>}
+              </div>
+              <div className="habit-progress-track" role="progressbar" aria-label={`${habit.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><span style={{ width: `${progress.percent}%` }} /></div>
+              {!progress.startDate && <small className="habit-tracker-hint">Edit this habit to set its start date before tracking check-ins.</small>}
+              {targetReached && <small className="habit-tracker-hint">The target period ended. Edit the duration or extend it to continue tracking.</small>}
+            </div>
+            <div className="habit-tracker-actions">
+              <label className="habit-day-check"><input type="checkbox" aria-label={`Mark ${habit.title} complete on ${trackingDate}`} checked={checked} disabled={!canCheck} onChange={() => toggleHabitDate(habit)} /><span>{reflectedOnDate ? "In reflection" : checked ? "Done" : "Done today"}</span></label>
+              <div className="table-actions">
+                <button className="icon-button" disabled={progress.targetDays === 3650} aria-label={progress.targetDays ? `Extend ${habit.title} target by 7 days` : `Set a target for ${habit.title}`} title={progress.targetDays ? "Extend target by 7 days" : "Set a 30-day target"} onClick={() => extendHabitTarget(habit)}><Plus size={14} /></button>
+                <button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button>
+                <button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)`, startDate: today(), completedDates: [] })}><Copy size={14} /></button>
+                <button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button>
+              </div>
+            </div>
+          </div>;
+        })}</div> : <EmptyState icon={<Heart size={18} />} title="No habits to track yet" description="Add a repeatable habit to begin checking in each day." />}
+      </Card>
+    </>}
+    {activeTab === "reflections" && <>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reflections" placeholder="Search date, emotion, situation, response..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={emotionFilter === "All emotions" ? 0 : 1}><Field label="Emotion"><Select aria-label="Filter reflections by emotion" value={emotionFilter} onChange={(event) => setEmotionFilter(event.target.value)}><option>All emotions</option><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select></Field></FilterDrawer><Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge></div>
     <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
       <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone={log.emotion === "Anger" || log.emotion === "Frustration" || log.emotion === "Stress" ? "amber" : "green"}>{log.emotion}</Badge><Badge>Intensity {log.intensity}/5</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
@@ -3717,6 +3820,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       {log.completedHabitIds.length > 0 && <div className="mindful-practiced"><strong>Habits practiced</strong>{log.completedHabitIds.map((id) => <Badge key={id}>{habitNames.get(id) ?? "Past habit"}</Badge>)}</div>}
     </Card>)}</div>
     {!visibleLogs.length && <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search or emotion." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
+    </>}
     {habitEditor !== undefined && <MindfulHabitModal key={habitEditor?.id ?? "new-mindful-habit"} initial={habitEditor} onClose={() => setHabitEditor(undefined)} onSave={(habit) => { onSaveHabit(habit, habitEditor?.id); setHabitEditor(undefined); }} />}
     {logEditor !== undefined && <MindfulnessLogModal key={logEditor?.id ?? "new-mindfulness-log"} initial={logEditor} habits={habits} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
   </>;
@@ -3730,6 +3834,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
   type ExerciseRowDraft = Omit<MorningExerciseLog, "id" | "date"> & { id?: string };
+  const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("log");
   const [exerciseDate, setExerciseDate] = useState(today);
   const [draftRows, setDraftRows] = useState<ExerciseRowDraft[]>([{
     daypart: "Morning",
@@ -3761,6 +3866,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const recentDays = new Set(recentLogs.map((log) => log.date)).size;
 
   function editLog(log: MorningExerciseLog) {
+    setActiveTab("log");
     setExerciseDate(log.date);
     setDraftRows([{
       id: log.id,
@@ -3888,6 +3994,12 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Card><span>Days active · last 7 days</span><strong>{recentDays} / 7</strong></Card>
       <Card><span>Minutes · last 7 days</span><strong>{recentMinutes}</strong></Card>
     </div>
+    <nav className="student-profile-tabs" aria-label="Morning exercise sections">
+      <Button variant={activeTab === "log" ? "primary" : "outline"} onClick={() => setActiveTab("log")}><Plus size={14} />Log exercises</Button>
+      <Button variant={activeTab === "records" ? "primary" : "outline"} onClick={() => setActiveTab("records")}><ClipboardList size={14} />Exercise records <Badge>{logs.length}</Badge></Button>
+      <Button variant={activeTab === "activities" ? "primary" : "outline"} onClick={() => setActiveTab("activities")}><Dumbbell size={14} />Activities <Badge>{activities.length}</Badge></Button>
+    </nav>
+    {activeTab === "log" && <>
     <Card className="mindful-habits-card">
       <div className="card-head"><div><h2 className="section-title">{draftRows.some((row) => row.id) ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose a date once, then add one row for each activity. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
       <form onSubmit={submit}>
@@ -3910,6 +4022,8 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
         <div className="connector-actions">{!draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button>}<Button type="submit">{draftRows.some((row) => row.id) ? "Save changes" : `Save ${draftRows.length} ${draftRows.length === 1 ? "exercise" : "exercises"}`}</Button>{draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
       </form>
     </Card>
+    </>}
+    {activeTab === "activities" && <>
     <Card className="mindful-habits-card">
       <div className="card-head"><div><h2 className="section-title">Exercise activities</h2><p className="section-description">Add or rename activity options. Changes sync to Supabase.</p></div><Dumbbell size={17} /></div>
       <form className="inline-form" onSubmit={addActivity}><Field label="New activity"><Input required maxLength={120} placeholder="e.g. Pull-ups" value={newActivity} onChange={(event) => setNewActivity(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add activity</Button></form>
@@ -3920,6 +4034,8 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       </div>)}</div>
       {activityError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{activityError}</div>}
     </Card>
+    </>}
+    {activeTab === "records" && <>
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
       <FilterDrawer activeCount={activityFilter ? 1 : 0}>
@@ -3928,11 +4044,20 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       </FilterDrawer>
       <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "session" : "sessions"}</Badge>
     </div>
-    <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
-      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge>{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</Badge><Badge tone="green">{log.activity}</Badge>{log.durationMinutes !== null && <Badge>{log.durationMinutes} min</Badge>}{log.count != null && <Badge>Reps / count {log.count}</Badge>}<Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
-      {log.notes && <div className="mindful-log-section"><span>Notes</span><p>{log.notes}</p></div>}
-    </Card>)}</div>
+    {visibleLogs.length ? <Card className="table-card"><table className="data-table">
+      <thead><tr><th>Date</th><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
+      <tbody>{visibleLogs.map((log) => <tr key={log.id}>
+        <td data-label="Date">{dateLabel(log.date)}</td>
+        <td data-label="Session">{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</td>
+        <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
+        <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
+        <td data-label="Intensity">{log.intensity}</td>
+        <td data-label="Notes">{log.notes}</td>
+        <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
+      </tr>)}</tbody>
+    </table></Card> : null}
     {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
+    </>}
   </>;
 }
 

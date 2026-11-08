@@ -682,10 +682,19 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.tool === "string" && entry.tool.length <= 120 &&
     (entry.type === "" || entry.type === "System" || entry.type === "Developer" || entry.type === "User" || entry.type === "Task" || entry.type === "Other") &&
     typeof entry.category === "string" && entry.category.length <= 80));
-  const mindfulHabitsOk = value.mindfulHabits === undefined || (Array.isArray(value.mindfulHabits) && value.mindfulHabits.every((entry) =>
-    isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
-    typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 120 &&
-    typeof entry.description === "string" && entry.description.length <= 5000));
+  const mindfulHabitsOk = value.mindfulHabits === undefined || (Array.isArray(value.mindfulHabits) && value.mindfulHabits.every((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || !entry.id ||
+      typeof entry.title !== "string" || !entry.title.trim() || entry.title.length > 120 ||
+      typeof entry.description !== "string" || entry.description.length > 5000) return false;
+    const completedDatesOk = entry.completedDates === undefined || (Array.isArray(entry.completedDates) &&
+      entry.completedDates.every((date) => typeof date === "string" && !Number.isNaN(Date.parse(date))) &&
+      new Set(entry.completedDates).size === entry.completedDates.length);
+    return completedDatesOk &&
+      (entry.startDate === undefined || entry.startDate === "" ||
+        (typeof entry.startDate === "string" && !Number.isNaN(Date.parse(entry.startDate)))) &&
+      (entry.targetDays === undefined || entry.targetDays === null ||
+        (typeof entry.targetDays === "number" && Number.isInteger(entry.targetDays) && entry.targetDays >= 1 && entry.targetDays <= 3650));
+  }));
   const mindfulnessLogsOk = value.mindfulnessLogs === undefined || (Array.isArray(value.mindfulnessLogs) && value.mindfulnessLogs.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
