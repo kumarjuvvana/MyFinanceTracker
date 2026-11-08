@@ -6102,7 +6102,7 @@ function PersonalEducationModal({ initial, onClose, onSave }: {
     onSave({ institution: institution.trim(), qualification: qualification.trim(), fieldOfStudy: fieldOfStudy.trim(), location: location.trim(), startDate, endDate, status, grade: grade.trim(), link: link.trim(), notes: notes.trim() });
   }
 
-  return <Modal title={initial ? "Edit education" : "Add education"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit education" : "Add education"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Institution"><Input autoFocus required maxLength={160} value={institution} onChange={(event) => setInstitution(event.target.value)} /></Field>
       <Field label="Degree / qualification"><Input required maxLength={140} placeholder="e.g. Bachelor of Commerce" value={qualification} onChange={(event) => setQualification(event.target.value)} /></Field>
@@ -6149,7 +6149,7 @@ function ProfessionalQualificationModal({ initial, onClose, onSave }: {
     onSave({ name: name.trim(), issuer: issuer.trim(), credentialId: credentialId.trim(), issueDate, expiryDate, link: link.trim(), notes: notes.trim() });
   }
 
-  return <Modal title={initial ? "Edit qualification" : "Add qualification"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit qualification" : "Add qualification"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Qualification / certificate"><Input autoFocus required maxLength={160} placeholder="e.g. Project Management Professional" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Issuing organization"><Input maxLength={160} value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
@@ -6191,7 +6191,7 @@ function WorkExperienceModal({ initial, onClose, onSave }: {
     onSave({ company: company.trim(), jobTitle: jobTitle.trim(), location: location.trim(), employmentType: employmentType.trim(), startDate, endDate: current ? "" : endDate, current, summary: summary.trim(), skills: skills.trim() });
   }
 
-  return <Modal title={initial ? "Edit work experience" : "Add work experience"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit work experience" : "Add work experience"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Company / organization"><Input autoFocus required maxLength={160} value={company} onChange={(event) => setCompany(event.target.value)} /></Field>
       <Field label="Job title"><Input required maxLength={140} value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} /></Field>
