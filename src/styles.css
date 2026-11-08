@@ -833,7 +833,6 @@ body{background:#f3f5ef}
 .cooking-summary .card{display:grid;gap:6px;padding:14px}
 .cooking-summary span{font-size:10px;color:#92998f}
 .cooking-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
-.cooking-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
 .cooking-section{display:grid;gap:10px;min-width:0}
 .cooking-list{display:grid;gap:10px}
 .cooking-card{min-width:0;padding:14px}
@@ -1144,7 +1143,6 @@ body{background:#f3f5ef}
   .devotional-calendar-day{min-height:52px;padding:6px 1px}
   .devotional-calendar-day small{font-size:7px}
   .devotional-calendar-head{align-items:flex-start;flex-wrap:wrap}
-  .cooking-columns{grid-template-columns:minmax(0,1fr)}
   .cooking-card{padding:12px}
   .cooking-add-dish{align-items:stretch}
   .cooking-add-dish>.button{flex:none}

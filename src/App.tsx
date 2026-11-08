@@ -5510,6 +5510,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
 }) {
   const [recipeEditor, setRecipeEditor] = useState<CookingRecipe | null | undefined>(undefined);
   const [logEditor, setLogEditor] = useState<CookingLog | null | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<"planner" | "recipes" | "logs">("planner");
   const [search, setSearch] = useState("");
   const query = search.trim().toLocaleLowerCase();
   const visibleRecipes = [...recipes].filter((recipe) =>
@@ -5521,7 +5522,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
   const todayCount = logs.filter((log) => log.date === today()).length;
 
   return <>
-    <PageHeading eyebrow="Kitchen journal" title="Cooking" subtitle="Keep your recipes and prepared items together, then record what you make and learn each day." action={<Button onClick={() => setRecipeEditor(null)}><Plus size={15} /> Add recipe / item</Button>} />
+    <PageHeading eyebrow="Kitchen journal" title="Cooking" subtitle="Plan meals, keep a recipe book, and record what you cook each day." action={activeTab === "recipes" ? <Button onClick={() => setRecipeEditor(null)}><Plus size={15} /> Add recipe / item</Button> : activeTab === "logs" ? <Button onClick={() => setLogEditor(null)}><Plus size={15} /> Log today</Button> : undefined} />
     <div className="cooking-summary">
       <Card><span>Saved recipes and items</span><strong>{recipes.length}</strong></Card>
       <Card><span>Planned meals</span><strong>{plans.length}</strong></Card>
@@ -5529,22 +5530,25 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
       <Card><span>Logs today</span><strong>{todayCount}</strong></Card>
     </div>
     <div className="alert"><Utensils size={15} style={{ flex: "none", marginTop: 1 }} /><span>Nutrition, vitamin, and health-benefit fields are your own notes, not verified nutritional data or medical advice.</span></div>
-    <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={onSaveLog} />
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search cooking recipes and logs" placeholder="Search recipes, ingredients, cuisine, or journal..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
-    <div className="cooking-columns">
-      <section className="cooking-section"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div><Button variant="outline" onClick={() => setRecipeEditor(null)}><Plus size={13} /> Add</Button></div>
+    <nav className="student-profile-tabs cooking-tabs" aria-label="Cooking sections">
+      <Button variant={activeTab === "planner" ? "primary" : "outline"} aria-pressed={activeTab === "planner"} onClick={() => setActiveTab("planner")}><CalendarDays size={14} />Meal planner<Badge>{plans.length}</Badge></Button>
+      <Button variant={activeTab === "recipes" ? "primary" : "outline"} aria-pressed={activeTab === "recipes"} onClick={() => setActiveTab("recipes")}><CookingPot size={14} />Recipe book<Badge>{recipes.length}</Badge></Button>
+      <Button variant={activeTab === "logs" ? "primary" : "outline"} aria-pressed={activeTab === "logs"} onClick={() => setActiveTab("logs")}><Utensils size={14} />Daily cooking log<Badge>{logs.length}</Badge></Button>
+    </nav>
+    {activeTab === "planner" && <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={onSaveLog} />}
+    {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
+    {activeTab === "recipes" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div></div>
         {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <Card className="cooking-card" key={recipe.id}>
           <div className="devotional-card-head"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={() => setRecipeEditor(recipe)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${recipe.name}`} onClick={() => { const { id, ...copy } = recipe; void id; onSaveRecipe(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${recipe.name}`} onClick={() => { if (window.confirm(`Move "${recipe.name}" to the archive? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Archive size={13} /></button></div></div>
           {recipe.ingredients && <p><strong>Ingredients:</strong> <LinkifiedText>{recipe.ingredients}</LinkifiedText></p>}{recipe.steps && <p><strong>Steps:</strong> <LinkifiedText>{recipe.steps}</LinkifiedText></p>}{recipe.allergens.length > 0 && <p><strong>Allergens:</strong> {recipe.allergens.join(", ")}</p>}{recipe.nutritionNotes && <p><strong>Nutrition / vitamins:</strong> <LinkifiedText>{recipe.nutritionNotes}</LinkifiedText></p>}{recipe.healthNotes && <p><strong>Health notes:</strong> <LinkifiedText>{recipe.healthNotes}</LinkifiedText></p>}{recipe.notes && <p><strong>Notes:</strong> <LinkifiedText>{recipe.notes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
-      </section>
-      <section className="cooking-section"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div><Button variant="outline" onClick={() => setLogEditor(null)}><Plus size={13} /> Log today</Button></div>
+    </section>}
+    {activeTab === "logs" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div></div>
         {visibleLogs.length ? <div className="cooking-list">{visibleLogs.map((log) => <Card className="cooking-card" key={log.id}>
           <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; onSaveLog(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) onDeleteLog(log); }}><Archive size={13} /></button></div></div>
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> <LinkifiedText>{log.learning}</LinkifiedText></p>}{log.notes && <p><strong>Notes:</strong> <LinkifiedText>{log.notes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
-      </section>
-    </div>
+    </section>}
     {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
     {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
   </>;
