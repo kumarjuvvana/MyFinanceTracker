@@ -1481,3 +1481,16 @@ body{background:#f3f5ef}
   .cooking-plan-ingredient-head{align-items:flex-start;flex-direction:column;gap:3px}
   .cooking-plan-footer{align-items:flex-start;flex-direction:column}
 }
+
+.devotional-reading-section{display:grid;gap:10px;margin-bottom:18px}
+.devotional-reading-list{display:grid;gap:9px}
+.devotional-reading-card{padding:13px}
+.bible-reading-range-title{display:flex;align-items:center;gap:7px;padding-top:5px;border-top:1px solid #eef0ec;color:#4f7956;font:700 11px Manrope,sans-serif}
+.bible-reading-range-title svg{flex:none}
+.app-shell.dark .bible-reading-range-title{border-color:#343d35;color:#a6c1a8}
+@media(max-width:600px){
+  .devotional-reading-card{padding:12px}
+  .devotional-reading-card .devotional-card-head{gap:4px}
+  .devotional-reading-card .table-actions{gap:1px;flex:none}
+  .devotional-reading-card .table-actions .icon-button{width:28px;height:28px}
+}

@@ -18,6 +18,7 @@ import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialV
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
+import type { DailyBibleReading } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -295,9 +296,10 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
       entries: [...(data.documents ?? [])].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4).map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
     },
     devotional: {
-      title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries or prayer requests recorded yet.",
+      title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries, Bible readings, or prayer requests recorded yet.",
       entries: [
         ...(data.devotionalEntries ?? []).map((entry) => ({ title: entry.scriptureReference, detail: [dateLabel(entry.date), entry.takeaway].filter(Boolean).join(" · "), date: entry.date })),
+        ...(data.dailyBibleReadings ?? []).map((entry) => ({ title: `${entry.fromBook} ${entry.fromChapterNumber}:${entry.fromVerseNumber} – ${entry.toBook} ${entry.toChapterNumber}:${entry.toVerseNumber}`, detail: `Daily Bible reading · ${dateLabel(entry.date)}`, date: entry.date })),
         ...(data.prayerRequests ?? []).filter((entry) => entry.status === "Ongoing").map((entry) => ({ title: entry.title, detail: `Prayer request · ${entry.status}`, date: entry.dateAdded })),
       ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4),
     },
@@ -887,6 +889,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         electricityReadings: mergeArchivedRows(previous.electricityReadings, snapshot.electricityReadings),
         subscriptions: mergeArchivedSubscriptions(previous.subscriptions, snapshot.subscriptions),
         devotionalEntries: mergeArchivedRows(previous.devotionalEntries, snapshot.devotionalEntries),
+        dailyBibleReadings: mergeArchivedRows(previous.dailyBibleReadings, snapshot.dailyBibleReadings),
         devotionalResources: mergeArchivedRows(previous.devotionalResources, snapshot.devotionalResources),
         prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
         cookingRecipes: mergeArchivedRows(previous.cookingRecipes, snapshot.cookingRecipes),
@@ -4591,6 +4594,91 @@ function DevotionalEntryModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
+function DailyBibleReadingModal({ initial, onClose, onSave }: {
+  initial: DailyBibleReading | null;
+  onClose: () => void;
+  onSave: (reading: Omit<DailyBibleReading, "id">) => void;
+}) {
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [fromTestament, setFromTestament] = useState<DailyBibleReading["fromTestament"]>(initial?.fromTestament ?? "Old Testament");
+  const [fromBook, setFromBook] = useState(initial?.fromBook ?? "");
+  const [fromChapterName, setFromChapterName] = useState(initial?.fromChapterName ?? "");
+  const [fromChapterNumber, setFromChapterNumber] = useState(initial?.fromChapterNumber?.toString() ?? "");
+  const [fromVerseNumber, setFromVerseNumber] = useState(initial?.fromVerseNumber?.toString() ?? "");
+  const [toTestament, setToTestament] = useState<DailyBibleReading["toTestament"]>(initial?.toTestament ?? "Old Testament");
+  const [toBook, setToBook] = useState(initial?.toBook ?? "");
+  const [toChapterName, setToChapterName] = useState(initial?.toChapterName ?? "");
+  const [toChapterNumber, setToChapterNumber] = useState(initial?.toChapterNumber?.toString() ?? "");
+  const [toVerseNumber, setToVerseNumber] = useState(initial?.toVerseNumber?.toString() ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function parsePositiveInteger(value: string) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const fromChapter = parsePositiveInteger(fromChapterNumber);
+    const fromVerse = parsePositiveInteger(fromVerseNumber);
+    const toChapter = parsePositiveInteger(toChapterNumber);
+    const toVerse = parsePositiveInteger(toVerseNumber);
+    if (!date || !fromBook.trim() || !toBook.trim()) {
+      setError("Enter the date and book names for both ends of the reading.");
+      return;
+    }
+    if (fromChapter === null || fromVerse === null || toChapter === null || toVerse === null) {
+      setError("Chapter and verse numbers must be positive whole numbers.");
+      return;
+    }
+    if (fromTestament === "New Testament" && toTestament === "Old Testament") {
+      setError("The To reference cannot be in the Old Testament when the From reference is in the New Testament.");
+      return;
+    }
+    if (fromTestament === toTestament && fromBook.trim().toLocaleLowerCase() === toBook.trim().toLocaleLowerCase() &&
+      (toChapter < fromChapter || (toChapter === fromChapter && toVerse < fromVerse))) {
+      setError("The To reference must be the same as or after the From reference.");
+      return;
+    }
+    onSave({
+      date,
+      fromTestament,
+      fromBook: fromBook.trim(),
+      fromChapterName: fromChapterName.trim(),
+      fromChapterNumber: fromChapter,
+      fromVerseNumber: fromVerse,
+      toTestament,
+      toBook: toBook.trim(),
+      toChapterName: toChapterName.trim(),
+      toChapterNumber: toChapter,
+      toVerseNumber: toVerse,
+      notes: notes.trim(),
+    });
+  }
+
+  return <Modal title={initial ? "Edit daily Bible reading" : "Add daily Bible reading"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Reading date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
+      <div className="full bible-reading-range-title"><BookOpen size={14} /> From reference</div>
+      <Field label="Testament"><Select value={fromTestament} onChange={(event) => setFromTestament(event.target.value as DailyBibleReading["fromTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
+      <Field label="Book"><Input required maxLength={100} placeholder="e.g. Genesis" value={fromBook} onChange={(event) => setFromBook(event.target.value)} /></Field>
+      <Field label="Chapter name (optional)"><Input maxLength={100} placeholder="Optional chapter title" value={fromChapterName} onChange={(event) => setFromChapterName(event.target.value)} /></Field>
+      <Field label="Chapter number"><Input required type="number" min="1" step="1" value={fromChapterNumber} onChange={(event) => setFromChapterNumber(event.target.value)} /></Field>
+      <Field label="Verse number"><Input required type="number" min="1" step="1" value={fromVerseNumber} onChange={(event) => setFromVerseNumber(event.target.value)} /></Field>
+      <div className="full bible-reading-range-title"><BookOpen size={14} /> To reference</div>
+      <Field label="Testament"><Select value={toTestament} onChange={(event) => setToTestament(event.target.value as DailyBibleReading["toTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
+      <Field label="Book"><Input required maxLength={100} placeholder="e.g. Genesis" value={toBook} onChange={(event) => setToBook(event.target.value)} /></Field>
+      <Field label="Chapter name (optional)"><Input maxLength={100} placeholder="Optional chapter title" value={toChapterName} onChange={(event) => setToChapterName(event.target.value)} /></Field>
+      <Field label="Chapter number"><Input required type="number" min="1" step="1" value={toChapterNumber} onChange={(event) => setToChapterNumber(event.target.value)} /></Field>
+      <Field label="Verse number"><Input required type="number" min="1" step="1" value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)} /></Field>
+      <Field className="full" label="Comments / notes (optional)"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Notes about your reading" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save reading"}</Button></div>
+    </form>
+  </Modal>;
+}
+
 function PrayerRequestModal({ initial, onClose, onSave }: {
   initial: PrayerRequest | null;
   onClose: () => void;
@@ -4677,18 +4765,22 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEntry, onSaveResource, onDeleteResource, onSaveRequest, onDeleteRequest }: {
+function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, onDeleteEntry, onSaveReading, onDeleteReading, onSaveResource, onDeleteResource, onSaveRequest, onDeleteRequest }: {
   entries: DevotionalEntry[];
+  readings: DailyBibleReading[];
   resources: DevotionalResource[];
   requests: PrayerRequest[];
   onSaveEntry: (entry: Omit<DevotionalEntry, "id">, id?: string) => void;
   onDeleteEntry: (entry: DevotionalEntry) => void;
+  onSaveReading: (reading: Omit<DailyBibleReading, "id">, id?: string) => void;
+  onDeleteReading: (reading: DailyBibleReading) => void;
   onSaveResource: (resource: Omit<DevotionalResource, "id">, id?: string) => void;
   onDeleteResource: (resource: DevotionalResource) => void;
   onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
   const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
+  const [readingEditor, setReadingEditor] = useState<DailyBibleReading | null | undefined>(undefined);
   const [resourceEditor, setResourceEditor] = useState<DevotionalResource | null | undefined>(undefined);
   const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
   const [requestFilter, setRequestFilter] = useState("Ongoing");
@@ -4696,6 +4788,12 @@ function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEnt
   const query = search.trim().toLocaleLowerCase();
   const visibleEntries = [...entries].filter((entry) =>
     !query || [entry.scriptureReference, entry.takeaway, entry.reflection, entry.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const visibleReadings = [...readings].filter((reading) =>
+    !query || [
+      reading.fromTestament, reading.fromBook, reading.fromChapterName, String(reading.fromChapterNumber), String(reading.fromVerseNumber),
+      reading.toTestament, reading.toBook, reading.toChapterName, String(reading.toChapterNumber), String(reading.toVerseNumber), reading.notes,
+    ].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const visibleRequests = [...requests].filter((request) =>
     (requestFilter === "All requests" || request.status === requestFilter) &&
@@ -4710,6 +4808,9 @@ function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEnt
   function confirmDeleteEntry(entry: DevotionalEntry) {
     if (window.confirm(`Move the devotional entry for ${entry.scriptureReference} to the archive?`)) onDeleteEntry(entry);
   }
+  function confirmDeleteReading(reading: DailyBibleReading) {
+    if (window.confirm(`Move the Bible reading for ${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber} to the archive?`)) onDeleteReading(reading);
+  }
   function confirmDeleteRequest(request: PrayerRequest) {
     if (window.confirm(`Move the prayer request "${request.title}" to the archive?`)) onDeleteRequest(request);
   }
@@ -4718,7 +4819,7 @@ function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEnt
   }
 
   return <>
-    <PageHeading eyebrow="Christian faith" title="Devotional" subtitle="Keep Scripture reflections and prayer requests together in your personal faith journal." action={<Button onClick={() => setEntryEditor(null)}><Plus size={15} /> Add Bible reflection</Button>} />
+    <PageHeading eyebrow="Christian faith" title="Devotional" subtitle="Keep daily Bible readings, Scripture reflections, and prayer requests together in your personal faith journal." action={<Button onClick={() => setEntryEditor(null)}><Plus size={15} /> Add Bible reflection</Button>} />
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Record Bible references and your own reflections, not full copyrighted passage text. Devotional notes and prayer requests are private shared Daybook data.</span></div>
     <div className="devotional-summary">
       <Card><span>Bible reflections</span><strong>{entries.length}</strong></Card>
@@ -4726,6 +4827,12 @@ function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEnt
       <Card><span>Answered prayers</span><strong>{answeredCount}</strong></Card>
     </div>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div><Button variant="outline" onClick={() => setReadingEditor(null)}><Plus size={13} /> Add reading</Button></div>
+      {visibleReadings.length ? <div className="devotional-reading-list">{visibleReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
+        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
+        {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
+      </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={readings.length ? "No matching Bible readings" : "No daily Bible readings yet"} description={readings.length ? "Try another search." : "Record a date and the Scripture range you read."} /></Card>}
+    </section>
     <div className="devotional-columns">
       <section className="devotional-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div><Button variant="outline" onClick={() => setEntryEditor(null)}><Plus size={13} /> Add entry</Button></div>
         {visibleEntries.length ? <div className="devotional-list">{visibleEntries.map((entry) => <Card className="devotional-card" key={entry.id}>
@@ -4754,6 +4861,7 @@ function DevotionalPage({ entries, resources, requests, onSaveEntry, onDeleteEnt
       </Card>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
     </section>
     {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
+    {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
     {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
     {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
@@ -6517,6 +6625,7 @@ function emptyTrackerData(): TrackerData {
     educationRecords: [],
     studentProfiles: [],
     educationPlans: [],
+    dailyBibleReadings: [],
     cookingRecipes: [],
     cookingLogs: [],
     cookingPlans: [],
@@ -7474,6 +7583,20 @@ export default function App() {
       devotionalEntries: (previous.devotionalEntries ?? []).filter((current) => current.id !== entry.id),
     }));
   }
+  function saveDailyBibleReading(reading: Omit<DailyBibleReading, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      dailyBibleReadings: id
+        ? (previous.dailyBibleReadings ?? []).map((current) => current.id === id ? { ...reading, id } : current)
+        : [{ ...reading, id: createId() }, ...(previous.dailyBibleReadings ?? [])],
+    }));
+  }
+  function deleteDailyBibleReading(reading: DailyBibleReading) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Bible reading · ${reading.date} · ${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}`, { dailyBibleReadings: [reading] }),
+      dailyBibleReadings: (previous.dailyBibleReadings ?? []).filter((current) => current.id !== reading.id),
+    }));
+  }
   function saveDevotionalResource(resource: Omit<DevotionalResource, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -7906,7 +8029,7 @@ export default function App() {
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
-    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
+    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} plans={data.cookingPlans ?? []} products={data.products ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} onSavePlan={saveCookingPlan} onCopyPlan={copyCookingPlan} onDeletePlan={deleteCookingPlan} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,

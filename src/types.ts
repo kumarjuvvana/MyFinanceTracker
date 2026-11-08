@@ -520,6 +520,24 @@ export interface DevotionalEntry {
   prayerNotes: string;
 }
 
+export type BibleTestament = "Old Testament" | "New Testament";
+
+export interface DailyBibleReading {
+  id: string;
+  date: string;
+  fromTestament: BibleTestament;
+  fromBook: string;
+  fromChapterName: string;
+  fromChapterNumber: number;
+  fromVerseNumber: number;
+  toTestament: BibleTestament;
+  toBook: string;
+  toChapterName: string;
+  toChapterNumber: number;
+  toVerseNumber: number;
+  notes: string;
+}
+
 export interface DevotionalResource {
   id: string;
   title: string;
@@ -782,6 +800,7 @@ export interface TrackerData {
   electricityReadings?: ElectricityReading[];
   subscriptions?: SubscriptionAccount[];
   devotionalEntries?: DevotionalEntry[];
+  dailyBibleReadings?: DailyBibleReading[];
   devotionalResources?: DevotionalResource[];
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];

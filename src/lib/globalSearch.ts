@@ -37,6 +37,7 @@ const collections: { key: keyof TrackerData; label: string; page: Page; titles: 
   { key: "electricityReadings", label: "Electricity readings", page: "Electricity", titles: ["meterName", "location"] },
   { key: "subscriptions", label: "Subscriptions & bills", page: "Subscriptions & bills", titles: ["name", "provider"] },
   { key: "devotionalEntries", label: "Devotional entries", page: "Devotional", titles: ["scriptureReference", "date"] },
+  { key: "dailyBibleReadings", label: "Daily Bible readings", page: "Devotional", titles: ["fromBook", "toBook", "date"] },
   { key: "devotionalResources", label: "Devotional resources", page: "Devotional", titles: ["title"] },
   { key: "prayerRequests", label: "Prayer requests", page: "Devotional", titles: ["title"] },
   { key: "cookingRecipes", label: "Cooking recipes", page: "Cooking", titles: ["name"] },
