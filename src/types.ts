@@ -24,6 +24,7 @@ export type Page =
   | "Master data"
   | "Stocks"
   | "Asset manager"
+  | "Bank accounts"
   | "Learning"
   | "Mind & habits"
   | "Morning exercise"
@@ -48,7 +49,7 @@ export type Page =
   | "R&D / Test Connectors";
 export const FAVORITABLE_PAGES: Page[] = [
   "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
-  "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager",
+  "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager", "Bank accounts",
   "Learning", "Mind & habits", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
@@ -791,6 +792,7 @@ export interface DocumentAttachment {
 
 export interface CredentialRecord {
   id: string;
+  kind?: "bank-account";
   provider: string;
   category: string;
   website: string;
@@ -800,6 +802,12 @@ export interface CredentialRecord {
   notes: string;
   tags: string[];
   additionalFields: PersonalRecordField[];
+  accountHolder?: string;
+  accountType?: string;
+  accountNumber?: string;
+  routingCode?: string;
+  branch?: string;
+  customerService?: string;
 }
 
 export interface EncryptedCredentialVault {

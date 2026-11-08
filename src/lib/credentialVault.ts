@@ -34,7 +34,12 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 export function isCredentialRecord(value: unknown): value is CredentialRecord {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
+  const isBankAccount = record.kind === "bank-account";
+  const bankFieldsValid = !isBankAccount || [
+    "accountHolder", "accountType", "accountNumber", "routingCode", "branch", "customerService",
+  ].every((field) => record[field] === undefined || typeof record[field] === "string");
   return typeof record.id === "string" && record.id.length > 0 &&
+    (record.kind === undefined || isBankAccount) && bankFieldsValid &&
     typeof record.provider === "string" && record.provider.trim().length > 0 &&
     typeof record.category === "string" && typeof record.website === "string" && isHttpsLink(record.website) &&
     typeof record.username === "string" && typeof record.password === "string" &&

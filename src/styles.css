@@ -1267,6 +1267,8 @@ body{background:#f3f5ef}
 .credential-secret-field{display:flex;align-items:center;gap:4px}
 .credential-secret-field .field{min-width:0;flex:1}
 .credential-secret-field .icon-button{flex:none}
+.credential-bank-number>div{display:flex;align-items:center;gap:6px;min-width:0}
+.credential-bank-number .icon-button{flex:none}
 .app-shell.dark .credential-lock-card h2,.app-shell.dark .credential-card-title h2,.app-shell.dark .credential-password-row code{color:#e3e8e2}
 .app-shell.dark .credential-lock-card>p,.app-shell.dark .credential-card-title p,.app-shell.dark .credential-secondary{color:#a7b0a7}
 .app-shell.dark .credential-icon,.app-shell.dark .credential-lock-icon{background:#2b3d30;color:#a6c1a8}

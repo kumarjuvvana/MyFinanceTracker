@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type F
 import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell,
   ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
-  Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
+  Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
@@ -80,6 +80,7 @@ const navigation: NavigationItem[] = [
   { name: "Master data", icon: Database, group: "Shopping" },
   { name: "Stocks", icon: TrendingUp, group: "Finance" },
   { name: "Asset manager", icon: Wallet, group: "Finance" },
+  { name: "Bank accounts", icon: Landmark, group: "Finance" },
   { name: "Learning", icon: BookOpen, group: "Personal growth" },
   { name: "Mind & habits", icon: Heart, group: "Personal growth" },
   { name: "Morning exercise", icon: Dumbbell, group: "Personal growth" },
@@ -6774,8 +6775,91 @@ function CredentialModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function CredentialVaultPage({ vault, onSave, onDelete }: {
+function BankAccountModal({ initial, onClose, onSave }: {
+  initial: CredentialRecord | null;
+  onClose: () => void;
+  onSave: (record: Omit<CredentialRecord, "id">) => Promise<void>;
+}) {
+  const [bankName, setBankName] = useState(initial?.provider ?? "");
+  const [accountHolder, setAccountHolder] = useState(initial?.accountHolder ?? "");
+  const [accountType, setAccountType] = useState(initial?.accountType ?? "Savings");
+  const [accountNumber, setAccountNumber] = useState(initial?.accountNumber ?? "");
+  const [routingCode, setRoutingCode] = useState(initial?.routingCode ?? "");
+  const [branch, setBranch] = useState(initial?.branch ?? "");
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [customerService, setCustomerService] = useState(initial?.customerService ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!bankName.trim() || !accountHolder.trim() || !accountNumber.trim()) {
+      setError("Enter the bank name, account holder, and account number.");
+      return;
+    }
+    if (website.trim()) {
+      try {
+        if (new URL(website.trim()).protocol !== "https:") throw new Error();
+      } catch {
+        setError("Enter a valid HTTPS bank website, or leave it blank.");
+        return;
+      }
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        kind: "bank-account",
+        provider: bankName.trim(),
+        category: "Bank account",
+        website: website.trim(),
+        username: "",
+        password: "",
+        recoveryInfo: "",
+        notes: notes.trim(),
+        tags: [],
+        additionalFields: [],
+        accountHolder: accountHolder.trim(),
+        accountType,
+        accountNumber: accountNumber.trim(),
+        routingCode: routingCode.trim(),
+        branch: branch.trim(),
+        customerService: customerService.trim(),
+      });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The encrypted bank details could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Modal title={initial ? "Edit bank account" : "Add bank account"} onClose={onClose} wide inline={Boolean(initial)}>
+    <form onSubmit={(event) => void submit(event)}>
+      <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Bank details are encrypted in your browser with the vault passphrase before they sync. Do not store PINs, passwords, one-time codes, or recovery codes.</span></div>
+      <div className="form-grid">
+        <Field label="Bank name"><Input required maxLength={120} autoComplete="off" value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field>
+        <Field label="Account holder"><Input required maxLength={160} autoComplete="off" value={accountHolder} onChange={(event) => setAccountHolder(event.target.value)} /></Field>
+        <Field label="Account type"><Select value={accountType} onChange={(event) => setAccountType(event.target.value)}><option>Savings</option><option>Checking / current</option><option>Salary</option><option>Joint</option><option>Fixed deposit</option><option>Other</option></Select></Field>
+        <div className="field-wrap"><label className="field-label" htmlFor="bank-account-number">Account number</label><div className="credential-secret-field"><Input id="bank-account-number" required maxLength={100} autoComplete="off" type={showAccountNumber ? "text" : "password"} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><button className="icon-button" type="button" aria-label={showAccountNumber ? "Hide account number" : "Show account number"} onClick={() => setShowAccountNumber((visible) => !visible)}>{showAccountNumber ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
+        <Field label="IFSC / routing code"><Input maxLength={80} autoComplete="off" value={routingCode} onChange={(event) => setRoutingCode(event.target.value)} /></Field>
+        <Field label="Branch"><Input maxLength={160} value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
+        <Field className="full" label="Bank website (HTTPS)"><ExternalLinkInput maxLength={2000} placeholder="https://..." value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
+        <Field className="full" label="Customer-service contact"><Input maxLength={500} placeholder="Phone number or email" autoComplete="off" value={customerService} onChange={(event) => setCustomerService(event.target.value)} /></Field>
+        <Field className="full" label="Quick-reference notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details such as account purpose or where to find statements" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      </div>
+      {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Encrypting..." : initial ? "Encrypt and save" : "Encrypt and add"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete }: {
   vault?: EncryptedCredentialVault;
+  section: "credentials" | "banks";
+  onNavigate: (page: Page) => void;
   onSave: (vault: EncryptedCredentialVault) => void;
   onDelete: () => void;
 }) {
@@ -6788,6 +6872,15 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lastSavedCiphertext = useRef(vault?.ciphertext ?? "");
+  function navigateSection(page: Page) {
+    setEditor(undefined);
+    setSearch("");
+    onNavigate(page);
+  }
+  const sectionTabs = <nav className="student-profile-tabs" aria-label="Private account sections">
+    <Button variant={section === "credentials" ? "primary" : "outline"} aria-pressed={section === "credentials"} onClick={() => navigateSection("Account credentials")}><KeyRound size={14} />Account credentials</Button>
+    <Button variant={section === "banks" ? "primary" : "outline"} aria-pressed={section === "banks"} onClick={() => navigateSection("Bank accounts")}><Landmark size={14} />Bank accounts</Button>
+  </nav>;
 
   useEffect(() => {
     if (!vault || !unlocked || vault.ciphertext === lastSavedCiphertext.current) return;
@@ -6866,7 +6959,8 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   }
 
   if (!unlocked) return <>
-    <PageHeading eyebrow="Private account vault" title="Account credentials" subtitle="Keep sign-in details together, encrypted before they enter shared storage." />
+    <PageHeading eyebrow="Private account vault" title={section === "banks" ? "Bank accounts" : "Account credentials"} subtitle={section === "banks" ? "Keep essential bank account details encrypted for private quick reference." : "Keep sign-in details together, encrypted before they enter shared storage."} />
+    {sectionTabs}
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>The vault encrypts account details in this browser with AES-256-GCM and your separate passphrase. GitHub and backup files receive ciphertext, not readable credentials. This protects stored files, not a compromised browser, device, or deployed app; the app can handle details while unlocked. Use a unique passphrase and keep a safe backup: if you forget it, the data cannot be recovered. A browser vault is not a replacement for a dedicated password manager; do not store bank PINs, one-time codes, or recovery codes here.</span></div>
     <Card className="credential-lock-card">
       <div className="credential-lock-icon"><KeyRound size={20} /></div>
@@ -6887,17 +6981,34 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
   </>;
 
   const query = search.trim().toLocaleLowerCase();
-  const records = unlocked.records.filter((record) => [
-    record.provider, record.category, record.website, record.username, record.recoveryInfo,
-    record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value]),
-  ].some((value) => value.toLocaleLowerCase().includes(query)));
+  const records = unlocked.records.filter((record) => section === "banks"
+    ? record.kind === "bank-account" && [
+      record.provider, record.accountHolder ?? "", record.accountType ?? "", record.accountNumber ?? "",
+      record.routingCode ?? "", record.branch ?? "", record.website, record.customerService ?? "", record.notes,
+    ].some((value) => value.toLocaleLowerCase().includes(query))
+    : record.kind !== "bank-account" && [
+      record.provider, record.category, record.website, record.username, record.recoveryInfo,
+      record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value]),
+    ].some((value) => value.toLocaleLowerCase().includes(query)));
+  const bankAccounts = section === "banks";
 
   return <>
-    <PageHeading eyebrow="Private account vault" title="Account credentials" subtitle="Search and manage your encrypted account details." action={<div className="credential-page-actions"><Button onClick={() => setEditor(null)}><Plus size={15} /> Add account</Button><Button variant="outline" onClick={lockVault}><LockKeyhole size={14} /> Lock vault</Button></div>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Encrypted with your separate vault passphrase before syncing. Search covers provider, category, sign-in link, username, recovery info, tags, notes and custom fields, but never passwords. Lock the vault when finished. Do not store bank PINs, one-time codes, or recovery codes.</span></div>
+    <PageHeading eyebrow="Private account vault" title={bankAccounts ? "Bank accounts" : "Account credentials"} subtitle={bankAccounts ? "Search and manage encrypted bank details for private quick reference." : "Search and manage your encrypted account details."} action={<div className="credential-page-actions"><Button onClick={() => setEditor(null)}><Plus size={15} />{bankAccounts ? "Add bank account" : "Add account"}</Button><Button variant="outline" onClick={lockVault}><LockKeyhole size={14} /> Lock vault</Button></div>} />
+    {sectionTabs}
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>{bankAccounts ? "Bank details are encrypted with your separate vault passphrase before syncing. Account numbers are masked until you reveal them. Lock the vault when finished; never store PINs, passwords, one-time codes, or recovery codes." : "Encrypted with your separate vault passphrase before syncing. Search covers provider, category, sign-in link, username, recovery info, tags, notes and custom fields, but never passwords. Lock the vault when finished. Do not store bank PINs, one-time codes, or recovery codes."}</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{records.length} {records.length === 1 ? "account" : "accounts"}</Badge></div>
-    <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={bankAccounts ? "Search bank accounts" : "Search account credentials"} placeholder={bankAccounts ? "Search bank, account holder, branch, code..." : "Search provider, username, tags, notes..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{records.length} {records.length === 1 ? bankAccounts ? "bank account" : "account" : bankAccounts ? "bank accounts" : "accounts"}</Badge></div>
+    {bankAccounts ? <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
+      <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{record.provider}</h2><p>{record.accountType || "Bank account"}{record.accountHolder ? ` · ${record.accountHolder}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider} bank account`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.provider} bank account`} title="Create a separately encrypted copy" onClick={() => { if (window.confirm(`Create a copy of the ${record.provider} bank account details?`)) void saveRecords([{ ...record, id: createId(), provider: copyLabel(record.provider, 120) }, ...unlocked.records]).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the bank account.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider} bank account`} onClick={() => { if (window.confirm(`Delete the ${record.provider} bank account from the encrypted vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
+      <div className="personal-record-details">
+        <div className="credential-bank-number"><span>Account number</span><div><strong>{visiblePasswords.has(record.id) ? record.accountNumber : record.accountNumber ? `•••• •••• ${record.accountNumber.slice(-4)}` : "Not recorded"}</strong><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} account number` : `Show ${record.provider} account number`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
+        {record.routingCode && <div><span>IFSC / routing code</span><strong>{record.routingCode}</strong></div>}
+        {record.branch && <div><span>Branch</span><strong>{record.branch}</strong></div>}
+        {record.customerService && <div><span>Customer service</span><strong>{record.customerService}</strong></div>}
+      </div>
+      {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open bank website</a>}
+      {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
+    </Card>)}</div> : <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
       <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p>{record.category}{record.username ? ` · ${record.username}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.provider} credential`} title="Duplicate encrypted credential" onClick={() => { if (window.confirm(`Create a second encrypted copy of the ${record.provider} credential?`)) void saveRecords([{ ...record, id: createId(), provider: copyLabel(record.provider, 120), tags: [...record.tags], additionalFields: record.additionalFields.map((field) => ({ ...field })) }, ...unlocked.records]).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not duplicate the credential.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider}`} onClick={() => { if (window.confirm(`Delete the ${record.provider} account from the vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
       {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer">{record.website}</a>}
       {record.password && <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password : "••••••••••••"}</code><button className="icon-button" type="button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>}
@@ -6905,15 +7016,21 @@ function CredentialVaultPage({ vault, onSave, onDelete }: {
       {record.additionalFields.map((field, index) => field.label || field.value ? <p className="credential-secondary" key={index}><strong>{field.label || "Additional detail"}:</strong> {field.value}</p> : null)}
       {record.tags.length > 0 && <div className="credential-tags">{record.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}
       {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
-    </Card>)}</div>
-    {!records.length && <Card><EmptyState icon={<KeyRound size={18} />} title={unlocked.records.length ? "No matching accounts" : "No accounts in the vault"} description={unlocked.records.length ? "Try another search." : "Add an account or load the fictional example from the add form to see the available fields."} /></Card>}
-    {editor !== undefined && <CredentialModal key={editor?.id ?? "new-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
+    </Card>)}</div>}
+    {!records.length && <Card><EmptyState icon={bankAccounts ? <Landmark size={18} /> : <KeyRound size={18} />} title={unlocked.records.some((record) => bankAccounts ? record.kind === "bank-account" : record.kind !== "bank-account") ? `No matching ${bankAccounts ? "bank accounts" : "accounts"}` : bankAccounts ? "No bank accounts saved" : "No accounts in the vault"} description={unlocked.records.some((record) => bankAccounts ? record.kind === "bank-account" : record.kind !== "bank-account") ? "Try another search." : bankAccounts ? "Add a bank account for encrypted quick reference." : "Add an account or load the fictional example from the add form to see the available fields."} /></Card>}
+    {editor !== undefined && (bankAccounts ? <BankAccountModal key={editor?.id ?? "new-bank-account"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
       const saved: CredentialRecord = { ...record, id: editor?.id ?? createId() };
       const next = editor
         ? unlocked.records.map((entry) => entry.id === editor.id ? saved : entry)
         : [saved, ...unlocked.records];
       await saveRecords(next);
-    }} />}
+    }} /> : <CredentialModal key={editor?.id ?? "new-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
+      const saved: CredentialRecord = { ...record, id: editor?.id ?? createId() };
+      const next = editor
+        ? unlocked.records.map((entry) => entry.id === editor.id ? saved : entry)
+        : [saved, ...unlocked.records];
+      await saveRecords(next);
+    }} />)}
   </>;
 }
 
@@ -8874,6 +8991,7 @@ export default function App() {
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
+    "Bank accounts": <CredentialVaultPage vault={data.credentialVault} section="banks" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLogs} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
@@ -8893,7 +9011,7 @@ export default function App() {
     "Database manager": <DatabaseManagerPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
-    "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
+    "Account credentials": <CredentialVaultPage vault={data.credentialVault} section="credentials" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
