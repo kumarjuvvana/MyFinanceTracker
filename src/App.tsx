@@ -2215,8 +2215,9 @@ function normalizeEducationSubjectName(name: string) {
   return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
-function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
+function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, onDelete, onUpdate }: {
   record: EducationRecord;
+  defaultExpanded?: boolean;
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -2231,7 +2232,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
     | { kind: "charge"; initial: EducationFeeCharge | null }
     | null
   >(null);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [mainDetailsExpanded, setMainDetailsExpanded] = useState(true);
   const [examsExpanded, setExamsExpanded] = useState(true);
   const [attendanceExpanded, setAttendanceExpanded] = useState(true);
@@ -2993,7 +2994,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
       {activeSection === "education" && <>
         <div className="education-section-head student-education-heading"><div><h2 className="section-title">Education timeline</h2><p className="section-description">Each entry represents one academic year or course; student ID-card images are optional.</p></div><Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={14} />Add education record</Button></div>
         <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search school, subject, exam, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter class or grade" style={{ width: 205 }} value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}><option>All classes / grades</option>{grades.map((grade) => <option key={grade}>{grade}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
-        <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
+        <div className="education-list">{visible.map((record, index) => <EducationRecordCard key={record.id} record={record} defaultExpanded={index === 0} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
         {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={profileRecords.length ? "No matching records" : "No education records yet"} description={profileRecords.length ? "Try another search or filter." : "Add an academic year or course to start this student's education timeline."} /></Card>}
       </>}
       {activeSection === "interests" && <Card className="student-interests-card">
