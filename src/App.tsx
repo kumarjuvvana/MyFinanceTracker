@@ -3837,6 +3837,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("log");
   const [exerciseDate, setExerciseDate] = useState(today);
   const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [copyingDate, setCopyingDate] = useState<string | null>(null);
   const [draftRows, setDraftRows] = useState<ExerciseRowDraft[]>([{
     daypart: "Morning",
     time: "",
@@ -3871,8 +3872,25 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   function editDay(date: string) {
     setExerciseDate(date);
     setEditingDate(date);
+    setCopyingDate(null);
     setDraftRows(logs.filter((log) => log.date === date).map((log) => ({
       id: log.id,
+      daypart: log.daypart ?? "Morning",
+      time: log.time ?? "",
+      activity: log.activity,
+      durationMinutes: log.durationMinutes ?? null,
+      count: log.count ?? null,
+      intensity: log.intensity,
+      notes: log.notes,
+    })));
+    setExerciseError("");
+  }
+
+  function copyDay(date: string) {
+    setExerciseDate(today());
+    setEditingDate(null);
+    setCopyingDate(date);
+    setDraftRows(logs.filter((log) => log.date === date).map((log) => ({
       daypart: log.daypart ?? "Morning",
       time: log.time ?? "",
       activity: log.activity,
@@ -3887,6 +3905,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   function resetForm() {
     setExerciseDate(today());
     setEditingDate(null);
+    setCopyingDate(null);
     setDraftRows([{
       daypart: "Morning",
       time: "",
@@ -3992,7 +4011,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   }
 
   const exerciseEntryForm = <Card className="mindful-habits-card">
-    <div className="card-head"><div><h2 className="section-title">{editingDate ? `Edit exercises · ${dateLabel(editingDate)}` : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
+    <div className="card-head"><div><h2 className="section-title">{editingDate ? `Edit exercises · ${dateLabel(editingDate)}` : copyingDate ? `Copy exercises from ${dateLabel(copyingDate)}` : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
     <form onSubmit={submit}>
       <div className="form-grid">
         <Field label="Exercise date"><DateInput required disabled={Boolean(editingDate)} value={exerciseDate} onValueChange={setExerciseDate} /></Field>
@@ -4010,7 +4029,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
         </div>
       </div>)}</div>
       {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
-      <div className="connector-actions"><Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button><Button type="submit">{editingDate ? "Save day record" : "Save all exercises for this day"}</Button>{editingDate && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
+      <div className="connector-actions"><Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button><Button type="submit">{editingDate ? "Save day record" : copyingDate ? "Save copied exercises" : "Save all exercises for this day"}</Button>{(editingDate || copyingDate) && <Button type="button" variant="outline" onClick={resetForm}>{editingDate ? "Cancel edit" : "Cancel copy"}</Button>}</div>
     </form>
   </Card>;
 
@@ -4042,7 +4061,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     </Card>
     </>}
     {activeTab === "records" && <>
-    {editingDate && exerciseEntryForm}
+    {(editingDate || copyingDate) && exerciseEntryForm}
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
       <FilterDrawer activeCount={activityFilter ? 1 : 0}>
@@ -4052,7 +4071,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Badge>{visibleDayGroups.length} {visibleDayGroups.length === 1 ? "day" : "days"} · {visibleLogs.length} {visibleLogs.length === 1 ? "activity" : "activities"}</Badge>
     </div>
     {visibleDayGroups.length ? <div className="exercise-day-list">{visibleDayGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
-      <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div>
+      <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => copyDay(date)}><Copy size={13} />Copy day</Button><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div></div>
       <div className="table-card"><table className="data-table">
         <thead><tr><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
         <tbody>{dayLogs.map((log) => <tr key={log.id}>
