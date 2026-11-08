@@ -562,60 +562,57 @@ function Reports({ data }: { data: TrackerData }) {
   </>;
 }
 
-function ReminderCard({ reminder, categories, onSave, onDelete, onToggle }: {
+function ReminderCard({ reminder, onEdit, onSave, onDelete, onToggle }: {
   reminder: Reminder;
-  categories: string[];
+  onEdit: () => void;
   onSave: (reminder: Omit<Reminder, "id">, id?: string) => void;
   onDelete: (id: string) => void;
   onToggle: (reminder: Reminder) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(reminder.title);
-  const [date, setDate] = useState(reminder.date);
-  const [category, setCategory] = useState(reminder.category || "General");
-  const [details, setDetails] = useState(reminder.details);
+  const [expanded, setExpanded] = useState(false);
+  return <Card className={`reminder-card ${reminder.completed ? "completed" : ""}`}>
+    <button className={`check-button ${reminder.completed ? "checked" : ""}`} aria-label={reminder.completed ? `Mark ${reminder.title} as incomplete` : `Mark ${reminder.title} as complete`} onClick={() => onToggle(reminder)}>{reminder.completed && <Check size={12} />}</button>
+    <div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{dateLabel(reminder.date)}</div>{expanded && reminder.details && <div className="reminder-details"><LinkifiedText>{reminder.details}</LinkifiedText></div>}</div>
+    <Badge className="reminder-category-badge">{reminder.category || "General"}</Badge>
+    <Badge className="reminder-status-badge" tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
+    <div className="table-actions">{reminder.details && <button className="reminder-details-toggle" aria-label={`${expanded ? "Hide" : "Show"} details for ${reminder.title}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide" : "Show"}</button>}<button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={onEdit}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button></div>
+  </Card>;
+}
+
+function ReminderModal({ initial, categories, onClose, onSave }: {
+  initial: Reminder | null;
+  categories: string[];
+  onClose: () => void;
+  onSave: (reminder: Omit<Reminder, "id">, id?: string) => void;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [category, setCategory] = useState(initial?.category || "General");
+  const [details, setDetails] = useState(initial?.details ?? "");
   const [error, setError] = useState("");
-
-  function startEditing() {
-    setTitle(reminder.title);
-    setDate(reminder.date);
-    setCategory(reminder.category || "General");
-    setDetails(reminder.details);
-    setError("");
-    setEditing(true);
-  }
-
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !date || !category.trim()) {
       setError("Enter a title, date, and category.");
       return;
     }
-    onSave({ title: title.trim(), date, category: category.trim(), details: details.trim(), completed: reminder.completed }, reminder.id);
-    setEditing(false);
+    onSave({ title: title.trim(), date, category: category.trim(), details: details.trim(), completed: initial?.completed ?? false }, initial?.id);
   }
-
-  if (editing) return <Card className="reminder-card reminder-card-editing">
-    <form className="reminder-inline-form" onSubmit={submit}>
-      <Field label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+  return <Modal title={initial ? "Edit note or reminder" : "Add a note or reminder"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
-      <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
-      <Field className="full" label="Details"><textarea className="field textarea" rows={3} maxLength={5000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
-      {error && <div className="alert alert-error full" role="alert">{error}</div>}
-      <div className="reminder-form-actions full"><Button type="submit"><Check size={14} />Save changes</Button><Button type="button" variant="outline" onClick={() => setEditing(false)}>Cancel</Button></div>
+      <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+      <Field className="full" label="Details (optional)"><textarea className="field textarea" rows={4} maxLength={1000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add reminder"}</Button></div>
     </form>
-  </Card>;
-
-  return <Card className={`reminder-card ${reminder.completed ? "completed" : ""}`}>
-    <button className={`check-button ${reminder.completed ? "checked" : ""}`} aria-label={reminder.completed ? `Mark ${reminder.title} as incomplete` : `Mark ${reminder.title} as complete`} onClick={() => onToggle(reminder)}>{reminder.completed && <Check size={12} />}</button>
-    <div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{dateLabel(reminder.date)}{reminder.details && <> · <LinkifiedText>{reminder.details}</LinkifiedText></>}</div></div>
-    <Badge className="reminder-category-badge">{reminder.category || "General"}</Badge>
-    <Badge className="reminder-status-badge" tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
-    <div className="table-actions"><button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={startEditing}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button></div>
-  </Card>;
+  </Modal>;
 }
 
 function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete, onToggle }: { reminders: Reminder[]; categories: string[]; onSave: (reminder: Omit<Reminder, "id">, id?: string) => void; onDelete: (id: string) => void; onToggle: (reminder: Reminder) => void }) {
+  const [activeTab, setActiveTab] = useState<"list" | "add">("list");
+  const [editor, setEditor] = useState<Reminder | null | undefined>(undefined);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [category, setCategory] = useState("General");
@@ -639,18 +636,25 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
     .filter((reminder) => [reminder.title, reminder.category || "General", reminder.details, reminder.date, reminder.completed ? "completed done" : "pending upcoming"]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => Number(a.completed) - Number(b.completed) || a.date.localeCompare(b.date));
-  return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Search and group reminders by category. Edit any record directly where it appears in the list." />
-    <Card className="reminder-form-card"><h2 className="section-title">Add a note or reminder</h2><form className="form-grid reminder-form" onSubmit={submit}>
+  return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Keep personal notes and dated reminders organized in one place." action={activeTab === "list" ? <Button onClick={() => setActiveTab("add")}><Plus size={15} />Add reminder</Button> : undefined} />
+    <nav className="student-profile-tabs reminder-tabs" aria-label="Notes and reminders sections">
+      <Button variant={activeTab === "list" ? "primary" : "outline"} aria-pressed={activeTab === "list"} onClick={() => setActiveTab("list")}><Bell size={14} />Notes & reminders<Badge>{reminders.length}</Badge></Button>
+      <Button variant={activeTab === "add" ? "primary" : "outline"} aria-pressed={activeTab === "add"} onClick={() => setActiveTab("add")}><Plus size={14} />Add note or reminder</Button>
+    </nav>
+    {activeTab === "add" && <Card className="reminder-form-card"><h2 className="section-title">Add a note or reminder</h2><form className="form-grid reminder-form" onSubmit={submit}>
       <Field label="Title"><Input autoFocus maxLength={120} required placeholder="e.g. Pick up a prescription" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
       <Field className="full" label="Category"><div className="reminder-category-grid" role="group" aria-label="Choose reminder category">{categories.map((entry) => <button key={entry} type="button" className={`category-choice ${category === entry ? "selected" : ""}`} aria-pressed={category === entry} onClick={() => setCategory(entry)}>{entry}</button>)}</div></Field>
       <Field className="full" label="Details (optional)"><textarea className="field textarea" rows={3} maxLength={1000} placeholder="Add any useful details..." value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
       {error && <div className="alert alert-error full" role="alert">{error}</div>}
-      <div className="reminder-form-actions full"><Button type="submit"><Plus size={14} />Add reminder</Button></div>
-    </form></Card>
+      <div className="reminder-form-actions full"><Button type="submit"><Plus size={14} />Add reminder</Button><Button type="button" variant="outline" onClick={() => setActiveTab("list")}>Cancel</Button></div>
+    </form></Card>}
+    {activeTab === "list" && <>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select><Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge></div>
     <div className="reminder-group-picker" role="group" aria-label="Filter reminders by category">{["All categories", ...categories].map((entry) => <button key={entry} type="button" className={`category-choice ${categoryFilter === entry ? "selected" : ""}`} aria-pressed={categoryFilter === entry} onClick={() => setCategoryFilter(entry)}>{entry}{entry === "All categories" && <span>{reminders.length}</span>}</button>)}</div>
-    <div className="reminder-page-list">{visible.length ? visible.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} categories={categories} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />) : <Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or category filter." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card>}</div>
+    <div className="reminder-page-list">{visible.length ? visible.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />) : <Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or category filter." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card>}</div>
+    </>}
+    {editor !== undefined && <ReminderModal key={editor?.id ?? "new-reminder"} initial={editor} categories={categories} onClose={() => setEditor(undefined)} onSave={(reminder, id) => { onSave(reminder, id); setEditor(undefined); }} />}
   </>;
 }
 
@@ -665,14 +669,34 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
   const [reminderCategoryName, setReminderCategoryName] = useState("");
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [activeTab, setActiveTab] = useState<"products" | "stores" | "categories" | "editor">("products");
+  const [editorKind, setEditorKind] = useState<"product" | "store" | "category" | null>(null);
   const [error, setError] = useState("");
+  function openEditor(kind: "product" | "store" | "category") {
+    setEditorKind(kind);
+    setEditingStore(null);
+    setEditingProduct(null);
+    setError("");
+    if (kind === "product") {
+      setProductName("");
+      setCategory("Groceries");
+      setUnit("pcs");
+      setPrice(0);
+    } else if (kind === "store") {
+      setStoreName("");
+      setLocation("");
+    } else {
+      setReminderCategoryName("");
+    }
+    setActiveTab("editor");
+  }
   function addStore(event: FormEvent) {
     event.preventDefault();
     if (!storeName.trim()) { setError("Enter a store name."); return; }
     if (stores.some((store) => store.id !== editingStore?.id && store.name.toLowerCase() === storeName.trim().toLowerCase())) { setError("That store is already in your master data."); return; }
     const saved = { name: storeName.trim(), location: location.trim() };
     if (editingStore) onSaveStore(saved, editingStore.id); else onAddStore(saved);
-    setEditingStore(null); setStoreName(""); setLocation(""); setError("");
+    setEditingStore(null); setStoreName(""); setLocation(""); setError(""); setEditorKind(null); setActiveTab("stores");
   }
   function addProduct(event: FormEvent) {
     event.preventDefault();
@@ -680,7 +704,7 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
     if (products.some((product) => product.id !== editingProduct?.id && product.name.toLowerCase() === productName.trim().toLowerCase())) { setError("That product is already in your master data."); return; }
     const saved = { name: productName.trim(), category, unit: unit.trim(), estimatedPrice: price };
     if (editingProduct) onSaveProduct(saved, editingProduct.id); else onAddProduct(saved);
-    setEditingProduct(null); setProductName(""); setUnit("pcs"); setPrice(0); setError("");
+    setEditingProduct(null); setProductName(""); setUnit("pcs"); setPrice(0); setError(""); setEditorKind(null); setActiveTab("products");
   }
   function addReminderCategory(event: FormEvent) {
     event.preventDefault();
@@ -694,32 +718,46 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
     onAddReminderCategory(name);
     setReminderCategoryName("");
     setError("");
+    setEditorKind(null);
+    setActiveTab("categories");
   }
-  return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Save and maintain reusable products, stores and reminder categories." />
+  return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Keep products, stores, and reminder categories organized. Add and edit forms are separate from their record lists." />
     {error && <div className="alert alert-error" role="alert">{error}</div>}
-    <div className="master-grid">
-      <Card>
-        <div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><ShoppingBasket size={16} /></div>
-        <form className="form-grid master-form" onSubmit={addProduct}>
-          <Field className="full" label="Product name"><Input required maxLength={100} placeholder="e.g. Basmati rice" value={productName} onChange={(event) => setProductName(event.target.value)} /></Field>
-          <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as Category)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
-          <Field label="Unit"><Input list="master-item-units" required value={unit} onChange={(event) => setUnit(event.target.value)} /><datalist id="master-item-units">{ITEM_UNITS.map((entry) => <option key={entry} value={entry} />)}</datalist></Field>
-          <Field className="full" label={`Price per ${unit || "unit"} (${currency})`}><Input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field>
-          <div className="full"><Button type="submit">{editingProduct ? <><Check size={14} />Save product</> : <><Plus size={14} />Add product</>}</Button>{editingProduct && <Button type="button" variant="outline" style={{ marginLeft: 8 }} onClick={() => { setEditingProduct(null); setProductName(""); setUnit("pcs"); setPrice(0); }}>Cancel</Button>}</div>
-        </form>
-        <div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div>
-      </Card>
-      <Card>
-        <div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Database size={16} /></div>
-        <form className="form-grid master-form" onSubmit={addStore}>
-          <Field className="full" label="Store name"><Input required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field>
-          <Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
-          <div className="full"><Button type="submit">{editingStore ? <><Check size={14} />Save store</> : <><Plus size={14} />Add store</>}</Button>{editingStore && <Button type="button" variant="outline" style={{ marginLeft: 8 }} onClick={() => { setEditingStore(null); setStoreName(""); setLocation(""); }}>Cancel</Button>}</div>
-        </form>
-        <div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setStoreName(store.name); setLocation(store.location); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div>
-      </Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Bell size={16} /></div><form className="master-form reminder-category-master-form" onSubmit={addReminderCategory}><Field label="New category"><Input required maxLength={80} placeholder="e.g. Travel, Family" value={reminderCategoryName} onChange={(event) => setReminderCategoryName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add category</Button></form><div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div></Card>
-    </div>
+    <nav className="student-profile-tabs master-tabs" aria-label="Master data sections">
+      <Button variant={activeTab === "products" ? "primary" : "outline"} aria-pressed={activeTab === "products"} onClick={() => setActiveTab("products")}><ShoppingBasket size={14} />Products<Badge>{products.length}</Badge></Button>
+      <Button variant={activeTab === "stores" ? "primary" : "outline"} aria-pressed={activeTab === "stores"} onClick={() => setActiveTab("stores")}><Database size={14} />Stores<Badge>{stores.length}</Badge></Button>
+      <Button variant={activeTab === "categories" ? "primary" : "outline"} aria-pressed={activeTab === "categories"} onClick={() => setActiveTab("categories")}><Bell size={14} />Reminder categories<Badge>{reminderCategories.length}</Badge></Button>
+      <Button variant={activeTab === "editor" ? "primary" : "outline"} aria-pressed={activeTab === "editor"} onClick={() => { setEditorKind(null); setActiveTab("editor"); }}><Plus size={14} />Add / edit</Button>
+    </nav>
+    {activeTab === "products" && <Card>
+      <div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><Button onClick={() => openEditor("product")}><Plus size={14} />Add product</Button></div>
+      <div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setEditingStore(null); setEditorKind("product"); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div>
+    </Card>}
+    {activeTab === "stores" && <Card>
+      <div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Button onClick={() => openEditor("store")}><Plus size={14} />Add store</Button></div>
+      <div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setEditingProduct(null); setEditorKind("store"); setStoreName(store.name); setLocation(store.location); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div>
+    </Card>}
+    {activeTab === "categories" && <Card>
+      <div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Button onClick={() => openEditor("category")}><Plus size={14} />Add category</Button></div>
+      <div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div>
+    </Card>}
+    {activeTab === "editor" && <Card className="master-editor-card">
+      <div className="card-head"><div><h2 className="section-title">{editorKind === "product" ? editingProduct ? "Edit product" : "Add product" : editorKind === "store" ? editingStore ? "Edit store" : "Add store" : editorKind === "category" ? "Add reminder category" : "Choose what to add"}</h2><p className="section-description">This form is separate from the record list.</p></div></div>
+      {!editorKind ? <div className="master-editor-choices"><Button variant="outline" onClick={() => openEditor("product")}><ShoppingBasket size={14} />Product</Button><Button variant="outline" onClick={() => openEditor("store")}><Database size={14} />Store</Button><Button variant="outline" onClick={() => openEditor("category")}><Bell size={14} />Reminder category</Button></div> : editorKind === "product" ? <form className="form-grid master-form" onSubmit={addProduct}>
+        <Field className="full" label="Product name"><Input autoFocus required maxLength={100} placeholder="e.g. Basmati rice" value={productName} onChange={(event) => setProductName(event.target.value)} /></Field>
+        <Field label="Category"><Select value={category} onChange={(event) => setCategory(event.target.value as Category)}>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Unit"><Input list="master-item-units" required value={unit} onChange={(event) => setUnit(event.target.value)} /><datalist id="master-item-units">{ITEM_UNITS.map((entry) => <option key={entry} value={entry} />)}</datalist></Field>
+        <Field className="full" label={`Price per ${unit || "unit"} (${currency})`}><Input type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field>
+        <div className="full"><Button type="submit">{editingProduct ? "Save product" : "Add product"}</Button><Button type="button" variant="outline" onClick={() => { setEditorKind(null); setEditingProduct(null); setActiveTab("products"); }}>Cancel</Button></div>
+      </form> : editorKind === "store" ? <form className="form-grid master-form" onSubmit={addStore}>
+        <Field className="full" label="Store name"><Input autoFocus required maxLength={100} placeholder="e.g. Green Basket" value={storeName} onChange={(event) => setStoreName(event.target.value)} /></Field>
+        <Field className="full" label="Address / location (optional)"><Input maxLength={200} placeholder="Street, neighborhood, or a note to identify it" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
+        <div className="full"><Button type="submit">{editingStore ? "Save store" : "Add store"}</Button><Button type="button" variant="outline" onClick={() => { setEditorKind(null); setEditingStore(null); setActiveTab("stores"); }}>Cancel</Button></div>
+      </form> : <form className="form-grid master-form" onSubmit={addReminderCategory}>
+        <Field className="full" label="New category"><Input autoFocus required maxLength={80} placeholder="e.g. Travel, Family" value={reminderCategoryName} onChange={(event) => setReminderCategoryName(event.target.value)} /></Field>
+        <div className="full"><Button type="submit"><Plus size={14} />Add category</Button><Button type="button" variant="outline" onClick={() => { setEditorKind(null); setActiveTab("categories"); }}>Cancel</Button></div>
+      </form>}
+    </Card>}
   </>;
 }
 
@@ -1080,6 +1118,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [averageBuyPrice, setAverageBuyPrice] = useState("");
   const [quantity, setQuantity] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [stockTab, setStockTab] = useState<"stocks" | "manage">("stocks");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -1134,7 +1173,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   function editStock(stock: TrackedStock) {
     setEditingId(stock.id); setSymbol(stock.symbol); setName(stock.name); setExchange(stock.exchange); setBroker(stock.broker);
     setAverageBuyPrice(stock.averageBuyPrice == null ? "" : String(stock.averageBuyPrice));
-    setQuantity(stock.quantity ? String(stock.quantity) : "");
+    setQuantity(stock.quantity ? String(stock.quantity) : ""); setStockTab("manage");
     setError(""); setNotice("");
   }
   function copyStock(stock: TrackedStock) {
@@ -1145,6 +1184,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setBroker(stock.broker);
     setAverageBuyPrice(stock.averageBuyPrice == null ? "" : String(stock.averageBuyPrice));
     setQuantity(stock.quantity ? String(stock.quantity) : "");
+    setStockTab("manage");
     setError(`Choose a different broker before saving; ${stock.symbol} on ${stock.exchange} is already tracked with ${stock.broker || "no broker"}.`);
     setNotice("");
   }
@@ -1165,7 +1205,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       setError("Enter both a positive average buy price and a whole-number share quantity, or leave both empty."); return;
     }
     onSaveStock({ symbol: normalizedSymbol, name: name.trim(), exchange, broker, averageBuyPrice: parsedAverageBuyPrice, quantity: parsedQuantity }, editingId ?? undefined);
-    resetStockForm(); setError(""); setNotice(editingId ? "Stock details updated." : "Stock added to your watchlist.");
+    resetStockForm(); setStockTab("stocks"); setError(""); setNotice(editingId ? "Stock details updated." : "Stock added to your watchlist.");
   }
   function submitBroker(event: FormEvent) {
     event.preventDefault();
@@ -1455,24 +1495,23 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {refreshErrors.length > 0 && <div className="alert alert-error stock-errors" role="alert"><div><strong>Some prices could not be refreshed:</strong><ul>{refreshErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {portfolioPositions.length > 0 && <Card className="portfolio-summary"><div className="portfolio-total"><span>Invested value</span><strong>{formatQuote(portfolioTotals.invested, "INR")}</strong></div><div className="portfolio-total"><span>Current value</span><strong>{formatQuote(portfolioTotals.currentValue, "INR")}</strong></div><div className={`portfolio-total ${portfolioTotals.profitLoss >= 0 ? "positive" : "negative"}`}><span>Unrealized P/L</span><strong>{portfolioTotals.profitLoss >= 0 ? "+" : ""}{formatQuote(portfolioTotals.profitLoss, "INR")}</strong><small>{portfolioTotals.invested ? `${portfolioTotals.profitLoss >= 0 ? "+" : ""}${(portfolioTotals.profitLoss / portfolioTotals.invested * 100).toFixed(2)}%` : ""}</small></div><div className="portfolio-coverage">{portfolioPositions.length} of {stocks.length} positions with average price, quantity, and an INR quote</div></Card>}
-    <div className="stock-admin-grid">
+    <nav className="student-profile-tabs stock-tabs" aria-label="Stock sections">
+      <Button variant={stockTab === "stocks" ? "primary" : "outline"} aria-pressed={stockTab === "stocks"} onClick={() => setStockTab("stocks")}><TrendingUp size={14} />Tracked stocks<Badge>{stocks.length}</Badge></Button>
+      <Button variant={stockTab === "manage" ? "primary" : "outline"} aria-pressed={stockTab === "manage"} onClick={() => setStockTab("manage")}><Settings2 size={14} />Add / manage<Badge>{brokers.length} brokers</Badge></Button>
+      {stockTab === "stocks" && <Button onClick={() => { resetStockForm(); setError(""); setNotice(""); setStockTab("manage"); }}><Plus size={14} />Add stock</Button>}
+    </nav>
+    {stockTab === "manage" && <div className="stock-admin-grid">
       <Card><div className="card-head"><div><h2 className="section-title">Broker names</h2><p className="section-description">Labels for grouping your saved stocks only; no broker account is connected.</p></div></div>
         <form className="broker-form" onSubmit={submitBroker}><Field label="Add a broker"><Input maxLength={60} placeholder="e.g. Zerodha" value={brokerName} onChange={(event) => setBrokerName(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add broker</Button></form>
         <div className="stock-broker-list">{brokers.length ? brokers.map((entry) => <div className="master-entry" key={entry}>
-          {editingBroker?.original === entry
-            ? <form className="stock-broker-edit" onSubmit={submitBrokerRename}>
-              <Input aria-label={`Broker name for ${entry}`} autoFocus required maxLength={80} value={editingBroker.value} onChange={(event) => setEditingBroker({ ...editingBroker, value: event.target.value })} />
-              <button className="icon-button" type="submit" aria-label={`Save broker name ${editingBroker.value}`} title="Save"><Check size={14} /></button>
-              <button className="icon-button" type="button" aria-label="Cancel broker name edit" title="Cancel" onClick={() => { setEditingBroker(null); setError(""); }}><X size={14} /></button>
-            </form>
-            : <><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { setEditingBroker({ original: entry, value: entry }); setError(""); setNotice(""); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button></>}
+          <div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{stocks.filter((stock) => stock.broker === entry).length} tracked stocks</div></div><button className="icon-button" aria-label={`Rename ${entry}`} onClick={() => { setEditingBroker({ original: entry, value: entry }); setError(""); setNotice(""); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry}`} onClick={() => { if (window.confirm(`Move "${entry}" to the archive? Its tracked stocks will remain and become unassigned.`)) onDeleteBroker(entry); }}><Archive size={14} /></button>
         </div>) : <p className="section-description">Add broker names to organize your watchlist.</p>}</div>
       </Card>
       <Card><div className="card-head"><div><h2 className="section-title">{editingId ? "Edit tracked stock" : "Add a stock"}</h2><p className="section-description">Use the exchange-listed code (without .NS or .BO).</p></div></div>
       <form className="form-grid stock-form" onSubmit={submitStock}><Field label="Stock code"><Input maxLength={30} placeholder="e.g. RELIANCE" value={symbol} onChange={(event) => { setSymbol(event.target.value); setError(""); }} /></Field><Field label="Exchange"><Select value={exchange} onChange={(event) => setExchange(event.target.value as StockExchange)}><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field className="full" label="Display name"><Input maxLength={100} placeholder="e.g. Reliance Industries" value={name} onChange={(event) => setName(event.target.value)} /></Field><Field className="full" label="Broker label (optional)"><Select value={broker} onChange={(event) => setBroker(event.target.value)}><option value="">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Average buy price per share (INR)"><Input type="number" min="0.01" step="0.01" placeholder="Optional" value={averageBuyPrice} onChange={(event) => setAverageBuyPrice(event.target.value)} /></Field><Field label="Shares owned"><Input type="number" min="0" step="1" placeholder="Optional" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field><div className="full stock-form-actions"><Button type="submit"><Plus size={14} />{editingId ? "Save stock" : "Add stock"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetStockForm}>Cancel</Button>}</div></form>
       </Card>
-    </div>
-    <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">Showing {filteredStocks.length} of {stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
+    </div>}
+    {stockTab === "stocks" && <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">Showing {filteredStocks.length} of {stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
       <div className="stock-view-controls">
         <label className="stock-search-control"><Search size={14} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></label>
         <Field label="Exchange"><Select value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field>
@@ -1501,13 +1540,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             <div className="stock-current">
               <strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
               <small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price yet — refresh"}</small>
-              {manualQuoteDraft?.stockId === stock.id
-                ? <form className="stock-manual-quote" onSubmit={saveManualQuote}>
-                  <Field label={`Latest price for ${stock.symbol} (INR)`}><Input autoFocus required type="number" min="0.01" step="0.01" value={manualQuoteDraft.price} onChange={(event) => { setManualQuoteDraft({ ...manualQuoteDraft, price: event.target.value }); setManualQuoteError(""); }} /></Field>
-                  {manualQuoteError && <span className="stock-manual-quote-error" role="alert">{manualQuoteError}</span>}
-                  <div className="stock-manual-quote-actions"><Button type="submit" size="sm"><Check size={13} />Save price</Button><Button type="button" size="sm" variant="outline" onClick={() => { setManualQuoteDraft(null); setManualQuoteError(""); }}>Cancel</Button></div>
-                </form>
-                : <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>}
+              <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
             </div>
             <div className="stock-position">
               <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} avg · ${stock.quantity} shares` : "Add avg price & shares"}</span>
@@ -1532,7 +1565,20 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       })}</div>}
         </div>;
       })}</div> : <EmptyState icon={<Filter size={18} />} title="No stocks match these filters" description="Try changing your search or filters to see more stocks." /> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
-    </Card>
+    </Card>}
+    {manualQuoteDraft && <Modal title={`Enter price for ${stocks.find((stock) => stock.id === manualQuoteDraft.stockId)?.symbol ?? "stock"}`} onClose={() => { setManualQuoteDraft(null); setManualQuoteError(""); }}>
+      <form className="form-grid" onSubmit={saveManualQuote}>
+        <Field label="Latest price (INR)"><Input autoFocus required type="number" min="0.01" step="0.01" value={manualQuoteDraft.price} onChange={(event) => { setManualQuoteDraft({ ...manualQuoteDraft, price: event.target.value }); setManualQuoteError(""); }} /></Field>
+        {manualQuoteError && <div className="alert alert-error full" role="alert">{manualQuoteError}</div>}
+        <div className="full modal-actions"><Button type="button" variant="outline" onClick={() => { setManualQuoteDraft(null); setManualQuoteError(""); }}>Cancel</Button><Button type="submit"><Check size={13} />Save price</Button></div>
+      </form>
+    </Modal>}
+    {editingBroker && <Modal title={`Rename broker · ${editingBroker.original}`} onClose={() => { setEditingBroker(null); setError(""); }}>
+      <form onSubmit={submitBrokerRename}><Field label="Broker name"><Input autoFocus required maxLength={80} value={editingBroker.value} onChange={(event) => setEditingBroker({ ...editingBroker, value: event.target.value })} /></Field>
+        {error && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{error}</div>}
+        <div className="modal-actions"><Button type="button" variant="outline" onClick={() => { setEditingBroker(null); setError(""); }}>Cancel</Button><Button type="submit">Save broker name</Button></div>
+      </form>
+    </Modal>}
     {importOpen && <Modal title="Review stock screenshot" onClose={() => { if (!importBusy) { setImportOpen(false); setImportError(""); } }} wide>
       <p className="section-description stock-import-intro">OCR reads the ticker, quantity, and average price from their table columns. It runs in this browser; check and correct the results before saving. Choose one broker for all rows, or override it per stock. Current quotes can be fetched after import. {importFileName && <strong>{importFileName}</strong>}</p>
       <Field className="full" label="Recognized text (editable)"><textarea className="field textarea" rows={4} value={importText} onChange={(event) => setImportText(event.target.value)} /></Field>
