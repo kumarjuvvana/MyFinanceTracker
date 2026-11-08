@@ -38,6 +38,7 @@ const collections: { key: keyof TrackerData; label: string; page: Page; titles: 
   { key: "subscriptions", label: "Subscriptions & bills", page: "Subscriptions & bills", titles: ["name", "provider"] },
   { key: "devotionalEntries", label: "Devotional entries", page: "Devotional", titles: ["scriptureReference", "date"] },
   { key: "dailyBibleReadings", label: "Daily Bible readings", page: "Devotional", titles: ["fromBook", "toBook", "date"] },
+  { key: "dailyPrayerLogs", label: "Daily prayer logs", page: "Devotional", titles: ["period", "prayerType", "date"] },
   { key: "devotionalResources", label: "Devotional resources", page: "Devotional", titles: ["title"] },
   { key: "prayerRequests", label: "Prayer requests", page: "Devotional", titles: ["title"] },
   { key: "cookingRecipes", label: "Cooking recipes", page: "Cooking", titles: ["name"] },

@@ -538,6 +538,17 @@ export interface DailyBibleReading {
   notes: string;
 }
 
+export type PrayerPeriod = "Morning" | "Afternoon" | "Evening" | "Night";
+export type DailyPrayerType = "Praise & worship" | "Thanksgiving" | "Confession" | "Personal request" | "Intercession" | "Guidance" | "Other";
+
+export interface DailyPrayerLog {
+  id: string;
+  date: string;
+  period: PrayerPeriod;
+  prayerType: DailyPrayerType;
+  prayerNotes: string;
+}
+
 export interface DevotionalResource {
   id: string;
   title: string;
@@ -801,6 +812,7 @@ export interface TrackerData {
   subscriptions?: SubscriptionAccount[];
   devotionalEntries?: DevotionalEntry[];
   dailyBibleReadings?: DailyBibleReading[];
+  dailyPrayerLogs?: DailyPrayerLog[];
   devotionalResources?: DevotionalResource[];
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];

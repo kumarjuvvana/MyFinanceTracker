@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -492,6 +492,14 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.toChapterNumber === "number" && Number.isInteger(entry.toChapterNumber) && entry.toChapterNumber > 0 &&
       typeof entry.toVerseNumber === "number" && Number.isInteger(entry.toVerseNumber) && entry.toVerseNumber > 0 &&
       typeof entry.notes === "string" && entry.notes.length <= 5000));
+  const dailyPrayerLogsOk = value.dailyPrayerLogs === undefined ||
+    (Array.isArray(value.dailyPrayerLogs) && value.dailyPrayerLogs.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      (entry.period === "Morning" || entry.period === "Afternoon" || entry.period === "Evening" || entry.period === "Night") &&
+      (entry.prayerType === "Praise & worship" || entry.prayerType === "Thanksgiving" || entry.prayerType === "Confession" ||
+        entry.prayerType === "Personal request" || entry.prayerType === "Intercession" || entry.prayerType === "Guidance" || entry.prayerType === "Other") &&
+      typeof entry.prayerNotes === "string" && entry.prayerNotes.trim().length > 0 && entry.prayerNotes.length <= 5000));
   const devotionalResourcesOk = value.devotionalResources === undefined ||
     (Array.isArray(value.devotionalResources) && value.devotionalResources.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -674,7 +682,7 @@ export function validateData(value: unknown): value is TrackerData {
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings", "subscriptions",
-    "devotionalEntries", "dailyBibleReadings", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
+    "devotionalEntries", "dailyBibleReadings", "dailyPrayerLogs", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
   ];
@@ -720,7 +728,7 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !studentProfilesOk || !educationPlansOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
-    !devotionalEntriesOk || !dailyBibleReadingsOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
+    !devotionalEntriesOk || !dailyBibleReadingsOk || !dailyPrayerLogsOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
     !archivedRecordsOk ||
     !credentialVaultOk) return false;
@@ -787,6 +795,8 @@ export function validateData(value: unknown): value is TrackerData {
     new Set((value.devotionalEntries as DevotionalEntry[]).map((entry) => entry.id)).size !== value.devotionalEntries.length) return false;
   if (Array.isArray(value.dailyBibleReadings) &&
     new Set((value.dailyBibleReadings as DailyBibleReading[]).map((entry) => entry.id)).size !== value.dailyBibleReadings.length) return false;
+  if (Array.isArray(value.dailyPrayerLogs) &&
+    new Set((value.dailyPrayerLogs as DailyPrayerLog[]).map((entry) => entry.id)).size !== value.dailyPrayerLogs.length) return false;
   if (Array.isArray(value.devotionalResources) &&
     new Set((value.devotionalResources as DevotionalResource[]).map((entry) => entry.id)).size !== value.devotionalResources.length) return false;
   if (Array.isArray(value.prayerRequests) &&
@@ -885,6 +895,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     subscriptions: data.subscriptions ?? [],
     devotionalEntries: data.devotionalEntries ?? [],
     dailyBibleReadings: data.dailyBibleReadings ?? [],
+    dailyPrayerLogs: data.dailyPrayerLogs ?? [],
     devotionalResources: data.devotionalResources ?? [],
     prayerRequests: data.prayerRequests ?? [],
     cookingRecipes: data.cookingRecipes ?? [],

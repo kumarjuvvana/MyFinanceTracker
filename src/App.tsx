@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -297,10 +297,11 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
       entries: [...(data.documents ?? [])].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4).map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
     },
     devotional: {
-      title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries, Bible readings, or prayer requests recorded yet.",
+      title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries, Bible readings, daily prayers, or prayer requests recorded yet.",
       entries: [
         ...(data.devotionalEntries ?? []).map((entry) => ({ title: entry.scriptureReference, detail: [dateLabel(entry.date), entry.takeaway].filter(Boolean).join(" · "), date: entry.date })),
         ...(data.dailyBibleReadings ?? []).map((entry) => ({ title: `${entry.fromBook} ${entry.fromChapterNumber}:${entry.fromVerseNumber} – ${entry.toBook} ${entry.toChapterNumber}:${entry.toVerseNumber}`, detail: `Daily Bible reading · ${dateLabel(entry.date)}`, date: entry.date })),
+        ...(data.dailyPrayerLogs ?? []).map((entry) => ({ title: `${entry.period} · ${entry.prayerType}`, detail: `Daily prayer · ${dateLabel(entry.date)} · ${entry.prayerNotes}`, date: entry.date })),
         ...(data.prayerRequests ?? []).filter((entry) => entry.status === "Ongoing").map((entry) => ({ title: entry.title, detail: `Prayer request · ${entry.status}`, date: entry.dateAdded })),
       ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4),
     },
@@ -891,6 +892,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         subscriptions: mergeArchivedSubscriptions(previous.subscriptions, snapshot.subscriptions),
         devotionalEntries: mergeArchivedRows(previous.devotionalEntries, snapshot.devotionalEntries),
         dailyBibleReadings: mergeArchivedRows(previous.dailyBibleReadings, snapshot.dailyBibleReadings),
+        dailyPrayerLogs: mergeArchivedRows(previous.dailyPrayerLogs, snapshot.dailyPrayerLogs),
         devotionalResources: mergeArchivedRows(previous.devotionalResources, snapshot.devotionalResources),
         prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
         cookingRecipes: mergeArchivedRows(previous.cookingRecipes, snapshot.cookingRecipes),
@@ -4738,6 +4740,38 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
   </Modal>;
 }
 
+function DailyPrayerLogModal({ initial, onClose, onSave }: {
+  initial: DailyPrayerLog | null;
+  onClose: () => void;
+  onSave: (log: Omit<DailyPrayerLog, "id">) => void;
+}) {
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [period, setPeriod] = useState<PrayerPeriod>(initial?.period ?? "Morning");
+  const [prayerType, setPrayerType] = useState<DailyPrayerType>(initial?.prayerType ?? "Personal request");
+  const [prayerNotes, setPrayerNotes] = useState(initial?.prayerNotes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!date || !prayerNotes.trim()) {
+      setError("Enter the date and what you prayed about.");
+      return;
+    }
+    onSave({ date, period, prayerType, prayerNotes: prayerNotes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit daily prayer" : "Record daily prayer"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Prayer date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
+      <Field label="Time of day"><Select value={period} onChange={(event) => setPeriod(event.target.value as PrayerPeriod)}><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Night</option></Select></Field>
+      <Field label="Prayer type"><Select value={prayerType} onChange={(event) => setPrayerType(event.target.value as DailyPrayerType)}><option>Praise & worship</option><option>Thanksgiving</option><option>Confession</option><option>Personal request</option><option>Intercession</option><option>Guidance</option><option>Other</option></Select></Field>
+      <Field className="full" label="What did you pray about?"><textarea className="field textarea" rows={4} maxLength={5000} required placeholder="Record your prayer, focus, or anything you want to remember." value={prayerNotes} onChange={(event) => setPrayerNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save prayer"}</Button></div>
+    </form>
+  </Modal>;
+}
+
 function PrayerRequestModal({ initial, onClose, onSave }: {
   initial: PrayerRequest | null;
   onClose: () => void;
@@ -4824,27 +4858,31 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, onDeleteEntry, onSaveReading, onDeleteReading, onSaveResource, onDeleteResource, onSaveRequest, onDeleteRequest }: {
+function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, requests, onSaveEntry, onDeleteEntry, onSaveReading, onDeleteReading, onSaveDailyPrayerLog, onDeleteDailyPrayerLog, onSaveResource, onDeleteResource, onSaveRequest, onDeleteRequest }: {
   entries: DevotionalEntry[];
   readings: DailyBibleReading[];
+  dailyPrayerLogs: DailyPrayerLog[];
   resources: DevotionalResource[];
   requests: PrayerRequest[];
   onSaveEntry: (entry: Omit<DevotionalEntry, "id">, id?: string) => void;
   onDeleteEntry: (entry: DevotionalEntry) => void;
   onSaveReading: (reading: Omit<DailyBibleReading, "id">, id?: string) => void;
   onDeleteReading: (reading: DailyBibleReading) => void;
+  onSaveDailyPrayerLog: (log: Omit<DailyPrayerLog, "id">, id?: string) => void;
+  onDeleteDailyPrayerLog: (log: DailyPrayerLog) => void;
   onSaveResource: (resource: Omit<DevotionalResource, "id">, id?: string) => void;
   onDeleteResource: (resource: DevotionalResource) => void;
   onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "progress">("readings");
+  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "progress" | "daily-prayers">("readings");
   const [progressMonth, setProgressMonth] = useState(() => monthKey(today()));
   const [selectedProgressDate, setSelectedProgressDate] = useState("");
   const [showReadingStreak, setShowReadingStreak] = useState(false);
   const [readingEditorDate, setReadingEditorDate] = useState(today());
   const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
   const [readingEditor, setReadingEditor] = useState<DailyBibleReading | null | undefined>(undefined);
+  const [dailyPrayerEditor, setDailyPrayerEditor] = useState<DailyPrayerLog | null | undefined>(undefined);
   const [resourceEditor, setResourceEditor] = useState<DevotionalResource | null | undefined>(undefined);
   const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
   const [requestFilter, setRequestFilter] = useState("Ongoing");
@@ -4863,6 +4901,10 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
     (requestFilter === "All requests" || request.status === requestFilter) &&
     (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))))
     .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+  const visibleDailyPrayerLogs = [...dailyPrayerLogs].filter((log) =>
+    !query || [log.date, log.period, log.prayerType, log.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => b.date.localeCompare(a.date) ||
+      ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period));
   const visibleResources = [...resources].filter((resource) =>
     !query || [resource.title, resource.link, resource.description, resource.source].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.title.localeCompare(b.title));
@@ -4922,6 +4964,8 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
         ? <Button onClick={() => setRequestEditor(null)}><Plus size={15} /> Add request</Button>
         : activeTab === "resources"
           ? <Button onClick={() => setResourceEditor(null)}><Plus size={15} /> Add resource</Button>
+          : activeTab === "daily-prayers"
+            ? <Button onClick={() => setDailyPrayerEditor(null)}><Plus size={15} /> Record prayer</Button>
           : undefined;
 
   function changeProgressMonth(offset: number) {
@@ -4939,6 +4983,9 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
   function confirmDeleteRequest(request: PrayerRequest) {
     if (window.confirm(`Move the prayer request "${request.title}" to the archive?`)) onDeleteRequest(request);
   }
+  function confirmDeleteDailyPrayer(log: DailyPrayerLog) {
+    if (window.confirm(`Move the ${log.period.toLocaleLowerCase()} prayer from ${dateLabel(log.date)} to the archive?`)) onDeleteDailyPrayerLog(log);
+  }
   function confirmDeleteResource(resource: DevotionalResource) {
     if (window.confirm(`Move "${resource.title}" to the archive?`)) onDeleteResource(resource);
   }
@@ -4951,6 +4998,7 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
       <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><BookOpen size={14} />Bible reflections<Badge>{entries.length}</Badge></Button>
       <Button variant={activeTab === "prayers" ? "primary" : "outline"} aria-pressed={activeTab === "prayers"} onClick={() => setActiveTab("prayers")}><Heart size={14} />Prayer requests<Badge>{requests.length}</Badge></Button>
       <Button variant={activeTab === "resources" ? "primary" : "outline"} aria-pressed={activeTab === "resources"} onClick={() => setActiveTab("resources")}><PlayCircle size={14} />Music & resources<Badge>{resources.length}</Badge></Button>
+      <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => setActiveTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
       <Button variant={activeTab === "progress" ? "primary" : "outline"} aria-pressed={activeTab === "progress"} onClick={() => setActiveTab("progress")}><CalendarDays size={14} />Reading progress</Button>
     </nav>
     {activeTab !== "progress" && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
@@ -4984,6 +5032,13 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
         {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
         <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
       </Card>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
+    </section>}
+    {activeTab === "daily-prayers" && <section className="devotional-section devotional-tab-panel">
+      <div className="devotional-section-head"><div><h2><Heart size={15} /> Daily prayer tracker</h2><p>{visibleDailyPrayerLogs.length} {visibleDailyPrayerLogs.length === 1 ? "prayer" : "prayers"} recorded · {new Set(dailyPrayerLogs.map((log) => log.date)).size} days tracked</p></div></div>
+      {visibleDailyPrayerLogs.length ? <div className="devotional-list">{visibleDailyPrayerLogs.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
+        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)} · {log.period}</span><h3>{log.prayerType}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog(copy); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
+        <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
+      </Card>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={dailyPrayerLogs.length ? "No matching daily prayers" : "No daily prayers recorded"} description={dailyPrayerLogs.length ? "Try another search." : "Record a prayer by date, time of day, type, and notes."} /></Card>}
     </section>}
     {activeTab === "progress" && <section className="devotional-progress">
       <div className="devotional-progress-summary">
@@ -5028,6 +5083,7 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
     </section>}
     {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
     {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} initialDate={readingEditorDate} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
+    {dailyPrayerEditor !== undefined && <DailyPrayerLogModal key={dailyPrayerEditor?.id ?? "new-daily-prayer"} initial={dailyPrayerEditor} onClose={() => setDailyPrayerEditor(undefined)} onSave={(log) => { onSaveDailyPrayerLog(log, dailyPrayerEditor?.id); setDailyPrayerEditor(undefined); }} />}
     {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
     {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
@@ -6792,6 +6848,7 @@ function emptyTrackerData(): TrackerData {
     studentProfiles: [],
     educationPlans: [],
     dailyBibleReadings: [],
+    dailyPrayerLogs: [],
     cookingRecipes: [],
     cookingLogs: [],
     cookingPlans: [],
@@ -7763,6 +7820,20 @@ export default function App() {
       dailyBibleReadings: (previous.dailyBibleReadings ?? []).filter((current) => current.id !== reading.id),
     }));
   }
+  function saveDailyPrayerLog(log: Omit<DailyPrayerLog, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      dailyPrayerLogs: id
+        ? (previous.dailyPrayerLogs ?? []).map((current) => current.id === id ? { ...log, id } : current)
+        : [{ ...log, id: createId() }, ...(previous.dailyPrayerLogs ?? [])],
+    }));
+  }
+  function deleteDailyPrayerLog(log: DailyPrayerLog) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Daily prayer · ${log.date} · ${log.period}`, { dailyPrayerLogs: [log] }),
+      dailyPrayerLogs: (previous.dailyPrayerLogs ?? []).filter((current) => current.id !== log.id),
+    }));
+  }
   function saveDevotionalResource(resource: Omit<DevotionalResource, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -8195,7 +8266,7 @@ export default function App() {
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
-    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
+    Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} dailyPrayerLogs={data.dailyPrayerLogs ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveDailyPrayerLog={saveDailyPrayerLog} onDeleteDailyPrayerLog={deleteDailyPrayerLog} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
     Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} plans={data.cookingPlans ?? []} products={data.products ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} onSavePlan={saveCookingPlan} onCopyPlan={copyCookingPlan} onDeletePlan={deleteCookingPlan} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
