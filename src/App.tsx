@@ -2856,6 +2856,11 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
   const visiblePlans = [...plans].sort((a, b) =>
     b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true }) ||
     a.institution.localeCompare(b.institution));
+  const totalsByCurrency = visiblePlans.reduce((totals, plan) => {
+    totals.set(plan.currency, (totals.get(plan.currency) ?? 0) +
+      plan.costs.reduce((sum, cost) => sum + cost.amount, 0));
+    return totals;
+  }, new Map<Currency, number>());
 
   function copyPlan(plan: StudentEducationPlan) {
     const copyCosts = !plan.costs.length || window.confirm(
@@ -2879,6 +2884,12 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
         }
       }}><Plus size={14} />Add plan</Button>
     </div>
+    {!!visiblePlans.length && <div className="student-plan-summary">
+      <span>Estimated total for {visiblePlans.length} displayed {visiblePlans.length === 1 ? "plan" : "plans"}</span>
+      <strong>{[...totalsByCurrency].map(([planCurrency, amount]) =>
+        new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(amount),
+      ).join(" · ")}</strong>
+    </div>}
     {visiblePlans.length ? <div className="student-plan-list">{visiblePlans.map((plan) => {
       const total = plan.costs.reduce((sum, cost) => sum + cost.amount, 0);
       const expanded = expandedPlans.has(plan.id);

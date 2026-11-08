@@ -527,6 +527,9 @@ body{background:#f3f5ef}
 .student-notes-card{padding:18px}
 .student-notes-input{min-height:240px!important;line-height:1.55}
 .student-plan-list{display:grid;gap:12px}
+.student-plan-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:12px 15px;border:1px solid var(--panel-line,#eef0ec);border-radius:10px;background:var(--panel,#fff);font-size:12px;color:var(--text-main,#303830)}
+.student-plan-summary>span{color:var(--text-muted,#858d83)}
+.student-plan-summary>strong{color:var(--user-accent,#56815d);text-align:right}
 .student-plan-card{min-width:0;padding:16px}
 .student-plan-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .student-plan-card-head h3{margin:0;color:var(--text-main,#303830);font:700 14px Manrope,sans-serif;overflow-wrap:anywhere}
@@ -589,6 +592,8 @@ body{background:#f3f5ef}
   .student-plan-card{padding:12px}
   .student-plan-card-head{flex-direction:column}
   .student-plan-card-actions{width:100%;justify-content:flex-end}
+  .student-plan-summary{align-items:flex-start;flex-direction:column;gap:5px;padding:10px 12px}
+  .student-plan-summary>strong{text-align:left}
   .student-plan-cost-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}
   .student-plan-cost-row>.button{grid-column:2;justify-self:end}
   .student-plan-cost-list>div{align-items:flex-start;font-size:10px}
