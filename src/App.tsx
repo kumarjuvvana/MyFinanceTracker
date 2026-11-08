@@ -159,8 +159,9 @@ function PageHeading({ eyebrow, title, subtitle, action }: { eyebrow: string; ti
   return <div className="page-head"><div><p className="eyebrow">{eyebrow}</p><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div>{action}</div>;
 }
 
-function FavoritesPage({ pages, onNavigate, onRemove }: {
+function FavoritesPage({ pages, saving, onNavigate, onRemove }: {
   pages: Page[];
+  saving: boolean;
   onNavigate: (page: Page) => void;
   onRemove: (page: Page) => void;
 }) {
@@ -169,7 +170,7 @@ function FavoritesPage({ pages, onNavigate, onRemove }: {
     <PageHeading eyebrow="Your shortcuts" title="Favorites" subtitle="Open your most-used screens quickly. Use the star in the top bar or Data management to update this list." />
     {favorites.length ? <div className="favorite-page-grid">{favorites.map(({ name, icon: Icon }) => <Card className="favorite-page-card" key={name}>
       <button type="button" className="favorite-page-open" onClick={() => onNavigate(name)}><span><Icon size={18} /><strong>{name}</strong></span><ChevronRight size={16} /></button>
-      <button type="button" className="icon-button favorite-page-remove" aria-label={`Remove ${name} from favorites`} title={`Remove ${name} from favorites`} onClick={() => onRemove(name)}><Star size={15} fill="currentColor" /></button>
+      <button type="button" className="icon-button favorite-page-remove" disabled={saving} aria-label={`Remove ${name} from favorites`} title={`Remove ${name} from favorites`} onClick={() => onRemove(name)}><Star size={15} fill="currentColor" /></button>
     </Card>)}</div> : <Card><EmptyState icon={<Star size={18} />} title="No favorite screens yet" description="Open any screen and select the star in the top bar, or choose screens in Data management." /></Card>}
   </>;
 }
@@ -5974,7 +5975,7 @@ function SettingsDisclosure({ title, description, icon, children }: { title: str
   </details>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, favoritePages, showScreenDescriptions, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onToggleFavoritePage, onShowScreenDescriptionsChange, onGroupMenusChange, onMenuSortOrderChange, onPreviewImport, onRestore, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; favoritePages: Page[]; showScreenDescriptions: boolean; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onToggleFavoritePage: (page: Page) => void; onShowScreenDescriptionsChange: (show: boolean) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onPreviewImport: (file: File) => Promise<TrackerData | null>; onRestore: (backup: TrackerData) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, favoritePages, favoriteSavePending, showScreenDescriptions, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onToggleFavoritePage, onShowScreenDescriptionsChange, onGroupMenusChange, onMenuSortOrderChange, onPreviewImport, onRestore, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; favoritePages: Page[]; favoriteSavePending: boolean; showScreenDescriptions: boolean; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onToggleFavoritePage: (page: Page) => void; onShowScreenDescriptionsChange: (show: boolean) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onPreviewImport: (file: File) => Promise<TrackerData | null>; onRestore: (backup: TrackerData) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [restorePreview, setRestorePreview] = useState<{ backup: TrackerData; fileName: string } | null>(null);
   const restoreCounts = restorePreview ? [...new Set([...Object.keys(data), ...Object.keys(restorePreview.backup)])]
@@ -6041,7 +6042,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     </Card>
     </SettingsDisclosure>
     <SettingsDisclosure title="Navigation menu" description="Grouping, ordering and menu display" icon={<ListTree size={17} />}><Card className="settings-card"><div className="card-head"><div><h2 className="section-title">Navigation menu</h2><p className="section-description">Reduce sidebar clutter by grouping screens. Choose the menu order used within groups, or across the flat menu.</p></div><ListTree size={17} /></div><div className="settings-grid navigation-settings-grid"><label className="dashboard-widget-option"><input type="checkbox" checked={groupMenus} onChange={(event) => onGroupMenusChange(event.target.checked)} /><span><strong>Group menus by category</strong><small>{groupMenus ? "Groups start collapsed; the active section opens automatically." : "Show every screen in one flat list."}</small></span></label><Field label="Menu order"><Select value={menuSortOrder} onChange={(event) => onMenuSortOrderChange(event.target.value as MenuSortOrder)}><option value="current">Current order</option><option value="ascending">Ascending (A–Z)</option></Select></Field></div></Card></SettingsDisclosure>
-    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Favorites are saved to shared Daybook data in Supabase, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>Show in Favorites</small></span></label>)}</div></Card></SettingsDisclosure>
+    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save directly to shared Daybook data in Supabase, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase data"}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved in this browser.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Screen descriptions" description="Show or hide helper text under screen titles" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies across screens that display a title description.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
@@ -6300,13 +6301,6 @@ function isDashboardWidget(value: unknown): value is DashboardWidget {
 function isDashboardWidgetList(value: unknown): value is DashboardWidget[] {
   return Array.isArray(value) && value.every(isDashboardWidget);
 }
-function isFavoritePage(value: unknown): value is Page {
-  return typeof value === "string" && FAVORITABLE_PAGES.includes(value as Page);
-}
-function isFavoritePageList(value: unknown): value is Page[] {
-  return Array.isArray(value) && value.every(isFavoritePage);
-}
-
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -6410,8 +6404,8 @@ export default function App() {
   const [darkTheme, setDarkTheme] = useState<DarkTheme>("forest");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("sage");
   const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>(DEFAULT_DASHBOARD_WIDGETS);
-  const [legacyFavoritePages, setLegacyFavoritePages] = useState<Page[]>([]);
   const [showScreenDescriptions, setShowScreenDescriptions] = useState(true);
+  const [favoriteSavePending, setFavoriteSavePending] = useState(false);
   const [groupMenus, setGroupMenus] = useState(true);
   const [menuSortOrder, setMenuSortOrder] = useState<MenuSortOrder>("current");
   const [preferencesReady, setPreferencesReady] = useState(false);
@@ -6483,7 +6477,6 @@ export default function App() {
           ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
           ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme)) ||
           ("dashboardWidgets" in parsed && !isDashboardWidgetList(parsed.dashboardWidgets)) ||
-          ("favoritePages" in parsed && !isFavoritePageList(parsed.favoritePages)) ||
           ("showScreenDescriptions" in parsed && typeof parsed.showScreenDescriptions !== "boolean") ||
           ("groupMenus" in parsed && typeof parsed.groupMenus !== "boolean") ||
           ("menuSortOrder" in parsed && parsed.menuSortOrder !== "current" && parsed.menuSortOrder !== "ascending")) {
@@ -6498,7 +6491,6 @@ export default function App() {
         if ("darkTheme" in parsed && isDarkTheme(parsed.darkTheme)) setDarkTheme(parsed.darkTheme);
         if ("visualTheme" in parsed && isVisualTheme(parsed.visualTheme)) setVisualTheme(parsed.visualTheme);
         if ("dashboardWidgets" in parsed && isDashboardWidgetList(parsed.dashboardWidgets)) setDashboardWidgets([...new Set(parsed.dashboardWidgets)]);
-        if ("favoritePages" in parsed && isFavoritePageList(parsed.favoritePages)) setLegacyFavoritePages([...new Set(parsed.favoritePages)]);
         if ("showScreenDescriptions" in parsed && typeof parsed.showScreenDescriptions === "boolean") setShowScreenDescriptions(parsed.showScreenDescriptions);
         if ("groupMenus" in parsed && typeof parsed.groupMenus === "boolean") setGroupMenus(parsed.groupMenus);
         if ("menuSortOrder" in parsed && (parsed.menuSortOrder === "current" || parsed.menuSortOrder === "ascending")) setMenuSortOrder(parsed.menuSortOrder);
@@ -6747,16 +6739,9 @@ export default function App() {
     setData((previous) => previous ? mutator(previous) : previous);
     setNotice("");
   }
-  useEffect(() => {
-    if (!preferencesReady || !authenticated || !data || setupRequired ||
-      data.favoritePages !== undefined || legacyFavoritePages.length === 0) return;
-    update((previous) => previous.favoritePages === undefined
-      ? { ...previous, favoritePages: legacyFavoritePages }
-      : previous);
-  }, [preferencesReady, authenticated, data, setupRequired, legacyFavoritePages]);
   async function persistUpdate(mutator: (previous: TrackerData) => TrackerData): Promise<void> {
     const previous = latestDataRef.current;
-    if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving documents.");
+    if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving changes.");
     const next = mutator(previous);
     if (saveTimer.current !== null) {
       window.clearTimeout(saveTimer.current);
@@ -6768,7 +6753,7 @@ export default function App() {
     skipNextSave.current = true;
     setData(next);
     setSyncStatus("saved");
-    setSyncMessage("Document details saved to Supabase.");
+    setSyncMessage("Changes saved to Supabase.");
     setNotice("");
   }
   function restoreArchivedRecord(id: string) {
@@ -7649,8 +7634,9 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function toggleFavoritePage(target: Page) {
-    if (target === "Favorites") return;
-    update((previous) => {
+    if (target === "Favorites" || favoriteSavePending) return;
+    setFavoriteSavePending(true);
+    void persistUpdate((previous) => {
       const current = previous.favoritePages ?? [];
       return {
         ...previous,
@@ -7658,7 +7644,9 @@ export default function App() {
           ? current.filter((entry) => entry !== target)
           : [...current, target],
       };
-    });
+    }).catch((caught: unknown) => {
+      setError(caught instanceof Error ? caught.message : "Could not save favorites to Supabase.");
+    }).finally(() => setFavoriteSavePending(false));
   }
   function selectSearchResult(key: string | null) {
     setPage("Global search");
@@ -7696,7 +7684,7 @@ export default function App() {
   })();
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
-    Favorites: <FavoritesPage pages={favoritePages} onNavigate={changePage} onRemove={toggleFavoritePage} />,
+    Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
     "Global search": <GlobalSearchPage data={data} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
@@ -7734,7 +7722,7 @@ export default function App() {
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={setShowScreenDescriptions} onGroupMenusChange={setGroupMenus} onMenuSortOrderChange={setMenuSortOrder} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={setCurrency} onToggleDarkMode={() => setDarkMode((enabled) => !enabled)} onFontSizeChange={setFontSize} onFontStyleChange={setFontStyle} onFontFamilyChange={setFontFamily} onAccentChange={setAccentColor} onDarkThemeChange={setDarkTheme} onVisualThemeChange={setVisualTheme} onToggleDashboardWidget={(widget) => setDashboardWidgets((current) => current.includes(widget) ? current.filter((entry) => entry !== widget) : [...current, widget])} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={setShowScreenDescriptions} onGroupMenusChange={setGroupMenus} onMenuSortOrderChange={setMenuSortOrder} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
@@ -7753,7 +7741,7 @@ export default function App() {
       })}</nav>
       <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday shopping, gently organized in one place.</div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className={`theme-toggle favorite-toggle${favoritePages.includes(page) ? " selected" : ""}`} type="button" disabled={page === "Favorites"} aria-pressed={favoritePages.includes(page)} aria-label={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? `Remove ${page} from favorites` : `Add ${page} to favorites`} title={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavoritePage(page)}>{favoritePages.includes(page) ? <Star size={15} fill="currentColor" /> : <Star size={15} />}<span>{favoritePages.includes(page) ? "Favorited" : "Favorite"}</span></button><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => setGroupMenus((enabled) => !enabled)}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
+    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className={`theme-toggle favorite-toggle${favoritePages.includes(page) ? " selected" : ""}`} type="button" disabled={page === "Favorites" || favoriteSavePending} aria-pressed={favoritePages.includes(page)} aria-label={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? `Remove ${page} from favorites` : `Add ${page} to favorites`} title={favoriteSavePending ? "Saving favorites to Supabase…" : page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavoritePage(page)}>{favoritePages.includes(page) ? <Star size={15} fill="currentColor" /> : <Star size={15} />}<span>{favoriteSavePending ? "Saving…" : favoritePages.includes(page) ? "Favorited" : "Favorite"}</span></button><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => setGroupMenus((enabled) => !enabled)}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => setDarkMode((enabled) => !enabled)}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
       <div className="main-content">{error && <div className="alert alert-error" role="alert"><X size={15} style={{ flex: "none", marginTop: 1 }} /><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}><X size={14} /></button></div>}{notice && <div className="alert alert-success" role="status"><CheckCircle2 size={15} /><span>{notice}</span><button className="icon-button" aria-label="Dismiss message" onClick={() => setNotice("")}><X size={14} /></button></div>}{pageContent[page]}</div>
     </main>
     <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.filter(({ name }) => ["Dashboard", "Shopping list", "Shopping trips", "Purchase history"].includes(name)).map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
