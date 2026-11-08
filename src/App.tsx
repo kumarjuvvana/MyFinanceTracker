@@ -2852,9 +2852,21 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
 }) {
   const [editor, setEditor] = useState<StudentEducationPlan | null | undefined>(undefined);
   const [editingProfileId, setEditingProfileId] = useState(studentProfileId);
+  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(() => new Set());
   const visiblePlans = [...plans].sort((a, b) =>
     b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true }) ||
     a.institution.localeCompare(b.institution));
+
+  function copyPlan(plan: StudentEducationPlan) {
+    const copyCosts = !plan.costs.length || window.confirm(
+      `Copy this plan with its ${plan.costs.length} estimated cost item${plan.costs.length === 1 ? "" : "s"}?\n\nChoose OK to copy costs, or Cancel to copy the plan without its cost items.`,
+    );
+    const planDraft = { ...plan, id: undefined };
+    onSave({
+      ...planDraft,
+      costs: copyCosts ? plan.costs.map((cost) => ({ ...cost, id: createId() })) : [],
+    });
+  }
 
   return <>
     <div className="education-section-head student-education-heading">
@@ -2869,16 +2881,24 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
     </div>
     {visiblePlans.length ? <div className="student-plan-list">{visiblePlans.map((plan) => {
       const total = plan.costs.reduce((sum, cost) => sum + cost.amount, 0);
-      return <Card className="student-plan-card" key={plan.id}>
+      const expanded = expandedPlans.has(plan.id);
+      return <Card className={`student-plan-card${expanded ? " expanded" : ""}`} key={plan.id}>
         <div className="student-plan-card-head">
-          <div><h3>{plan.gradeCourse}</h3><p>{plan.institution} · {plan.academicYear} · {plan.level}</p></div>
-          <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(total)}</strong><button className="icon-button" aria-label={`Edit ${plan.gradeCourse} plan`} onClick={() => setEditor(plan)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${plan.gradeCourse} plan`} onClick={() => {
+          <button type="button" className="student-plan-toggle" aria-expanded={expanded} aria-controls={`student-plan-details-${plan.id}`} onClick={() => setExpandedPlans((current) => {
+            const next = new Set(current);
+            if (next.has(plan.id)) next.delete(plan.id);
+            else next.add(plan.id);
+            return next;
+          })}><ChevronRight size={15} /><span><strong>{plan.gradeCourse}</strong><small>{plan.institution} · {plan.academicYear} · {plan.level}</small></span></button>
+          <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(total)}</strong><button className="icon-button" aria-label={`Copy ${plan.gradeCourse} plan`} title="Copy plan" onClick={() => copyPlan(plan)}><Copy size={14} /></button><button className="icon-button" aria-label={`Edit ${plan.gradeCourse} plan`} onClick={() => setEditor(plan)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${plan.gradeCourse} plan`} onClick={() => {
             if (window.confirm(`Delete the ${plan.academicYear} education plan for ${studentName}?`)) onDelete(plan);
           }}><Trash2 size={14} /></button></div>
         </div>
-        {(plan.startDate || plan.endDate) && <p className="student-plan-dates">{plan.startDate ? dateLabel(plan.startDate) : "Start date not set"} – {plan.endDate ? dateLabel(plan.endDate) : "End date not set"}</p>}
-        {plan.costs.length > 0 && <div className="student-plan-cost-list">{plan.costs.map((cost) => <div key={cost.id}><span>{cost.category}{cost.description ? ` · ${cost.description}` : ""}</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(cost.amount)}</strong></div>)}</div>}
-        {plan.notes && <p className="student-plan-notes"><LinkifiedText>{plan.notes}</LinkifiedText></p>}
+        <div className="student-plan-details" id={`student-plan-details-${plan.id}`} hidden={!expanded}>
+          {(plan.startDate || plan.endDate) && <p className="student-plan-dates">{plan.startDate ? dateLabel(plan.startDate) : "Start date not set"} – {plan.endDate ? dateLabel(plan.endDate) : "End date not set"}</p>}
+          {plan.costs.length > 0 && <div className="student-plan-cost-list">{plan.costs.map((cost) => <div key={cost.id}><span>{cost.category}{cost.description ? ` · ${cost.description}` : ""}</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(cost.amount)}</strong></div>)}</div>}
+          {plan.notes && <p className="student-plan-notes"><LinkifiedText>{plan.notes}</LinkifiedText></p>}
+        </div>
       </Card>;
     })}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title="No education plans yet" description={`Add a class, intermediate, degree, or other plan for ${studentName} and estimate its yearly costs.`} /></Card>}
     {editor !== undefined && <StudentEducationPlanModal key={editor?.id ?? "new-student-plan"} initial={editor} studentProfileId={editingProfileId ?? studentProfileId ?? ""} onClose={() => setEditor(undefined)} onSave={(plan) => {
