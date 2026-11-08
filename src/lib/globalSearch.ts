@@ -55,6 +55,7 @@ const collections: { key: keyof TrackerData; label: string; page: Page; titles: 
   { key: "promptRecords", label: "AI Prompts", page: "AI Prompts", titles: ["title"] },
   { key: "mindfulHabits", label: "Mind & habits", page: "Mind & habits", titles: ["title"] },
   { key: "mindfulnessLogs", label: "Mindfulness logs", page: "Mind & habits", titles: ["emotion", "date"] },
+  { key: "morningExerciseLogs", label: "Morning exercise", page: "Morning exercise", titles: ["activity", "date"] },
   { key: "archivedRecords", label: "Archive", page: "Archive", titles: ["label"] },
 ];
 

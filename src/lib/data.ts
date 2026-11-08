@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -697,6 +697,15 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.positiveAction === "string" && entry.positiveAction.length <= 5000 &&
     typeof entry.reflection === "string" && entry.reflection.length <= 5000 &&
     Array.isArray(entry.completedHabitIds) && entry.completedHabitIds.every((id) => typeof id === "string")));
+  const morningExerciseLogsOk = value.morningExerciseLogs === undefined || (Array.isArray(value.morningExerciseLogs) &&
+    value.morningExerciseLogs.every((entry) => isRecord(entry) &&
+      typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      typeof entry.activity === "string" && entry.activity.trim().length > 0 && entry.activity.length <= 120 &&
+      typeof entry.durationMinutes === "number" && Number.isInteger(entry.durationMinutes) &&
+      entry.durationMinutes >= 1 && entry.durationMinutes <= 1440 &&
+      EXERCISE_INTENSITIES.includes(entry.intensity as ExerciseIntensity) &&
+      typeof entry.notes === "string" && entry.notes.length <= 5000));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
@@ -704,6 +713,7 @@ export function validateData(value: unknown): value is TrackerData {
     "devotionalEntries", "dailyBibleReadings", "dailyPrayerLogs", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
+    "morningExerciseLogs",
   ];
   const archivedRecordsOk = value.archivedRecords === undefined ||
     (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {
@@ -748,7 +758,7 @@ export function validateData(value: unknown): value is TrackerData {
     !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !studentProfilesOk || !educationPlansOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
     !devotionalEntriesOk || !dailyBibleReadingsOk || !dailyPrayerLogsOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
-    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
+    !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk || !morningExerciseLogsOk ||
     !archivedRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
@@ -841,6 +851,8 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.promptRecords) && new Set((value.promptRecords as PromptRecord[]).map((entry) => entry.id)).size !== value.promptRecords.length) return false;
   if (Array.isArray(value.mindfulHabits) && new Set((value.mindfulHabits as MindfulHabit[]).map((entry) => entry.id)).size !== value.mindfulHabits.length) return false;
   if (Array.isArray(value.mindfulnessLogs) && new Set((value.mindfulnessLogs as MindfulnessLog[]).map((entry) => entry.id)).size !== value.mindfulnessLogs.length) return false;
+  if (Array.isArray(value.morningExerciseLogs) &&
+    new Set((value.morningExerciseLogs as MorningExerciseLog[]).map((entry) => entry.id)).size !== value.morningExerciseLogs.length) return false;
   if (Array.isArray(value.brokers) && new Set((value.brokers as string[]).map((broker) => broker.toLowerCase())).size !== value.brokers.length) return false;
   if (Array.isArray(value.stocks)) {
     const stocks = value.stocks as TrackedStock[];
@@ -940,6 +952,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     promptRecords: data.promptRecords ?? [],
     mindfulHabits: data.mindfulHabits ?? [],
     mindfulnessLogs: data.mindfulnessLogs ?? [],
+    morningExerciseLogs: data.morningExerciseLogs ?? [],
   };
 }
 

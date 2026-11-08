@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
+  Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell,
   ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree,
@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -82,6 +82,7 @@ const navigation: NavigationItem[] = [
   { name: "Asset manager", icon: Wallet, group: "Finance" },
   { name: "Learning", icon: BookOpen, group: "Personal growth" },
   { name: "Mind & habits", icon: Heart, group: "Personal growth" },
+  { name: "Morning exercise", icon: Dumbbell, group: "Personal growth" },
   { name: "AI Prompts", icon: Sparkles, group: "Personal growth" },
   { name: "Training & classes", icon: CalendarDays, group: "Personal growth" },
   { name: "Devotional", icon: Heart, group: "Personal growth" },
@@ -943,6 +944,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         promptRecords: mergeArchivedRows(previous.promptRecords, snapshot.promptRecords),
         mindfulHabits: mergeArchivedRows(previous.mindfulHabits, snapshot.mindfulHabits),
         mindfulnessLogs: mergeArchivedRows(previous.mindfulnessLogs, snapshot.mindfulnessLogs),
+        morningExerciseLogs: mergeArchivedRows(previous.morningExerciseLogs, snapshot.morningExerciseLogs),
   };
 }
 
@@ -3717,6 +3719,92 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
     {!visibleLogs.length && <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search or emotion." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
     {habitEditor !== undefined && <MindfulHabitModal key={habitEditor?.id ?? "new-mindful-habit"} initial={habitEditor} onClose={() => setHabitEditor(undefined)} onSave={(habit) => { onSaveHabit(habit, habitEditor?.id); setHabitEditor(undefined); }} />}
     {logEditor !== undefined && <MindfulnessLogModal key={logEditor?.id ?? "new-mindfulness-log"} initial={logEditor} habits={habits} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
+  </>;
+}
+
+function MorningExercisePage({ logs, onSave, onArchive }: {
+  logs: MorningExerciseLog[];
+  onSave: (log: Omit<MorningExerciseLog, "id">, id?: string) => void;
+  onArchive: (log: MorningExerciseLog) => void;
+}) {
+  const [draft, setDraft] = useState<Omit<MorningExerciseLog, "id">>({
+    date: today(),
+    activity: "Walking",
+    durationMinutes: 30,
+    intensity: "Moderate",
+    notes: "",
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [activityFilter, setActivityFilter] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
+  const visibleLogs = sortedLogs.filter((log) =>
+    (!activityFilter || log.activity === activityFilter) &&
+    [log.date, log.activity, log.intensity, log.notes].some((value) => value.toLocaleLowerCase().includes(query)));
+  const weekStart = new Date(`${today()}T00:00:00`);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
+  const recentLogs = logs.filter((log) => log.date >= weekStartKey && log.date <= today());
+  const recentMinutes = recentLogs.reduce((total, log) => total + log.durationMinutes, 0);
+  const recentDays = new Set(recentLogs.map((log) => log.date)).size;
+
+  function editLog(log: MorningExerciseLog) {
+    const { id, ...values } = log;
+    setDraft(values);
+    setEditingId(id);
+  }
+
+  function resetForm() {
+    setDraft({ date: today(), activity: "Walking", durationMinutes: 30, intensity: "Moderate", notes: "" });
+    setEditingId(null);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onSave({ ...draft, activity: draft.activity.trim(), notes: draft.notes.trim() }, editingId ?? undefined);
+    resetForm();
+  }
+
+  function archiveLog(log: MorningExerciseLog) {
+    if (!window.confirm(`Move the ${log.date} ${log.activity.toLocaleLowerCase()} record to the archive?`)) return;
+    onArchive(log);
+    if (editingId === log.id) resetForm();
+  }
+
+  return <>
+    <PageHeading eyebrow="Personal growth" title="Morning exercise" subtitle="Keep a simple record of your morning movement, duration, and how it felt." />
+    <div className="mindful-summary">
+      <Card><span>Exercise sessions · last 7 days</span><strong>{recentLogs.length}</strong></Card>
+      <Card><span>Days active · last 7 days</span><strong>{recentDays} / 7</strong></Card>
+      <Card><span>Minutes · last 7 days</span><strong>{recentMinutes}</strong></Card>
+    </div>
+    <Card className="mindful-habits-card">
+      <div className="card-head"><div><h2 className="section-title">{editingId ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose a suggested activity or enter your own. Notes are optional.</p></div><Dumbbell size={17} /></div>
+      <form onSubmit={submit}>
+        <div className="form-grid">
+          <Field label="Date"><DateInput required value={draft.date} onValueChange={(date) => setDraft((current) => ({ ...current, date }))} /></Field>
+          <Field label="Exercise or activity"><Input required list="morning-exercise-options" maxLength={120} placeholder="Choose or enter an activity" value={draft.activity} onChange={(event) => setDraft((current) => ({ ...current, activity: event.target.value }))} /><datalist id="morning-exercise-options">{MORNING_EXERCISE_OPTIONS.map((activity) => <option value={activity} key={activity} />)}</datalist></Field>
+          <Field label="Duration (minutes)"><Input required type="number" min={1} max={1440} step={1} value={draft.durationMinutes} onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: Number(event.target.value) }))} /></Field>
+          <Field label="Intensity"><Select value={draft.intensity} onChange={(event) => setDraft((current) => ({ ...current, intensity: event.target.value as ExerciseIntensity }))}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
+          <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} /></Field>
+        </div>
+        <div className="connector-actions"><Button type="submit">{editingId ? "Save changes" : "Save exercise"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
+      </form>
+    </Card>
+    <div className="toolbar filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer activeCount={activityFilter ? 1 : 0}>
+        <Field label="Activity"><Select aria-label="Filter by exercise activity" value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}><option value="">All activities</option>{[...new Set(logs.map((log) => log.activity))].sort((a, b) => a.localeCompare(b)).map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
+        {activityFilter && <Button type="button" variant="outline" size="sm" onClick={() => setActivityFilter("")}>Clear filter</Button>}
+      </FilterDrawer>
+      <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "session" : "sessions"}</Badge>
+    </div>
+    <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
+      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone="green">{log.activity}</Badge><Badge>{log.durationMinutes} min</Badge><Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
+      {log.notes && <div className="mindful-log-section"><span>Notes</span><p>{log.notes}</p></div>}
+    </Card>)}</div>
+    {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
   </>;
 }
 
@@ -6950,6 +7038,7 @@ function emptyTrackerData(): TrackerData {
     promptRecords: [],
     mindfulHabits: [],
     mindfulnessLogs: [],
+    morningExerciseLogs: [],
     educationRecords: [],
     studentProfiles: [],
     educationPlans: [],
@@ -7852,6 +7941,20 @@ export default function App() {
       mindfulnessLogs: (previous.mindfulnessLogs ?? []).filter((entry) => entry.id !== log.id),
     }));
   }
+  function saveMorningExerciseLog(log: Omit<MorningExerciseLog, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      morningExerciseLogs: id
+        ? (previous.morningExerciseLogs ?? []).map((entry) => entry.id === id ? { ...log, id } : entry)
+        : [{ ...log, id: createId() }, ...(previous.morningExerciseLogs ?? [])],
+    }));
+  }
+  function archiveMorningExerciseLog(log: MorningExerciseLog) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Morning exercise · ${log.date} · ${log.activity}`, { morningExerciseLogs: [log] }),
+      morningExerciseLogs: (previous.morningExerciseLogs ?? []).filter((entry) => entry.id !== log.id),
+    }));
+  }
   async function copyPromptToClipboard(record: PromptRecord) {
     try {
       await navigator.clipboard.writeText(record.prompt);
@@ -8466,6 +8569,7 @@ export default function App() {
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
+    "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} onSave={saveMorningExerciseLog} onArchive={archiveMorningExerciseLog} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} dailyPrayerLogs={data.dailyPrayerLogs ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveDailyPrayerLog={saveDailyPrayerLog} onDeleteDailyPrayerLog={deleteDailyPrayerLog} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,

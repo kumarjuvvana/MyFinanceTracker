@@ -26,6 +26,7 @@ export type Page =
   | "Asset manager"
   | "Learning"
   | "Mind & habits"
+  | "Morning exercise"
   | "Training & classes"
   | "Devotional"
   | "Cooking"
@@ -48,7 +49,7 @@ export type Page =
 export const FAVORITABLE_PAGES: Page[] = [
   "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
   "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager",
-  "Learning", "Mind & habits", "Training & classes", "Devotional", "Cooking",
+  "Learning", "Mind & habits", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
   "Database manager", "Hosting & storage", "Archive", "Account credentials",
@@ -407,6 +408,23 @@ export interface MindfulnessLog {
   positiveAction: string;
   reflection: string;
   completedHabitIds: string[];
+}
+
+export const MORNING_EXERCISE_OPTIONS = [
+  "Walking", "Brisk walking", "Jogging", "Running", "Yoga", "Stretching",
+  "Strength training", "Bodyweight exercise", "Cycling", "Skipping rope", "Dance",
+  "Breathing exercises", "Other",
+] as const;
+export const EXERCISE_INTENSITIES = ["Easy", "Moderate", "Vigorous"] as const;
+export type ExerciseIntensity = (typeof EXERCISE_INTENSITIES)[number];
+
+export interface MorningExerciseLog {
+  id: string;
+  date: string;
+  activity: string;
+  durationMinutes: number;
+  intensity: ExerciseIntensity;
+  notes: string;
 }
 
 export type TrainingDeliveryMode = "In-person class" | "Online class" | "Virtual class" | "Self-study";
@@ -831,6 +849,7 @@ export interface TrackerData {
   promptRecords?: PromptRecord[];
   mindfulHabits?: MindfulHabit[];
   mindfulnessLogs?: MindfulnessLog[];
+  morningExerciseLogs?: MorningExerciseLog[];
   credentialVault?: EncryptedCredentialVault;
 }
 
