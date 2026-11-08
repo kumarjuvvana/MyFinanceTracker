@@ -19,6 +19,7 @@ import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCAT
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
+import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -4601,17 +4602,51 @@ function DailyBibleReadingModal({ initial, onClose, onSave }: {
 }) {
   const [date, setDate] = useState(initial?.date ?? today());
   const [fromTestament, setFromTestament] = useState<DailyBibleReading["fromTestament"]>(initial?.fromTestament ?? "Old Testament");
-  const [fromBook, setFromBook] = useState(initial?.fromBook ?? "");
+  const [fromBook, setFromBook] = useState(initial?.fromBook ?? "Genesis");
   const [fromChapterName, setFromChapterName] = useState(initial?.fromChapterName ?? "");
-  const [fromChapterNumber, setFromChapterNumber] = useState(initial?.fromChapterNumber?.toString() ?? "");
-  const [fromVerseNumber, setFromVerseNumber] = useState(initial?.fromVerseNumber?.toString() ?? "");
+  const [fromChapterNumber, setFromChapterNumber] = useState(initial?.fromChapterNumber?.toString() ?? "1");
+  const [fromVerseNumber, setFromVerseNumber] = useState(initial?.fromVerseNumber?.toString() ?? "1");
   const [toTestament, setToTestament] = useState<DailyBibleReading["toTestament"]>(initial?.toTestament ?? "Old Testament");
-  const [toBook, setToBook] = useState(initial?.toBook ?? "");
+  const [toBook, setToBook] = useState(initial?.toBook ?? "Genesis");
   const [toChapterName, setToChapterName] = useState(initial?.toChapterName ?? "");
-  const [toChapterNumber, setToChapterNumber] = useState(initial?.toChapterNumber?.toString() ?? "");
-  const [toVerseNumber, setToVerseNumber] = useState(initial?.toVerseNumber?.toString() ?? "");
+  const [toChapterNumber, setToChapterNumber] = useState(initial?.toChapterNumber?.toString() ?? "1");
+  const [toVerseNumber, setToVerseNumber] = useState(initial?.toVerseNumber?.toString() ?? "1");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [error, setError] = useState("");
+  const fromBookReference = getBibleBook(fromTestament, fromBook);
+  const toBookReference = getBibleBook(toTestament, toBook);
+  const fromChapterLimit = fromBookReference?.verseCounts.length;
+  const toChapterLimit = toBookReference?.verseCounts.length;
+  const fromVerseLimit = fromBookReference?.verseCounts[Number(fromChapterNumber) - 1];
+  const toVerseLimit = toBookReference?.verseCounts[Number(toChapterNumber) - 1];
+
+  function testamentBooks(testament: DailyBibleReading["fromTestament"]) {
+    return BIBLE_BOOK_CATALOG.filter((book) => book.testament === testament);
+  }
+
+  function changeBook(which: "from" | "to", name: string) {
+    if (which === "from") {
+      setFromBook(name);
+      setFromChapterName("");
+      setFromChapterNumber("1");
+      setFromVerseNumber("1");
+    } else {
+      setToBook(name);
+      setToChapterName("");
+      setToChapterNumber("1");
+      setToVerseNumber("1");
+    }
+  }
+
+  function changeTestament(which: "from" | "to", testament: DailyBibleReading["fromTestament"]) {
+    if (which === "from") {
+      setFromTestament(testament);
+      changeBook("from", testamentBooks(testament)[0]?.name ?? "");
+    } else {
+      setToTestament(testament);
+      changeBook("to", testamentBooks(testament)[0]?.name ?? "");
+    }
+  }
 
   function parsePositiveInteger(value: string) {
     const parsed = Number(value);
@@ -4632,12 +4667,23 @@ function DailyBibleReadingModal({ initial, onClose, onSave }: {
       setError("Chapter and verse numbers must be positive whole numbers.");
       return;
     }
+    if ((fromBookReference && (fromChapter > (fromChapterLimit ?? 0) || fromVerse > (fromVerseLimit ?? 0))) ||
+      (toBookReference && (toChapter > (toChapterLimit ?? 0) || toVerse > (toVerseLimit ?? 0)))) {
+      setError("Choose a chapter and verse within the selected Bible book.");
+      return;
+    }
     if (fromTestament === "New Testament" && toTestament === "Old Testament") {
       setError("The To reference cannot be in the Old Testament when the From reference is in the New Testament.");
       return;
     }
-    if (fromTestament === toTestament && fromBook.trim().toLocaleLowerCase() === toBook.trim().toLocaleLowerCase() &&
-      (toChapter < fromChapter || (toChapter === fromChapter && toVerse < fromVerse))) {
+    const fromBookOrder = BIBLE_BOOK_CATALOG.findIndex((book) => book.testament === fromTestament && book.name === fromBook);
+    const toBookOrder = BIBLE_BOOK_CATALOG.findIndex((book) => book.testament === toTestament && book.name === toBook);
+    const readingIsReversed = fromBookOrder >= 0 && toBookOrder >= 0
+      ? toBookOrder < fromBookOrder || (toBookOrder === fromBookOrder &&
+        (toChapter < fromChapter || (toChapter === fromChapter && toVerse < fromVerse)))
+      : fromTestament === toTestament && fromBook.trim().toLocaleLowerCase() === toBook.trim().toLocaleLowerCase() &&
+        (toChapter < fromChapter || (toChapter === fromChapter && toVerse < fromVerse));
+    if (readingIsReversed) {
       setError("The To reference must be the same as or after the From reference.");
       return;
     }
@@ -4661,17 +4707,29 @@ function DailyBibleReadingModal({ initial, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Reading date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <div className="full bible-reading-range-title"><BookOpen size={14} /> From reference</div>
-      <Field label="Testament"><Select value={fromTestament} onChange={(event) => setFromTestament(event.target.value as DailyBibleReading["fromTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
-      <Field label="Book"><Input required maxLength={100} placeholder="e.g. Genesis" value={fromBook} onChange={(event) => setFromBook(event.target.value)} /></Field>
+      <Field label="Testament"><Select value={fromTestament} onChange={(event) => changeTestament("from", event.target.value as DailyBibleReading["fromTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
+      <Field label="Book">{fromBookReference
+        ? <Select required value={fromBook} onChange={(event) => changeBook("from", event.target.value)}>{testamentBooks(fromTestament).map((book) => <option key={book.name} value={book.name}>{book.name} · {book.verseCounts.length} chapters</option>)}</Select>
+        : <Input required maxLength={100} placeholder="e.g. Genesis" value={fromBook} onChange={(event) => setFromBook(event.target.value)} />}</Field>
       <Field label="Chapter name (optional)"><Input maxLength={100} placeholder="Optional chapter title" value={fromChapterName} onChange={(event) => setFromChapterName(event.target.value)} /></Field>
-      <Field label="Chapter number"><Input required type="number" min="1" step="1" value={fromChapterNumber} onChange={(event) => setFromChapterNumber(event.target.value)} /></Field>
-      <Field label="Verse number"><Input required type="number" min="1" step="1" value={fromVerseNumber} onChange={(event) => setFromVerseNumber(event.target.value)} /></Field>
+      <Field label={fromChapterLimit ? `Chapter (${fromChapterLimit} total)` : "Chapter number"}>{fromBookReference
+        ? <Select required value={fromChapterNumber} onChange={(event) => { setFromChapterNumber(event.target.value); setFromVerseNumber("1"); }}>{fromBookReference.verseCounts.map((count, index) => <option key={index + 1} value={index + 1}>Chapter {index + 1} · {count} verses</option>)}</Select>
+        : <Input required type="number" min="1" step="1" value={fromChapterNumber} onChange={(event) => setFromChapterNumber(event.target.value)} />}</Field>
+      <Field label={fromVerseLimit ? `Verse (1–${fromVerseLimit})` : "Verse number"}>{fromVerseLimit
+        ? <Select required value={fromVerseNumber} onChange={(event) => setFromVerseNumber(event.target.value)}>{Array.from({ length: fromVerseLimit }, (_, index) => <option key={index + 1} value={index + 1}>Verse {index + 1}</option>)}</Select>
+        : <Input required type="number" min="1" step="1" value={fromVerseNumber} onChange={(event) => setFromVerseNumber(event.target.value)} />}</Field>
       <div className="full bible-reading-range-title"><BookOpen size={14} /> To reference</div>
-      <Field label="Testament"><Select value={toTestament} onChange={(event) => setToTestament(event.target.value as DailyBibleReading["toTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
-      <Field label="Book"><Input required maxLength={100} placeholder="e.g. Genesis" value={toBook} onChange={(event) => setToBook(event.target.value)} /></Field>
+      <Field label="Testament"><Select value={toTestament} onChange={(event) => changeTestament("to", event.target.value as DailyBibleReading["toTestament"])}><option>Old Testament</option><option>New Testament</option></Select></Field>
+      <Field label="Book">{toBookReference
+        ? <Select required value={toBook} onChange={(event) => changeBook("to", event.target.value)}>{testamentBooks(toTestament).map((book) => <option key={book.name} value={book.name}>{book.name} · {book.verseCounts.length} chapters</option>)}</Select>
+        : <Input required maxLength={100} placeholder="e.g. Genesis" value={toBook} onChange={(event) => setToBook(event.target.value)} />}</Field>
       <Field label="Chapter name (optional)"><Input maxLength={100} placeholder="Optional chapter title" value={toChapterName} onChange={(event) => setToChapterName(event.target.value)} /></Field>
-      <Field label="Chapter number"><Input required type="number" min="1" step="1" value={toChapterNumber} onChange={(event) => setToChapterNumber(event.target.value)} /></Field>
-      <Field label="Verse number"><Input required type="number" min="1" step="1" value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)} /></Field>
+      <Field label={toChapterLimit ? `Chapter (${toChapterLimit} total)` : "Chapter number"}>{toBookReference
+        ? <Select required value={toChapterNumber} onChange={(event) => { setToChapterNumber(event.target.value); setToVerseNumber("1"); }}>{toBookReference.verseCounts.map((count, index) => <option key={index + 1} value={index + 1}>Chapter {index + 1} · {count} verses</option>)}</Select>
+        : <Input required type="number" min="1" step="1" value={toChapterNumber} onChange={(event) => setToChapterNumber(event.target.value)} />}</Field>
+      <Field label={toVerseLimit ? `Verse (1–${toVerseLimit})` : "Verse number"}>{toVerseLimit
+        ? <Select required value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)}>{Array.from({ length: toVerseLimit }, (_, index) => <option key={index + 1} value={index + 1}>Verse {index + 1}</option>)}</Select>
+        : <Input required type="number" min="1" step="1" value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)} />}</Field>
       <Field className="full" label="Comments / notes (optional)"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Notes about your reading" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save reading"}</Button></div>
@@ -4829,7 +4887,7 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
     <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div><Button variant="outline" onClick={() => setReadingEditor(null)}><Plus size={13} /> Add reading</Button></div>
       {visibleReadings.length ? <div className="devotional-reading-list">{visibleReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
-        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
+        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
         {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
       </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={readings.length ? "No matching Bible readings" : "No daily Bible readings yet"} description={readings.length ? "Try another search." : "Record a date and the Scripture range you read."} /></Card>}
     </section>
