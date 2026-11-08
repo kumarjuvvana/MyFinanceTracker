@@ -9,7 +9,7 @@ import {
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
-import { checkSession, loadSharedData, saveSharedData, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
+import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
@@ -6622,7 +6622,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     </Card>
     </SettingsDisclosure>
     <SettingsDisclosure title="Navigation menu" description="Grouping, ordering and menu display" icon={<ListTree size={17} />}><Card className="settings-card"><div className="card-head"><div><h2 className="section-title">Navigation menu</h2><p className="section-description">Reduce sidebar clutter by grouping screens. Choose the menu order used within groups, or across the flat menu.</p></div><ListTree size={17} /></div><div className="settings-grid navigation-settings-grid"><label className="dashboard-widget-option"><input type="checkbox" checked={groupMenus} onChange={(event) => onGroupMenusChange(event.target.checked)} /><span><strong>Group menus by category</strong><small>{groupMenus ? "Groups start collapsed; the active section opens automatically." : "Show every screen in one flat list."}</small></span></label><Field label="Menu order"><Select value={menuSortOrder} onChange={(event) => onMenuSortOrderChange(event.target.value as MenuSortOrder)}><option value="current">Current order</option><option value="ascending">Ascending (A–Z)</option></Select></Field></div></Card></SettingsDisclosure>
-    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save directly to shared Daybook data in Supabase, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase data"}</small></span></label>)}</div></Card></SettingsDisclosure>
+    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save to the shared Supabase preferences table, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase preferences"}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved with shared Daybook data.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Screen descriptions" description="Show or hide helper text under screen titles" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies across screens that display a title description and syncs across devices.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
@@ -7014,6 +7014,7 @@ export default function App() {
   const [syncMessage, setSyncMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [favoriteSavePending, setFavoriteSavePending] = useState(false);
+  const [preferenceSavePending, setPreferenceSavePending] = useState(false);
   const [modal, setModal] = useState<"add" | "trip" | null>(null);
   const [editing, setEditing] = useState<ShoppingItem | null>(null);
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -7025,6 +7026,9 @@ export default function App() {
   const skipNextSave = useRef(false);
   const saveQueue = useRef<Promise<string | null>>(Promise.resolve(null));
   const persistUpdateQueue = useRef<Promise<void>>(Promise.resolve());
+  const preferenceSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const preferenceSaveCount = useRef(0);
+  const preferenceRevisionRef = useRef<string | null>(null);
   const saveTimer = useRef<number | null>(null);
   const refreshInProgress = useRef(false);
 
@@ -7074,38 +7078,44 @@ export default function App() {
     return save;
   }
 
-  async function prepareSharedData(saved: { data: unknown; revision: string | null; initialized: boolean }) {
+  async function prepareSharedData(saved: {
+    data: unknown;
+    revision: string | null;
+    initialized: boolean;
+    preferencesInitialized: boolean;
+    preferencesRevision: string | null;
+  }) {
     let preparedData = normalizeTrackerData(saved.data as TrackerData);
-    let preparedRevision = saved.revision;
+    const preparedRevision = saved.revision;
+    let preparedPreferencesRevision = saved.preferencesRevision;
     let migrationWarning = "";
-    let removeLegacyPreferences = saved.initialized && (saved.data as TrackerData).preferences !== undefined;
-    if (saved.initialized && (saved.data as TrackerData).preferences === undefined) {
+    if (!saved.preferencesInitialized) {
       let legacyPreferences: TrackerPreferences | null = null;
       try {
         legacyPreferences = readLegacyBrowserPreferences();
       } catch (caught) {
         migrationWarning = caught instanceof Error ? caught.message : "Legacy browser preferences could not be read.";
       }
-      preparedData = {
-        ...preparedData,
-        preferences: legacyPreferences ?? preparedData.preferences,
-      };
-      try {
-        preparedRevision = await saveSharedData(preparedData, preparedRevision);
-        removeLegacyPreferences = true;
-      } catch (caught) {
-        const message = caught instanceof Error ? caught.message : "Could not save preferences to Supabase.";
-        migrationWarning = `Preferences could not be migrated to Supabase: ${message}`;
+      if (legacyPreferences) {
+        preparedData = { ...preparedData, preferences: legacyPreferences };
+        if (saved.initialized) {
+          try {
+            preparedPreferencesRevision = await saveSharedPreferences(preparedData.favoritePages ?? [], legacyPreferences);
+          } catch (caught) {
+            const message = caught instanceof Error ? caught.message : "Could not save preferences to Supabase.";
+            migrationWarning = `Preferences could not be migrated to Supabase: ${message}`;
+          }
+        }
       }
     }
-    if (removeLegacyPreferences) {
+    if (saved.preferencesInitialized || preparedPreferencesRevision) {
       try {
         localStorage.removeItem(PREFERENCES_KEY);
       } catch {
         if (!migrationWarning) migrationWarning = "The old browser-only preferences could not be removed from this device.";
       }
     }
-    return { data: preparedData, revision: preparedRevision, migrationWarning };
+    return { data: preparedData, revision: preparedRevision, preferencesRevision: preparedPreferencesRevision, migrationWarning };
   }
 
   useEffect(() => {
@@ -7146,6 +7156,7 @@ export default function App() {
       setData(prepared.data);
       setRevision(prepared.revision);
       revisionRef.current = prepared.revision;
+      preferenceRevisionRef.current = prepared.preferencesRevision;
       skipNextSave.current = saved.initialized;
       setSetupRequired(!saved.initialized);
       setSyncStatus(prepared.migrationWarning ? "error" : "saved");
@@ -7174,9 +7185,14 @@ export default function App() {
       const baseData = legacy ?? (importThisDevice ? emptyTrackerData() : data);
       const initialData = {
         ...baseData,
+        favoritePages: baseData.favoritePages ?? [],
         preferences: legacyPreferences ?? baseData.preferences ?? DEFAULT_TRACKER_PREFERENCES,
       };
       const nextRevision = await saveSharedData(initialData, null);
+      const nextPreferencesRevision = await saveSharedPreferences(
+        initialData.favoritePages ?? [],
+        initialData.preferences ?? DEFAULT_TRACKER_PREFERENCES,
+      );
       try {
         localStorage.removeItem(PREFERENCES_KEY);
       } catch {
@@ -7184,6 +7200,7 @@ export default function App() {
       }
       revisionRef.current = nextRevision;
       setRevision(nextRevision);
+      preferenceRevisionRef.current = nextPreferencesRevision;
       skipNextSave.current = true;
       setData(initialData);
       setSetupRequired(false);
@@ -7262,6 +7279,7 @@ export default function App() {
 
   async function refreshSharedData(manual = true) {
     if (!authenticatedRef.current || refreshInProgress.current) return;
+    if (!manual && preferenceSaveCount.current > 0) return;
     const discardLocalChanges = manual && syncStatusRef.current !== "saved";
     if (discardLocalChanges &&
       !window.confirm("There may be changes that have not synced. Replace them with the latest shared data?")) return;
@@ -7273,15 +7291,20 @@ export default function App() {
     if (manual) setRefreshing(true);
     let refreshWarning = "";
     try {
-      if (manual) await saveQueue.current;
+      if (manual) {
+        await saveQueue.current;
+        await preferenceSaveQueue.current;
+      }
       const saved = await loadSharedData();
       if (!validateData(saved.data)) throw new Error("Shared Daybook data is invalid or uses an unsupported version. Restore a valid JSON backup.");
-      if (saved.revision !== revisionRef.current || discardLocalChanges) {
+      if (saved.revision !== revisionRef.current ||
+        saved.preferencesRevision !== preferenceRevisionRef.current || discardLocalChanges) {
         if (!manual && syncStatusRef.current !== "saved") return;
         const prepared = await prepareSharedData(saved);
         refreshWarning = prepared.migrationWarning;
         skipNextSave.current = true;
         revisionRef.current = prepared.revision;
+        preferenceRevisionRef.current = prepared.preferencesRevision;
         setRevision(prepared.revision);
         setData(prepared.data);
         setSetupRequired(!saved.initialized);
@@ -7378,8 +7401,59 @@ export default function App() {
     persistUpdateQueue.current = operation.catch(() => undefined);
     return operation;
   }
+  function persistPreferenceUpdate(mutator: (previous: TrackerData) => TrackerData): Promise<void> {
+    preferenceSaveCount.current += 1;
+    setPreferenceSavePending(true);
+    const operation = preferenceSaveQueue.current.then(async () => {
+      const previous = latestDataRef.current;
+      if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving preferences.");
+      const next = mutator(previous);
+      if (saveTimer.current !== null) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
+        void queueSave(next);
+      }
+      latestDataRef.current = next;
+      skipNextSave.current = true;
+      setData(next);
+      try {
+        preferenceRevisionRef.current = await saveSharedPreferences(
+          next.favoritePages ?? [],
+          next.preferences ?? DEFAULT_TRACKER_PREFERENCES,
+        );
+      } catch (caught) {
+        if (latestDataRef.current === next) {
+          latestDataRef.current = previous;
+          skipNextSave.current = true;
+          setData(previous);
+        }
+        throw caught;
+      }
+    });
+    const trackedOperation = operation.finally(() => {
+      preferenceSaveCount.current -= 1;
+      setPreferenceSavePending(preferenceSaveCount.current > 0);
+    });
+    preferenceSaveQueue.current = trackedOperation.catch(() => undefined);
+    return trackedOperation.catch((caught: unknown) => {
+      const message = caught instanceof Error ? caught.message : "Could not save preferences to Supabase.";
+      setError(message);
+      throw caught;
+    });
+  }
+  function savePreferenceSnapshot(snapshot: TrackerData): Promise<void> {
+    const operation = preferenceSaveQueue.current.then(async () => {
+      if (!authenticatedRef.current) throw new Error("Sign in to Daybook before saving preferences.");
+      preferenceRevisionRef.current = await saveSharedPreferences(
+        snapshot.favoritePages ?? [],
+        snapshot.preferences ?? DEFAULT_TRACKER_PREFERENCES,
+      );
+    });
+    preferenceSaveQueue.current = operation.catch(() => undefined);
+    return operation;
+  }
   function updatePreferences(mutator: (previous: TrackerPreferences) => TrackerPreferences) {
-    void persistUpdate((previous) => ({
+    void persistPreferenceUpdate((previous) => ({
       ...previous,
       preferences: mutator({
         ...DEFAULT_TRACKER_PREFERENCES,
@@ -8279,7 +8353,12 @@ export default function App() {
     }
   }
   function restoreBackup(backup: TrackerData) {
+    latestDataRef.current = backup;
     setData(backup);
+    void savePreferenceSnapshot(backup).catch((caught: unknown) => {
+      const message = caught instanceof Error ? caught.message : "Could not restore preferences to Supabase.";
+      setError(message);
+    });
     setError("");
     setNotice("Backup restored. Saving to Supabase. Uploaded document files are stored separately and are not included in JSON backups.");
   }
@@ -8318,7 +8397,7 @@ export default function App() {
   function toggleFavoritePage(target: Page) {
     if (target === "Favorites" || favoriteSavePending) return;
     setFavoriteSavePending(true);
-    void persistUpdate((previous) => {
+    void persistPreferenceUpdate((previous) => {
       const current = previous.favoritePages ?? [];
       return {
         ...previous,
@@ -8404,7 +8483,7 @@ export default function App() {
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <CredentialVaultPage vault={data.credentialVault} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={syncStatus} syncMessage={syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>

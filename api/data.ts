@@ -23,6 +23,12 @@ interface StoredData {
   revision: string;
 }
 
+interface StoredPreferences {
+  favoritePages: NonNullable<TrackerData["favoritePages"]>;
+  preferences: NonNullable<TrackerData["preferences"]>;
+  revision: string;
+}
+
 class SupabaseApiError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
@@ -120,6 +126,44 @@ async function loadStoredData(): Promise<StoredData | null> {
   };
 }
 
+async function loadStoredPreferences(): Promise<StoredPreferences | null> {
+  const response = await supabaseRequest("rpc/load_daybook_preferences", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  const result: unknown = await response.json();
+  if (!Array.isArray(result)) {
+    throw new Error("Supabase returned an invalid response for Daybook preferences.");
+  }
+  if (result.length === 0) return null;
+
+  const row: unknown = result[0];
+  if (typeof row !== "object" || row === null ||
+    !("favorite_pages" in row) || !("preferences" in row) ||
+    !("revision" in row) || typeof row.revision !== "string") {
+    throw new Error("The shared Daybook preferences in Supabase are invalid.");
+  }
+  const savedData = {
+    version: 1 as const,
+    items: [],
+    purchases: [],
+    trips: [],
+    favoritePages: row.favorite_pages,
+    preferences: row.preferences,
+  };
+  if (!validateData(savedData)) {
+    throw new Error("The shared Daybook preferences in Supabase are invalid.");
+  }
+  if (!savedData.favoritePages || !savedData.preferences) {
+    throw new Error("The shared Daybook preferences in Supabase are incomplete.");
+  }
+  return {
+    favoritePages: savedData.favoritePages,
+    preferences: savedData.preferences,
+    revision: row.revision,
+  };
+}
+
 async function loadReminderCategories(): Promise<string[]> {
   const response = await supabaseRequest("rpc/load_reminder_categories", {
     method: "POST",
@@ -156,6 +200,26 @@ async function saveData(data: TrackerData, expectedRevision: string | null): Pro
   return saved.revision;
 }
 
+async function savePreferences(
+  favoritePages: NonNullable<TrackerData["favoritePages"]>,
+  preferences: NonNullable<TrackerData["preferences"]>,
+): Promise<string> {
+  const response = await supabaseRequest("rpc/save_daybook_preferences", {
+    method: "POST",
+    body: JSON.stringify({ p_favorite_pages: favoritePages, p_preferences: preferences }),
+  });
+  const result: unknown = await response.json();
+  if (!Array.isArray(result) || result.length !== 1) {
+    throw new Error("Supabase did not confirm the saved Daybook preferences.");
+  }
+  const saved: unknown = result[0];
+  if (typeof saved !== "object" || saved === null ||
+    !("revision" in saved) || typeof saved.revision !== "string") {
+    throw new Error("Supabase returned an invalid saved preferences revision.");
+  }
+  return saved.revision;
+}
+
 async function saveReminderCategories(categories: string[], expectedRevision: string): Promise<boolean> {
   const response = await supabaseRequest("rpc/save_reminder_categories", {
     method: "POST",
@@ -177,23 +241,71 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
   try {
     if (request.method === "GET") {
       const current = await loadStoredData();
+      const savedPreferences = await loadStoredPreferences();
+      const baseData = current?.data ?? seedData;
+      const recordData = { ...baseData };
+      delete recordData.favoritePages;
+      delete recordData.preferences;
+      const data = normalizeTrackerData({
+        ...recordData,
+        ...(savedPreferences
+          ? { favoritePages: savedPreferences.favoritePages, preferences: savedPreferences.preferences }
+          : { favoritePages: [] }),
+      });
       respond(response, 200, current
-        ? { data: current.data, revision: current.revision, initialized: true }
-        : { data: seedData, revision: null, initialized: false });
+        ? {
+          data,
+          revision: current.revision,
+          initialized: true,
+          preferencesInitialized: savedPreferences !== null,
+          preferencesRevision: savedPreferences?.revision ?? null,
+        }
+        : {
+          data,
+          revision: null,
+          initialized: false,
+          preferencesInitialized: savedPreferences !== null,
+          preferencesRevision: savedPreferences?.revision ?? null,
+        });
       return;
     }
 
-    if (request.method !== "PUT") {
-      response.setHeader("Allow", "GET, PUT");
-      respond(response, 405, { error: "Only GET and PUT requests are supported." });
-      return;
-    }
     if (!isSameOrigin(request)) {
       respond(response, 403, { error: "This request must come from the Daybook site." });
       return;
     }
 
     const body = requestBody(request);
+    if (request.method === "PATCH") {
+      if (typeof body !== "object" || body === null ||
+        !("favoritePages" in body) || !("preferences" in body) ||
+        typeof body.favoritePages === "undefined" || typeof body.preferences === "undefined") {
+        respond(response, 400, { error: "The submitted Daybook preferences are invalid. No changes were saved." });
+        return;
+      }
+      const preferencesData = {
+        version: 1 as const,
+        items: [],
+        purchases: [],
+        trips: [],
+        favoritePages: body.favoritePages,
+        preferences: body.preferences,
+      };
+      if (!validateData(preferencesData) || !preferencesData.favoritePages || !preferencesData.preferences) {
+        respond(response, 400, { error: "The submitted Daybook preferences are invalid. No changes were saved." });
+        return;
+      }
+      const savedPreferences = await savePreferences(preferencesData.favoritePages, preferencesData.preferences);
+      respond(response, 200, { preferencesRevision: savedPreferences });
+      return;
+    }
+
+    if (request.method !== "PUT") {
+      response.setHeader("Allow", "GET, PUT, PATCH");
+      respond(response, 405, { error: "Only GET, PUT, and PATCH requests are supported." });
+      return;
+    }
+
     if (typeof body !== "object" || body === null || !("data" in body) ||
       !("revision" in body) || !(typeof body.revision === "string" || body.revision === null) ||
       !validateData(body.data)) {
@@ -207,7 +319,10 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
       return;
     }
 
-    const revision = await saveData(data, body.revision);
+    const recordData = { ...data };
+    delete recordData.favoritePages;
+    delete recordData.preferences;
+    const revision = await saveData(recordData, body.revision);
     if (revision === null) {
       respond(response, 409, { error: "The shared data changed on another device. Refresh before saving to avoid overwriting it." });
       return;
