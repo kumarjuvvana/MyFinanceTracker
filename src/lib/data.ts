@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -191,6 +191,25 @@ export function validateData(value: unknown): value is TrackerData {
     value.favoritePages.every((page) => typeof page === "string" && FAVORITABLE_PAGES.includes(page as (typeof FAVORITABLE_PAGES)[number])) &&
     new Set(value.favoritePages).size === value.favoritePages.length);
   if (!favoritePagesOk) return false;
+  const preferencesOk = value.preferences === undefined || (() => {
+    const preferences = value.preferences;
+    return isRecord(preferences) &&
+      CURRENCIES.includes(preferences.currency as Currency) &&
+      typeof preferences.darkMode === "boolean" &&
+      ["extra-small", "small", "medium", "large", "extra-large", "xx-large"].includes(String(preferences.fontSize)) &&
+      ["modern", "editorial", "rounded"].includes(String(preferences.fontStyle)) &&
+      FONT_FAMILIES.includes(preferences.fontFamily as (typeof FONT_FAMILIES)[number]) &&
+      ACCENT_COLORS.includes(preferences.accentColor as (typeof ACCENT_COLORS)[number]) &&
+      DARK_THEMES.includes(preferences.darkTheme as (typeof DARK_THEMES)[number]) &&
+      VISUAL_THEMES.includes(preferences.visualTheme as (typeof VISUAL_THEMES)[number]) &&
+      Array.isArray(preferences.dashboardWidgets) &&
+      preferences.dashboardWidgets.every((widget) => DASHBOARD_WIDGETS.includes(widget as (typeof DASHBOARD_WIDGETS)[number])) &&
+      new Set(preferences.dashboardWidgets).size === preferences.dashboardWidgets.length &&
+      typeof preferences.showScreenDescriptions === "boolean" &&
+      typeof preferences.groupMenus === "boolean" &&
+      (preferences.menuSortOrder === "current" || preferences.menuSortOrder === "ascending");
+  })();
+  if (!preferencesOk) return false;
   const storesOk = value.stores === undefined || (Array.isArray(value.stores) && value.stores.every((store) =>
     isRecord(store) && typeof store.id === "string" && typeof store.name === "string" &&
     typeof store.location === "string"));
@@ -856,6 +875,11 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
   const stockQuotes = [...(data.stockQuotes ?? [])];
   return {
     ...data,
+    preferences: {
+      ...DEFAULT_TRACKER_PREFERENCES,
+      ...data.preferences,
+      dashboardWidgets: data.preferences?.dashboardWidgets ?? [...DEFAULT_TRACKER_PREFERENCES.dashboardWidgets],
+    },
     stores: data.stores ?? [],
     products: data.products ?? [],
     reminders: (data.reminders ?? []).map((reminder) => ({

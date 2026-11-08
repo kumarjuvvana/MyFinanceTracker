@@ -788,6 +788,7 @@ export interface EncryptedCredentialVault {
 export interface TrackerData {
   version: 1;
   favoritePages?: Page[];
+  preferences?: TrackerPreferences;
   items: ShoppingItem[];
   purchases: Purchase[];
   trips: ShoppingTrip[];
@@ -833,7 +834,45 @@ export interface TrackerData {
   credentialVault?: EncryptedCredentialVault;
 }
 
-export type ArchiveSnapshot = Partial<Omit<TrackerData, "version" | "archivedRecords" | "credentialVault">>;
+export type ArchiveSnapshot = Partial<Omit<TrackerData, "version" | "favoritePages" | "preferences" | "archivedRecords" | "credentialVault">>;
+
+export const DASHBOARD_WIDGETS = [
+  "shopping", "reminders", "personalDocuments", "stocks", "assets", "learning", "training",
+  "devotional", "cooking", "issues", "career", "family", "schools", "vehicles", "electricity",
+  "mindfulness", "prompts", "subscriptions", "documents",
+] as const;
+export type DashboardWidget = (typeof DASHBOARD_WIDGETS)[number];
+export type MenuSortOrder = "current" | "ascending";
+
+export interface TrackerPreferences {
+  currency: Currency;
+  darkMode: boolean;
+  fontSize: FontSize;
+  fontStyle: FontStyle;
+  fontFamily: FontFamily;
+  accentColor: AccentColor;
+  darkTheme: DarkTheme;
+  visualTheme: VisualTheme;
+  dashboardWidgets: DashboardWidget[];
+  showScreenDescriptions: boolean;
+  groupMenus: boolean;
+  menuSortOrder: MenuSortOrder;
+}
+
+export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
+  currency: "INR",
+  darkMode: false,
+  fontSize: "medium",
+  fontStyle: "modern",
+  fontFamily: "inter",
+  accentColor: "green",
+  darkTheme: "forest",
+  visualTheme: "sage",
+  dashboardWidgets: ["shopping", "reminders", "personalDocuments"],
+  showScreenDescriptions: true,
+  groupMenus: true,
+  menuSortOrder: "current",
+};
 
 export interface ArchivedRecord {
   id: string;
