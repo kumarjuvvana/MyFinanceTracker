@@ -1,5 +1,5 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
-import { X } from "lucide-react";
+import { Filter, X } from "lucide-react";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost" | "danger"; size?: "sm" | "md" };
 
@@ -142,6 +142,38 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
       </section>
     </div>
   );
+}
+
+export function FilterDrawer({ children, activeCount = 0, label = "Filters" }: { children: ReactNode; activeCount?: number; label?: string }) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
+
+  return <>
+    <Button type="button" variant="outline" className="filter-drawer-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+      <Filter size={14} />{label}{activeCount > 0 && <span className="filter-drawer-count">{activeCount}</span>}
+    </Button>
+    {open && <div className="filter-drawer-layer">
+      <button type="button" className="filter-drawer-backdrop" aria-label="Close filters" onClick={() => setOpen(false)} />
+      <aside className="filter-drawer" role="dialog" aria-modal="true" aria-label={label} onChangeCapture={(event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement && target.closest(".date-input-mobile"))) setOpen(false);
+      }} onClickCapture={(event) => {
+        const target = event.target;
+        if (target instanceof HTMLButtonElement) setOpen(false);
+      }}>
+        <div className="filter-drawer-head"><h2>{label}</h2><button className="icon-button" type="button" aria-label="Close filters" onClick={() => setOpen(false)}><X size={17} /></button></div>
+        <div className="filter-drawer-content">{children}</div>
+      </aside>
+    </div>}
+  </>;
 }
 
 export function Badge({ children, tone = "neutral", className = "" }: { children: ReactNode; tone?: "neutral" | "green" | "amber" | "blue"; className?: string }) {

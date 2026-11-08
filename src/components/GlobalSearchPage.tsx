@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from "react";
-import { ArrowUpRight, Filter, Search, X } from "lucide-react";
-import { Button, Card, EmptyState, Input, Select } from "./ui";
+import { ArrowUpRight, Search, X } from "lucide-react";
+import { Button, Card, EmptyState, FilterDrawer, Input, Select } from "./ui";
 import { searchTrackerData, type GlobalSearchResult } from "../lib/globalSearch";
 import type { Page, TrackerData } from "../types";
 
@@ -91,30 +91,31 @@ export function GlobalSearchPage({ data, query, selectedKey, onQueryChange, onSe
   return <>
     <div className="page-head"><div><p className="eyebrow">Search your Daybook</p><h1 className="page-title">Global search</h1><p className="page-subtitle">Find records across your lists, notes, documents, and trackers.</p></div></div>
     <Card className="global-search-card">
-      <label className="global-search-input"><Search size={17} /><Input autoFocus={!selectedKey} aria-label="Search all records" placeholder="Search by keyword or text…" value={query} onChange={(event) => onQueryChange(event.target.value)} /></label>
-      <p className="section-description global-search-hint">Searches saved record details and notes. Passwords and encrypted credential data are never indexed. Right-click a result to open its details in a new tab.</p>
-      <div className="global-search-filters" aria-label="Filter records">
-        <div className="global-search-filter-heading"><Filter size={14} /><span>Filter results</span></div>
-        <Select aria-label="Filter by section" value={section} onChange={(event) => setSection(event.target.value)}>
-          <option value="">All sections</option>
-          {sections.map((value) => <option key={value} value={value}>{value}</option>)}
-        </Select>
-        <Select aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}>
-          <option value="">All categories</option>
-          {categories.map((value) => <option key={value} value={value}>{value}</option>)}
-        </Select>
-        <Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">All statuses</option>
-          {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
-        </Select>
-        <Select aria-label="Filter by provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
-          <option value="">All providers</option>
-          {providers.map((value) => <option key={value} value={value}>{value}</option>)}
-        </Select>
-        <Input aria-label="Filter from date" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-        <Input aria-label="Filter to date" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} />
-        {hasActiveFilters && <Button variant="outline" size="sm" type="button" onClick={clearFilters}>Clear filters</Button>}
+      <div className="toolbar filter-toolbar global-search-filter-toolbar">
+        <div className="search-wrap"><Search size={15} /><Input autoFocus={!selectedKey} aria-label="Search all records" placeholder="Search by keyword or text…" value={query} onChange={(event) => onQueryChange(event.target.value)} /></div>
+        <FilterDrawer activeCount={[section, category, status, provider, dateFrom, dateTo].filter(Boolean).length}>
+          <label className="field-wrap"><span className="field-label">Section</span><Select aria-label="Filter by section" value={section} onChange={(event) => setSection(event.target.value)}>
+            <option value="">All sections</option>
+            {sections.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select></label>
+          <label className="field-wrap"><span className="field-label">Category</span><Select aria-label="Filter by category" value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="">All categories</option>
+            {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select></label>
+          <label className="field-wrap"><span className="field-label">Status</span><Select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="">All statuses</option>
+            {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select></label>
+          <label className="field-wrap"><span className="field-label">Provider</span><Select aria-label="Filter by provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
+            <option value="">All providers</option>
+            {providers.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select></label>
+          <label className="field-wrap"><span className="field-label">From date</span><Input aria-label="Filter from date" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+          <label className="field-wrap"><span className="field-label">To date</span><Input aria-label="Filter to date" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => setDateTo(event.target.value)} /></label>
+          {hasActiveFilters && <Button variant="outline" size="sm" type="button" onClick={clearFilters}>Clear filters</Button>}
+        </FilterDrawer>
       </div>
+      <p className="section-description global-search-hint">Searches saved record details and notes. Passwords and encrypted credential data are never indexed. Right-click a result to open its details in a new tab.</p>
     </Card>
     {canShowResults
       ? <div className="global-search-results" aria-live="polite">
