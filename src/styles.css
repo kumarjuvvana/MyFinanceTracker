@@ -1372,6 +1372,12 @@ body{background:#f3f5ef}
 .mindful-summary span{font-size:11px;color:#818a80}
 .mindful-summary strong{font:700 19px Manrope,sans-serif;color:#3e6747;white-space:nowrap}
 .mindful-habits-card{margin-bottom:16px}
+.exercise-entry-rows{display:grid;margin-top:10px}
+.exercise-entry-row{display:grid;gap:12px;padding:14px 0;border-top:1px solid #eef0ec}
+.exercise-entry-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.exercise-entry-row-head>strong{font-size:12px;color:#424a42;overflow-wrap:anywhere}
+.app-shell.dark .exercise-entry-row{border-color:#343d35}
+.app-shell.dark .exercise-entry-row-head>strong{color:#e3e8e2}
 .mindful-habit-list{display:grid}
 .mindful-habit-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #eef0ec}
 .mindful-habit-row>div:first-child{min-width:0}

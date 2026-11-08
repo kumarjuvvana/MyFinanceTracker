@@ -3919,17 +3919,17 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       setExerciseError("Select a date and add at least one exercise row.");
       return;
     }
-    for (const [index, row] of draftRows.entries()) {
+    for (const row of draftRows) {
       if (row.durationMinutes === null && row.count === null) {
-        setExerciseError(`Exercise row ${index + 1}: enter a duration, a count, or both.`);
+        setExerciseError(`${row.activity || "Exercise"}: enter a duration, a count, or both.`);
         return;
       }
       if (row.durationMinutes !== null && (!Number.isInteger(row.durationMinutes) || row.durationMinutes < 1 || row.durationMinutes > 1440)) {
-        setExerciseError(`Exercise row ${index + 1}: duration must be between 1 and 1,440 minutes.`);
+        setExerciseError(`${row.activity || "Exercise"}: duration must be between 1 and 1,440 minutes.`);
         return;
       }
       if (row.count !== null && (!Number.isInteger(row.count) || row.count < 1 || row.count > 1000000)) {
-        setExerciseError(`Exercise row ${index + 1}: count must be between 1 and 1,000,000.`);
+        setExerciseError(`${row.activity || "Exercise"}: count must be between 1 and 1,000,000.`);
         return;
       }
     }
@@ -4001,13 +4001,13 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     </nav>
     {activeTab === "log" && <>
     <Card className="mindful-habits-card">
-      <div className="card-head"><div><h2 className="section-title">{draftRows.some((row) => row.id) ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose a date once, then add one row for each activity. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
+      <div className="card-head"><div><h2 className="section-title">{draftRows.some((row) => row.id) ? "Edit exercises" : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Exercise date"><DateInput required value={exerciseDate} onValueChange={setExerciseDate} /></Field>
         </div>
-        <div className="mindful-log-list">{draftRows.map((row, index) => <Card className="mindful-log-card" key={row.id ?? `new-exercise-${index}`}>
-          <div className="card-head"><div><h3 className="section-title">Exercise {index + 1}</h3><p className="section-description">{row.id ? "Update this exercise entry" : "Add an activity for this date"}</p></div>{draftRows.length > 1 && <Button type="button" size="sm" variant="outline" aria-label={`Remove exercise row ${index + 1}`} onClick={() => removeDraftRow(index)}><Trash2 size={14} />Remove row</Button>}</div>
+        <div className="exercise-entry-rows">{draftRows.map((row, index) => <div className="exercise-entry-row" key={row.id ?? `new-exercise-${index}`}>
+          <div className="exercise-entry-row-head"><strong>{row.activity || "Choose an activity"}</strong><Button type="button" size="sm" variant="outline" aria-label={`Remove ${row.activity || "exercise"} row`} onClick={() => removeDraftRow(index)}><Trash2 size={14} />Remove</Button></div>
           <div className="form-grid">
             <Field label="When"><Select value={row.daypart ?? "Morning"} onChange={(event) => updateDraftRow(index, { daypart: event.target.value as ExerciseDaypart })}>{EXERCISE_DAYPARTS.map((part) => <option key={part}>{part}</option>)}</Select></Field>
             <Field label="Time (optional)"><Input type="time" value={row.time ?? ""} onChange={(event) => updateDraftRow(index, { time: event.target.value })} /></Field>
@@ -4017,9 +4017,9 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
             <Field label="Intensity"><Select value={row.intensity} onChange={(event) => updateDraftRow(index, { intensity: event.target.value as ExerciseIntensity })}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
             <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={row.notes} onChange={(event) => updateDraftRow(index, { notes: event.target.value })} /></Field>
           </div>
-        </Card>)}</div>
+        </div>)}</div>
         {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
-        <div className="connector-actions">{!draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button>}<Button type="submit">{draftRows.some((row) => row.id) ? "Save changes" : `Save ${draftRows.length} ${draftRows.length === 1 ? "exercise" : "exercises"}`}</Button>{draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
+        <div className="connector-actions"><Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button><Button type="submit">Save all exercises for this day</Button>{draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
       </form>
     </Card>
     </>}
