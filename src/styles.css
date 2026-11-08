@@ -1376,6 +1376,13 @@ body{background:#f3f5ef}
 .exercise-entry-row{display:grid;gap:12px;padding:14px 0;border-top:1px solid #eef0ec}
 .exercise-entry-row-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .exercise-entry-row-head>strong{font-size:12px;color:#424a42;overflow-wrap:anywhere}
+.exercise-day-list{display:grid;gap:12px}
+.exercise-day-card{padding:16px}
+.exercise-day-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.exercise-day-head h2{margin:0;color:#343d35;font:700 14px Manrope,sans-serif}
+.exercise-day-head p{margin:4px 0 0;color:#858d83;font-size:10px}
+.app-shell.dark .exercise-day-head h2{color:#e3e8e2}
+.app-shell.dark .exercise-day-head p{color:#a7b0a7}
 .app-shell.dark .exercise-entry-row{border-color:#343d35}
 .app-shell.dark .exercise-entry-row-head>strong{color:#e3e8e2}
 .mindful-habit-list{display:grid}
@@ -1442,6 +1449,9 @@ body{background:#f3f5ef}
   .habit-date-toolbar>.field{width:100%}
   .habit-tracker-row{display:grid;gap:9px}
   .habit-tracker-actions{width:100%;display:flex;align-items:center;justify-content:space-between}
+  .exercise-day-card{padding:12px}
+  .exercise-day-head{align-items:flex-start}
+  .exercise-day-head>.button{flex:none}
 }
 
 .hosting-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}

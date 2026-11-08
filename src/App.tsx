@@ -3829,13 +3829,14 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
 function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivities }: {
   logs: MorningExerciseLog[];
   activities: string[];
-  onSave: (logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>) => void;
+  onSave: (logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>, replaceDate?: string) => void;
   onArchive: (log: MorningExerciseLog) => void;
   onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
   type ExerciseRowDraft = Omit<MorningExerciseLog, "id" | "date"> & { id?: string };
   const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("log");
   const [exerciseDate, setExerciseDate] = useState(today);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
   const [draftRows, setDraftRows] = useState<ExerciseRowDraft[]>([{
     daypart: "Morning",
     time: "",
@@ -3854,10 +3855,12 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const [exerciseError, setExerciseError] = useState("");
   const query = search.trim().toLocaleLowerCase();
   const formActivities = [...new Set([...activities, ...draftRows.map((row) => row.activity)])];
-  const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
-  const visibleLogs = sortedLogs.filter((log) =>
+  const visibleLogs = [...logs].filter((log) =>
     (!activityFilter || log.activity === activityFilter) &&
     [log.date, log.activity, log.intensity, log.notes].some((value) => value.toLocaleLowerCase().includes(query)));
+  const visibleDayGroups = [...new Set(visibleLogs.map((log) => log.date))]
+    .sort((a, b) => b.localeCompare(a))
+    .map((date) => ({ date, logs: visibleLogs.filter((log) => log.date === date) }));
   const weekStart = new Date(`${today()}T00:00:00`);
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
@@ -3865,10 +3868,10 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const recentMinutes = recentLogs.reduce((total, log) => total + (log.durationMinutes ?? 0), 0);
   const recentDays = new Set(recentLogs.map((log) => log.date)).size;
 
-  function editLog(log: MorningExerciseLog) {
-    setActiveTab("log");
-    setExerciseDate(log.date);
-    setDraftRows([{
+  function editDay(date: string) {
+    setExerciseDate(date);
+    setEditingDate(date);
+    setDraftRows(logs.filter((log) => log.date === date).map((log) => ({
       id: log.id,
       daypart: log.daypart ?? "Morning",
       time: log.time ?? "",
@@ -3877,11 +3880,13 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       count: log.count ?? null,
       intensity: log.intensity,
       notes: log.notes,
-    }]);
+    })));
+    setExerciseError("");
   }
 
   function resetForm() {
     setExerciseDate(today());
+    setEditingDate(null);
     setDraftRows([{
       daypart: "Morning",
       time: "",
@@ -3934,7 +3939,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       }
     }
     setExerciseError("");
-    onSave(draftRows.map((row) => ({ ...row, date: exerciseDate, activity: row.activity.trim(), time: row.time ?? "", daypart: row.daypart ?? "Morning", notes: row.notes.trim() })));
+    onSave(draftRows.map((row) => ({ ...row, date: exerciseDate, activity: row.activity.trim(), time: row.time ?? "", daypart: row.daypart ?? "Morning", notes: row.notes.trim() })), editingDate ?? undefined);
     resetForm();
   }
 
@@ -3984,8 +3989,30 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   function archiveLog(log: MorningExerciseLog) {
     if (!window.confirm(`Move the ${log.date} ${log.activity.toLocaleLowerCase()} record to the archive?`)) return;
     onArchive(log);
-    if (draftRows.some((row) => row.id === log.id)) resetForm();
   }
+
+  const exerciseEntryForm = <Card className="mindful-habits-card">
+    <div className="card-head"><div><h2 className="section-title">{editingDate ? `Edit exercises · ${dateLabel(editingDate)}` : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
+    <form onSubmit={submit}>
+      <div className="form-grid">
+        <Field label="Exercise date"><DateInput required disabled={Boolean(editingDate)} value={exerciseDate} onValueChange={setExerciseDate} /></Field>
+      </div>
+      <div className="exercise-entry-rows">{draftRows.map((row, index) => <div className="exercise-entry-row" key={row.id ?? `new-exercise-${index}`}>
+        <div className="exercise-entry-row-head"><strong>{row.activity || "Choose an activity"}</strong><Button type="button" size="sm" variant="outline" aria-label={`Remove ${row.activity || "exercise"} row`} onClick={() => removeDraftRow(index)}><Trash2 size={14} />Remove</Button></div>
+        <div className="form-grid">
+          <Field label="When"><Select value={row.daypart ?? "Morning"} onChange={(event) => updateDraftRow(index, { daypart: event.target.value as ExerciseDaypart })}>{EXERCISE_DAYPARTS.map((part) => <option key={part}>{part}</option>)}</Select></Field>
+          <Field label="Time (optional)"><Input type="time" value={row.time ?? ""} onChange={(event) => updateDraftRow(index, { time: event.target.value })} /></Field>
+          <Field label="Exercise type"><Select required value={row.activity} onChange={(event) => updateDraftRow(index, { activity: event.target.value })}>{formActivities.map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
+          <Field label="Duration (minutes, optional)"><Input type="number" min={1} max={1440} step={1} placeholder="e.g. 30" value={row.durationMinutes ?? ""} onChange={(event) => updateDraftRow(index, { durationMinutes: event.target.value ? Number(event.target.value) : null })} /></Field>
+          <Field label="Repetitions / count (optional)"><Input type="number" min={1} max={1000000} step={1} placeholder="e.g. 20" value={row.count ?? ""} onChange={(event) => updateDraftRow(index, { count: event.target.value ? Number(event.target.value) : null })} /></Field>
+          <Field label="Intensity"><Select value={row.intensity} onChange={(event) => updateDraftRow(index, { intensity: event.target.value as ExerciseIntensity })}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
+          <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={row.notes} onChange={(event) => updateDraftRow(index, { notes: event.target.value })} /></Field>
+        </div>
+      </div>)}</div>
+      {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
+      <div className="connector-actions"><Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button><Button type="submit">{editingDate ? "Save day record" : "Save all exercises for this day"}</Button>{editingDate && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
+    </form>
+  </Card>;
 
   return <>
     <PageHeading eyebrow="Personal growth" title="Morning exercise" subtitle="Keep a simple record of your morning movement, duration or repetitions, and how it felt." />
@@ -4000,28 +4027,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Button variant={activeTab === "activities" ? "primary" : "outline"} aria-pressed={activeTab === "activities"} onClick={() => setActiveTab("activities")}><Dumbbell size={14} />Activities <Badge>{activities.length}</Badge></Button>
     </nav>
     {activeTab === "log" && <>
-    <Card className="mindful-habits-card">
-      <div className="card-head"><div><h2 className="section-title">{draftRows.some((row) => row.id) ? "Edit exercises" : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
-      <form onSubmit={submit}>
-        <div className="form-grid">
-          <Field label="Exercise date"><DateInput required value={exerciseDate} onValueChange={setExerciseDate} /></Field>
-        </div>
-        <div className="exercise-entry-rows">{draftRows.map((row, index) => <div className="exercise-entry-row" key={row.id ?? `new-exercise-${index}`}>
-          <div className="exercise-entry-row-head"><strong>{row.activity || "Choose an activity"}</strong><Button type="button" size="sm" variant="outline" aria-label={`Remove ${row.activity || "exercise"} row`} onClick={() => removeDraftRow(index)}><Trash2 size={14} />Remove</Button></div>
-          <div className="form-grid">
-            <Field label="When"><Select value={row.daypart ?? "Morning"} onChange={(event) => updateDraftRow(index, { daypart: event.target.value as ExerciseDaypart })}>{EXERCISE_DAYPARTS.map((part) => <option key={part}>{part}</option>)}</Select></Field>
-            <Field label="Time (optional)"><Input type="time" value={row.time ?? ""} onChange={(event) => updateDraftRow(index, { time: event.target.value })} /></Field>
-            <Field label="Exercise type"><Select required value={row.activity} onChange={(event) => updateDraftRow(index, { activity: event.target.value })}>{formActivities.map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
-            <Field label="Duration (minutes, optional)"><Input type="number" min={1} max={1440} step={1} placeholder="e.g. 30" value={row.durationMinutes ?? ""} onChange={(event) => updateDraftRow(index, { durationMinutes: event.target.value ? Number(event.target.value) : null })} /></Field>
-            <Field label="Repetitions / count (optional)"><Input type="number" min={1} max={1000000} step={1} placeholder="e.g. 20" value={row.count ?? ""} onChange={(event) => updateDraftRow(index, { count: event.target.value ? Number(event.target.value) : null })} /></Field>
-            <Field label="Intensity"><Select value={row.intensity} onChange={(event) => updateDraftRow(index, { intensity: event.target.value as ExerciseIntensity })}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
-            <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={row.notes} onChange={(event) => updateDraftRow(index, { notes: event.target.value })} /></Field>
-          </div>
-        </div>)}</div>
-        {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
-        <div className="connector-actions"><Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button><Button type="submit">Save all exercises for this day</Button>{draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
-      </form>
-    </Card>
+    {exerciseEntryForm}
     </>}
     {activeTab === "activities" && <>
     <Card className="mindful-habits-card">
@@ -4036,26 +4042,29 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     </Card>
     </>}
     {activeTab === "records" && <>
+    {editingDate && exerciseEntryForm}
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
       <FilterDrawer activeCount={activityFilter ? 1 : 0}>
         <Field label="Activity"><Select aria-label="Filter by exercise activity" value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}><option value="">All activities</option>{[...new Set(logs.map((log) => log.activity))].sort((a, b) => a.localeCompare(b)).map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
         {activityFilter && <Button type="button" variant="outline" size="sm" onClick={() => setActivityFilter("")}>Clear filter</Button>}
       </FilterDrawer>
-      <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "session" : "sessions"}</Badge>
+      <Badge>{visibleDayGroups.length} {visibleDayGroups.length === 1 ? "day" : "days"} · {visibleLogs.length} {visibleLogs.length === 1 ? "activity" : "activities"}</Badge>
     </div>
-    {visibleLogs.length ? <Card className="table-card"><table className="data-table">
-      <thead><tr><th>Date</th><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
-      <tbody>{visibleLogs.map((log) => <tr key={log.id}>
-        <td data-label="Date">{dateLabel(log.date)}</td>
-        <td data-label="Session">{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</td>
-        <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
-        <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
-        <td data-label="Intensity">{log.intensity}</td>
-        <td data-label="Notes">{log.notes}</td>
-        <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
-      </tr>)}</tbody>
-    </table></Card> : null}
+    {visibleDayGroups.length ? <div className="exercise-day-list">{visibleDayGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
+      <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div>
+      <div className="table-card"><table className="data-table">
+        <thead><tr><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>{dayLogs.map((log) => <tr key={log.id}>
+          <td data-label="Session">{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</td>
+          <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
+          <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
+          <td data-label="Intensity">{log.intensity}</td>
+          <td data-label="Notes">{log.notes}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></div>
+    </Card>)}</div> : null}
     {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
     </>}
   </>;
@@ -8194,17 +8203,27 @@ export default function App() {
       mindfulnessLogs: (previous.mindfulnessLogs ?? []).filter((entry) => entry.id !== log.id),
     }));
   }
-  function saveMorningExerciseLogs(logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>) {
-    update((previous) => ({
-      ...previous,
-      morningExerciseLogs: logs.reduce((current, log) => {
+  function saveMorningExerciseLogs(logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>, replaceDate?: string) {
+    update((previous) => {
+      const currentLogs = previous.morningExerciseLogs ?? [];
+      const submittedIds = new Set(logs.flatMap((log) => log.id ? [log.id] : []));
+      const removedLogs = replaceDate
+        ? currentLogs.filter((log) => log.date === replaceDate && !submittedIds.has(log.id))
+        : [];
+      const base = removedLogs.length
+        ? withArchivedRecord(previous, `Morning exercise · ${replaceDate} · removed activities`, { morningExerciseLogs: removedLogs })
+        : previous;
+      return {
+        ...base,
+        morningExerciseLogs: logs.reduce((current, log) => {
         const id = log.id ?? createId();
         const saved = { ...log, id };
         const index = current.findIndex((entry) => entry.id === id);
         if (index < 0) return [saved, ...current];
         return current.map((entry) => entry.id === id ? saved : entry);
-      }, [...(previous.morningExerciseLogs ?? [])]),
-    }));
+        }, currentLogs.filter((log) => !removedLogs.some((removed) => removed.id === log.id))),
+      };
+    });
   }
   function saveMorningExerciseActivities(activities: string[], rename?: { previousName: string; nextName: string }) {
     update((previous) => {
