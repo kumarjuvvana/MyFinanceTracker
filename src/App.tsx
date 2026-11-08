@@ -3722,22 +3722,32 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   </>;
 }
 
-function MorningExercisePage({ logs, onSave, onArchive }: {
+function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivities }: {
   logs: MorningExerciseLog[];
+  activities: string[];
   onSave: (log: Omit<MorningExerciseLog, "id">, id?: string) => void;
   onArchive: (log: MorningExerciseLog) => void;
+  onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
   const [draft, setDraft] = useState<Omit<MorningExerciseLog, "id">>({
     date: today(),
     activity: "Walking",
-    durationMinutes: 30,
+    durationMinutes: null,
+    count: null,
     intensity: "Moderate",
     notes: "",
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activityFilter, setActivityFilter] = useState("");
+  const [newActivity, setNewActivity] = useState("");
+  const [editingActivity, setEditingActivity] = useState<string | null>(null);
+  const [activityDraft, setActivityDraft] = useState("");
+  const [activityError, setActivityError] = useState("");
+  const [exerciseError, setExerciseError] = useState("");
   const query = search.trim().toLocaleLowerCase();
+  const editedActivity = editingId ? logs.find((log) => log.id === editingId)?.activity : undefined;
+  const formActivities = [...new Set([...activities, ...(editedActivity ? [editedActivity] : [])])];
   const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
   const visibleLogs = sortedLogs.filter((log) =>
     (!activityFilter || log.activity === activityFilter) &&
@@ -3746,24 +3756,78 @@ function MorningExercisePage({ logs, onSave, onArchive }: {
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
   const recentLogs = logs.filter((log) => log.date >= weekStartKey && log.date <= today());
-  const recentMinutes = recentLogs.reduce((total, log) => total + log.durationMinutes, 0);
+  const recentMinutes = recentLogs.reduce((total, log) => total + (log.durationMinutes ?? 0), 0);
   const recentDays = new Set(recentLogs.map((log) => log.date)).size;
 
   function editLog(log: MorningExerciseLog) {
     const { id, ...values } = log;
-    setDraft(values);
+    setDraft({ ...values, durationMinutes: values.durationMinutes ?? null, count: values.count ?? null });
     setEditingId(id);
   }
 
   function resetForm() {
-    setDraft({ date: today(), activity: "Walking", durationMinutes: 30, intensity: "Moderate", notes: "" });
+    setDraft({ date: today(), activity: activities[0] ?? "", durationMinutes: null, count: null, intensity: "Moderate", notes: "" });
     setEditingId(null);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (draft.durationMinutes === null && draft.count === null) {
+      setExerciseError("Enter a duration, a count, or both.");
+      return;
+    }
+    if (draft.durationMinutes !== null && (!Number.isInteger(draft.durationMinutes) || draft.durationMinutes < 1 || draft.durationMinutes > 1440)) {
+      setExerciseError("Duration must be between 1 and 1,440 minutes.");
+      return;
+    }
+    if (draft.count !== null && (!Number.isInteger(draft.count) || draft.count < 1 || draft.count > 1000000)) {
+      setExerciseError("Count must be a whole number between 1 and 1,000,000.");
+      return;
+    }
+    setExerciseError("");
     onSave({ ...draft, activity: draft.activity.trim(), notes: draft.notes.trim() }, editingId ?? undefined);
     resetForm();
+  }
+
+  function addActivity(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newActivity.trim();
+    if (activities.length >= 200) {
+      setActivityError("You can save up to 200 activity options.");
+      return;
+    }
+    if (!name || name.length > 120 || activities.some((activity) => activity.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setActivityError("Enter a unique activity name (up to 120 characters).");
+      return;
+    }
+    onSaveActivities([...activities, name]);
+    setDraft((current) => ({ ...current, activity: name }));
+    setNewActivity("");
+    setActivityError("");
+  }
+
+  function renameActivity(previousName: string) {
+    const name = activityDraft.trim();
+    if (!name || name.length > 120 || activities.some((activity) =>
+      activity !== previousName && activity.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setActivityError("Enter a unique activity name (up to 120 characters).");
+      return;
+    }
+    onSaveActivities(activities.map((activity) => activity === previousName ? name : activity), { previousName, nextName: name });
+    if (draft.activity === previousName) setDraft((current) => ({ ...current, activity: name }));
+    setEditingActivity(null);
+    setActivityError("");
+  }
+
+  function removeActivity(name: string) {
+    if (activities.length === 1) {
+      setActivityError("Keep at least one activity in the list.");
+      return;
+    }
+    if (!window.confirm(`Remove "${name}" from the activity list? Existing exercise records will be kept.`)) return;
+    onSaveActivities(activities.filter((activity) => activity !== name));
+    if (draft.activity === name) setDraft((current) => ({ ...current, activity: activities.find((activity) => activity !== name) ?? "" }));
+    setActivityError("");
   }
 
   function archiveLog(log: MorningExerciseLog) {
@@ -3773,24 +3837,36 @@ function MorningExercisePage({ logs, onSave, onArchive }: {
   }
 
   return <>
-    <PageHeading eyebrow="Personal growth" title="Morning exercise" subtitle="Keep a simple record of your morning movement, duration, and how it felt." />
+    <PageHeading eyebrow="Personal growth" title="Morning exercise" subtitle="Keep a simple record of your morning movement, duration or repetitions, and how it felt." />
     <div className="mindful-summary">
       <Card><span>Exercise sessions · last 7 days</span><strong>{recentLogs.length}</strong></Card>
       <Card><span>Days active · last 7 days</span><strong>{recentDays} / 7</strong></Card>
       <Card><span>Minutes · last 7 days</span><strong>{recentMinutes}</strong></Card>
     </div>
     <Card className="mindful-habits-card">
-      <div className="card-head"><div><h2 className="section-title">{editingId ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose a suggested activity or enter your own. Notes are optional.</p></div><Dumbbell size={17} /></div>
+      <div className="card-head"><div><h2 className="section-title">{editingId ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose an activity from the list or add a new one below. Duration and repetitions are optional, but enter at least one.</p></div><Dumbbell size={17} /></div>
       <form onSubmit={submit}>
         <div className="form-grid">
           <Field label="Date"><DateInput required value={draft.date} onValueChange={(date) => setDraft((current) => ({ ...current, date }))} /></Field>
-          <Field label="Exercise or activity"><Input required list="morning-exercise-options" maxLength={120} placeholder="Choose or enter an activity" value={draft.activity} onChange={(event) => setDraft((current) => ({ ...current, activity: event.target.value }))} /><datalist id="morning-exercise-options">{MORNING_EXERCISE_OPTIONS.map((activity) => <option value={activity} key={activity} />)}</datalist></Field>
-          <Field label="Duration (minutes)"><Input required type="number" min={1} max={1440} step={1} value={draft.durationMinutes} onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: Number(event.target.value) }))} /></Field>
+          <Field label="Exercise or activity"><Select required value={draft.activity} onChange={(event) => setDraft((current) => ({ ...current, activity: event.target.value }))}>{formActivities.map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
+          <Field label="Duration (minutes, optional)"><Input type="number" min={1} max={1440} step={1} placeholder="e.g. 30" value={draft.durationMinutes ?? ""} onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: event.target.value ? Number(event.target.value) : null }))} /></Field>
+          <Field label="Repetitions / count (optional)"><Input type="number" min={1} max={1000000} step={1} placeholder="e.g. 20 pull-ups" value={draft.count ?? ""} onChange={(event) => setDraft((current) => ({ ...current, count: event.target.value ? Number(event.target.value) : null }))} /></Field>
           <Field label="Intensity"><Select value={draft.intensity} onChange={(event) => setDraft((current) => ({ ...current, intensity: event.target.value as ExerciseIntensity }))}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
           <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} /></Field>
         </div>
+        {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
         <div className="connector-actions"><Button type="submit">{editingId ? "Save changes" : "Save exercise"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
       </form>
+    </Card>
+    <Card className="mindful-habits-card">
+      <div className="card-head"><div><h2 className="section-title">Exercise activities</h2><p className="section-description">Add or rename activity options. Changes sync to Supabase.</p></div><Dumbbell size={17} /></div>
+      <form className="inline-form" onSubmit={addActivity}><Field label="New activity"><Input required maxLength={120} placeholder="e.g. Pull-ups" value={newActivity} onChange={(event) => setNewActivity(event.target.value)} /></Field><Button type="submit"><Plus size={14} />Add activity</Button></form>
+      <div className="mindful-habit-list">{activities.map((activity) => <div className="mindful-habit-row" key={activity}>
+        {editingActivity === activity
+          ? <form className="inline-form" onSubmit={(event) => { event.preventDefault(); renameActivity(activity); }}><Input aria-label={`Rename ${activity}`} required maxLength={120} value={activityDraft} onChange={(event) => setActivityDraft(event.target.value)} /><Button size="sm" type="submit">Save</Button><Button size="sm" type="button" variant="outline" onClick={() => setEditingActivity(null)}>Cancel</Button></form>
+          : <><strong>{activity}</strong><div className="table-actions"><button className="icon-button" aria-label={`Rename ${activity}`} onClick={() => { setEditingActivity(activity); setActivityDraft(activity); setActivityError(""); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Remove ${activity}`} onClick={() => removeActivity(activity)}><Trash2 size={14} /></button></div></>}
+      </div>)}</div>
+      {activityError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{activityError}</div>}
     </Card>
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
@@ -3801,7 +3877,7 @@ function MorningExercisePage({ logs, onSave, onArchive }: {
       <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "session" : "sessions"}</Badge>
     </div>
     <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
-      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone="green">{log.activity}</Badge><Badge>{log.durationMinutes} min</Badge><Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
+      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone="green">{log.activity}</Badge>{log.durationMinutes !== null && <Badge>{log.durationMinutes} min</Badge>}{log.count != null && <Badge>Reps / count {log.count}</Badge>}<Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
       {log.notes && <div className="mindful-log-section"><span>Notes</span><p>{log.notes}</p></div>}
     </Card>)}</div>
     {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
@@ -7949,6 +8025,18 @@ export default function App() {
         : [{ ...log, id: createId() }, ...(previous.morningExerciseLogs ?? [])],
     }));
   }
+  function saveMorningExerciseActivities(activities: string[], rename?: { previousName: string; nextName: string }) {
+    update((previous) => {
+      return {
+        ...previous,
+        morningExerciseActivities: [...activities],
+        morningExerciseLogs: (previous.morningExerciseLogs ?? []).map((log) => ({
+          ...log,
+          activity: rename && log.activity === rename.previousName ? rename.nextName : log.activity,
+        })),
+      };
+    });
+  }
   function archiveMorningExerciseLog(log: MorningExerciseLog) {
     update((previous) => ({
       ...withArchivedRecord(previous, `Morning exercise · ${log.date} · ${log.activity}`, { morningExerciseLogs: [log] }),
@@ -8473,7 +8561,7 @@ export default function App() {
   function clearData() {
     if (!data) return;
     if (!window.confirm("Clear all active Daybook records? They will be moved to the Archive first. The encrypted credential vault is excluded from archive and will be permanently cleared.")) return;
-    const { version, archivedRecords, credentialVault, stockSeedVersion, favoritePages: archivedFavorites, preferences, ...snapshot } = data;
+    const { version, archivedRecords, credentialVault, stockSeedVersion, favoritePages: archivedFavorites, preferences, morningExerciseActivities, ...snapshot } = data;
     void version;
     void credentialVault;
     void stockSeedVersion;
@@ -8484,7 +8572,7 @@ export default function App() {
       archivedAt: new Date().toISOString(),
       snapshot,
     };
-    setData({ ...emptyTrackerData(), favoritePages: data.favoritePages, preferences, archivedRecords: [archive, ...(archivedRecords ?? [])] });
+    setData({ ...emptyTrackerData(), favoritePages: data.favoritePages, preferences, morningExerciseActivities, archivedRecords: [archive, ...(archivedRecords ?? [])] });
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
   }
@@ -8569,7 +8657,7 @@ export default function App() {
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
-    "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} onSave={saveMorningExerciseLog} onArchive={archiveMorningExerciseLog} />,
+    "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLog} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} dailyPrayerLogs={data.dailyPrayerLogs ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveDailyPrayerLog={saveDailyPrayerLog} onDeleteDailyPrayerLog={deleteDailyPrayerLog} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,

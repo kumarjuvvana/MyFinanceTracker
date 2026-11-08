@@ -422,7 +422,8 @@ export interface MorningExerciseLog {
   id: string;
   date: string;
   activity: string;
-  durationMinutes: number;
+  durationMinutes: number | null;
+  count: number | null;
   intensity: ExerciseIntensity;
   notes: string;
 }
@@ -850,10 +851,11 @@ export interface TrackerData {
   mindfulHabits?: MindfulHabit[];
   mindfulnessLogs?: MindfulnessLog[];
   morningExerciseLogs?: MorningExerciseLog[];
+  morningExerciseActivities?: string[];
   credentialVault?: EncryptedCredentialVault;
 }
 
-export type ArchiveSnapshot = Partial<Omit<TrackerData, "version" | "favoritePages" | "preferences" | "archivedRecords" | "credentialVault">>;
+export type ArchiveSnapshot = Partial<Omit<TrackerData, "version" | "favoritePages" | "preferences" | "archivedRecords" | "credentialVault" | "morningExerciseActivities">>;
 
 export const DASHBOARD_WIDGETS = [
   "shopping", "reminders", "personalDocuments", "stocks", "assets", "learning", "training",
