@@ -17,6 +17,7 @@ import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUs
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
+import type { CookingPlan } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -890,6 +891,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         prayerRequests: mergeArchivedRows(previous.prayerRequests, snapshot.prayerRequests),
         cookingRecipes: mergeArchivedRows(previous.cookingRecipes, snapshot.cookingRecipes),
         cookingLogs: mergeArchivedRows(previous.cookingLogs, snapshot.cookingLogs),
+        cookingPlans: mergeArchivedRows(previous.cookingPlans, snapshot.cookingPlans),
         issueRecords: mergeArchivedRows(previous.issueRecords, snapshot.issueRecords),
         personalEducation: mergeArchivedRows(previous.personalEducation, snapshot.personalEducation),
         professionalQualifications: mergeArchivedRows(previous.professionalQualifications, snapshot.professionalQualifications),
@@ -4905,13 +4907,188 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   </Modal>;
 }
 
-function CookingPage({ recipes, logs, onSaveRecipe, onDeleteRecipe, onSaveLog, onDeleteLog }: {
+function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSaveLog }: {
+  plan: CookingPlan;
+  products: Product[];
+  logs: CookingLog[];
+  onSave: (plan: CookingPlan) => void;
+  onCopy: (plan: CookingPlan) => void;
+  onDelete: (plan: CookingPlan) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
+}) {
+  const formatCurrency = useCurrencyFormatter();
+  const [expanded, setExpanded] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [nameDraft, setNameDraft] = useState(plan.name);
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const productById = new Map(products.map((product) => [product.id, product]));
+  const plannedCost = plan.ingredients.reduce((total, ingredient) => {
+    const product = productById.get(ingredient.productId);
+    return total + ingredient.quantity * (product?.estimatedPrice ?? ingredient.unitPrice);
+  }, 0);
+  const alreadyLogged = logs.some((log) => log.date === plan.date && log.dishes.some((dish) => dish.name === plan.name));
+
+  function saveIngredient(ingredientId: string, changes: Partial<CookingPlan["ingredients"][number]>) {
+    onSave({
+      ...plan,
+      ingredients: plan.ingredients.map((ingredient) => ingredient.id === ingredientId ? { ...ingredient, ...changes } : ingredient),
+    });
+  }
+
+  function addToLog() {
+    const matchingLog = logs.find((log) => log.date === plan.date);
+    if (matchingLog) {
+      if (!matchingLog.dishes.some((dish) => dish.name === plan.name)) {
+        onSaveLog({ ...matchingLog, dishes: [...matchingLog.dishes, { recipeId: null, name: plan.name }] }, matchingLog.id);
+      }
+    } else {
+      onSaveLog({ date: plan.date, occasion: "", dishes: [{ recipeId: null, name: plan.name }], rating: null, learning: "", notes: "" });
+    }
+    onSave({ ...plan, status: "Cooked" });
+  }
+
+  return <Card className="cooking-plan-card">
+    <div className="cooking-plan-row">
+      <div className="cooking-plan-main">
+        <strong>{plan.name}</strong>
+        <span>{plan.ingredients.length} ingredients · estimated {formatCurrency(plannedCost)}</span>
+      </div>
+      <Select aria-label={`Status for ${plan.name}`} value={plan.status} onChange={(event) => onSave({ ...plan, status: event.target.value as CookingPlan["status"] })}>
+        <option>Planned</option><option>In progress</option><option>Cooked</option><option>Skipped</option>
+      </Select>
+      <div className="table-actions">
+        <button className="icon-button" type="button" aria-label={`${expanded ? "Hide" : "Edit"} plan details for ${plan.name}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronRight size={14} style={{ transform: "rotate(90deg)" }} /> : <Pencil size={13} />}</button>
+        <button className="icon-button" type="button" disabled={alreadyLogged} aria-label={`Add ${plan.name} to daily cooking log`} title={alreadyLogged ? "Already in daily cooking log" : "Add to daily cooking log"} onClick={addToLog}><Utensils size={13} /></button>
+        <button className="icon-button" type="button" aria-label={`Copy plan for ${plan.name}`} onClick={() => onCopy(plan)}><Copy size={13} /></button>
+        <button className="icon-button" type="button" aria-label={`Archive plan for ${plan.name}`} onClick={() => { if (window.confirm(`Move the plan for "${plan.name}" to the archive?`)) onDelete(plan); }}><Archive size={13} /></button>
+      </div>
+    </div>
+    {expanded && <div className="cooking-plan-details">
+      <div className="cooking-plan-edit-fields">
+        <Field label="Planned item"><Input maxLength={160} value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onBlur={() => {
+          const name = nameDraft.trim();
+          if (name && name !== plan.name) onSave({ ...plan, name });
+          else if (!name) setNameDraft(plan.name);
+        }} /></Field>
+        <Field label="Date"><DateInput required value={plan.date} onValueChange={(date) => onSave({ ...plan, date })} /></Field>
+      </div>
+      <div className="cooking-plan-ingredients">
+        <div className="cooking-plan-ingredient-head"><strong>Ingredients</strong><span>Estimated cost uses the current Product master price.</span></div>
+        {plan.ingredients.map((ingredient) => {
+          const product = productById.get(ingredient.productId);
+          const unitPrice = product?.estimatedPrice ?? ingredient.unitPrice;
+          return <div className="cooking-plan-ingredient" key={ingredient.id}>
+            <Select aria-label={`Ingredient for ${plan.name}`} value={ingredient.productId} onChange={(event) => {
+              const nextProduct = productById.get(event.target.value);
+              if (nextProduct) saveIngredient(ingredient.id, { productId: nextProduct.id, productName: nextProduct.name, unit: nextProduct.unit, unitPrice: nextProduct.estimatedPrice });
+            }}>
+              {!product && <option value={ingredient.productId}>{ingredient.productName} (not in master data)</option>}
+              {products.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {formatCurrency(entry.estimatedPrice)} / {entry.unit}</option>)}
+            </Select>
+            <Input aria-label={`Quantity of ${ingredient.productName}`} type="number" min="0.001" step="any" value={quantityDrafts[ingredient.id] ?? String(ingredient.quantity)} onChange={(event) => setQuantityDrafts((current) => ({ ...current, [ingredient.id]: event.target.value }))} onBlur={() => {
+              const quantity = Number(quantityDrafts[ingredient.id]);
+              if (Number.isFinite(quantity) && quantity > 0) saveIngredient(ingredient.id, { quantity });
+              setQuantityDrafts((current) => ({ ...current, [ingredient.id]: String(Number.isFinite(quantity) && quantity > 0 ? quantity : ingredient.quantity) }));
+            }} />
+            <span className="cooking-plan-ingredient-cost">{ingredient.quantity} {product?.unit ?? ingredient.unit} · {formatCurrency(ingredient.quantity * unitPrice)}</span>
+            <button className="icon-button" type="button" aria-label={`Remove ${ingredient.productName}`} onClick={() => onSave({ ...plan, ingredients: plan.ingredients.filter((entry) => entry.id !== ingredient.id) })}><X size={13} /></button>
+          </div>;
+        })}
+        {products.length ? <div className="cooking-add-ingredient"><Select aria-label={`Choose ingredient for ${plan.name}`} value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}><option value="">Choose from Product master</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {formatCurrency(product.estimatedPrice)} / {product.unit}</option>)}</Select><Button type="button" variant="outline" size="sm" disabled={!selectedProductId} onClick={() => {
+          const product = productById.get(selectedProductId);
+          if (!product) return;
+          onSave({ ...plan, ingredients: [...plan.ingredients, { id: createId(), productId: product.id, productName: product.name, quantity: 1, unit: product.unit, unitPrice: product.estimatedPrice }] });
+          setSelectedProductId("");
+        }}><Plus size={13} /> Add ingredient</Button></div> : <p className="section-description">Add vegetables, spices, dairy, or other ingredients in Master data first.</p>}
+      </div>
+      <Field label="Optional notes"><Input maxLength={1000} placeholder="Optional preparation or shopping notes" value={plan.notes} onChange={(event) => onSave({ ...plan, notes: event.target.value })} /></Field>
+      <div className="cooking-plan-footer"><strong>Estimated total: {formatCurrency(plannedCost)}</strong><Button type="button" size="sm" variant="outline" disabled={alreadyLogged} onClick={addToLog}><Utensils size={13} />{alreadyLogged ? "Already in daily log" : "Add to daily cooking log"}</Button></div>
+    </div>}
+  </Card>;
+}
+
+function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDeletePlan, onSaveLog }: {
+  plans: CookingPlan[];
+  products: Product[];
+  logs: CookingLog[];
+  onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
+  onCopyPlan: (plan: CookingPlan) => void;
+  onDeletePlan: (plan: CookingPlan) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
+}) {
+  const formatCurrency = useCurrencyFormatter();
+  const [selectedDate, setSelectedDate] = useState(today());
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const date = new Date(`${today()}T12:00:00`);
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  });
+  const [newPlanName, setNewPlanName] = useState("");
+  const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate();
+  const startOffset = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay();
+  const monthLabel = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const planCounts = new Map<string, number>();
+  for (const plan of plans) planCounts.set(plan.date, (planCounts.get(plan.date) ?? 0) + 1);
+  const selectedPlans = plans.filter((plan) => plan.date === selectedDate);
+  const productsById = new Map(products.map((product) => [product.id, product]));
+  const selectedDayEstimate = selectedPlans.reduce((total, plan) => total + plan.ingredients.reduce((planTotal, ingredient) =>
+    planTotal + ingredient.quantity * (productsById.get(ingredient.productId)?.estimatedPrice ?? ingredient.unitPrice), 0), 0);
+
+  function changeMonth(offset: number) {
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1);
+    setVisibleMonth(nextMonth);
+    setSelectedDate(`${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}-01`);
+  }
+
+  function selectCalendarDate(day: number) {
+    const date = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    setSelectedDate(date);
+  }
+
+  function addPlan(event: FormEvent) {
+    event.preventDefault();
+    const name = newPlanName.trim();
+    if (!name) return;
+    onSavePlan({ name, date: selectedDate, status: "Planned", ingredients: [], notes: "" });
+    setNewPlanName("");
+  }
+
+  return <section className="cooking-planner-section">
+    <div className="devotional-section-head"><div><h2><CalendarDays size={15} /> Cooking plan</h2><p>Choose a day, add planned items, and estimate ingredient costs from Master data.</p></div></div>
+    <div className="cooking-planner">
+      <Card className="cooking-calendar">
+        <div className="cooking-calendar-head"><Button type="button" variant="outline" size="sm" aria-label="Previous month" onClick={() => changeMonth(-1)}><ChevronRight size={14} style={{ transform: "rotate(180deg)" }} /></Button><strong>{monthLabel}</strong><Button type="button" variant="outline" size="sm" aria-label="Next month" onClick={() => changeMonth(1)}><ChevronRight size={14} /></Button></div>
+        <div className="cooking-calendar-grid">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span className="cooking-calendar-weekday" key={day}>{day}</span>)}
+          {Array.from({ length: startOffset }, (_, index) => <span className="cooking-calendar-blank" key={`blank-${index}`} />)}
+          {Array.from({ length: daysInMonth }, (_, index) => {
+            const day = index + 1;
+            const date = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            const count = planCounts.get(date) ?? 0;
+            return <button type="button" key={date} className={`cooking-calendar-day${date === selectedDate ? " selected" : ""}${date === today() ? " today" : ""}`} aria-pressed={date === selectedDate} onClick={() => selectCalendarDate(day)}><span>{day}</span>{count > 0 && <small>{count} plan{count === 1 ? "" : "s"}</small>}</button>;
+          })}
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={() => { const date = today(); setSelectedDate(date); setVisibleMonth(new Date(new Date(`${date}T12:00:00`).getFullYear(), new Date(`${date}T12:00:00`).getMonth(), 1)); }}>Today</Button>
+      </Card>
+      <div className="cooking-plans-for-day">
+        <div className="cooking-day-heading"><div><h3>{dateLabel(selectedDate)}</h3><span>{selectedPlans.length} planned {selectedPlans.length === 1 ? "item" : "items"} · estimated total {formatCurrency(selectedDayEstimate)}</span></div></div>
+        <form className="cooking-plan-add" onSubmit={addPlan}><Input aria-label="New planned dish or meal" maxLength={160} placeholder="Plan a curry, biryani, tiffin, coffee..." value={newPlanName} onChange={(event) => setNewPlanName(event.target.value)} /><Button type="submit" disabled={!newPlanName.trim()}><Plus size={14} /> Add plan</Button></form>
+        {selectedPlans.length ? <div className="cooking-plan-list">{selectedPlans.map((plan) => <CookingPlanCard key={plan.id} plan={plan} products={products} logs={logs} onSave={(updated) => onSavePlan(updated, updated.id)} onCopy={onCopyPlan} onDelete={onDeletePlan} onSaveLog={onSaveLog} />)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title="Nothing planned for this day" description="Add a dish or drink above. Ingredients are optional." /></Card>}
+      </div>
+    </div>
+  </section>;
+}
+
+function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRecipe, onSaveLog, onDeleteLog, onSavePlan, onCopyPlan, onDeletePlan }: {
   recipes: CookingRecipe[];
   logs: CookingLog[];
+  plans: CookingPlan[];
+  products: Product[];
   onSaveRecipe: (recipe: Omit<CookingRecipe, "id">, id?: string) => void;
   onDeleteRecipe: (recipe: CookingRecipe) => void;
   onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
   onDeleteLog: (log: CookingLog) => void;
+  onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
+  onCopyPlan: (plan: CookingPlan) => void;
+  onDeletePlan: (plan: CookingPlan) => void;
 }) {
   const [recipeEditor, setRecipeEditor] = useState<CookingRecipe | null | undefined>(undefined);
   const [logEditor, setLogEditor] = useState<CookingLog | null | undefined>(undefined);
@@ -4929,10 +5106,12 @@ function CookingPage({ recipes, logs, onSaveRecipe, onDeleteRecipe, onSaveLog, o
     <PageHeading eyebrow="Kitchen journal" title="Cooking" subtitle="Keep your recipes and prepared items together, then record what you make and learn each day." action={<Button onClick={() => setRecipeEditor(null)}><Plus size={15} /> Add recipe / item</Button>} />
     <div className="cooking-summary">
       <Card><span>Saved recipes and items</span><strong>{recipes.length}</strong></Card>
+      <Card><span>Planned meals</span><strong>{plans.length}</strong></Card>
       <Card><span>Daily cooking logs</span><strong>{logs.length}</strong></Card>
       <Card><span>Logs today</span><strong>{todayCount}</strong></Card>
     </div>
     <div className="alert"><Utensils size={15} style={{ flex: "none", marginTop: 1 }} /><span>Nutrition, vitamin, and health-benefit fields are your own notes, not verified nutritional data or medical advice.</span></div>
+    <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={onSaveLog} />
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search cooking recipes and logs" placeholder="Search recipes, ingredients, cuisine, or journal..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
     <div className="cooking-columns">
       <section className="cooking-section"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div><Button variant="outline" onClick={() => setRecipeEditor(null)}><Plus size={13} /> Add</Button></div>
@@ -6340,6 +6519,7 @@ function emptyTrackerData(): TrackerData {
     educationPlans: [],
     cookingRecipes: [],
     cookingLogs: [],
+    cookingPlans: [],
     issueRecords: [],
     personalEducation: [],
     professionalQualifications: [],
@@ -7350,6 +7530,25 @@ export default function App() {
       cookingLogs: (previous.cookingLogs ?? []).filter((current) => current.id !== log.id),
     }));
   }
+  function saveCookingPlan(plan: Omit<CookingPlan, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      cookingPlans: id
+        ? (previous.cookingPlans ?? []).map((current) => current.id === id ? { ...plan, id } : current)
+        : [{ ...plan, id: createId() }, ...(previous.cookingPlans ?? [])],
+    }));
+  }
+  function copyCookingPlan(plan: CookingPlan) {
+    const { id, ...copy } = plan;
+    void id;
+    saveCookingPlan({ ...copy, status: "Planned", ingredients: copy.ingredients.map((ingredient) => ({ ...ingredient, id: createId() })) });
+  }
+  function deleteCookingPlan(plan: CookingPlan) {
+    update((previous) => ({
+      ...withArchivedRecord(previous, `Cooking plan: ${plan.name} · ${plan.date}`, { cookingPlans: [plan] }),
+      cookingPlans: (previous.cookingPlans ?? []).filter((current) => current.id !== plan.id),
+    }));
+  }
   function saveIssueRecord(record: Omit<IssueRecord, "id">, id?: string) {
     update((previous) => ({
       ...previous,
@@ -7708,7 +7907,7 @@ export default function App() {
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
-    Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} />,
+    Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} plans={data.cookingPlans ?? []} products={data.products ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} onSavePlan={saveCookingPlan} onCopyPlan={copyCookingPlan} onDeletePlan={deleteCookingPlan} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,

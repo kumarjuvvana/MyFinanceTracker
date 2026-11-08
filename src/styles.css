@@ -1413,3 +1413,71 @@ body{background:#f3f5ef}
 .app-shell.dark .capacity-track{background:#343d35}
 @media(max-width:900px){.hosting-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.hosting-usage-grid{grid-template-columns:1fr;gap:9px}.capacity-card{padding:15px}}
+
+.cooking-planner-section{display:grid;gap:12px;margin:18px 0 22px}
+.cooking-planner-section>.devotional-section-head h2{display:flex;align-items:center;gap:7px;margin:0;font:700 13px Manrope,sans-serif;color:#3d493e}
+.cooking-planner-section>.devotional-section-head h2 svg{color:#648568}
+.cooking-planner-section>.devotional-section-head p{margin:4px 0 0;font-size:10px;color:#92998f}
+.cooking-planner{display:grid;grid-template-columns:minmax(260px,.78fr) minmax(0,1.35fr);gap:14px;align-items:start}
+.cooking-calendar{display:grid;gap:12px;padding:14px}
+.cooking-calendar-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cooking-calendar-head>strong{font:700 13px Manrope,sans-serif;color:#414a42}
+.cooking-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cooking-calendar-weekday{padding:4px 0;text-align:center;color:#92998f;font-size:9px;font-weight:700}
+.cooking-calendar-blank{min-height:44px}
+.cooking-calendar-day{display:grid;align-content:start;justify-items:center;gap:3px;min-width:0;min-height:46px;padding:6px 2px;border:1px solid transparent;border-radius:8px;background:transparent;color:#4b554b;font:500 11px Manrope,sans-serif;cursor:pointer}
+.cooking-calendar-day:hover{background:#f1f5ef}
+.cooking-calendar-day.today{border-color:#dbe7db}
+.cooking-calendar-day.selected{background:#e8f1e8;border-color:#aac5ad;color:#315b39;font-weight:700}
+.cooking-calendar-day small{color:#68846a;font-size:8px;line-height:1.1}
+.cooking-plans-for-day{display:grid;gap:10px;min-width:0}
+.cooking-day-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cooking-day-heading h3{margin:0;color:#3d493e;font:700 13px Manrope,sans-serif}
+.cooking-day-heading span{color:#92998f;font-size:10px}
+.cooking-plan-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.cooking-plan-list{display:grid;gap:8px}
+.cooking-plan-card{min-width:0;padding:12px}
+.cooking-plan-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px}
+.cooking-plan-main{display:grid;gap:4px;min-width:0}
+.cooking-plan-main strong{color:#414a42;font-size:12px;overflow-wrap:anywhere}
+.cooking-plan-main span{color:#92998f;font-size:10px}
+.cooking-plan-row>.field{width:auto;min-width:104px}
+.cooking-plan-row>.table-actions{gap:2px}
+.cooking-plan-details{display:grid;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #eef0ec}
+.cooking-plan-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cooking-plan-ingredients{display:grid;gap:8px}
+.cooking-plan-ingredient-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cooking-plan-ingredient-head strong{font-size:11px;color:#414a42}
+.cooking-plan-ingredient-head span{font-size:9px;color:#92998f}
+.cooking-plan-ingredient{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(65px,.45fr) auto auto;align-items:center;gap:7px}
+.cooking-plan-ingredient .field{min-width:0}
+.cooking-plan-ingredient-cost{color:#707a70;font-size:10px;white-space:nowrap}
+.cooking-add-ingredient{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:2px}
+.cooking-plan-details>.field-wrap{min-width:0}
+.cooking-plan-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cooking-plan-footer>strong{color:#3e6747;font:700 12px Manrope,sans-serif}
+.app-shell.dark .cooking-planner-section>.devotional-section-head h2,.app-shell.dark .cooking-calendar-head>strong,.app-shell.dark .cooking-day-heading h3,.app-shell.dark .cooking-plan-main strong,.app-shell.dark .cooking-plan-ingredient-head strong{color:#e3e8e2}
+.app-shell.dark .cooking-planner-section>.devotional-section-head p,.app-shell.dark .cooking-day-heading span,.app-shell.dark .cooking-plan-main span,.app-shell.dark .cooking-calendar-weekday,.app-shell.dark .cooking-plan-ingredient-head span,.app-shell.dark .cooking-plan-ingredient-cost{color:#a7b0a7}
+.app-shell.dark .cooking-calendar-day{color:#d4ddd4}
+.app-shell.dark .cooking-calendar-day:hover{background:#26352a}
+.app-shell.dark .cooking-calendar-day.today{border-color:#465647}
+.app-shell.dark .cooking-calendar-day.selected{background:#2b3d30;border-color:#58775d;color:#d4e5d4}
+.app-shell.dark .cooking-calendar-day small{color:#a6c1a8}
+.app-shell.dark .cooking-plan-details{border-color:#343d35}
+.app-shell.dark .cooking-plan-footer>strong{color:#a6c1a8}
+@media(max-width:850px){.cooking-planner{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){
+  .cooking-planner{gap:10px}
+  .cooking-calendar{padding:11px}
+  .cooking-calendar-day,.cooking-calendar-blank{min-height:38px}
+  .cooking-plan-add,.cooking-add-ingredient{grid-template-columns:minmax(0,1fr)}
+  .cooking-plan-row{grid-template-columns:minmax(0,1fr) auto;gap:6px}
+  .cooking-plan-row>.field{grid-column:1;grid-row:2;width:100%}
+  .cooking-plan-row>.table-actions{grid-column:2;grid-row:1}
+  .cooking-plan-edit-fields{grid-template-columns:minmax(0,1fr)}
+  .cooking-plan-ingredient{grid-template-columns:minmax(0,1fr) minmax(65px,.4fr) auto;gap:5px}
+  .cooking-plan-ingredient-cost{grid-column:1 / 3}
+  .cooking-plan-ingredient>.icon-button{grid-column:3;grid-row:1}
+  .cooking-plan-ingredient-head{align-items:flex-start;flex-direction:column;gap:3px}
+  .cooking-plan-footer{align-items:flex-start;flex-direction:column}
+}

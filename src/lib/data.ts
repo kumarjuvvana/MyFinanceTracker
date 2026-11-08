@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FAVORITABLE_PAGES, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -519,6 +519,20 @@ export function validateData(value: unknown): value is TrackerData {
         typeof dish.name === "string" && dish.name.trim().length > 0) &&
       (entry.rating === null || (typeof entry.rating === "number" && Number.isInteger(entry.rating) && entry.rating >= 1 && entry.rating <= 5)) &&
       typeof entry.learning === "string" && typeof entry.notes === "string"));
+  const cookingPlansOk = value.cookingPlans === undefined ||
+    (Array.isArray(value.cookingPlans) && value.cookingPlans.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.name === "string" && entry.name.trim().length > 0 && entry.name.length <= 160 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      (entry.status === "Planned" || entry.status === "In progress" || entry.status === "Cooked" || entry.status === "Skipped") &&
+      Array.isArray(entry.ingredients) && entry.ingredients.every((ingredient) =>
+        isRecord(ingredient) && typeof ingredient.id === "string" && ingredient.id.length > 0 &&
+        typeof ingredient.productId === "string" && ingredient.productId.length > 0 &&
+        typeof ingredient.productName === "string" && ingredient.productName.trim().length > 0 &&
+        typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0 &&
+        typeof ingredient.unit === "string" && ingredient.unit.length > 0 &&
+        typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0) &&
+      typeof entry.notes === "string"));
   const issueRecordsOk = value.issueRecords === undefined ||
     (Array.isArray(value.issueRecords) && value.issueRecords.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -645,7 +659,7 @@ export function validateData(value: unknown): value is TrackerData {
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings", "subscriptions",
-    "devotionalEntries", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
+    "devotionalEntries", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
   ];
@@ -691,7 +705,7 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !studentProfilesOk || !educationPlansOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
-    !devotionalEntriesOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
+    !devotionalEntriesOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
     !archivedRecordsOk ||
     !credentialVaultOk) return false;
@@ -705,6 +719,10 @@ export function validateData(value: unknown): value is TrackerData {
     new Set((value.studentProfiles as StudentProfile[]).map((profile) => profile.id)).size !== value.studentProfiles.length) return false;
   if (Array.isArray(value.educationPlans) &&
     new Set((value.educationPlans as StudentEducationPlan[]).map((plan) => plan.id)).size !== value.educationPlans.length) return false;
+  if (Array.isArray(value.cookingPlans) &&
+    (new Set((value.cookingPlans as CookingPlan[]).map((plan) => plan.id)).size !== value.cookingPlans.length ||
+      new Set((value.cookingPlans as CookingPlan[]).flatMap((plan) => plan.ingredients.map((ingredient) => ingredient.id))).size !==
+        (value.cookingPlans as CookingPlan[]).reduce((count, plan) => count + plan.ingredients.length, 0))) return false;
   if (Array.isArray(value.educationPlans)) {
     const profileIds = new Set((Array.isArray(value.studentProfiles) ? value.studentProfiles : [])
       .filter(isRecord)
@@ -853,6 +871,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     prayerRequests: data.prayerRequests ?? [],
     cookingRecipes: data.cookingRecipes ?? [],
     cookingLogs: data.cookingLogs ?? [],
+    cookingPlans: data.cookingPlans ?? [],
     issueRecords: data.issueRecords ?? [],
     personalEducation: data.personalEducation ?? [],
     professionalQualifications: data.professionalQualifications ?? [],

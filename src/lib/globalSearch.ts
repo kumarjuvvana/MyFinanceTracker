@@ -41,6 +41,7 @@ const collections: { key: keyof TrackerData; label: string; page: Page; titles: 
   { key: "prayerRequests", label: "Prayer requests", page: "Devotional", titles: ["title"] },
   { key: "cookingRecipes", label: "Cooking recipes", page: "Cooking", titles: ["name"] },
   { key: "cookingLogs", label: "Cooking logs", page: "Cooking", titles: ["occasion", "date"] },
+  { key: "cookingPlans", label: "Cooking plans", page: "Cooking", titles: ["name", "date", "status"] },
   { key: "issueRecords", label: "Issues & maintenance", page: "Issues & maintenance", titles: ["title"] },
   { key: "personalEducation", label: "Education & career", page: "Education & career", titles: ["qualification", "institution"] },
   { key: "professionalQualifications", label: "Professional qualifications", page: "Education & career", titles: ["name"] },

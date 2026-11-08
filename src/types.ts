@@ -572,6 +572,26 @@ export interface CookingLog {
   notes: string;
 }
 
+export type CookingPlanStatus = "Planned" | "In progress" | "Cooked" | "Skipped";
+
+export interface CookingPlanIngredient {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+}
+
+export interface CookingPlan {
+  id: string;
+  name: string;
+  date: string;
+  status: CookingPlanStatus;
+  ingredients: CookingPlanIngredient[];
+  notes: string;
+}
+
 export type IssueArea = "Personal" | "Professional" | "Home" | "Vehicle" | "Other";
 export type IssueKind = "Issue" | "Repair" | "Maintenance" | "Task";
 export type IssueStatus = "Open" | "In progress" | "Waiting" | "Resolved" | "Closed";
@@ -766,6 +786,7 @@ export interface TrackerData {
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];
   cookingLogs?: CookingLog[];
+  cookingPlans?: CookingPlan[];
   issueRecords?: IssueRecord[];
   personalEducation?: PersonalEducationRecord[];
   professionalQualifications?: ProfessionalQualification[];
