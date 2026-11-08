@@ -798,6 +798,38 @@ body{background:#f3f5ef}
 .app-shell.dark .devotional-resource-card h3{color:#e3e8e2}
 .app-shell.dark .devotional-resource-card p{color:#a7b0a7}
 .app-shell.dark .devotional-resource-link{color:#a6c1a8}
+.devotional-progress{display:grid;gap:14px}
+.devotional-progress-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:10px}
+.devotional-progress-summary .card{display:grid;gap:6px;padding:13px}
+.devotional-progress-summary span,.devotional-streak-summary span{font-size:10px;color:#92998f}
+.devotional-progress-summary strong,.devotional-streak-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
+.devotional-calendar{display:grid;gap:12px;padding:14px}
+.devotional-calendar-head,.devotional-month-controls{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.devotional-month-controls{justify-content:flex-start}
+.devotional-month-controls>strong{min-width:145px;text-align:center;font:700 13px Manrope,sans-serif;color:#414a42}
+.devotional-streak-toggle{display:flex;align-items:center;gap:6px;color:#667066;font-size:10px;cursor:pointer}
+.devotional-streak-toggle input{accent-color:var(--user-accent,#56815d)}
+.devotional-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.devotional-calendar-weekday{padding:5px 0;text-align:center;color:#92998f;font-size:9px;font-weight:700}
+.devotional-calendar-blank{min-height:64px}
+.devotional-calendar-day{display:grid;align-content:start;justify-items:center;gap:4px;min-width:0;min-height:64px;padding:8px 2px;border:1px solid transparent;border-radius:8px;background:transparent;color:#4b554b;font:500 11px Manrope,sans-serif;cursor:pointer}
+.devotional-calendar-day:hover{background:#f1f5ef}
+.devotional-calendar-day.today{border-color:#dbe7db}
+.devotional-calendar-day.selected{background:#e8f1e8;border-color:#aac5ad;color:#315b39;font-weight:700}
+.devotional-calendar-day.has-reading>span{font-weight:700}
+.devotional-calendar-day small{max-width:100%;color:#68846a;font-size:8px;line-height:1.15;text-align:center;overflow-wrap:anywhere}
+.devotional-streak-summary{display:flex;flex-wrap:wrap;gap:24px;padding-top:10px;border-top:1px solid #eef0ec}
+.devotional-streak-summary>div{display:grid;gap:4px}
+.devotional-progress-day{display:grid;gap:10px}
+.devotional-progress-day>.devotional-list{margin-top:0}
+.app-shell.dark .devotional-progress-summary strong,.app-shell.dark .devotional-month-controls>strong,.app-shell.dark .devotional-streak-summary strong{color:#e3e8e2}
+.app-shell.dark .devotional-progress-summary span,.app-shell.dark .devotional-streak-toggle,.app-shell.dark .devotional-streak-summary span{color:#a7b0a7}
+.app-shell.dark .devotional-calendar-day{color:#d3d9d2}
+.app-shell.dark .devotional-calendar-day:hover{background:#29352b}
+.app-shell.dark .devotional-calendar-day.today{border-color:#526753}
+.app-shell.dark .devotional-calendar-day.selected{background:#304433;border-color:#607c62;color:#e3e8e2}
+.app-shell.dark .devotional-calendar-day small{color:#a6c1a8}
+.app-shell.dark .devotional-streak-summary{border-color:#343d35}
 .cooking-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
 .cooking-summary .card{display:grid;gap:6px;padding:14px}
 .cooking-summary span{font-size:10px;color:#92998f}
@@ -1107,6 +1139,12 @@ body{background:#f3f5ef}
   .devotional-columns{grid-template-columns:minmax(0,1fr)}
   .devotional-section-head{align-items:flex-start}
   .devotional-card{padding:12px}
+  .devotional-calendar{padding:10px}
+  .devotional-calendar-grid{gap:2px}
+  .devotional-calendar-blank{min-height:52px}
+  .devotional-calendar-day{min-height:52px;padding:6px 1px}
+  .devotional-calendar-day small{font-size:7px}
+  .devotional-calendar-head{align-items:flex-start;flex-wrap:wrap}
   .cooking-columns{grid-template-columns:minmax(0,1fr)}
   .cooking-card{padding:12px}
   .cooking-add-dish{align-items:stretch}

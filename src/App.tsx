@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2,
-  ChevronRight, ClipboardList, Clock3, Database, Download,
+  ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
@@ -4595,12 +4595,13 @@ function DevotionalEntryModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function DailyBibleReadingModal({ initial, onClose, onSave }: {
+function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
   initial: DailyBibleReading | null;
+  initialDate?: string;
   onClose: () => void;
   onSave: (reading: Omit<DailyBibleReading, "id">) => void;
 }) {
-  const [date, setDate] = useState(initial?.date ?? today());
+  const [date, setDate] = useState(initial?.date ?? initialDate ?? today());
   const [fromTestament, setFromTestament] = useState<DailyBibleReading["fromTestament"]>(initial?.fromTestament ?? "Old Testament");
   const [fromBook, setFromBook] = useState(initial?.fromBook ?? "Genesis");
   const [fromChapterName, setFromChapterName] = useState(initial?.fromChapterName ?? "");
@@ -4837,7 +4838,11 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
   onSaveRequest: (request: Omit<PrayerRequest, "id">, id?: string) => void;
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources">("readings");
+  const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "progress">("readings");
+  const [progressMonth, setProgressMonth] = useState(() => monthKey(today()));
+  const [selectedProgressDate, setSelectedProgressDate] = useState("");
+  const [showReadingStreak, setShowReadingStreak] = useState(false);
+  const [readingEditorDate, setReadingEditorDate] = useState(today());
   const [entryEditor, setEntryEditor] = useState<DevotionalEntry | null | undefined>(undefined);
   const [readingEditor, setReadingEditor] = useState<DailyBibleReading | null | undefined>(undefined);
   const [resourceEditor, setResourceEditor] = useState<DevotionalResource | null | undefined>(undefined);
@@ -4863,13 +4868,67 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
     .sort((a, b) => a.title.localeCompare(b.title));
   const ongoingCount = requests.filter((request) => request.status === "Ongoing").length;
   const answeredCount = requests.filter((request) => request.status === "Answered").length;
-  const activeSectionAction = activeTab === "readings"
-    ? <Button onClick={() => setReadingEditor(null)}><Plus size={15} /> Add reading</Button>
+  const progressReadingDays = new Map<string, number>();
+  for (const reading of readings) {
+    progressReadingDays.set(reading.date, (progressReadingDays.get(reading.date) ?? 0) + 1);
+  }
+  const [progressYearText, progressMonthText] = progressMonth.split("-");
+  const progressYear = Number(progressYearText);
+  const progressMonthIndex = Number(progressMonthText) - 1;
+  const progressMonthStart = new Date(progressYear, progressMonthIndex, 1);
+  const progressMonthDays = new Date(progressYear, progressMonthIndex + 1, 0).getDate();
+  const progressCalendarOffset = (progressMonthStart.getDay() + 6) % 7;
+  const progressCalendarCellCount = Math.ceil((progressCalendarOffset + progressMonthDays) / 7) * 7;
+  const progressMonthReadings = readings.filter((reading) => reading.date.startsWith(`${progressMonth}-`));
+  const progressMonthReadingDays = progressReadingDays.size
+    ? [...progressReadingDays.keys()].filter((date) => date.startsWith(`${progressMonth}-`)).length
+    : 0;
+  const selectedDateReadings = selectedProgressDate
+    ? readings.filter((reading) => reading.date === selectedProgressDate).sort((a, b) => a.fromBook.localeCompare(b.fromBook))
+    : [];
+  const sortedReadingDates = [...progressReadingDays.keys()].sort();
+  const completedReadingDates = sortedReadingDates.filter((date) => date <= today());
+  const latestReadingDate = completedReadingDates[completedReadingDates.length - 1];
+  const yesterday = new Date(`${today()}T00:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const streakEndDate = latestReadingDate && latestReadingDate >= yesterday.toISOString().slice(0, 10) && latestReadingDate <= today()
+    ? latestReadingDate
+    : "";
+  let currentReadingStreak = 0;
+  if (streakEndDate) {
+    const streakDate = new Date(`${streakEndDate}T00:00:00Z`);
+    while (progressReadingDays.has(streakDate.toISOString().slice(0, 10))) {
+      currentReadingStreak += 1;
+      streakDate.setUTCDate(streakDate.getUTCDate() - 1);
+    }
+  }
+  let bestReadingStreak = 0;
+  let runningReadingStreak = 0;
+  let previousReadingDate: Date | null = null;
+  for (const date of completedReadingDates) {
+    const currentDate = new Date(`${date}T00:00:00Z`);
+    const daysSincePrevious = previousReadingDate
+      ? Math.round((currentDate.getTime() - previousReadingDate.getTime()) / 86400000)
+      : 0;
+    runningReadingStreak = daysSincePrevious === 1 ? runningReadingStreak + 1 : 1;
+    bestReadingStreak = Math.max(bestReadingStreak, runningReadingStreak);
+    previousReadingDate = currentDate;
+  }
+  const activeSectionAction = activeTab === "readings" || activeTab === "progress"
+    ? <Button onClick={() => { setReadingEditorDate(activeTab === "progress" && selectedProgressDate ? selectedProgressDate : today()); setReadingEditor(null); }}><Plus size={15} /> Add reading</Button>
     : activeTab === "reflections"
       ? <Button onClick={() => setEntryEditor(null)}><Plus size={15} /> Add Bible reflection</Button>
       : activeTab === "prayers"
         ? <Button onClick={() => setRequestEditor(null)}><Plus size={15} /> Add request</Button>
-        : <Button onClick={() => setResourceEditor(null)}><Plus size={15} /> Add resource</Button>;
+        : activeTab === "resources"
+          ? <Button onClick={() => setResourceEditor(null)}><Plus size={15} /> Add resource</Button>
+          : undefined;
+
+  function changeProgressMonth(offset: number) {
+    const nextMonth = new Date(progressYear, progressMonthIndex + offset, 1);
+    setProgressMonth(`${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedProgressDate("");
+  }
 
   function confirmDeleteEntry(entry: DevotionalEntry) {
     if (window.confirm(`Move the devotional entry for ${entry.scriptureReference} to the archive?`)) onDeleteEntry(entry);
@@ -4892,8 +4951,9 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
       <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><BookOpen size={14} />Bible reflections<Badge>{entries.length}</Badge></Button>
       <Button variant={activeTab === "prayers" ? "primary" : "outline"} aria-pressed={activeTab === "prayers"} onClick={() => setActiveTab("prayers")}><Heart size={14} />Prayer requests<Badge>{requests.length}</Badge></Button>
       <Button variant={activeTab === "resources" ? "primary" : "outline"} aria-pressed={activeTab === "resources"} onClick={() => setActiveTab("resources")}><PlayCircle size={14} />Music & resources<Badge>{resources.length}</Badge></Button>
+      <Button variant={activeTab === "progress" ? "primary" : "outline"} aria-pressed={activeTab === "progress"} onClick={() => setActiveTab("progress")}><CalendarDays size={14} />Reading progress</Button>
     </nav>
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    {activeTab !== "progress" && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
     {activeTab === "readings" && <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div></div>
       {visibleReadings.length ? <div className="devotional-reading-list">{visibleReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
         <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
@@ -4925,8 +4985,49 @@ function DevotionalPage({ entries, readings, resources, requests, onSaveEntry, o
         <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
       </Card>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
     </section>}
+    {activeTab === "progress" && <section className="devotional-progress">
+      <div className="devotional-progress-summary">
+        <Card><span>Readings this month</span><strong>{progressMonthReadings.length}</strong></Card>
+        <Card><span>Days with reading</span><strong>{progressMonthReadingDays}</strong></Card>
+        <Card><span>Total recorded readings</span><strong>{readings.length}</strong></Card>
+      </div>
+      <Card className="devotional-calendar">
+        <div className="devotional-calendar-head">
+          <div className="devotional-month-controls">
+            <button type="button" className="icon-button" aria-label="Previous month" onClick={() => changeProgressMonth(-1)}><ChevronLeft size={15} /></button>
+            <strong>{progressMonthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+            <button type="button" className="icon-button" aria-label="Next month" onClick={() => changeProgressMonth(1)}><ChevronRight size={15} /></button>
+          </div>
+          <label className="devotional-streak-toggle"><input type="checkbox" checked={showReadingStreak} onChange={(event) => setShowReadingStreak(event.target.checked)} />Show reading streak</label>
+        </div>
+            <div className="devotional-calendar-grid" role="group" aria-label="Bible reading calendar dates">
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((weekday) => <span className="devotional-calendar-weekday" key={weekday}>{weekday}</span>)}
+          {Array.from({ length: progressCalendarCellCount }, (_, index) => {
+            const day = index - progressCalendarOffset + 1;
+                if (day < 1 || day > progressMonthDays) return <span className="devotional-calendar-blank" key={`blank-${index}`} />;
+            const date = `${progressMonth}-${String(day).padStart(2, "0")}`;
+            const count = progressReadingDays.get(date) ?? 0;
+            const isToday = date === today();
+            const isSelected = date === selectedProgressDate;
+            return <button type="button" aria-label={`${dateLabel(date)}${count ? `, ${count} ${count === 1 ? "reading" : "readings"}` : ", no readings"}`} aria-pressed={isSelected} className={`devotional-calendar-day${count ? " has-reading" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}`} key={date} onClick={() => setSelectedProgressDate(date)}>
+              <span>{day}</span>{count > 0 && <small>{count} {count === 1 ? "reading" : "readings"}</small>}
+            </button>;
+          })}
+        </div>
+        {showReadingStreak && <div className="devotional-streak-summary"><div><span>Current streak</span><strong>{currentReadingStreak} {currentReadingStreak === 1 ? "day" : "days"}</strong></div><div><span>Best streak</span><strong>{bestReadingStreak} {bestReadingStreak === 1 ? "day" : "days"}</strong></div></div>}
+      </Card>
+      <section className="devotional-progress-day">
+        <div className="devotional-section-head"><div><h2><BookOpen size={15} />{selectedProgressDate ? dateLabel(selectedProgressDate) : "Select a date"}</h2><p>{selectedProgressDate ? `${selectedDateReadings.length} ${selectedDateReadings.length === 1 ? "reading" : "readings"} recorded` : "Choose a calendar day to view its readings."}</p></div>{selectedProgressDate && <Button size="sm" variant="outline" onClick={() => { setReadingEditorDate(selectedProgressDate); setReadingEditor(null); }}><Plus size={13} />Add reading</Button>}</div>
+        {selectedProgressDate && (selectedDateReadings.length
+          ? <div className="devotional-list">{selectedDateReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
+            <div className="devotional-card-head"><div><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament} → {reading.toTestament}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><button type="button" className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button></div>
+            {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
+          </Card>)}</div>
+          : <Card><EmptyState icon={<BookOpen size={18} />} title="No readings on this date" description="Add a reading to include it in your progress calendar." /></Card>)}
+      </section>
+    </section>}
     {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
-    {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
+    {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} initialDate={readingEditorDate} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
     {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
     {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
