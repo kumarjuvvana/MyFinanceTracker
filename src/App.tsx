@@ -16,6 +16,7 @@ import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDataba
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import type { StudentProfile } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -1733,8 +1734,9 @@ function inferPaymentFeeType(period: string): EducationFeeType {
   return "Tuition";
 }
 
-const emptyEducationRecord = (): Omit<EducationRecord, "id"> => ({
-  studentName: "",
+const emptyEducationRecord = (studentName = "", studentProfileId?: string): Omit<EducationRecord, "id"> => ({
+  studentProfileId,
+  studentName,
   institution: "",
   level: "Primary (Grades 1–5)",
   gradeCourse: "",
@@ -1757,13 +1759,15 @@ const emptyEducationRecord = (): Omit<EducationRecord, "id"> => ({
   notes: "",
 });
 
-function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
+function EducationRecordModal({ initial, initialStudentName = "", initialStudentProfileId, copyMode = false, onClose, onSave }: {
   initial: EducationRecord | null;
+  initialStudentName?: string;
+  initialStudentProfileId?: string;
   copyMode?: boolean;
   onClose: () => void;
   onSave: (record: Omit<EducationRecord, "id">) => void;
 }) {
-  const [record, setRecord] = useState<Omit<EducationRecord, "id">>(initial ?? emptyEducationRecord());
+  const [record, setRecord] = useState<Omit<EducationRecord, "id">>(initial ?? emptyEducationRecord(initialStudentName, initialStudentProfileId));
   const [annualFee, setAnnualFee] = useState(initial?.annualFee == null ? "" : String(initial.annualFee));
   const [admissionFee, setAdmissionFee] = useState(initial?.admissionFee == null ? "" : String(initial.admissionFee));
   const [schoolVanFee, setSchoolVanFee] = useState(initial?.schoolVanFee == null ? "" : String(initial.schoolVanFee));
@@ -1870,6 +1874,7 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       contact: record.contact.trim(),
       link: record.link.trim(),
       notes: record.notes.trim(),
+      idCardImageStoragePath: record.idCardImageStoragePath ?? "",
       reportSummary,
     });
   }
@@ -1895,6 +1900,7 @@ function EducationRecordModal({ initial, copyMode = false, onClose, onSave }: {
       <Field label="Previously paid fee (legacy)"><Input type="number" min="0" step="0.01" placeholder="Optional; avoid duplicate entries" value={paidFee} onChange={(event) => setPaidFee(event.target.value)} /></Field>
       <Field label="School contact name"><Input maxLength={120} placeholder="Optional" value={record.contactName} onChange={(event) => setRecord((current) => ({ ...current, contactName: event.target.value }))} /></Field>
       <Field label="Contact details"><Input maxLength={160} placeholder="Optional phone or email" value={record.contact} onChange={(event) => setRecord((current) => ({ ...current, contact: event.target.value }))} /></Field>
+      <PrivateImageField label="Student ID card image (optional)" storagePath={record.idCardImageStoragePath ?? ""} onChange={(idCardImageStoragePath) => setRecord((current) => ({ ...current, idCardImageStoragePath }))} />
       <div className="full"><h3>Official report summary (optional)</h3><p className="section-description">Enter the overall figures as printed; they are kept separate from subject results.</p></div>
       <Field label="Total marks obtained"><Input type="number" min="0" step="any" value={summaryMarks} onChange={(event) => setSummaryMarks(event.target.value)} /></Field>
       <Field label="Total maximum marks"><Input type="number" min="0.01" step="any" value={summaryMaximum} onChange={(event) => setSummaryMaximum(event.target.value)} /></Field>
@@ -2372,6 +2378,7 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
       {(totalDue !== null || totalPaid > 0) && <div><span>{remainingOwing !== null && remainingOwing < 0 ? "Overpaid (total fees)" : "Remaining total fees"}</span><strong>{totalDue === null ? "Add fee amounts to calculate" : formatAmount(Math.abs(remainingOwing ?? balance ?? 0))}</strong></div>}
       {record.contactName && <div><span>School contact</span><strong>{record.contactName}</strong></div>}
       {record.contact && <div><span>Contact details</span><strong>{record.contact}</strong></div>}
+      {record.idCardImageStoragePath && <div className="education-id-card-preview"><span>Student ID card</span><a href={`/api/documents?path=${encodeURIComponent(record.idCardImageStoragePath)}`} target="_blank" rel="noopener noreferrer"><img src={`/api/documents?path=${encodeURIComponent(record.idCardImageStoragePath)}`} alt={`${record.studentName} ${record.academicYear} ID card`} />View ID-card image</a></div>}
       {record.reportSummary && <>
         {record.reportSummary.totalMarksObtained !== null && record.reportSummary.totalMaximumMarks !== null && <div><span>Official total</span><strong>{record.reportSummary.totalMarksObtained} / {record.reportSummary.totalMaximumMarks}</strong></div>}
         {record.reportSummary.percentage !== null && <div><span>Official percentage</span><strong>{record.reportSummary.percentage}%</strong></div>}
@@ -2635,26 +2642,173 @@ function EducationRecordCard({ record, onEdit, onCopy, onDelete, onUpdate }: {
   </Card>;
 }
 
-function EducationRecordsPage({ records, onSave, onDelete }: {
+function PrivateImageField({ label, storagePath, onChange }: {
+  label: string;
+  storagePath: string;
+  onChange: (path: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function upload(file?: File) {
+    if (!file) return;
+    const fileType = getDocumentFileType(file.name);
+    if (!fileType?.contentType.startsWith("image/")) {
+      setError("Choose a PNG, JPG, JPEG, or WEBP image.");
+      return;
+    }
+    if (file.size > MAX_DOCUMENT_FILE_BYTES) {
+      setError("Choose an image no larger than 10 MB.");
+      return;
+    }
+    setError("");
+    setUploading(true);
+    try {
+      const uploaded = await uploadDocumentFile(file);
+      onChange(uploaded.storagePath);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The image could not be uploaded.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return <Field className="full" label={label}>
+    {storagePath && <img className="student-image-preview" src={`/api/documents?path=${encodeURIComponent(storagePath)}`} alt={label} />}
+    <div className="student-image-actions">
+      <Input type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" disabled={uploading} aria-label={label} onChange={(event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        void upload(file);
+      }} />
+      {storagePath && <Button type="button" variant="outline" disabled={uploading} onClick={() => onChange("")}>Remove image</Button>}
+      {uploading && <LoaderCircle size={15} className="spin" aria-label="Uploading image" />}
+    </div>
+    <small className="section-description">Private Supabase storage · PNG, JPG, or WEBP · up to 10 MB.</small>
+    {error && <span className="field-error" role="alert">{error}</span>}
+  </Field>;
+}
+
+function StudentProfileModal({ initial, onClose, onSave }: {
+  initial: StudentProfile | null;
+  onClose: () => void;
+  onSave: (profile: Omit<StudentProfile, "id">) => void;
+}) {
+  const [profile, setProfile] = useState<Omit<StudentProfile, "id">>(initial ?? {
+    name: "", dateOfBirth: "", fatherName: "", motherName: "", bloodGroup: "",
+    contactNumber: "", address: "", photoStoragePath: "", interests: [],
+  });
+  const [interestDraft, setInterestDraft] = useState("");
+  const [error, setError] = useState("");
+
+  function addInterest() {
+    const value = interestDraft.trim();
+    if (!value) return;
+    if (value.length > 80) {
+      setError("Each hobby or interest must be 80 characters or fewer.");
+      return;
+    }
+    if (!profile.interests.some((interest) => interest.toLocaleLowerCase() === value.toLocaleLowerCase())) {
+      setProfile((current) => ({ ...current, interests: [...current.interests, value] }));
+    }
+    setInterestDraft("");
+    setError("");
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile.name.trim()) {
+      setError("Enter the student's name.");
+      return;
+    }
+    onSave({ ...profile, name: profile.name.trim(), interests: profile.interests.map((interest) => interest.trim()).filter(Boolean) });
+  }
+
+  return <Modal title={initial ? "Edit student profile" : "Add student profile"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Student name (required)"><Input autoFocus required maxLength={120} value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /></Field>
+      <Field label="Date of birth"><DateInput value={profile.dateOfBirth} onValueChange={(dateOfBirth) => setProfile((current) => ({ ...current, dateOfBirth }))} /></Field>
+      <Field label="Father's name"><Input maxLength={120} value={profile.fatherName} onChange={(event) => setProfile((current) => ({ ...current, fatherName: event.target.value }))} /></Field>
+      <Field label="Mother's name"><Input maxLength={120} value={profile.motherName} onChange={(event) => setProfile((current) => ({ ...current, motherName: event.target.value }))} /></Field>
+      <Field label="Blood group"><Select value={profile.bloodGroup} onChange={(event) => setProfile((current) => ({ ...current, bloodGroup: event.target.value }))}><option value="">Not provided</option>{["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((group) => <option key={group}>{group}</option>)}</Select></Field>
+      <Field label="Contact number"><Input maxLength={40} value={profile.contactNumber} onChange={(event) => setProfile((current) => ({ ...current, contactNumber: event.target.value }))} /></Field>
+      <Field className="full" label="Address"><Input maxLength={1000} value={profile.address} onChange={(event) => setProfile((current) => ({ ...current, address: event.target.value }))} /></Field>
+      <PrivateImageField label="Profile photo (optional)" storagePath={profile.photoStoragePath} onChange={(photoStoragePath) => setProfile((current) => ({ ...current, photoStoragePath }))} />
+      <div className="full">
+        <Field label="Hobbies & interests"><div className="student-interest-editor">
+          <Input maxLength={80} placeholder="Add a hobby or interest" value={interestDraft} onChange={(event) => setInterestDraft(event.target.value)} onKeyDown={(event) => {
+            if (event.key === "Enter") { event.preventDefault(); addInterest(); }
+          }} />
+          <Button type="button" variant="outline" onClick={addInterest}><Plus size={14} />Add</Button>
+        </div></Field>
+        <div className="student-interest-list">{profile.interests.map((interest) => <Badge key={interest}>{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => setProfile((current) => ({ ...current, interests: current.interests.filter((item) => item !== interest) }))}><X size={12} /></button></Badge>)}</div>
+      </div>
+    </div>
+    <p className="section-description">Student and family information is sensitive. Only enter details you need to keep in this private, shared account.</p>
+    {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save profile" : "Add student"}</Button></div></form>
+  </Modal>;
+}
+
+function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
+  const [value, setValue] = useState("");
+  return <form className="student-interest-editor" onSubmit={(event) => {
+    event.preventDefault();
+    const interest = value.trim();
+    if (!interest || interest.length > 80) return;
+    onAdd(interest);
+    setValue("");
+  }}>
+    <Input aria-label="Add hobby or interest" maxLength={80} placeholder="Add a hobby or interest" value={value} onChange={(event) => setValue(event.target.value)} />
+    <Button type="submit" variant="outline" disabled={!value.trim()}><Plus size={14} />Add</Button>
+  </form>;
+}
+
+function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfile }: {
   records: EducationRecord[];
+  profiles: StudentProfile[];
   onSave: (record: Omit<EducationRecord, "id">, id?: string) => void;
   onDelete: (record: EducationRecord) => void;
+  onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => void;
 }) {
   const [editor, setEditor] = useState<{
     record: EducationRecord | null;
     mode: "new" | "edit" | "copy";
   } | null>(null);
+  const [profileEditor, setProfileEditor] = useState<{ profile: StudentProfile | null; existingId?: string; previousName?: string } | null>(null);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("All levels");
   const [gradeFilter, setGradeFilter] = useState("All classes / grades");
   const [statusFilter, setStatusFilter] = useState("All statuses");
-  const [selectedStudent, setSelectedStudent] = useState("All students");
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests">("overview");
   const [sortBy, setSortBy] = useState("student-year");
-  const students = [...new Set(records.map((record) => record.studentName.trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b));
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   const query = search.trim().toLocaleLowerCase();
+  const normalizeStudentName = (name: string) => name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+  const studentEntries: { key: string; name: string; profile: StudentProfile | null; records: EducationRecord[] }[] = profiles.map((profile) => ({
+    key: `profile:${profile.id}`,
+    name: profile.name,
+    profile,
+    records: records.filter((record) => record.studentProfileId === profile.id ||
+      (!record.studentProfileId && normalizeStudentName(record.studentName) === normalizeStudentName(profile.name))),
+  }));
+  const profilesByName = new Set(profiles.map((profile) => normalizeStudentName(profile.name)));
+  const legacyStudents = new Map<string, EducationRecord[]>();
+  for (const record of records) {
+    if (record.studentProfileId && profileIds.has(record.studentProfileId)) continue;
+    const key = normalizeStudentName(record.studentName);
+    if (!key || profilesByName.has(key)) continue;
+    legacyStudents.set(key, [...(legacyStudents.get(key) ?? []), record]);
+  }
+  for (const [key, studentRecords] of legacyStudents) {
+    studentEntries.push({ key: `legacy:${key}`, name: studentRecords[0].studentName.trim(), profile: null, records: studentRecords });
+  }
+  studentEntries.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  const selectedEntry = studentEntries.find((student) => student.key === selectedStudent) ?? null;
+
   function academicYearValue(value: string) {
     const year = value.match(/\b(?:19|20|21)\d{2}\b/);
     return year ? Number(year[0]) : null;
@@ -2708,8 +2862,7 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
     return comparison || a.institution.localeCompare(b.institution) || a.id.localeCompare(b.id);
   }
 
-  const visible = records.filter((record) =>
-    (selectedStudent === "All students" || record.studentName.trim() === selectedStudent) &&
+  const visible = (selectedEntry?.records ?? []).filter((record) =>
     (levelFilter === "All levels" || record.level === levelFilter) &&
     (gradeFilter === "All classes / grades" || record.gradeCourse.trim() === gradeFilter) &&
     (statusFilter === "All statuses" || record.status === statusFilter) &&
@@ -2740,7 +2893,9 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
       record: {
         ...record,
         id: createId(),
+        studentProfileId: selectedEntry?.profile?.id ?? record.studentProfileId,
         paidFee: null,
+        idCardImageStoragePath: "",
         subjects: [],
         exams: [],
         payments: [],
@@ -2755,13 +2910,101 @@ function EducationRecordsPage({ records, onSave, onDelete }: {
     });
   }
 
+  function openProfileEditor() {
+    if (!selectedEntry) {
+      setProfileEditor({ profile: null });
+      return;
+    }
+    const profile = selectedEntry.profile ?? {
+      id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [],
+    };
+    setProfileEditor({
+      profile,
+      existingId: selectedEntry.profile?.id,
+      previousName: selectedEntry.name,
+    });
+  }
+
+  function saveProfile(profile: Omit<StudentProfile, "id">) {
+    const id = profileEditor?.existingId ?? createId();
+    onSaveProfile(profile, id, profileEditor?.previousName);
+    setSelectedStudent(`profile:${id}`);
+    setActiveSection("overview");
+    setProfileEditor(null);
+  }
+
+  function saveInterest(interest: string, remove = false) {
+    if (!selectedEntry) return;
+    const existing = selectedEntry.profile ?? {
+      id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [],
+    };
+    const interests = existing.interests.filter((item) => item.toLocaleLowerCase() !== interest.toLocaleLowerCase());
+    const updated = remove ? interests : [...interests, interest];
+    const profileId = selectedEntry.profile?.id ?? existing.id;
+    onSaveProfile({ ...existing, interests: updated }, profileId, selectedEntry.name);
+    setSelectedStudent(`profile:${profileId}`);
+  }
+
+  const directoryEntries = studentEntries.filter((student) => {
+    if (!query) return true;
+    const searchable = [student.name, ...(student.profile?.interests ?? [])].join(" ").toLocaleLowerCase();
+    return searchable.includes(query);
+  });
+  const profileRecords = selectedEntry?.records ?? [];
+  const firstProfileRecord = profileRecords[0];
+  const shownProfile = selectedEntry?.profile;
+
   return <>
-    <PageHeading eyebrow="Growing and learning" title="Schools & Colleges" subtitle="Review academic years, results, fee balances, and school-related spending for each student." action={<Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={15} /> Add record</Button>} />
-    <div className="alert"><GraduationCap size={15} style={{ flex: "none", marginTop: 1 }} /><span>Each record represents one academic year at a school, college, or university. Add flexible terms, quarters, semesters, or installments as separate payments; assessment types and grading systems can vary by institution. Records are readable in the private GitHub repository by collaborators and remain in its history; avoid storing student ID numbers or sensitive health information.</span></div>
-    <div className="toolbar"><Select aria-label="Select student" style={{ width: 210 }} value={selectedStudent} onChange={(event) => setSelectedStudent(event.target.value)}><option>All students</option>{students.map((student) => <option key={student}>{student}</option>)}</Select><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search student, subject, exam, attendance, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter class or grade" style={{ width: 205 }} value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}><option>All classes / grades</option>{grades.map((grade) => <option key={grade}>{grade}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Student, newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
-    <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
-    {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={records.length ? "No matching records" : "No education records yet"} description={records.length ? "Try another search or filter." : "Add a school or college record to start an education timeline."} /></Card>}
-    {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
+    <PageHeading eyebrow="Student directory" title="Schools & Colleges" subtitle={selectedEntry ? `${selectedEntry.name}'s profile and education timeline.` : "Choose a student to view their profile, education, and interests."} action={selectedEntry ? <><Button variant="outline" onClick={() => { setSelectedStudent(null); setActiveSection("overview"); }}><ArrowLeftRight size={14} />All students</Button><Button onClick={openProfileEditor}><Pencil size={14} />Edit profile</Button></> : <Button onClick={() => setProfileEditor({ profile: null })}><Plus size={15} /> Add student</Button>} />
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Student profiles, family contact details, blood group, and school records are sensitive. They are stored in the private Supabase project and accessible to people with the shared account password. Do not store government ID numbers or information you do not need.</span></div>
+    {!selectedEntry ? <>
+      <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search students" placeholder="Search student names and interests..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{directoryEntries.length} {directoryEntries.length === 1 ? "student" : "students"}</Badge></div>
+      {directoryEntries.length ? <div className="student-directory-grid">{directoryEntries.map((student) => <Card key={student.key} className="student-directory-card">
+        <button type="button" className="student-directory-open" onClick={() => { setSelectedStudent(student.key); setActiveSection("overview"); setSearch(""); }}>
+          {student.profile?.photoStoragePath ? <img src={`/api/documents?path=${encodeURIComponent(student.profile.photoStoragePath)}`} alt="" /> : <span className="student-directory-avatar"><UsersRound size={23} /></span>}
+          <strong>{student.name}</strong><span>{student.records.length ? `${student.records.length} education ${student.records.length === 1 ? "record" : "records"}` : "Profile only"}</span>
+          {!!student.profile?.interests.length && <div className="student-interest-list">{student.profile.interests.slice(0, 3).map((interest) => <Badge key={interest}>{interest}</Badge>)}</div>}
+          <span className="student-directory-link">View profile <ChevronRight size={14} /></span>
+        </button>
+      </Card>)}</div> : <Card><EmptyState icon={<UsersRound size={18} />} title="No students found" description={studentEntries.length ? "Try another search." : "Add a student profile or add an education record to start the directory."} /></Card>}
+    </> : <>
+      <nav className="student-profile-tabs" aria-label="Student profile sections">
+        <Button variant={activeSection === "overview" ? "primary" : "outline"} onClick={() => setActiveSection("overview")}><UsersRound size={14} />Profile</Button>
+        <Button variant={activeSection === "education" ? "primary" : "outline"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
+        <Button variant={activeSection === "interests" ? "primary" : "outline"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
+      </nav>
+      {activeSection === "overview" && <Card className="student-profile-card">
+        <div className="student-profile-heading">
+          {shownProfile?.photoStoragePath ? <img src={`/api/documents?path=${encodeURIComponent(shownProfile.photoStoragePath)}`} alt={`${selectedEntry.name} profile`} /> : <span className="student-directory-avatar"><UsersRound size={26} /></span>}
+          <div><h2>{selectedEntry.name}</h2><p>{firstProfileRecord ? `${firstProfileRecord.institution}${firstProfileRecord.gradeCourse ? ` · ${firstProfileRecord.gradeCourse}` : ""}` : "Student profile"}</p></div>
+        </div>
+        {shownProfile ? <div className="student-profile-details">
+          {shownProfile.dateOfBirth && <div><span>Date of birth</span><strong>{dateLabel(shownProfile.dateOfBirth)}</strong></div>}
+          {shownProfile.fatherName && <div><span>Father</span><strong>{shownProfile.fatherName}</strong></div>}
+          {shownProfile.motherName && <div><span>Mother</span><strong>{shownProfile.motherName}</strong></div>}
+          {shownProfile.bloodGroup && <div><span>Blood group</span><strong>{shownProfile.bloodGroup}</strong></div>}
+          {shownProfile.contactNumber && <div><span>Contact number</span><strong>{shownProfile.contactNumber}</strong></div>}
+          {shownProfile.address && <div className="full"><span>Address</span><strong>{shownProfile.address}</strong></div>}
+        </div> : <EmptyState icon={<UsersRound size={18} />} title="Profile details not added" description="Add date of birth, parent names, contact details, photo, or interests to complete this student's profile." />}
+        <div className="student-profile-links"><Button variant="outline" onClick={() => setActiveSection("education")}><GraduationCap size={14} />Open education records</Button><Button variant="outline" onClick={() => setActiveSection("interests")}><Heart size={14} />Open hobbies & interests</Button></div>
+      </Card>}
+      {activeSection === "education" && <>
+        <div className="education-section-head student-education-heading"><div><h2 className="section-title">Education timeline</h2><p className="section-description">Each entry represents one academic year or course; student ID-card images are optional.</p></div><Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={14} />Add education record</Button></div>
+        <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search school, subject, exam, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Select aria-label="Filter education level" style={{ width: 205 }} value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select><Select aria-label="Filter class or grade" style={{ width: 205 }} value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}><option>All classes / grades</option>{grades.map((grade) => <option key={grade}>{grade}</option>)}</Select><Select aria-label="Filter education status" style={{ width: 140 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select><Select aria-label="Sort education records" style={{ width: 200 }} value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
+        <div className="education-list">{visible.map((record) => <EducationRecordCard key={record.id} record={record} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
+        {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={profileRecords.length ? "No matching records" : "No education records yet"} description={profileRecords.length ? "Try another search or filter." : "Add an academic year or course to start this student's education timeline."} /></Card>}
+      </>}
+      {activeSection === "interests" && <Card className="student-interests-card">
+        <div className="card-head"><div><h2 className="section-title">Hobbies & interests</h2><p className="section-description">Keep hobbies and interests as individual tags for this student.</p></div><Heart size={17} /></div>
+        <div className="student-interest-list">{(shownProfile?.interests ?? []).map((interest) => <Badge key={interest}>{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => saveInterest(interest, true)}><X size={12} /></button></Badge>)}</div>
+        <InterestQuickAdd onAdd={(interest) => saveInterest(interest)} />
+        {!shownProfile?.interests.length && <p className="education-empty">No hobbies or interests have been added yet.</p>}
+      </Card>}
+    </>}
+    {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} initialStudentName={editor.mode === "new" ? selectedEntry?.name ?? "" : ""} initialStudentProfileId={editor.mode === "new" ? selectedEntry?.profile?.id : undefined} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave({ ...record, studentProfileId: record.studentProfileId ?? selectedEntry?.profile?.id }, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
+    {profileEditor && <StudentProfileModal key={profileEditor.existingId ?? "new-student-profile"} initial={profileEditor.profile} onClose={() => setProfileEditor(null)} onSave={saveProfile} />}
   </>;
 }
 
@@ -5127,7 +5370,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
 
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
-    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan file storage; each document can be up to 10 MB.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
+    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan bucket; each upload can be up to 10 MB. The estimate tracks document records only; student photos and ID-card images also use this bucket but are not included.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
     {visible.length ? <div className="document-list">{visible.map((document) => {
       const hasFile = Boolean(document.storagePath);
@@ -5742,6 +5985,7 @@ function emptyTrackerData(): TrackerData {
     mindfulHabits: [],
     mindfulnessLogs: [],
     educationRecords: [],
+    studentProfiles: [],
     cookingRecipes: [],
     cookingLogs: [],
     issueRecords: [],
@@ -6448,6 +6692,24 @@ export default function App() {
       };
     });
   }
+  function saveStudentProfile(profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) {
+    const profileId = id ?? createId();
+    const normalizedPreviousName = previousName?.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+    update((previous) => ({
+      ...previous,
+      studentProfiles: (previous.studentProfiles ?? []).some((entry) => entry.id === profileId)
+        ? (previous.studentProfiles ?? []).map((entry) => entry.id === profileId ? { ...profile, id: profileId } : entry)
+        : [{ ...profile, id: profileId }, ...(previous.studentProfiles ?? [])],
+      educationRecords: (previous.educationRecords ?? []).map((record) => {
+        const isLinkedById = record.studentProfileId === profileId;
+        const isLegacyMatch = !record.studentProfileId && normalizedPreviousName !== undefined &&
+          record.studentName.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase() === normalizedPreviousName;
+        return isLinkedById || isLegacyMatch
+          ? { ...record, studentProfileId: profileId, studentName: profile.name }
+          : record;
+      }),
+    }));
+  }
   function deleteEducationRecord(record: EducationRecord) {
     update((previous) => ({
       ...withArchivedRecord(previous, record.studentName, { educationRecords: [record] }),
@@ -7062,7 +7324,7 @@ export default function App() {
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,
-    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} />,
+    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} profiles={data.studentProfiles ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} onSaveProfile={saveStudentProfile} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,

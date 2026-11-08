@@ -264,6 +264,7 @@ export interface EducationExpense {
 
 export interface EducationRecord {
   id: string;
+  studentProfileId?: string;
   studentName: string;
   institution: string;
   level: EducationLevel;
@@ -285,6 +286,7 @@ export interface EducationRecord {
   contact: string;
   link: string;
   notes: string;
+  idCardImageStoragePath?: string;
   subjects?: EducationSubject[];
   exams?: EducationExam[];
   payments?: EducationPayment[];
@@ -293,6 +295,19 @@ export interface EducationRecord {
   monthlyAttendance?: EducationMonthlyAttendance[];
   dailyAttendance?: EducationDailyAttendance[];
   feeCharges?: EducationFeeCharge[];
+}
+
+export interface StudentProfile {
+  id: string;
+  name: string;
+  dateOfBirth: string;
+  fatherName: string;
+  motherName: string;
+  bloodGroup: string;
+  contactNumber: string;
+  address: string;
+  photoStoragePath: string;
+  interests: string[];
 }
 
 export type LearningLevel = "Beginner" | "Basic" | "Intermediate" | "Advanced" | "Expert";
@@ -688,6 +703,7 @@ export interface TrackerData {
   learningRecords?: LearningRecord[];
   trainingSessions?: TrainingSession[];
   educationRecords?: EducationRecord[];
+  studentProfiles?: StudentProfile[];
   vehicles?: Vehicle[];
   vehicleJourneys?: VehicleJourney[];
   vehicleMaintenance?: VehicleMaintenance[];

@@ -1,4 +1,4 @@
-import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ASSET_TYPES, CATEGORIES, CURRENCIES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, REMINDER_CATEGORIES, type AssetRecord, type Category, type CookingLog, type CookingRecipe, type Currency, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -63,6 +63,7 @@ function isNonNegativeNumber(value: unknown): value is number {
 function isEducationRecord(value: unknown): boolean {
   if (!isRecord(value) || typeof value.id !== "string" || !value.id ||
     typeof value.studentName !== "string" || !value.studentName.trim() ||
+    (value.studentProfileId !== undefined && typeof value.studentProfileId !== "string") ||
     typeof value.institution !== "string" || !value.institution.trim() ||
     typeof value.level !== "string" || !EDUCATION_LEVELS.some((level) => level === value.level) ||
     typeof value.gradeCourse !== "string" || typeof value.academicYear !== "string" ||
@@ -81,6 +82,9 @@ function isEducationRecord(value: unknown): boolean {
     typeof value.contactName !== "string" || typeof value.contact !== "string" ||
     typeof value.link !== "string" || !isSafeExternalLink(value.link) ||
     typeof value.notes !== "string") return false;
+  if (value.idCardImageStoragePath !== undefined &&
+    (typeof value.idCardImageStoragePath !== "string" ||
+      value.idCardImageStoragePath !== "" && !isDocumentStoragePath(value.idCardImageStoragePath))) return false;
 
   const charges = value.feeCharges === undefined ? [] : value.feeCharges;
   if (!Array.isArray(charges) || !charges.every((charge) =>
@@ -243,6 +247,7 @@ export function validateData(value: unknown): value is TrackerData {
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+    (entry.studentProfileId === undefined || typeof entry.studentProfileId === "string") &&
     typeof entry.studentName === "string" && entry.studentName.trim().length > 0 &&
     typeof entry.institution === "string" && entry.institution.trim().length > 0 &&
     typeof entry.level === "string" && EDUCATION_LEVELS.some((level) => level === entry.level) &&
@@ -262,6 +267,9 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.contactName === "string" && typeof entry.contact === "string" &&
     typeof entry.link === "string" && isSafeExternalLink(entry.link) &&
     typeof entry.notes === "string" &&
+    (entry.idCardImageStoragePath === undefined ||
+      typeof entry.idCardImageStoragePath === "string" &&
+      (entry.idCardImageStoragePath === "" || isDocumentStoragePath(entry.idCardImageStoragePath))) &&
     (entry.subjects === undefined || (Array.isArray(entry.subjects) && entry.subjects.every((subject) =>
       isRecord(subject) && typeof subject.id === "string" && subject.id.length > 0 &&
       typeof subject.name === "string" && subject.name.trim().length > 0 &&
@@ -327,6 +335,16 @@ export function validateData(value: unknown): value is TrackerData {
       typeof charge.notes === "string"))))));
   const educationRecordDetailsOk = value.educationRecords === undefined ||
     (Array.isArray(value.educationRecords) && value.educationRecords.every(isEducationRecord));
+  const studentProfilesOk = value.studentProfiles === undefined || (Array.isArray(value.studentProfiles) && value.studentProfiles.every((profile) =>
+    isRecord(profile) && typeof profile.id === "string" && profile.id.length > 0 &&
+    typeof profile.name === "string" && profile.name.trim().length > 0 && profile.name.length <= 120 &&
+    typeof profile.dateOfBirth === "string" && (profile.dateOfBirth === "" || !Number.isNaN(Date.parse(profile.dateOfBirth))) &&
+    typeof profile.fatherName === "string" && typeof profile.motherName === "string" &&
+    typeof profile.bloodGroup === "string" && typeof profile.contactNumber === "string" &&
+    typeof profile.address === "string" && typeof profile.photoStoragePath === "string" &&
+    (profile.photoStoragePath === "" || isDocumentStoragePath(profile.photoStoragePath)) &&
+    Array.isArray(profile.interests) && profile.interests.every((interest) =>
+      typeof interest === "string" && interest.trim().length > 0 && interest.length <= 80)));
   const learningRecordsOk = value.learningRecords === undefined || (Array.isArray(value.learningRecords) && value.learningRecords.every((entry) =>
     isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
     typeof entry.title === "string" && entry.title.trim().length > 0 &&
@@ -641,7 +659,7 @@ export function validateData(value: unknown): value is TrackerData {
     trip.purchaseIds.every((id) => typeof id === "string"));
   if (!itemOk || !purchaseOk || !tripOk || !storesOk || !productsOk || !remindersOk || !reminderCategoriesOk ||
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
-    !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !learningRecordsOk || !trainingSessionsOk ||
+    !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !studentProfilesOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
     !devotionalEntriesOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk ||
@@ -653,6 +671,8 @@ export function validateData(value: unknown): value is TrackerData {
   if (Array.isArray(value.stocks) && new Set((value.stocks as TrackedStock[]).map((stock) => stock.id)).size !== value.stocks.length) return false;
   if (Array.isArray(value.assets) && new Set((value.assets as AssetRecord[]).map((asset) => asset.id)).size !== value.assets.length) return false;
   if (Array.isArray(value.educationRecords) && new Set((value.educationRecords as EducationRecord[]).map((entry) => entry.id)).size !== value.educationRecords.length) return false;
+  if (Array.isArray(value.studentProfiles) &&
+    new Set((value.studentProfiles as StudentProfile[]).map((profile) => profile.id)).size !== value.studentProfiles.length) return false;
   if (Array.isArray(value.learningRecords) && new Set((value.learningRecords as LearningRecord[]).map((entry) => entry.id)).size !== value.learningRecords.length) return false;
   if (Array.isArray(value.trainingSessions) && new Set((value.trainingSessions as TrainingSession[]).map((entry) => entry.id)).size !== value.trainingSessions.length) return false;
   if (Array.isArray(value.educationRecords)) {
@@ -780,6 +800,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
         feeType: payment.feeType ?? inferLegacyEducationFeeType(payment.period),
       })),
     })),
+    studentProfiles: data.studentProfiles ?? [],
     vehicles: data.vehicles ?? [],
     vehicleJourneys: data.vehicleJourneys ?? [],
     vehicleMaintenance: data.vehicleMaintenance ?? [],

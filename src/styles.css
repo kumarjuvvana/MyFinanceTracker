@@ -513,6 +513,53 @@ body{background:#f3f5ef}
   .app-shell.dark .prompt-list>.prompt-card{border-bottom-color:var(--line,#343d35)}
 }
 
+.student-directory-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.student-directory-card{min-width:0;padding:0;overflow:hidden}
+.student-directory-open{display:flex;width:100%;height:100%;flex-direction:column;align-items:flex-start;gap:7px;padding:17px;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}
+.student-directory-open>img,.student-profile-heading>img{width:72px;height:72px;border-radius:50%;object-fit:cover;background:#edf4ee}
+.student-directory-avatar{width:72px;height:72px;display:grid;place-items:center;flex:none;border-radius:50%;background:#edf4ee;color:#4e7e57}
+.student-directory-open>strong{font:700 14px Manrope,sans-serif;color:var(--text-main,#303830);overflow-wrap:anywhere}
+.student-directory-open>span:not(.student-directory-avatar){font-size:11px;color:var(--text-muted,#858d83)}
+.student-directory-link{display:flex;align-items:center;gap:2px;margin-top:3px;color:var(--user-accent,#56815d)!important;font-weight:600}
+.student-profile-tabs,.student-profile-links,.student-image-actions,.student-interest-editor{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.student-profile-tabs{margin-bottom:13px}
+.student-profile-card,.student-interests-card{padding:18px}
+.student-profile-heading{display:flex;align-items:center;gap:14px}
+.student-profile-heading h2{margin:0;color:var(--text-main,#303830);font:700 18px Manrope,sans-serif}
+.student-profile-heading p{margin:5px 0 0;color:var(--text-muted,#858d83);font-size:12px}
+.student-profile-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:17px}
+.student-profile-details>div{display:grid;gap:4px;min-width:0;padding:10px;border:1px solid var(--panel-line,#eef0ec);border-radius:9px}
+.student-profile-details>div.full{grid-column:1/-1}
+.student-profile-details span{font-size:10px;color:var(--text-muted,#858d83)}
+.student-profile-details strong{font-size:12px;color:var(--text-main,#414a42);overflow-wrap:anywhere}
+.student-profile-links{margin-top:16px}
+.student-image-preview{display:block;max-width:min(100%,360px);max-height:220px;margin:0 0 9px;border:1px solid var(--panel-line,#e8ece6);border-radius:9px;object-fit:contain}
+.student-image-actions>input{flex:1;min-width:160px}
+.student-interest-editor>input{flex:1;min-width:180px}
+.student-interest-list{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+.student-interest-list .badge{display:inline-flex;align-items:center;gap:5px}
+.student-interest-list .badge button{display:inline-grid;place-items:center;padding:0;border:0;background:transparent;color:inherit;cursor:pointer}
+.student-education-heading{margin:8px 0}
+.education-id-card-preview{grid-column:1/-1}
+.education-id-card-preview>a{display:flex;align-items:center;gap:9px;color:var(--user-accent,#56815d);font-size:11px;font-weight:600;text-decoration:none}
+.education-id-card-preview img{max-width:180px;max-height:100px;border-radius:6px;object-fit:contain}
+.app-shell.dark .student-directory-avatar,.app-shell.dark .student-directory-open>img,.app-shell.dark .student-profile-heading>img{background:#2b3d30;color:#a6c1a8}
+.app-shell.dark .student-directory-open>strong,.app-shell.dark .student-profile-heading h2,.app-shell.dark .student-profile-details strong{color:#e3e8e2}
+.app-shell.dark .student-profile-details>div,.app-shell.dark .student-image-preview{border-color:#343d35}
+.app-shell.dark .student-profile-details span,.app-shell.dark .student-profile-heading p,.app-shell.dark .student-directory-open>span:not(.student-directory-avatar){color:#a7b0a7}
+@media(max-width:600px){
+  .student-directory-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .student-directory-open{padding:12px}
+  .student-directory-open>img,.student-profile-heading>img,.student-directory-avatar{width:54px;height:54px}
+  .student-directory-open>strong{font-size:12px}
+  .student-profile-card,.student-interests-card{padding:13px}
+  .student-profile-details{grid-template-columns:minmax(0,1fr);gap:5px;margin-top:12px}
+  .student-profile-details>div.full{grid-column:auto}
+  .student-profile-tabs{gap:5px}
+  .student-profile-tabs .button{padding-inline:8px;font-size:10px}
+  .student-education-heading{align-items:flex-start;flex-wrap:wrap}
+}
+
 .database-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .database-browser{min-width:0}
 .database-sql-console{display:grid;gap:12px}

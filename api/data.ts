@@ -98,7 +98,7 @@ async function supabaseRequest(path: string, init?: RequestInit): Promise<Respon
 }
 
 async function loadStoredData(): Promise<StoredData | null> {
-  const response = await supabaseRequest("rpc/load_daybook_data_extended", {
+  const response = await supabaseRequest("rpc/load_daybook_data_with_students", {
     method: "POST",
     body: JSON.stringify({}),
   });
@@ -139,7 +139,7 @@ async function loadReminderCategories(): Promise<string[]> {
 }
 
 async function saveData(data: TrackerData, expectedRevision: string | null): Promise<string | null> {
-  const response = await supabaseRequest("rpc/save_daybook_data_extended", {
+  const response = await supabaseRequest("rpc/save_daybook_data_with_students", {
     method: "POST",
     body: JSON.stringify({ p_data: data, p_expected_revision: expectedRevision }),
   });
