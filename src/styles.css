@@ -526,6 +526,22 @@ body{background:#f3f5ef}
 .student-profile-card,.student-interests-card{padding:18px}
 .student-notes-card{padding:18px}
 .student-notes-input{min-height:240px!important;line-height:1.55}
+.student-plan-list{display:grid;gap:12px}
+.student-plan-card{min-width:0;padding:16px}
+.student-plan-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.student-plan-card-head h3{margin:0;color:var(--text-main,#303830);font:700 14px Manrope,sans-serif;overflow-wrap:anywhere}
+.student-plan-card-head p,.student-plan-dates,.student-plan-notes{margin:5px 0 0;color:var(--text-muted,#858d83);font-size:11px;overflow-wrap:anywhere}
+.student-plan-card-actions{display:flex;align-items:center;gap:4px;flex:none}
+.student-plan-card-actions>strong{margin-right:5px;color:var(--user-accent,#56815d);font-size:13px;white-space:nowrap}
+.student-plan-costs{margin-top:5px;padding-top:13px;border-top:1px solid var(--panel-line,#eef0ec)}
+.student-plan-costs h3{margin:0;color:var(--text-main,#303830);font:700 12px Manrope,sans-serif}
+.student-plan-cost-row{display:grid;grid-template-columns:minmax(140px,1fr) minmax(140px,1fr) minmax(120px,.8fr) auto;align-items:end;gap:9px;margin-top:10px}
+.student-plan-total{display:flex;justify-content:space-between;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--panel-line,#eef0ec);font-size:12px}
+.student-plan-total>strong{color:var(--user-accent,#56815d);white-space:nowrap}
+.student-plan-cost-list{display:grid;margin-top:10px;border-top:1px solid var(--panel-line,#eef0ec)}
+.student-plan-cost-list>div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--panel-line,#eef0ec);font-size:11px}
+.student-plan-cost-list>div>span{overflow-wrap:anywhere}
+.student-plan-cost-list>div>strong{white-space:nowrap}
 .student-profile-heading{display:flex;align-items:center;gap:14px}
 .student-profile-heading h2{margin:0;color:var(--text-main,#303830);font:700 18px Manrope,sans-serif}
 .student-profile-heading p{margin:5px 0 0;color:var(--text-muted,#858d83);font-size:12px}
@@ -548,6 +564,8 @@ body{background:#f3f5ef}
 .app-shell.dark .student-directory-avatar,.app-shell.dark .student-directory-open>img,.app-shell.dark .student-profile-heading>img{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .student-directory-open>strong,.app-shell.dark .student-profile-heading h2,.app-shell.dark .student-profile-details strong{color:#e3e8e2}
 .app-shell.dark .student-profile-details>div,.app-shell.dark .student-image-preview{border-color:#343d35}
+.app-shell.dark .student-plan-costs,.app-shell.dark .student-plan-total,.app-shell.dark .student-plan-cost-list,.app-shell.dark .student-plan-cost-list>div{border-color:#343d35}
+.app-shell.dark .student-plan-card-head h3,.app-shell.dark .student-plan-costs h3{color:#e3e8e2}
 .app-shell.dark .student-profile-details span,.app-shell.dark .student-profile-heading p,.app-shell.dark .student-directory-open>span:not(.student-directory-avatar){color:#a7b0a7}
 @media(max-width:600px){
   .student-directory-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -561,6 +579,13 @@ body{background:#f3f5ef}
   .student-profile-tabs{gap:5px}
   .student-profile-tabs .button{padding-inline:8px;font-size:10px}
   .student-education-heading{align-items:flex-start;flex-wrap:wrap}
+  .student-plan-card{padding:12px}
+  .student-plan-card-head{flex-direction:column}
+  .student-plan-card-actions{width:100%;justify-content:flex-end}
+  .student-plan-cost-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}
+  .student-plan-cost-row>.button{grid-column:2;justify-self:end}
+  .student-plan-cost-list>div{align-items:flex-start;font-size:10px}
+  .student-plan-total{font-size:11px}
 }
 
 .database-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}

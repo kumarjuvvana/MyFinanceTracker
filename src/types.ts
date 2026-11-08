@@ -311,6 +311,37 @@ export interface StudentProfile {
   notes?: string;
 }
 
+export const EDUCATION_PLAN_COST_CATEGORIES = [
+  "Tuition",
+  "Admission",
+  "Transport",
+  "Hostel / accommodation",
+  "Books / learning materials",
+  "Exams / activities",
+  "Other",
+] as const;
+
+export interface StudentEducationPlanCost {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+}
+
+export interface StudentEducationPlan {
+  id: string;
+  studentProfileId: string;
+  level: EducationLevel;
+  institution: string;
+  gradeCourse: string;
+  academicYear: string;
+  startDate: string;
+  endDate: string;
+  currency: Currency;
+  notes: string;
+  costs: StudentEducationPlanCost[];
+}
+
 export type LearningLevel = "Beginner" | "Basic" | "Intermediate" | "Advanced" | "Expert";
 export type LearningStatus = "Not started" | "In progress" | "Completed";
 
@@ -705,6 +736,7 @@ export interface TrackerData {
   trainingSessions?: TrainingSession[];
   educationRecords?: EducationRecord[];
   studentProfiles?: StudentProfile[];
+  educationPlans?: StudentEducationPlan[];
   vehicles?: Vehicle[];
   vehicleJourneys?: VehicleJourney[];
   vehicleMaintenance?: VehicleMaintenance[];

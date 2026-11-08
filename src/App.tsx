@@ -16,7 +16,7 @@ import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDataba
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, FONT_FAMILIES, ITEM_UNITS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DarkTheme, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
-import type { StudentProfile } from "./types";
+import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -2751,6 +2751,143 @@ function StudentProfileModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
+type StudentEducationPlanDraft = Omit<StudentEducationPlan, "id">;
+type StudentEducationPlanCostDraft = { id: string; category: string; description: string; amount: string };
+
+function StudentEducationPlanModal({ initial, studentProfileId, onClose, onSave }: {
+  initial: StudentEducationPlan | null;
+  studentProfileId: string;
+  onClose: () => void;
+  onSave: (plan: StudentEducationPlanDraft) => void;
+}) {
+  const [level, setLevel] = useState(initial?.level ?? "Primary (Grades 1–5)");
+  const [institution, setInstitution] = useState(initial?.institution ?? "");
+  const [gradeCourse, setGradeCourse] = useState(initial?.gradeCourse ?? "");
+  const [academicYear, setAcademicYear] = useState(initial?.academicYear ?? "");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "INR");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [costs, setCosts] = useState<StudentEducationPlanCostDraft[]>((initial?.costs ?? []).map((cost) => ({
+    ...cost, amount: String(cost.amount),
+  })));
+  const [error, setError] = useState("");
+  const total = costs.reduce((sum, cost) => sum + (Number(cost.amount) || 0), 0);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!institution.trim() || !gradeCourse.trim() || !academicYear.trim()) {
+      setError("Enter the institution, class/course, and academic year.");
+      return;
+    }
+    if (startDate && endDate && endDate < startDate) {
+      setError("The end date cannot be before the start date.");
+      return;
+    }
+    const parsedCosts = costs.map((cost) => ({
+      id: cost.id || createId(),
+      category: cost.category.trim(),
+      description: cost.description.trim(),
+      amount: Number(cost.amount),
+    }));
+    if (parsedCosts.some((cost) => !cost.category || cost.category.length > 80 ||
+      !Number.isFinite(cost.amount) || cost.amount <= 0)) {
+      setError("Each estimate needs a cost category and a valid amount greater than zero.");
+      return;
+    }
+    onSave({
+      studentProfileId,
+      level,
+      institution: institution.trim(),
+      gradeCourse: gradeCourse.trim(),
+      academicYear: academicYear.trim(),
+      startDate,
+      endDate,
+      currency,
+      notes: notes.trim(),
+      costs: parsedCosts,
+    });
+  }
+
+  return <Modal title={initial ? "Edit education plan" : "Plan education"} onClose={onClose} wide>
+    <form onSubmit={submit}>
+      <div className="form-grid">
+        <Field label="Education stage"><Select value={level} onChange={(event) => setLevel(event.target.value as EducationLevel)}>{EDUCATION_LEVELS.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+        <Field label="Academic year (required)"><Input required maxLength={40} placeholder="e.g. 2027–2028" value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} /></Field>
+        <Field className="full" label="School / college / institute (required)"><Input required maxLength={160} placeholder="Institution name" value={institution} onChange={(event) => setInstitution(event.target.value)} /></Field>
+        <Field className="full" label="Class / course / degree (required)"><Input required maxLength={120} placeholder="e.g. Class 5, Intermediate MPC, B.Tech Computer Science" value={gradeCourse} onChange={(event) => setGradeCourse(event.target.value)} /></Field>
+        <Field label="Estimated year starts"><DateInput value={startDate} onValueChange={setStartDate} /></Field>
+        <Field label="Estimated year ends"><DateInput value={endDate} onValueChange={setEndDate} /></Field>
+        <Field label="Estimate currency"><Select value={currency} onChange={(event) => setCurrency(event.target.value as Currency)}>{CURRENCIES.map((item) => <option key={item}>{item}</option>)}</Select></Field>
+        <div className="full student-plan-costs">
+          <div className="education-section-head">
+            <div><h3>Estimated costs for this year</h3><p className="section-description">Enter each estimate once for this academic year. Include one-time admission costs in this year's total.</p></div>
+            <Button type="button" variant="outline" onClick={() => setCosts((current) => [...current, { id: createId(), category: "Tuition", description: "", amount: "" }])}><Plus size={13} />Add cost</Button>
+          </div>
+          <datalist id="student-education-plan-cost-categories">{EDUCATION_PLAN_COST_CATEGORIES.map((item) => <option key={item} value={item} />)}</datalist>
+          {costs.map((cost, index) => <div className="student-plan-cost-row" key={cost.id}>
+            <Field label={index === 0 ? "Category (standard or custom)" : `Category ${index + 1}`}><Input list="student-education-plan-cost-categories" maxLength={80} required placeholder="e.g. Tuition, Hostel" value={cost.category} onChange={(event) => setCosts((current) => current.map((item, row) => row === index ? { ...item, category: event.target.value } : item))} /></Field>
+            <Field label={index === 0 ? "Details (optional)" : "Details"}><Input maxLength={200} placeholder="e.g. annual tuition" value={cost.description} onChange={(event) => setCosts((current) => current.map((item, row) => row === index ? { ...item, description: event.target.value } : item))} /></Field>
+            <Field label={`Estimated amount (${currency})`}><Input type="number" min="0.01" step="0.01" required value={cost.amount} onChange={(event) => setCosts((current) => current.map((item, row) => row === index ? { ...item, amount: event.target.value } : item))} /></Field>
+            <Button type="button" variant="outline" aria-label={`Remove ${cost.category} cost`} onClick={() => setCosts((current) => current.filter((_, row) => row !== index))}><X size={14} />Remove</Button>
+          </div>)}
+          {!costs.length && <p className="education-empty">Add tuition, admission, transport, hostel, books, exam fees, or custom estimates.</p>}
+          <div className="student-plan-total"><span>Estimated total for {academicYear || "this year"}</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency }).format(total)}</strong></div>
+        </div>
+        <Field className="full" label="Planning notes"><textarea className="field textarea" maxLength={5000} placeholder="Optional details, assumptions, scholarships, or reminders" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      </div>
+      {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save plan" : "Add plan"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureProfile, onSave, onDelete }: {
+  studentName: string;
+  studentProfileId: string | undefined;
+  plans: StudentEducationPlan[];
+  onEnsureProfile: () => string;
+  onSave: (plan: StudentEducationPlanDraft, id?: string) => void;
+  onDelete: (plan: StudentEducationPlan) => void;
+}) {
+  const [editor, setEditor] = useState<StudentEducationPlan | null | undefined>(undefined);
+  const [editingProfileId, setEditingProfileId] = useState(studentProfileId);
+  const visiblePlans = [...plans].sort((a, b) =>
+    b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true }) ||
+    a.institution.localeCompare(b.institution));
+
+  return <>
+    <div className="education-section-head student-education-heading">
+      <div><h2 className="section-title">Education plans</h2><p className="section-description">Plan class, intermediate, degree, or engineering years and estimate costs separately from actual education records.</p></div>
+      <Button onClick={() => {
+        const profileId = studentProfileId ?? onEnsureProfile();
+        if (profileId) {
+          setEditingProfileId(profileId);
+          setEditor(null);
+        }
+      }}><Plus size={14} />Add plan</Button>
+    </div>
+    {visiblePlans.length ? <div className="student-plan-list">{visiblePlans.map((plan) => {
+      const total = plan.costs.reduce((sum, cost) => sum + cost.amount, 0);
+      return <Card className="student-plan-card" key={plan.id}>
+        <div className="student-plan-card-head">
+          <div><h3>{plan.gradeCourse}</h3><p>{plan.institution} · {plan.academicYear} · {plan.level}</p></div>
+          <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(total)}</strong><button className="icon-button" aria-label={`Edit ${plan.gradeCourse} plan`} onClick={() => setEditor(plan)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${plan.gradeCourse} plan`} onClick={() => {
+            if (window.confirm(`Delete the ${plan.academicYear} education plan for ${studentName}?`)) onDelete(plan);
+          }}><Trash2 size={14} /></button></div>
+        </div>
+        {(plan.startDate || plan.endDate) && <p className="student-plan-dates">{plan.startDate ? dateLabel(plan.startDate) : "Start date not set"} – {plan.endDate ? dateLabel(plan.endDate) : "End date not set"}</p>}
+        {plan.costs.length > 0 && <div className="student-plan-cost-list">{plan.costs.map((cost) => <div key={cost.id}><span>{cost.category}{cost.description ? ` · ${cost.description}` : ""}</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(cost.amount)}</strong></div>)}</div>}
+        {plan.notes && <p className="student-plan-notes"><LinkifiedText>{plan.notes}</LinkifiedText></p>}
+      </Card>;
+    })}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title="No education plans yet" description={`Add a class, intermediate, degree, or other plan for ${studentName} and estimate its yearly costs.`} /></Card>}
+    {editor !== undefined && <StudentEducationPlanModal key={editor?.id ?? "new-student-plan"} initial={editor} studentProfileId={editingProfileId ?? studentProfileId ?? ""} onClose={() => setEditor(undefined)} onSave={(plan) => {
+      onSave(plan, editor?.id);
+      setEditor(undefined);
+    }} />}
+  </>;
+}
+
 function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
   const [value, setValue] = useState("");
   return <form className="student-interest-editor" onSubmit={(event) => {
@@ -2765,12 +2902,15 @@ function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
   </form>;
 }
 
-function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfile }: {
+function EducationRecordsPage({ records, profiles, educationPlans, onSave, onDelete, onSaveProfile, onSavePlan, onDeletePlan }: {
   records: EducationRecord[];
   profiles: StudentProfile[];
+  educationPlans: StudentEducationPlan[];
   onSave: (record: Omit<EducationRecord, "id">, id?: string) => void;
   onDelete: (record: EducationRecord) => void;
   onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => void;
+  onSavePlan: (plan: StudentEducationPlanDraft, id?: string) => void;
+  onDeletePlan: (plan: StudentEducationPlan) => void;
 }) {
   const [editor, setEditor] = useState<{
     record: EducationRecord | null;
@@ -2782,7 +2922,8 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
   const [gradeFilter, setGradeFilter] = useState("All classes / grades");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes" | "plans">("overview");
+  const [planProfileId, setPlanProfileId] = useState("");
   const [sortBy, setSortBy] = useState("student-year");
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
@@ -2959,6 +3100,19 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
     setSelectedStudent(`profile:${profileId}`);
   }
 
+  function ensureProfileForPlans(): string {
+    if (!selectedEntry) return "";
+    if (selectedEntry.profile) return selectedEntry.profile.id;
+    const profileId = createId();
+    onSaveProfile({
+      name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
+      bloodGroup: "", contactNumber: "", address: "", photoStoragePath: "", interests: [], notes: "",
+    }, profileId, selectedEntry.name);
+    setPlanProfileId(profileId);
+    setSelectedStudent(`profile:${profileId}`);
+    return profileId;
+  }
+
   const directoryEntries = studentEntries.filter((student) => {
     if (!query) return true;
     const searchable = [student.name, ...(student.profile?.interests ?? [])].join(" ").toLocaleLowerCase();
@@ -2987,6 +3141,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
         <Button variant={activeSection === "education" ? "primary" : "outline"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
         <Button variant={activeSection === "interests" ? "primary" : "outline"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
         <Button variant={activeSection === "notes" ? "primary" : "outline"} onClick={() => setActiveSection("notes")}><FileText size={14} />Notes</Button>
+        <Button variant={activeSection === "plans" ? "primary" : "outline"} onClick={() => setActiveSection("plans")}><CalendarDays size={14} />Plan for education</Button>
       </nav>
       {activeSection === "overview" && <Card className="student-profile-card">
         <div className="student-profile-heading">
@@ -3019,6 +3174,14 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
         <div className="card-head"><div><h2 className="section-title">{selectedEntry.name}'s notes</h2><p className="section-description">Save details, reminders, or other information specific to this student. Notes sync automatically across devices.</p></div><FileText size={17} /></div>
         <Field label="Student notes"><textarea className="field textarea student-notes-input" maxLength={20000} aria-label={`Notes for ${selectedEntry.name}`} placeholder="Write any details you want to keep for this student..." value={shownProfile?.notes ?? ""} onChange={(event) => saveStudentNotes(event.target.value)} /></Field>
       </Card>}
+      {activeSection === "plans" && <StudentEducationPlans
+        studentName={selectedEntry.name}
+        studentProfileId={shownProfile?.id ?? (planProfileId || undefined)}
+        plans={educationPlans.filter((plan) => plan.studentProfileId === (shownProfile?.id ?? planProfileId))}
+        onEnsureProfile={ensureProfileForPlans}
+        onSave={onSavePlan}
+        onDelete={onDeletePlan}
+      />}
     </>}
     {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} initialStudentName={editor.mode === "new" ? selectedEntry?.name ?? "" : ""} initialStudentProfileId={editor.mode === "new" ? selectedEntry?.profile?.id : undefined} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave({ ...record, studentProfileId: record.studentProfileId ?? selectedEntry?.profile?.id }, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
     {profileEditor && <StudentProfileModal key={profileEditor.existingId ?? "new-student-profile"} initial={profileEditor.profile} onClose={() => setProfileEditor(null)} onSave={saveProfile} />}
@@ -6003,6 +6166,7 @@ function emptyTrackerData(): TrackerData {
     mindfulnessLogs: [],
     educationRecords: [],
     studentProfiles: [],
+    educationPlans: [],
     cookingRecipes: [],
     cookingLogs: [],
     issueRecords: [],
@@ -6727,6 +6891,20 @@ export default function App() {
       }),
     }));
   }
+  function saveStudentEducationPlan(plan: Omit<StudentEducationPlan, "id">, id?: string) {
+    update((previous) => ({
+      ...previous,
+      educationPlans: id
+        ? (previous.educationPlans ?? []).map((entry) => entry.id === id ? { ...plan, id } : entry)
+        : [{ ...plan, id: createId() }, ...(previous.educationPlans ?? [])],
+    }));
+  }
+  function deleteStudentEducationPlan(plan: StudentEducationPlan) {
+    update((previous) => ({
+      ...previous,
+      educationPlans: (previous.educationPlans ?? []).filter((entry) => entry.id !== plan.id),
+    }));
+  }
   function deleteEducationRecord(record: EducationRecord) {
     update((previous) => ({
       ...withArchivedRecord(previous, record.studentName, { educationRecords: [record] }),
@@ -7341,7 +7519,7 @@ export default function App() {
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,
-    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} profiles={data.studentProfiles ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} onSaveProfile={saveStudentProfile} />,
+    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} profiles={data.studentProfiles ?? []} educationPlans={data.educationPlans ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} onSaveProfile={saveStudentProfile} onSavePlan={saveStudentEducationPlan} onDeletePlan={deleteStudentEducationPlan} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,
