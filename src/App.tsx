@@ -2693,7 +2693,7 @@ function PrivateImageField({ label, storagePath, onChange }: {
 function StudentProfileModal({ initial, onClose, onSave }: {
   initial: StudentProfile | null;
   onClose: () => void;
-  onSave: (profile: Omit<StudentProfile, "id">) => Promise<void>;
+  onSave: (profile: Omit<StudentProfile, "id">) => void;
 }) {
   const [profile, setProfile] = useState<Omit<StudentProfile, "id">>(initial ?? {
     name: "", dateOfBirth: "", fatherName: "", motherName: "", bloodGroup: "",
@@ -2701,7 +2701,6 @@ function StudentProfileModal({ initial, onClose, onSave }: {
   });
   const [interestDraft, setInterestDraft] = useState("");
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
 
   function addInterest() {
     const value = interestDraft.trim();
@@ -2717,25 +2716,17 @@ function StudentProfileModal({ initial, onClose, onSave }: {
     setError("");
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!profile.name.trim()) {
       setError("Enter the student's name.");
       return;
     }
-    setSaving(true);
-    setError("");
-    try {
-      await onSave({ ...profile, name: profile.name.trim(), interests: profile.interests.map((interest) => interest.trim()).filter(Boolean) });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The student profile could not be saved to Supabase.");
-    } finally {
-      setSaving(false);
-    }
+    onSave({ ...profile, name: profile.name.trim(), interests: profile.interests.map((interest) => interest.trim()).filter(Boolean) });
   }
 
-  return <Modal title={initial ? "Edit student profile" : "Add student profile"} onClose={saving ? () => undefined : onClose} wide>
-    <form onSubmit={(event) => void submit(event)}><div className="form-grid">
+  return <Modal title={initial ? "Edit student profile" : "Add student profile"} onClose={onClose} wide>
+    <form onSubmit={submit}><div className="form-grid">
       <Field label="Student name (required)"><Input autoFocus required maxLength={120} value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="Date of birth"><DateInput value={profile.dateOfBirth} onValueChange={(dateOfBirth) => setProfile((current) => ({ ...current, dateOfBirth }))} /></Field>
       <Field label="Father's name"><Input maxLength={120} value={profile.fatherName} onChange={(event) => setProfile((current) => ({ ...current, fatherName: event.target.value }))} /></Field>
@@ -2754,29 +2745,23 @@ function StudentProfileModal({ initial, onClose, onSave }: {
         <div className="student-interest-list">{profile.interests.map((interest) => <Badge key={interest}>{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => setProfile((current) => ({ ...current, interests: current.interests.filter((item) => item !== interest) }))}><X size={12} /></button></Badge>)}</div>
       </div>
     </div>
-    <p className="section-description">Student and family information is sensitive. Only enter details you need to keep. The profile closes after Supabase confirms the save.</p>
+    <p className="section-description">Student and family information is sensitive. Only enter details you need to keep. Changes sync automatically to Supabase.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
-    <div className="modal-actions"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? <><LoaderCircle size={14} className="spin" />Saving to Supabase…</> : initial ? "Save profile" : "Add student"}</Button></div></form>
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save profile" : "Add student"}</Button></div></form>
   </Modal>;
 }
 
-function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => Promise<void> }) {
+function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
   const [value, setValue] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
   return <form className="student-interest-editor" onSubmit={(event) => {
     event.preventDefault();
     const interest = value.trim();
     if (!interest || interest.length > 80) return;
-    setSaving(true);
-    setError("");
-    void onAdd(interest).then(() => setValue("")).catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : "The interest could not be saved to Supabase.");
-    }).finally(() => setSaving(false));
+    onAdd(interest);
+    setValue("");
   }}>
-    <Input aria-label="Add hobby or interest" maxLength={80} placeholder="Add a hobby or interest" value={value} disabled={saving} onChange={(event) => setValue(event.target.value)} />
-    <Button type="submit" variant="outline" disabled={!value.trim() || saving}>{saving ? <LoaderCircle size={14} className="spin" /> : <Plus size={14} />}{saving ? "Saving…" : "Add"}</Button>
-    {error && <span className="field-error" role="alert">{error}</span>}
+    <Input aria-label="Add hobby or interest" maxLength={80} placeholder="Add a hobby or interest" value={value} onChange={(event) => setValue(event.target.value)} />
+    <Button type="submit" variant="outline" disabled={!value.trim()}><Plus size={14} />Add</Button>
   </form>;
 }
 
@@ -2785,7 +2770,7 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
   profiles: StudentProfile[];
   onSave: (record: Omit<EducationRecord, "id">, id?: string) => void;
   onDelete: (record: EducationRecord) => void;
-  onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => Promise<void>;
+  onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => void;
 }) {
   const [editor, setEditor] = useState<{
     record: EducationRecord | null;
@@ -2798,8 +2783,6 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests">("overview");
-  const [interestError, setInterestError] = useState("");
-  const [interestSaving, setInterestSaving] = useState(false);
   const [sortBy, setSortBy] = useState("student-year");
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
@@ -2944,15 +2927,15 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
     });
   }
 
-  async function saveProfile(profile: Omit<StudentProfile, "id">): Promise<void> {
+  function saveProfile(profile: Omit<StudentProfile, "id">) {
     const id = profileEditor?.existingId ?? createId();
-    await onSaveProfile(profile, id, profileEditor?.previousName);
+    onSaveProfile(profile, id, profileEditor?.previousName);
     setSelectedStudent(`profile:${id}`);
     setActiveSection("overview");
     setProfileEditor(null);
   }
 
-  async function saveInterest(interest: string, remove = false): Promise<void> {
+  function saveInterest(interest: string, remove = false) {
     if (!selectedEntry) return;
     const existing = selectedEntry.profile ?? {
       id: createId(), name: selectedEntry.name, dateOfBirth: "", fatherName: "", motherName: "",
@@ -2961,18 +2944,8 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
     const interests = existing.interests.filter((item) => item.toLocaleLowerCase() !== interest.toLocaleLowerCase());
     const updated = remove ? interests : [...interests, interest];
     const profileId = selectedEntry.profile?.id ?? existing.id;
-    setInterestSaving(true);
-    setInterestError("");
-    try {
-      await onSaveProfile({ ...existing, interests: updated }, profileId, selectedEntry.name);
-      setSelectedStudent(`profile:${profileId}`);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "The interest could not be saved to Supabase.";
-      setInterestError(message);
-      throw cause;
-    } finally {
-      setInterestSaving(false);
-    }
+    onSaveProfile({ ...existing, interests: updated }, profileId, selectedEntry.name);
+    setSelectedStudent(`profile:${profileId}`);
   }
 
   const directoryEntries = studentEntries.filter((student) => {
@@ -3026,9 +2999,8 @@ function EducationRecordsPage({ records, profiles, onSave, onDelete, onSaveProfi
       </>}
       {activeSection === "interests" && <Card className="student-interests-card">
         <div className="card-head"><div><h2 className="section-title">Hobbies & interests</h2><p className="section-description">Keep hobbies and interests as individual tags for this student.</p></div><Heart size={17} /></div>
-        <div className="student-interest-list">{(shownProfile?.interests ?? []).map((interest) => <Badge key={interest}>{interest}<button type="button" disabled={interestSaving} aria-label={`Remove ${interest}`} onClick={() => void saveInterest(interest, true).catch(() => undefined)}><X size={12} /></button></Badge>)}</div>
+        <div className="student-interest-list">{(shownProfile?.interests ?? []).map((interest) => <Badge key={interest}>{interest}<button type="button" aria-label={`Remove ${interest}`} onClick={() => saveInterest(interest, true)}><X size={12} /></button></Badge>)}</div>
         <InterestQuickAdd onAdd={(interest) => saveInterest(interest)} />
-        {interestError && <div className="alert alert-error" style={{ marginTop: 10 }} role="alert">{interestError}</div>}
         {!shownProfile?.interests.length && <p className="education-empty">No hobbies or interests have been added yet.</p>}
       </Card>}
     </>}
@@ -6721,10 +6693,10 @@ export default function App() {
       };
     });
   }
-  async function saveStudentProfile(profile: Omit<StudentProfile, "id">, id?: string, previousName?: string): Promise<void> {
+  function saveStudentProfile(profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) {
     const profileId = id ?? createId();
     const normalizedPreviousName = previousName?.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
-    await persistUpdate((previous) => ({
+    update((previous) => ({
       ...previous,
       studentProfiles: (previous.studentProfiles ?? []).some((entry) => entry.id === profileId)
         ? (previous.studentProfiles ?? []).map((entry) => entry.id === profileId ? { ...profile, id: profileId } : entry)

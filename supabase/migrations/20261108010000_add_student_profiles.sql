@@ -33,7 +33,7 @@ begin
       raise exception 'Daybook collection studentProfiles must be a JSON array';
     end if;
 
-    delete from public.student_profiles;
+    delete from public.student_profiles where id is not null;
     insert into public.student_profiles (id, position, record)
     select entry ->> 'id', entry_position::integer, entry
     from pg_catalog.jsonb_array_elements(p_data -> 'studentProfiles')
