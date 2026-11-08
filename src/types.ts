@@ -417,10 +417,14 @@ export const MORNING_EXERCISE_OPTIONS = [
 ] as const;
 export const EXERCISE_INTENSITIES = ["Easy", "Moderate", "Vigorous"] as const;
 export type ExerciseIntensity = (typeof EXERCISE_INTENSITIES)[number];
+export const EXERCISE_DAYPARTS = ["Morning", "Afternoon", "Evening", "Night"] as const;
+export type ExerciseDaypart = (typeof EXERCISE_DAYPARTS)[number];
 
 export interface MorningExerciseLog {
   id: string;
   date: string;
+  daypart?: ExerciseDaypart;
+  time?: string;
   activity: string;
   durationMinutes: number | null;
   count: number | null;

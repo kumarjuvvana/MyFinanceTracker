@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -3725,19 +3725,21 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
 function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivities }: {
   logs: MorningExerciseLog[];
   activities: string[];
-  onSave: (log: Omit<MorningExerciseLog, "id">, id?: string) => void;
+  onSave: (logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>) => void;
   onArchive: (log: MorningExerciseLog) => void;
   onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
-  const [draft, setDraft] = useState<Omit<MorningExerciseLog, "id">>({
-    date: today(),
-    activity: "Walking",
+  type ExerciseRowDraft = Omit<MorningExerciseLog, "id" | "date"> & { id?: string };
+  const [exerciseDate, setExerciseDate] = useState(today);
+  const [draftRows, setDraftRows] = useState<ExerciseRowDraft[]>([{
+    daypart: "Morning",
+    time: "",
+    activity: activities[0] ?? "",
     durationMinutes: null,
     count: null,
     intensity: "Moderate",
     notes: "",
-  });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  }]);
   const [search, setSearch] = useState("");
   const [activityFilter, setActivityFilter] = useState("");
   const [newActivity, setNewActivity] = useState("");
@@ -3746,8 +3748,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const [activityError, setActivityError] = useState("");
   const [exerciseError, setExerciseError] = useState("");
   const query = search.trim().toLocaleLowerCase();
-  const editedActivity = editingId ? logs.find((log) => log.id === editingId)?.activity : undefined;
-  const formActivities = [...new Set([...activities, ...(editedActivity ? [editedActivity] : [])])];
+  const formActivities = [...new Set([...activities, ...draftRows.map((row) => row.activity)])];
   const sortedLogs = [...logs].sort((a, b) => b.date.localeCompare(a.date));
   const visibleLogs = sortedLogs.filter((log) =>
     (!activityFilter || log.activity === activityFilter) &&
@@ -3760,32 +3761,74 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const recentDays = new Set(recentLogs.map((log) => log.date)).size;
 
   function editLog(log: MorningExerciseLog) {
-    const { id, ...values } = log;
-    setDraft({ ...values, durationMinutes: values.durationMinutes ?? null, count: values.count ?? null });
-    setEditingId(id);
+    setExerciseDate(log.date);
+    setDraftRows([{
+      id: log.id,
+      daypart: log.daypart ?? "Morning",
+      time: log.time ?? "",
+      activity: log.activity,
+      durationMinutes: log.durationMinutes ?? null,
+      count: log.count ?? null,
+      intensity: log.intensity,
+      notes: log.notes,
+    }]);
   }
 
   function resetForm() {
-    setDraft({ date: today(), activity: activities[0] ?? "", durationMinutes: null, count: null, intensity: "Moderate", notes: "" });
-    setEditingId(null);
+    setExerciseDate(today());
+    setDraftRows([{
+      daypart: "Morning",
+      time: "",
+      activity: activities[0] ?? "",
+      durationMinutes: null,
+      count: null,
+      intensity: "Moderate",
+      notes: "",
+    }]);
+  }
+
+  function updateDraftRow(index: number, patch: Partial<ExerciseRowDraft>) {
+    setDraftRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row));
+  }
+
+  function addDraftRow() {
+    setDraftRows((current) => [...current, {
+      daypart: "Morning",
+      time: "",
+      activity: activities[0] ?? "",
+      durationMinutes: null,
+      count: null,
+      intensity: "Moderate",
+      notes: "",
+    }]);
+  }
+
+  function removeDraftRow(index: number) {
+    setDraftRows((current) => current.length > 1 ? current.filter((_, rowIndex) => rowIndex !== index) : current);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft.durationMinutes === null && draft.count === null) {
-      setExerciseError("Enter a duration, a count, or both.");
+    if (!exerciseDate || !draftRows.length) {
+      setExerciseError("Select a date and add at least one exercise row.");
       return;
     }
-    if (draft.durationMinutes !== null && (!Number.isInteger(draft.durationMinutes) || draft.durationMinutes < 1 || draft.durationMinutes > 1440)) {
-      setExerciseError("Duration must be between 1 and 1,440 minutes.");
-      return;
-    }
-    if (draft.count !== null && (!Number.isInteger(draft.count) || draft.count < 1 || draft.count > 1000000)) {
-      setExerciseError("Count must be a whole number between 1 and 1,000,000.");
-      return;
+    for (const [index, row] of draftRows.entries()) {
+      if (row.durationMinutes === null && row.count === null) {
+        setExerciseError(`Exercise row ${index + 1}: enter a duration, a count, or both.`);
+        return;
+      }
+      if (row.durationMinutes !== null && (!Number.isInteger(row.durationMinutes) || row.durationMinutes < 1 || row.durationMinutes > 1440)) {
+        setExerciseError(`Exercise row ${index + 1}: duration must be between 1 and 1,440 minutes.`);
+        return;
+      }
+      if (row.count !== null && (!Number.isInteger(row.count) || row.count < 1 || row.count > 1000000)) {
+        setExerciseError(`Exercise row ${index + 1}: count must be between 1 and 1,000,000.`);
+        return;
+      }
     }
     setExerciseError("");
-    onSave({ ...draft, activity: draft.activity.trim(), notes: draft.notes.trim() }, editingId ?? undefined);
+    onSave(draftRows.map((row) => ({ ...row, date: exerciseDate, activity: row.activity.trim(), time: row.time ?? "", daypart: row.daypart ?? "Morning", notes: row.notes.trim() })));
     resetForm();
   }
 
@@ -3801,7 +3844,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       return;
     }
     onSaveActivities([...activities, name]);
-    setDraft((current) => ({ ...current, activity: name }));
+    updateDraftRow(0, { activity: name });
     setNewActivity("");
     setActivityError("");
   }
@@ -3814,7 +3857,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       return;
     }
     onSaveActivities(activities.map((activity) => activity === previousName ? name : activity), { previousName, nextName: name });
-    if (draft.activity === previousName) setDraft((current) => ({ ...current, activity: name }));
+    setDraftRows((current) => current.map((row) => row.activity === previousName ? { ...row, activity: name } : row));
     setEditingActivity(null);
     setActivityError("");
   }
@@ -3826,14 +3869,16 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     }
     if (!window.confirm(`Remove "${name}" from the activity list? Existing exercise records will be kept.`)) return;
     onSaveActivities(activities.filter((activity) => activity !== name));
-    if (draft.activity === name) setDraft((current) => ({ ...current, activity: activities.find((activity) => activity !== name) ?? "" }));
+    setDraftRows((current) => current.map((row) => row.activity === name
+      ? { ...row, activity: activities.find((activity) => activity !== name) ?? "" }
+      : row));
     setActivityError("");
   }
 
   function archiveLog(log: MorningExerciseLog) {
     if (!window.confirm(`Move the ${log.date} ${log.activity.toLocaleLowerCase()} record to the archive?`)) return;
     onArchive(log);
-    if (editingId === log.id) resetForm();
+    if (draftRows.some((row) => row.id === log.id)) resetForm();
   }
 
   return <>
@@ -3844,18 +3889,25 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Card><span>Minutes · last 7 days</span><strong>{recentMinutes}</strong></Card>
     </div>
     <Card className="mindful-habits-card">
-      <div className="card-head"><div><h2 className="section-title">{editingId ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose an activity from the list or add a new one below. Duration and repetitions are optional, but enter at least one.</p></div><Dumbbell size={17} /></div>
+      <div className="card-head"><div><h2 className="section-title">{draftRows.some((row) => row.id) ? "Edit exercise" : "Log morning exercise"}</h2><p className="section-description">Choose a date once, then add one row for each activity. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
       <form onSubmit={submit}>
         <div className="form-grid">
-          <Field label="Date"><DateInput required value={draft.date} onValueChange={(date) => setDraft((current) => ({ ...current, date }))} /></Field>
-          <Field label="Exercise or activity"><Select required value={draft.activity} onChange={(event) => setDraft((current) => ({ ...current, activity: event.target.value }))}>{formActivities.map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
-          <Field label="Duration (minutes, optional)"><Input type="number" min={1} max={1440} step={1} placeholder="e.g. 30" value={draft.durationMinutes ?? ""} onChange={(event) => setDraft((current) => ({ ...current, durationMinutes: event.target.value ? Number(event.target.value) : null }))} /></Field>
-          <Field label="Repetitions / count (optional)"><Input type="number" min={1} max={1000000} step={1} placeholder="e.g. 20 pull-ups" value={draft.count ?? ""} onChange={(event) => setDraft((current) => ({ ...current, count: event.target.value ? Number(event.target.value) : null }))} /></Field>
-          <Field label="Intensity"><Select value={draft.intensity} onChange={(event) => setDraft((current) => ({ ...current, intensity: event.target.value as ExerciseIntensity }))}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
-          <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} /></Field>
+          <Field label="Exercise date"><DateInput required value={exerciseDate} onValueChange={setExerciseDate} /></Field>
         </div>
+        <div className="mindful-log-list">{draftRows.map((row, index) => <Card className="mindful-log-card" key={row.id ?? `new-exercise-${index}`}>
+          <div className="card-head"><div><h3 className="section-title">Exercise {index + 1}</h3><p className="section-description">{row.id ? "Update this exercise entry" : "Add an activity for this date"}</p></div>{draftRows.length > 1 && <Button type="button" size="sm" variant="outline" aria-label={`Remove exercise row ${index + 1}`} onClick={() => removeDraftRow(index)}><Trash2 size={14} />Remove row</Button>}</div>
+          <div className="form-grid">
+            <Field label="When"><Select value={row.daypart ?? "Morning"} onChange={(event) => updateDraftRow(index, { daypart: event.target.value as ExerciseDaypart })}>{EXERCISE_DAYPARTS.map((part) => <option key={part}>{part}</option>)}</Select></Field>
+            <Field label="Time (optional)"><Input type="time" value={row.time ?? ""} onChange={(event) => updateDraftRow(index, { time: event.target.value })} /></Field>
+            <Field label="Exercise type"><Select required value={row.activity} onChange={(event) => updateDraftRow(index, { activity: event.target.value })}>{formActivities.map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
+            <Field label="Duration (minutes, optional)"><Input type="number" min={1} max={1440} step={1} placeholder="e.g. 30" value={row.durationMinutes ?? ""} onChange={(event) => updateDraftRow(index, { durationMinutes: event.target.value ? Number(event.target.value) : null })} /></Field>
+            <Field label="Repetitions / count (optional)"><Input type="number" min={1} max={1000000} step={1} placeholder="e.g. 20" value={row.count ?? ""} onChange={(event) => updateDraftRow(index, { count: event.target.value ? Number(event.target.value) : null })} /></Field>
+            <Field label="Intensity"><Select value={row.intensity} onChange={(event) => updateDraftRow(index, { intensity: event.target.value as ExerciseIntensity })}>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
+            <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="How did it feel? Add any detail you want to remember." value={row.notes} onChange={(event) => updateDraftRow(index, { notes: event.target.value })} /></Field>
+          </div>
+        </Card>)}</div>
         {exerciseError && <div className="alert alert-error" style={{ marginTop: 12 }} role="alert">{exerciseError}</div>}
-        <div className="connector-actions"><Button type="submit">{editingId ? "Save changes" : "Save exercise"}</Button>{editingId && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
+        <div className="connector-actions">{!draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={addDraftRow}><Plus size={14} />Add exercise row</Button>}<Button type="submit">{draftRows.some((row) => row.id) ? "Save changes" : `Save ${draftRows.length} ${draftRows.length === 1 ? "exercise" : "exercises"}`}</Button>{draftRows.some((row) => row.id) && <Button type="button" variant="outline" onClick={resetForm}>Cancel edit</Button>}</div>
       </form>
     </Card>
     <Card className="mindful-habits-card">
@@ -3877,7 +3929,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "session" : "sessions"}</Badge>
     </div>
     <div className="mindful-log-list">{visibleLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
-      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone="green">{log.activity}</Badge>{log.durationMinutes !== null && <Badge>{log.durationMinutes} min</Badge>}{log.count != null && <Badge>Reps / count {log.count}</Badge>}<Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
+      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge>{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</Badge><Badge tone="green">{log.activity}</Badge>{log.durationMinutes !== null && <Badge>{log.durationMinutes} min</Badge>}{log.count != null && <Badge>Reps / count {log.count}</Badge>}<Badge>{log.intensity}</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${log.activity} exercise on ${log.date}`} onClick={() => editLog(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
       {log.notes && <div className="mindful-log-section"><span>Notes</span><p>{log.notes}</p></div>}
     </Card>)}</div>
     {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
@@ -8017,12 +8069,16 @@ export default function App() {
       mindfulnessLogs: (previous.mindfulnessLogs ?? []).filter((entry) => entry.id !== log.id),
     }));
   }
-  function saveMorningExerciseLog(log: Omit<MorningExerciseLog, "id">, id?: string) {
+  function saveMorningExerciseLogs(logs: Array<Omit<MorningExerciseLog, "id"> & { id?: string }>) {
     update((previous) => ({
       ...previous,
-      morningExerciseLogs: id
-        ? (previous.morningExerciseLogs ?? []).map((entry) => entry.id === id ? { ...log, id } : entry)
-        : [{ ...log, id: createId() }, ...(previous.morningExerciseLogs ?? [])],
+      morningExerciseLogs: logs.reduce((current, log) => {
+        const id = log.id ?? createId();
+        const saved = { ...log, id };
+        const index = current.findIndex((entry) => entry.id === id);
+        if (index < 0) return [saved, ...current];
+        return current.map((entry) => entry.id === id ? saved : entry);
+      }, [...(previous.morningExerciseLogs ?? [])]),
     }));
   }
   function saveMorningExerciseActivities(activities: string[], rename?: { previousName: string; nextName: string }) {
@@ -8657,7 +8713,7 @@ export default function App() {
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
-    "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLog} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
+    "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLogs} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} dailyPrayerLogs={data.dailyPrayerLogs ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveDailyPrayerLog={saveDailyPrayerLog} onDeleteDailyPrayerLog={deleteDailyPrayerLog} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
