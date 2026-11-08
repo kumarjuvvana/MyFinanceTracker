@@ -810,6 +810,19 @@ export interface CredentialRecord {
   customerService?: string;
 }
 
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountHolder: string;
+  accountType: string;
+  accountNumber: string;
+  routingCode: string;
+  branch: string;
+  website: string;
+  customerService: string;
+  notes: string;
+}
+
 export interface EncryptedCredentialVault {
   version: 1;
   kdf: "PBKDF2-SHA-256";
@@ -867,6 +880,7 @@ export interface TrackerData {
   mindfulnessLogs?: MindfulnessLog[];
   morningExerciseLogs?: MorningExerciseLog[];
   morningExerciseActivities?: string[];
+  bankAccounts?: BankAccount[];
   credentialVault?: EncryptedCredentialVault;
 }
 

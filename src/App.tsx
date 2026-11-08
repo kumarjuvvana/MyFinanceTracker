@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -946,6 +946,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         mindfulHabits: mergeArchivedRows(previous.mindfulHabits, snapshot.mindfulHabits),
         mindfulnessLogs: mergeArchivedRows(previous.mindfulnessLogs, snapshot.mindfulnessLogs),
         morningExerciseLogs: mergeArchivedRows(previous.morningExerciseLogs, snapshot.morningExerciseLogs),
+        bankAccounts: mergeArchivedRows(previous.bankAccounts, snapshot.bankAccounts),
   };
 }
 
@@ -6775,6 +6776,134 @@ function CredentialModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
+function DirectBankAccountModal({ initial, onClose, onSave }: {
+  initial: BankAccount | null;
+  onClose: () => void;
+  onSave: (account: BankAccount) => Promise<void>;
+}) {
+  const [bankName, setBankName] = useState(initial?.bankName ?? "");
+  const [accountHolder, setAccountHolder] = useState(initial?.accountHolder ?? "");
+  const [accountType, setAccountType] = useState(initial?.accountType ?? "Savings");
+  const [accountNumber, setAccountNumber] = useState(initial?.accountNumber ?? "");
+  const [routingCode, setRoutingCode] = useState(initial?.routingCode ?? "");
+  const [branch, setBranch] = useState(initial?.branch ?? "");
+  const [website, setWebsite] = useState(initial?.website ?? "");
+  const [customerService, setCustomerService] = useState(initial?.customerService ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError("");
+    if (!bankName.trim() || !accountHolder.trim() || !accountNumber.trim()) {
+      setError("Enter the bank name, account holder, and account number.");
+      return;
+    }
+    if (website.trim()) {
+      try {
+        if (new URL(website.trim()).protocol !== "https:") throw new Error();
+      } catch {
+        setError("Enter a valid HTTPS bank website, or leave it blank.");
+        return;
+      }
+    }
+    setSaving(true);
+    try {
+      await onSave({
+        id: initial?.id ?? createId(),
+        bankName: bankName.trim(),
+        accountHolder: accountHolder.trim(),
+        accountType: accountType.trim(),
+        accountNumber: accountNumber.trim(),
+        routingCode: routingCode.trim(),
+        branch: branch.trim(),
+        website: website.trim(),
+        customerService: customerService.trim(),
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The bank account could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Modal title={initial ? "Edit bank account" : "Add bank account"} onClose={onClose} wide inline={Boolean(initial)}>
+    <form onSubmit={(event) => void submit(event)}>
+      <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>Bank details are stored as readable fields in your Supabase bank_accounts table and included in backups. Do not store PINs, passwords, one-time codes, or recovery codes.</span></div>
+      <div className="form-grid">
+        <Field label="Bank name"><Input required maxLength={120} autoComplete="off" value={bankName} onChange={(event) => setBankName(event.target.value)} /></Field>
+        <Field label="Account holder"><Input required maxLength={160} autoComplete="off" value={accountHolder} onChange={(event) => setAccountHolder(event.target.value)} /></Field>
+        <Field label="Account type"><Select value={accountType} onChange={(event) => setAccountType(event.target.value)}><option>Savings</option><option>Checking / current</option><option>Salary</option><option>Joint</option><option>Fixed deposit</option><option>Other</option></Select></Field>
+        <div className="field-wrap"><label className="field-label" htmlFor="direct-bank-account-number">Account number</label><div className="credential-secret-field"><Input id="direct-bank-account-number" required maxLength={100} autoComplete="off" type={showAccountNumber ? "text" : "password"} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><button className="icon-button" type="button" aria-label={showAccountNumber ? "Hide account number" : "Show account number"} onClick={() => setShowAccountNumber((visible) => !visible)}>{showAccountNumber ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
+        <Field label="IFSC / routing code"><Input maxLength={80} autoComplete="off" value={routingCode} onChange={(event) => setRoutingCode(event.target.value)} /></Field>
+        <Field label="Branch"><Input maxLength={160} value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
+        <Field className="full" label="Bank website (HTTPS)"><ExternalLinkInput maxLength={2000} placeholder="https://..." value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
+        <Field className="full" label="Customer-service contact"><Input maxLength={500} placeholder="Phone number or email" autoComplete="off" value={customerService} onChange={(event) => setCustomerService(event.target.value)} /></Field>
+        <Field className="full" label="Quick-reference notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details such as account purpose or where to find statements" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+      </div>
+      {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" disabled={saving} onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : initial ? "Save changes" : "Add bank account"}</Button></div>
+    </form>
+  </Modal>;
+}
+
+function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
+  accounts: BankAccount[];
+  onNavigate: (page: Page) => void;
+  onSave: (account: BankAccount) => Promise<void>;
+  onArchive: (account: BankAccount) => Promise<void>;
+}) {
+  const [search, setSearch] = useState("");
+  const [visibleAccountNumbers, setVisibleAccountNumbers] = useState<Set<string>>(new Set());
+  const [editor, setEditor] = useState<BankAccount | null | undefined>(undefined);
+  const [error, setError] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const filteredAccounts = accounts.filter((account) => [
+    account.bankName, account.accountHolder, account.accountType, account.accountNumber,
+    account.routingCode, account.branch, account.website, account.customerService, account.notes,
+  ].some((value) => value.toLocaleLowerCase().includes(query)));
+
+  return <>
+    <PageHeading eyebrow="Finance" title="Bank accounts" subtitle="Quick-reference details for your bank accounts." action={<Button onClick={() => setEditor(null)}><Plus size={15} />Add bank account</Button>} />
+    <nav className="student-profile-tabs" aria-label="Finance account sections">
+      <Button variant="primary" aria-pressed="true"><Landmark size={14} />Bank accounts</Button>
+      <Button variant="outline" onClick={() => onNavigate("Account credentials")}><KeyRound size={14} />Account credentials</Button>
+    </nav>
+    <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details are stored in a separate, readable Supabase table and included in JSON backups. Anyone with database/service-role access can read them. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
+    {error && <div className="alert alert-error" role="alert">{error}</div>}
+    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search bank accounts" placeholder="Search bank, account holder, branch, code..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge></div>
+    {filteredAccounts.length ? <div className="credential-list">{filteredAccounts.map((account) => <Card className="credential-card" key={account.id}>
+      <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
+        <button className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={() => setEditor(account)}><Pencil size={14} /></button>
+        <button className="icon-button" aria-label={`Copy ${account.bankName} bank account`} title="Create a separately editable copy" onClick={() => {
+          if (window.confirm(`Create a copy of the ${account.bankName} bank account?`)) {
+            void onSave({ ...account, id: createId(), bankName: copyLabel(account.bankName, 120) }).catch((caught: unknown) =>
+              setError(caught instanceof Error ? caught.message : "Could not copy the bank account."));
+          }
+        }}><Copy size={14} /></button>
+        <button className="icon-button" aria-label={`Archive ${account.bankName} bank account`} onClick={() => {
+          if (window.confirm(`Move the ${account.bankName} bank account to the Archive?`)) {
+            void onArchive(account).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the bank account."));
+          }
+        }}><Trash2 size={14} /></button>
+      </div></div>
+      <div className="personal-record-details">
+        <div className="credential-bank-number"><span>Account number</span><div><strong>{visibleAccountNumbers.has(account.id) ? account.accountNumber : `•••• •••• ${account.accountNumber.slice(-4)}`}</strong><button type="button" className="icon-button" aria-label={visibleAccountNumbers.has(account.id) ? `Hide ${account.bankName} account number` : `Show ${account.bankName} account number`} onClick={() => setVisibleAccountNumbers((visible) => { const next = new Set(visible); if (next.has(account.id)) next.delete(account.id); else next.add(account.id); return next; })}>{visibleAccountNumbers.has(account.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
+        {account.routingCode && <div><span>IFSC / routing code</span><strong>{account.routingCode}</strong></div>}
+        {account.branch && <div><span>Branch</span><strong>{account.branch}</strong></div>}
+        {account.customerService && <div><span>Customer service</span><strong>{account.customerService}</strong></div>}
+      </div>
+      {account.website && <a className="personal-document-link" href={account.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
+      {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
+    </Card>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try another search." : "Add a bank account for quick reference."} /></Card>}
+    {editor !== undefined && <DirectBankAccountModal key={editor?.id ?? "new-direct-bank-account"} initial={editor} onClose={() => setEditor(undefined)} onSave={onSave} />}
+  </>;
+}
+
 function BankAccountModal({ initial, onClose, onSave }: {
   initial: CredentialRecord | null;
   onClose: () => void;
@@ -6856,12 +6985,13 @@ function BankAccountModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete }: {
+function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete, onMigrateBankAccounts }: {
   vault?: EncryptedCredentialVault;
   section: "credentials" | "banks";
   onNavigate: (page: Page) => void;
   onSave: (vault: EncryptedCredentialVault) => void;
   onDelete: () => void;
+  onMigrateBankAccounts?: (vault: EncryptedCredentialVault, accounts: BankAccount[]) => Promise<void>;
 }) {
   const [unlocked, setUnlocked] = useState<UnlockedCredentialVault | null>(null);
   const [password, setPassword] = useState("");
@@ -6949,6 +7079,37 @@ function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete }: {
     onSave(encrypted);
   }
 
+  async function migrateLegacyBankAccounts() {
+    if (!vault || !unlocked || !onMigrateBankAccounts) return;
+    const legacy = unlocked.records.filter((record) => record.kind === "bank-account");
+    const remaining = unlocked.records.filter((record) => record.kind !== "bank-account");
+    if (!legacy.length) return;
+    setBusy(true);
+    setError("");
+    try {
+      const accounts: BankAccount[] = legacy.map((record) => ({
+        id: record.id,
+        bankName: record.provider,
+        accountHolder: record.accountHolder ?? "",
+        accountType: record.accountType ?? "Other",
+        accountNumber: record.accountNumber ?? "",
+        routingCode: record.routingCode ?? "",
+        branch: record.branch ?? "",
+        website: record.website,
+        customerService: record.customerService ?? "",
+        notes: record.notes,
+      }));
+      const encrypted = await updateCredentialVault(remaining, unlocked.key, vault);
+      await onMigrateBankAccounts(encrypted, accounts);
+      lastSavedCiphertext.current = encrypted.ciphertext;
+      setUnlocked({ ...unlocked, records: remaining });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not move the legacy bank accounts.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function lockVault() {
     setUnlocked(null);
     setPassword("");
@@ -6991,12 +7152,14 @@ function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete }: {
       record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value]),
     ].some((value) => value.toLocaleLowerCase().includes(query)));
   const bankAccounts = section === "banks";
+  const legacyBankAccountCount = unlocked.records.filter((record) => record.kind === "bank-account").length;
 
   return <>
     <PageHeading eyebrow="Private account vault" title={bankAccounts ? "Bank accounts" : "Account credentials"} subtitle={bankAccounts ? "Search and manage encrypted bank details for private quick reference." : "Search and manage your encrypted account details."} action={<div className="credential-page-actions"><Button onClick={() => setEditor(null)}><Plus size={15} />{bankAccounts ? "Add bank account" : "Add account"}</Button><Button variant="outline" onClick={lockVault}><LockKeyhole size={14} /> Lock vault</Button></div>} />
     {sectionTabs}
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>{bankAccounts ? "Bank details are encrypted with your separate vault passphrase before syncing. Account numbers are masked until you reveal them. Lock the vault when finished; never store PINs, passwords, one-time codes, or recovery codes." : "Encrypted with your separate vault passphrase before syncing. Search covers provider, category, sign-in link, username, recovery info, tags, notes and custom fields, but never passwords. Lock the vault when finished. Do not store bank PINs, one-time codes, or recovery codes."}</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
+    {!bankAccounts && legacyBankAccountCount > 0 && <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>{legacyBankAccountCount} bank {legacyBankAccountCount === 1 ? "account is" : "accounts are"} still stored in the encrypted vault. Move {legacyBankAccountCount === 1 ? "it" : "them"} to the separate Bank accounts table to access {legacyBankAccountCount === 1 ? "it" : "them"} without unlocking this vault. <Button size="sm" disabled={busy || !onMigrateBankAccounts} onClick={() => void migrateLegacyBankAccounts()}>{busy ? "Moving..." : "Move to Bank accounts"}</Button></span></div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={bankAccounts ? "Search bank accounts" : "Search account credentials"} placeholder={bankAccounts ? "Search bank, account holder, branch, code..." : "Search provider, username, tags, notes..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{records.length} {records.length === 1 ? bankAccounts ? "bank account" : "account" : bankAccounts ? "bank accounts" : "accounts"}</Badge></div>
     {bankAccounts ? <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
       <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{record.provider}</h2><p>{record.accountType || "Bank account"}{record.accountHolder ? ` · ${record.accountHolder}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider} bank account`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.provider} bank account`} title="Create a separately encrypted copy" onClick={() => { if (window.confirm(`Create a copy of the ${record.provider} bank account details?`)) void saveRecords([{ ...record, id: createId(), provider: copyLabel(record.provider, 120) }, ...unlocked.records]).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the bank account.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider} bank account`} onClick={() => { if (window.confirm(`Delete the ${record.provider} bank account from the encrypted vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
@@ -7436,6 +7599,7 @@ function emptyTrackerData(): TrackerData {
     promptRecords: [],
     mindfulHabits: [],
     mindfulnessLogs: [],
+    bankAccounts: [],
     morningExerciseLogs: [],
     educationRecords: [],
     studentProfiles: [],
@@ -8991,7 +9155,15 @@ export default function App() {
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
     "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
-    "Bank accounts": <CredentialVaultPage vault={data.credentialVault} section="banks" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
+    "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}
+      onSave={(account) => persistUpdate((previous) => ({
+        ...previous,
+        bankAccounts: [account, ...(previous.bankAccounts ?? []).filter((entry) => entry.id !== account.id)],
+      }))}
+      onArchive={(account) => persistUpdate((previous) => ({
+        ...withArchivedRecord(previous, `Bank account: ${account.bankName}`, { bankAccounts: [account] }),
+        bankAccounts: (previous.bankAccounts ?? []).filter((entry) => entry.id !== account.id),
+      }))} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
     "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLogs} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
@@ -9011,7 +9183,12 @@ export default function App() {
     "Database manager": <DatabaseManagerPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
-    "Account credentials": <CredentialVaultPage vault={data.credentialVault} section="credentials" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))} />,
+    "Account credentials": <CredentialVaultPage vault={data.credentialVault} section="credentials" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))}
+      onMigrateBankAccounts={(credentialVault, accounts) => persistUpdate((previous) => ({
+        ...previous,
+        credentialVault,
+        bankAccounts: [...accounts, ...(previous.bankAccounts ?? []).filter((entry) => !accounts.some((account) => account.id === entry.id))],
+      }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,
   };
