@@ -1,4 +1,4 @@
-import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { Filter, X } from "lucide-react";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost" | "danger"; size?: "sm" | "md" };
@@ -133,7 +133,20 @@ export function EmptyState({ title, description, icon }: { title: string; descri
   return <div className="empty-state"><div className="empty-icon">{icon}</div><p className="empty-title">{title}</p><p className="empty-copy">{description}</p></div>;
 }
 
-export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide = false, inline = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; inline?: boolean }) {
+  const inlineEditorRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (inline) inlineEditorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [inline]);
+
+  if (inline) {
+    return <section ref={inlineEditorRef} className="card inline-editor" role="region" aria-label={`Editing: ${title}`}>
+      <div className="modal-head"><h2>{title}</h2><button className="icon-button" aria-label="Close inline editor" onClick={onClose}><X size={18} /></button></div>
+      {children}
+    </section>;
+  }
+
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className={`modal ${wide ? "modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">

@@ -376,7 +376,7 @@ function ItemModal({ initial, products, onClose, onSave }: { initial?: ShoppingI
     if (!Number.isFinite(form.quantity) || form.quantity <= 0 || !Number.isFinite(form.estimatedPrice) || form.estimatedPrice < 0) { setError("Quantity must be above zero and price cannot be negative."); return; }
     onSave({ ...form, name: form.name.trim(), unit: form.unit.trim() });
   }
-  return <Modal title={initial ? "Edit item" : "Add to your list"} onClose={onClose}><form onSubmit={submit}><div className="form-grid">
+  return <Modal title={initial ? "Edit item" : "Add to your list"} onClose={onClose} inline={Boolean(initial)}><form onSubmit={submit}><div className="form-grid">
     {!initial && products.length > 0 && <Field className="full" label="Start from product master data"><Select value={productId} onChange={(event) => {
       const product = products.find((entry) => entry.id === event.target.value);
       setProductId(event.target.value);
@@ -599,7 +599,7 @@ function ReminderModal({ initial, categories, onClose, onSave }: {
     }
     onSave({ title: title.trim(), date, category: category.trim(), details: details.trim(), completed: initial?.completed ?? false }, initial?.id);
   }
-  return <Modal title={initial ? "Edit note or reminder" : "Add a note or reminder"} onClose={onClose}>
+  return <Modal title={initial ? "Edit note or reminder" : "Add a note or reminder"} onClose={onClose} inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus maxLength={120} required value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
@@ -3335,11 +3335,11 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
       </Card>)}</div> : <Card><EmptyState icon={<UsersRound size={18} />} title="No students found" description={studentEntries.length ? "Try another search." : "Add a student profile or add an education record to start the directory."} /></Card>}
     </> : <>
       <nav className="student-profile-tabs" aria-label="Student profile sections">
-        <Button variant={activeSection === "overview" ? "primary" : "outline"} onClick={() => setActiveSection("overview")}><UsersRound size={14} />Profile</Button>
-        <Button variant={activeSection === "education" ? "primary" : "outline"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
-        <Button variant={activeSection === "interests" ? "primary" : "outline"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
-        <Button variant={activeSection === "notes" ? "primary" : "outline"} onClick={() => setActiveSection("notes")}><FileText size={14} />Notes</Button>
-        <Button variant={activeSection === "plans" ? "primary" : "outline"} onClick={() => setActiveSection("plans")}><CalendarDays size={14} />Plan for education</Button>
+        <Button variant={activeSection === "overview" ? "primary" : "outline"} aria-pressed={activeSection === "overview"} onClick={() => setActiveSection("overview")}><UsersRound size={14} />Profile</Button>
+        <Button variant={activeSection === "education" ? "primary" : "outline"} aria-pressed={activeSection === "education"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
+        <Button variant={activeSection === "interests" ? "primary" : "outline"} aria-pressed={activeSection === "interests"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
+        <Button variant={activeSection === "notes" ? "primary" : "outline"} aria-pressed={activeSection === "notes"} onClick={() => setActiveSection("notes")}><FileText size={14} />Notes</Button>
+        <Button variant={activeSection === "plans" ? "primary" : "outline"} aria-pressed={activeSection === "plans"} onClick={() => setActiveSection("plans")}><CalendarDays size={14} />Plan for education</Button>
       </nav>
       {activeSection === "overview" && <Card className="student-profile-card">
         <div className="student-profile-heading">
@@ -3442,7 +3442,7 @@ function LearningRecordModal({ initial, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit learning record" : "Add learning record"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit learning record" : "Add learning record"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="What are you learning? (required)"><Input autoFocus required maxLength={140} placeholder="e.g. .NET programming, finance, public speaking" value={record.title} onChange={(event) => setRecord((current) => ({ ...current, title: event.target.value }))} /></Field>
       <Field label="Topic / category"><Input maxLength={100} placeholder="e.g. Programming, Design" value={record.topic} onChange={(event) => setRecord((current) => ({ ...current, topic: event.target.value }))} /></Field>
@@ -3523,7 +3523,7 @@ function PromptRecordModal({ initial, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit AI prompt" : "Add AI prompt"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit AI prompt" : "Add AI prompt"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Review a pull request" value={record.title} onChange={(event) => setRecord((current) => ({ ...current, title: event.target.value }))} /></Field>
       <Field className="full" label="Description / when to use it"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Describe the goal, context, intended audience, or when this prompt is useful." value={record.description} onChange={(event) => setRecord((current) => ({ ...current, description: event.target.value }))} /></Field>
@@ -3608,7 +3608,7 @@ function MindfulHabitModal({ initial, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit positive habit" : "Add positive habit"} onClose={onClose}>
+  return <Modal title={initial ? "Edit positive habit" : "Add positive habit"} onClose={onClose} inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Habit (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Pause before replying when upset" value={habit.title} onChange={(event) => setHabit((current) => ({ ...current, title: event.target.value }))} /></Field>
       <Field className="full" label="What does this look like for you?"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional reminder or description" value={habit.description} onChange={(event) => setHabit((current) => ({ ...current, description: event.target.value }))} /></Field>
@@ -3771,8 +3771,8 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
     <div className="alert"><Heart size={15} style={{ flex: "none", marginTop: 1 }} /><span>A gentle personal journal, not a medical assessment. Progress is about noticing and practicing, not being perfect. These notes are saved in your shared Daybook data.</span></div>
     <div className="mindful-summary"><Card><span>Days reflected · last 7 days</span><strong>{recentDays} / 7</strong></Card><Card><span>Habit practices · last 7 days</span><strong>{recentHabitPractices}</strong></Card><Card><span>Positive habits</span><strong>{habits.length}</strong></Card></div>
     <nav className="student-profile-tabs" aria-label="Mind and habits sections">
-      <Button variant={activeTab === "habits" ? "primary" : "outline"} onClick={() => setActiveTab("habits")}><Heart size={14} />Habit tracker <Badge>{habits.length}</Badge></Button>
-      <Button variant={activeTab === "reflections" ? "primary" : "outline"} onClick={() => setActiveTab("reflections")}><FileText size={14} />Reflections <Badge>{logs.length}</Badge></Button>
+      <Button variant={activeTab === "habits" ? "primary" : "outline"} aria-pressed={activeTab === "habits"} onClick={() => setActiveTab("habits")}><Heart size={14} />Habit tracker <Badge>{habits.length}</Badge></Button>
+      <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><FileText size={14} />Reflections <Badge>{logs.length}</Badge></Button>
     </nav>
     {activeTab === "habits" && <>
       <Card className="mindful-habits-card">
@@ -3995,9 +3995,9 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
       <Card><span>Minutes · last 7 days</span><strong>{recentMinutes}</strong></Card>
     </div>
     <nav className="student-profile-tabs" aria-label="Morning exercise sections">
-      <Button variant={activeTab === "log" ? "primary" : "outline"} onClick={() => setActiveTab("log")}><Plus size={14} />Log exercises</Button>
-      <Button variant={activeTab === "records" ? "primary" : "outline"} onClick={() => setActiveTab("records")}><ClipboardList size={14} />Exercise records <Badge>{logs.length}</Badge></Button>
-      <Button variant={activeTab === "activities" ? "primary" : "outline"} onClick={() => setActiveTab("activities")}><Dumbbell size={14} />Activities <Badge>{activities.length}</Badge></Button>
+      <Button variant={activeTab === "log" ? "primary" : "outline"} aria-pressed={activeTab === "log"} onClick={() => setActiveTab("log")}><Plus size={14} />Log exercises</Button>
+      <Button variant={activeTab === "records" ? "primary" : "outline"} aria-pressed={activeTab === "records"} onClick={() => setActiveTab("records")}><ClipboardList size={14} />Exercise records <Badge>{logs.length}</Badge></Button>
+      <Button variant={activeTab === "activities" ? "primary" : "outline"} aria-pressed={activeTab === "activities"} onClick={() => setActiveTab("activities")}><Dumbbell size={14} />Activities <Badge>{activities.length}</Badge></Button>
     </nav>
     {activeTab === "log" && <>
     <Card className="mindful-habits-card">
@@ -4355,7 +4355,7 @@ function TrainingSessionModal({ initial, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit class or learning session" : "Log a class or learning session"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit class or learning session" : "Log a class or learning session"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Course / class name (required)"><Input autoFocus required maxLength={140} placeholder="e.g. DevOps Engineer training" value={courseName} onChange={(event) => setCourseName(event.target.value)} /></Field>
       <Field label="Training format"><Select value={mode} onChange={(event) => setMode(event.target.value as TrainingDeliveryMode)}>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
@@ -4688,7 +4688,7 @@ function ElectricityReadingModal({ initial, copyMode = false, readings, onClose,
     });
   }
 
-  return <Modal title={copyMode ? "Copy electricity reading" : initial ? "Edit electricity reading" : "Add electricity reading"} onClose={onClose} wide>
+  return <Modal title={copyMode ? "Copy electricity reading" : initial ? "Edit electricity reading" : "Add electricity reading"} onClose={onClose} wide inline={Boolean(initial) && !copyMode}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Meter name"><Input autoFocus required maxLength={100} list="electricity-meter-names" placeholder="e.g. Main meter" value={meterName} onChange={(event) => setMeterName(event.target.value)} /><datalist id="electricity-meter-names">{[...new Set(readings.map((entry) => entry.meterName))].map((name) => <option key={name} value={name} />)}</datalist></Field>
       <Field label="Location"><Input maxLength={120} placeholder="Home, rental, or building" value={location} onChange={(event) => setLocation(event.target.value)} /></Field>
@@ -4958,7 +4958,7 @@ function DevotionalEntryModal({ initial, initialDate, onClose, onSave }: {
     onSave({ date, scriptureReference: scriptureReference.trim(), takeaway: takeaway.trim(), reflection: reflection.trim(), prayerNotes: prayerNotes.trim() });
   }
 
-  return <Modal title={initial ? "Edit devotional entry" : "Add devotional entry"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit devotional entry" : "Add devotional entry"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Bible passage reference"><Input required maxLength={120} placeholder="e.g. Psalm 23:1–6" value={scriptureReference} onChange={(event) => setScriptureReference(event.target.value)} /></Field>
@@ -5080,7 +5080,7 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit daily Bible reading" : "Add daily Bible reading"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit daily Bible reading" : "Add daily Bible reading"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Reading date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <div className="full bible-reading-range-title"><BookOpen size={14} /> From reference</div>
@@ -5135,7 +5135,7 @@ function DailyPrayerLogModal({ initial, initialDate, onClose, onSave }: {
     onSave({ date, period, prayerType, prayerNotes: prayerNotes.trim() });
   }
 
-  return <Modal title={initial ? "Edit daily prayer" : "Record daily prayer"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit daily prayer" : "Record daily prayer"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Prayer date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Time of day"><Select value={period} onChange={(event) => setPeriod(event.target.value as PrayerPeriod)}><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Night</option></Select></Field>
@@ -5177,7 +5177,7 @@ function PrayerRequestModal({ initial, initialDate, onClose, onSave }: {
     onSave({ title: title.trim(), details: details.trim(), dateAdded, status, answeredDate: status === "Answered" ? answeredDate : "" });
   }
 
-  return <Modal title={initial ? "Edit prayer request" : "Add prayer request"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit prayer request" : "Add prayer request"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Prayer request"><Input autoFocus required maxLength={160} placeholder="A short title for this prayer" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date added"><DateInput required value={dateAdded} onValueChange={setDateAdded} /></Field>
@@ -5222,7 +5222,7 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
     onSave({ title: title.trim(), link: normalizedLink, description: description.trim(), source: source.trim() });
   }
 
-  return <Modal title={initial ? "Edit devotional resource" : "Add devotional resource"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit devotional resource" : "Add devotional resource"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="Song, sermon, video, audio, Scripture study..." value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field className="full" label="Link (HTTPS)"><Input type="url" required maxLength={2048} placeholder="https://..." value={link} onChange={(event) => setLink(event.target.value)} /></Field>
@@ -5950,7 +5950,7 @@ function IssueRecordModal({ initial, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit issue or repair" : "Add issue or repair"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit issue or repair" : "Add issue or repair"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="e.g. Leaking kitchen tap, laptop issue, or project follow-up" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Area"><Select value={area} onChange={(event) => setArea(event.target.value as IssueArea)}><option>Personal</option><option>Professional</option><option>Home</option><option>Vehicle</option><option>Other</option></Select></Field>
@@ -6204,7 +6204,7 @@ function ProfessionalSkillModal({ initial, onClose, onSave }: {
     onSave({ name: name.trim(), category: category.trim(), proficiency, yearsExperience: years, notes: notes.trim() });
   }
 
-  return <Modal title={initial ? "Edit skill" : "Add skill"} onClose={onClose} wide>
+  return <Modal title={initial ? "Edit skill" : "Add skill"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Skill / language"><Input autoFocus required maxLength={120} placeholder="e.g. TypeScript, stakeholder management, Telugu" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Category"><Input maxLength={80} placeholder="Technical, leadership, language..." value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
