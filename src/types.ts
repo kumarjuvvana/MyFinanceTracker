@@ -45,6 +45,15 @@ export type Page =
   | "Account credentials"
   | "Data management"
   | "R&D / Test Connectors";
+export const FAVORITABLE_PAGES: Page[] = [
+  "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
+  "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager",
+  "Learning", "Mind & habits", "Training & classes", "Devotional", "Cooking",
+  "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
+  "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
+  "Database manager", "Hosting & storage", "Archive", "Account credentials",
+  "Data management", "R&D / Test Connectors",
+];
 
 export interface ShoppingItem {
   id: string;
@@ -729,6 +738,7 @@ export interface EncryptedCredentialVault {
 
 export interface TrackerData {
   version: 1;
+  favoritePages?: Page[];
   items: ShoppingItem[];
   purchases: Purchase[];
   trips: ShoppingTrip[];
