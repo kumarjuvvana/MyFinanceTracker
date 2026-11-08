@@ -862,6 +862,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         learningRecords: mergeArchivedRows(previous.learningRecords, snapshot.learningRecords),
         trainingSessions: mergeArchivedRows(previous.trainingSessions, snapshot.trainingSessions),
         educationRecords: restoreEducationRecords(previous.educationRecords, snapshot.educationRecords),
+        educationPlans: mergeArchivedRows(previous.educationPlans, snapshot.educationPlans),
         vehicles: mergeArchivedRows(previous.vehicles, snapshot.vehicles),
         vehicleJourneys: mergeArchivedRows(previous.vehicleJourneys, snapshot.vehicleJourneys),
         vehicleMaintenance: mergeArchivedRows(previous.vehicleMaintenance, snapshot.vehicleMaintenance),
@@ -2842,25 +2843,51 @@ function StudentEducationPlanModal({ initial, studentProfileId, onClose, onSave 
   </Modal>;
 }
 
-function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureProfile, onSave, onDelete }: {
+function StudentEducationPlans({ studentName, studentProfileId, profile, plans, archivedRecords, onEnsureProfile, onSave, onSaveProfile, onArchive, onRestoreArchive, onDeleteArchive }: {
   studentName: string;
   studentProfileId: string | undefined;
+  profile: StudentProfile | undefined;
   plans: StudentEducationPlan[];
+  archivedRecords: ArchivedRecord[];
   onEnsureProfile: () => string;
   onSave: (plan: StudentEducationPlanDraft, id?: string) => void;
-  onDelete: (plan: StudentEducationPlan) => void;
+  onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => void;
+  onArchive: (plan: StudentEducationPlan) => void;
+  onRestoreArchive: (id: string) => void;
+  onDeleteArchive: (id: string) => void;
 }) {
   const [editor, setEditor] = useState<StudentEducationPlan | null | undefined>(undefined);
   const [editingProfileId, setEditingProfileId] = useState(studentProfileId);
   const [expandedPlans, setExpandedPlans] = useState<Set<string>>(() => new Set());
+  const [filterDraft, setFilterDraft] = useState<{ academicYears: string[]; feeTypes: string[] } | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const visiblePlans = [...plans].sort((a, b) =>
     b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true }) ||
     a.institution.localeCompare(b.institution));
-  const totalsByCurrency = visiblePlans.reduce((totals, plan) => {
-    totals.set(plan.currency, (totals.get(plan.currency) ?? 0) +
-      plan.costs.reduce((sum, cost) => sum + cost.amount, 0));
-    return totals;
-  }, new Map<Currency, number>());
+  const academicYears = [...new Set(visiblePlans.map((plan) => plan.academicYear))]
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  const feeTypes = [...new Set(visiblePlans.flatMap((plan) => plan.costs.map((cost) => cost.category)))]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const savedFilters = profile?.educationPlanFilters;
+  const selectedAcademicYears = (filterDraft?.academicYears ?? academicYears.filter((year) =>
+    !savedFilters || savedFilters.academicYears.includes(year) || !savedFilters.knownAcademicYears.includes(year)))
+    .filter((year) => academicYears.includes(year));
+  const selectedFeeTypes = (filterDraft?.feeTypes ?? feeTypes.filter((feeType) =>
+    !savedFilters || savedFilters.feeTypes.includes(feeType) || !savedFilters.knownFeeTypes.includes(feeType)))
+    .filter((feeType) => feeTypes.includes(feeType));
+  const selectedYearSet = new Set(selectedAcademicYears);
+  const selectedFeeTypeSet = new Set(selectedFeeTypes);
+  const selectedPlans = visiblePlans.filter((plan) => selectedYearSet.has(plan.academicYear));
+  const currencies = [...new Set(visiblePlans.map((plan) => plan.currency))].sort();
+  const archivedPlans = archivedRecords.flatMap((record) =>
+    (record.snapshot.educationPlans ?? [])
+      .filter((plan) => plan.studentProfileId === studentProfileId)
+      .map((plan) => ({ archiveId: record.id, plan, archivedAt: record.archivedAt })));
+
+  useEffect(() => {
+    setFilterDraft(null);
+    setShowArchived(false);
+  }, [studentProfileId]);
 
   function copyPlan(plan: StudentEducationPlan) {
     const copyCosts = !plan.costs.length || window.confirm(
@@ -2873,23 +2900,100 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
     });
   }
 
+  function toggleFilter(kind: "academicYears" | "feeTypes", value: string) {
+    const current = kind === "academicYears" ? selectedAcademicYears : selectedFeeTypes;
+    const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
+    setFilterDraft({
+      academicYears: kind === "academicYears" ? next : selectedAcademicYears,
+      feeTypes: kind === "feeTypes" ? next : selectedFeeTypes,
+    });
+  }
+
+  function saveFilters() {
+    if (!profile) return;
+    onSaveProfile({
+      ...profile,
+      educationPlanFilters: {
+        academicYears: selectedAcademicYears,
+        feeTypes: selectedFeeTypes,
+        knownAcademicYears: academicYears,
+        knownFeeTypes: feeTypes,
+      },
+    }, profile.id, profile.name);
+    setFilterDraft(null);
+  }
+
+  function selectAllFilters() {
+    setFilterDraft({ academicYears, feeTypes });
+  }
+
+  function clearAllFilters() {
+    setFilterDraft({ academicYears: [], feeTypes: [] });
+  }
+
+  function totalFor(currency: Currency) {
+    return selectedPlans.reduce((sum, plan) => sum + (plan.currency === currency
+      ? plan.costs.reduce((costTotal, cost) =>
+        costTotal + (selectedFeeTypeSet.has(cost.category) ? cost.amount : 0), 0)
+      : 0), 0);
+  }
+
+  function amountFor(currency: Currency, year: string, feeType: string) {
+    return visiblePlans.reduce((sum, plan) => sum +
+      (plan.currency === currency && plan.academicYear === year
+        ? plan.costs.reduce((costTotal, cost) => costTotal + (cost.category === feeType ? cost.amount : 0), 0)
+        : 0), 0);
+  }
+
   return <>
     <div className="education-section-head student-education-heading">
       <div><h2 className="section-title">Education plans</h2><p className="section-description">Plan class, intermediate, degree, or engineering years and estimate costs separately from actual education records.</p></div>
-      <Button onClick={() => {
+      {!showArchived && <Button onClick={() => {
         const profileId = studentProfileId ?? onEnsureProfile();
         if (profileId) {
           setEditingProfileId(profileId);
           setEditor(null);
         }
-      }}><Plus size={14} />Add plan</Button>
+      }}><Plus size={14} />Add plan</Button>}
     </div>
+    <div className="student-plan-view-tabs">
+      <Button variant={!showArchived ? "primary" : "outline"} onClick={() => setShowArchived(false)}>Active plans <Badge>{visiblePlans.length}</Badge></Button>
+      <Button variant={showArchived ? "primary" : "outline"} onClick={() => setShowArchived(true)}><Archive size={14} />Archived <Badge>{archivedPlans.length}</Badge></Button>
+    </div>
+    {showArchived ? archivedPlans.length ? <div className="student-plan-list">{archivedPlans.map(({ archiveId, plan, archivedAt }) => <Card className="student-plan-card" key={`${archiveId}:${plan.id}`}>
+      <div className="student-plan-card-head">
+        <div><h3>{plan.gradeCourse}</h3><p>{plan.institution} · {plan.academicYear} · {plan.level}</p></div>
+        <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(plan.costs.reduce((sum, cost) => sum + cost.amount, 0))}</strong><button className="icon-button" aria-label={`Restore ${plan.gradeCourse} for ${plan.academicYear}`} title="Restore plan" onClick={() => onRestoreArchive(archiveId)}><ArrowDownToLine size={14} /></button><button className="icon-button" aria-label={`Permanently delete ${plan.gradeCourse} for ${plan.academicYear}`} title="Delete permanently" onClick={() => {
+          if (window.confirm(`Permanently delete the archived ${plan.academicYear} plan for ${studentName}? This cannot be undone.`)) onDeleteArchive(archiveId);
+        }}><Trash2 size={14} /></button></div>
+      </div>
+      <p className="student-plan-dates">Archived {new Date(archivedAt).toLocaleDateString()}</p>
+    </Card>)}</div> : <Card><EmptyState icon={<Archive size={18} />} title="No archived education plans" description="Archived yearly plans will appear here and can be restored or permanently deleted." /></Card> : <>
+    {!!visiblePlans.length && <Card className="student-plan-filter-card">
+      <div className="student-plan-filter-heading"><div><h3>Choose years and fee types</h3><p className="section-description">The total and breakdown update to include only the selected years and cost categories.</p></div><div className="student-plan-filter-actions"><Button type="button" variant="outline" onClick={selectAllFilters}>Select all</Button><Button type="button" variant="outline" onClick={clearAllFilters}>Clear</Button></div></div>
+      <div className="student-plan-filter-group"><strong>Academic years</strong>{academicYears.length ? <div className="student-plan-filter-options">{academicYears.map((year) => <label key={year}><input type="checkbox" checked={selectedYearSet.has(year)} onChange={() => toggleFilter("academicYears", year)} />{year}</label>)}</div> : <span className="section-description">No years available.</span>}</div>
+      <div className="student-plan-filter-group"><strong>Fee types</strong>{feeTypes.length ? <div className="student-plan-filter-options">{feeTypes.map((feeType) => <label key={feeType}><input type="checkbox" checked={selectedFeeTypeSet.has(feeType)} onChange={() => toggleFilter("feeTypes", feeType)} />{feeType}</label>)}</div> : <span className="section-description">No fee items available.</span>}</div>
+      {filterDraft && <div className="student-plan-save-filters"><span>Selection not saved</span><Button type="button" disabled={!profile} onClick={saveFilters}><Check size={14} />Save for this student</Button></div>}
+    </Card>}
     {!!visiblePlans.length && <div className="student-plan-summary">
-      <span>Estimated total for {visiblePlans.length} displayed {visiblePlans.length === 1 ? "plan" : "plans"}</span>
-      <strong>{[...totalsByCurrency].map(([planCurrency, amount]) =>
-        new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(amount),
-      ).join(" · ")}</strong>
+      <span>Selected total · {selectedAcademicYears.length} {selectedAcademicYears.length === 1 ? "year" : "years"} · {selectedFeeTypes.length} {selectedFeeTypes.length === 1 ? "fee type" : "fee types"}</span>
+      <strong>{currencies.map((planCurrency) =>
+        new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(totalFor(planCurrency)),
+      ).join(" · ") || new Intl.NumberFormat(undefined, { style: "currency", currency: "INR" }).format(0)}</strong>
     </div>}
+    {selectedPlans.length && selectedFeeTypes.length && currencies.length ? <div className="student-plan-matrices">{currencies.map((planCurrency) => <div className="student-plan-matrix-section" key={planCurrency}>
+      <h3>{planCurrency} · year-wise estimate</h3>
+      <div className="student-plan-matrix-scroll"><table className="data-table student-plan-matrix">
+        <thead><tr><th>Academic year</th>{selectedFeeTypes.map((feeType) => <th key={feeType}>{feeType}</th>)}<th>Year total</th></tr></thead>
+        <tbody>{academicYears.filter((year) => selectedYearSet.has(year)).map((year) => <tr key={year}>
+          <td>{year}</td>{selectedFeeTypes.map((feeType) => {
+            const amount = amountFor(planCurrency, year, feeType);
+            return <td key={feeType}>{amount ? new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(amount) : "—"}</td>;
+          })}<td><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(selectedFeeTypes.reduce((sum, feeType) => sum + amountFor(planCurrency, year, feeType), 0))}</strong></td>
+        </tr>)}</tbody>
+        <tfoot><tr><th>Selected total</th>{selectedFeeTypes.map((feeType) => <th key={feeType}>{new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(selectedPlans.reduce((sum, plan) => sum + (plan.currency === planCurrency ? plan.costs.reduce((costTotal, cost) => costTotal + (cost.category === feeType ? cost.amount : 0), 0) : 0), 0))}</th>)}<th>{new Intl.NumberFormat(undefined, { style: "currency", currency: planCurrency }).format(totalFor(planCurrency))}</th></tr></tfoot>
+      </table></div>
+    </div>)}</div> : visiblePlans.length ? <Card><EmptyState icon={<BarChart3 size={18} />} title="No matching estimates" description="Select at least one year and fee type to see the year-by-year totals." /></Card> : null}
     {visiblePlans.length ? <div className="student-plan-list">{visiblePlans.map((plan) => {
       const total = plan.costs.reduce((sum, cost) => sum + cost.amount, 0);
       const expanded = expandedPlans.has(plan.id);
@@ -2901,9 +3005,9 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
             else next.add(plan.id);
             return next;
           })}><ChevronRight size={15} /><span><strong>{plan.gradeCourse}</strong><small>{plan.institution} · {plan.academicYear} · {plan.level}</small></span></button>
-          <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(total)}</strong><button className="icon-button" aria-label={`Copy ${plan.gradeCourse} plan`} title="Copy plan" onClick={() => copyPlan(plan)}><Copy size={14} /></button><button className="icon-button" aria-label={`Edit ${plan.gradeCourse} plan`} onClick={() => setEditor(plan)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Delete ${plan.gradeCourse} plan`} onClick={() => {
-            if (window.confirm(`Delete the ${plan.academicYear} education plan for ${studentName}?`)) onDelete(plan);
-          }}><Trash2 size={14} /></button></div>
+          <div className="student-plan-card-actions"><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: plan.currency }).format(total)}</strong><button className="icon-button" aria-label={`Copy ${plan.gradeCourse} plan`} title="Copy plan" onClick={() => copyPlan(plan)}><Copy size={14} /></button><button className="icon-button" aria-label={`Edit ${plan.gradeCourse} plan`} onClick={() => setEditor(plan)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${plan.gradeCourse} plan`} title="Archive plan" onClick={() => {
+            if (window.confirm(`Move the ${plan.academicYear} education plan for ${studentName} to the archive?`)) onArchive(plan);
+          }}><Archive size={14} /></button></div>
         </div>
         <div className="student-plan-details" id={`student-plan-details-${plan.id}`} hidden={!expanded}>
           {(plan.startDate || plan.endDate) && <p className="student-plan-dates">{plan.startDate ? dateLabel(plan.startDate) : "Start date not set"} – {plan.endDate ? dateLabel(plan.endDate) : "End date not set"}</p>}
@@ -2912,6 +3016,7 @@ function StudentEducationPlans({ studentName, studentProfileId, plans, onEnsureP
         </div>
       </Card>;
     })}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title="No education plans yet" description={`Add a class, intermediate, degree, or other plan for ${studentName} and estimate its yearly costs.`} /></Card>}
+    </>}
     {editor !== undefined && <StudentEducationPlanModal key={editor?.id ?? "new-student-plan"} initial={editor} studentProfileId={editingProfileId ?? studentProfileId ?? ""} onClose={() => setEditor(undefined)} onSave={(plan) => {
       onSave(plan, editor?.id);
       setEditor(undefined);
@@ -2933,15 +3038,18 @@ function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
   </form>;
 }
 
-function EducationRecordsPage({ records, profiles, educationPlans, onSave, onDelete, onSaveProfile, onSavePlan, onDeletePlan }: {
+function EducationRecordsPage({ records, profiles, educationPlans, archivedRecords, onSave, onDelete, onSaveProfile, onSavePlan, onArchivePlan, onRestoreArchive, onDeleteArchive }: {
   records: EducationRecord[];
   profiles: StudentProfile[];
   educationPlans: StudentEducationPlan[];
+  archivedRecords: ArchivedRecord[];
   onSave: (record: Omit<EducationRecord, "id">, id?: string) => void;
   onDelete: (record: EducationRecord) => void;
   onSaveProfile: (profile: Omit<StudentProfile, "id">, id?: string, previousName?: string) => void;
   onSavePlan: (plan: StudentEducationPlanDraft, id?: string) => void;
-  onDeletePlan: (plan: StudentEducationPlan) => void;
+  onArchivePlan: (plan: StudentEducationPlan) => void;
+  onRestoreArchive: (id: string) => void;
+  onDeleteArchive: (id: string) => void;
 }) {
   const [editor, setEditor] = useState<{
     record: EducationRecord | null;
@@ -3208,10 +3316,15 @@ function EducationRecordsPage({ records, profiles, educationPlans, onSave, onDel
       {activeSection === "plans" && <StudentEducationPlans
         studentName={selectedEntry.name}
         studentProfileId={shownProfile?.id ?? (planProfileId || undefined)}
+        profile={shownProfile ?? undefined}
         plans={educationPlans.filter((plan) => plan.studentProfileId === (shownProfile?.id ?? planProfileId))}
+        archivedRecords={archivedRecords}
         onEnsureProfile={ensureProfileForPlans}
         onSave={onSavePlan}
-        onDelete={onDeletePlan}
+        onSaveProfile={onSaveProfile}
+        onArchive={onArchivePlan}
+        onRestoreArchive={onRestoreArchive}
+        onDeleteArchive={onDeleteArchive}
       />}
     </>}
     {editor && <EducationRecordModal key={`${editor.mode}-${editor.record?.id ?? "new-education-record"}`} initial={editor.record} initialStudentName={editor.mode === "new" ? selectedEntry?.name ?? "" : ""} initialStudentProfileId={editor.mode === "new" ? selectedEntry?.profile?.id : undefined} copyMode={editor.mode === "copy"} onClose={() => setEditor(null)} onSave={(record) => { onSave({ ...record, studentProfileId: record.studentProfileId ?? selectedEntry?.profile?.id }, editor.mode === "edit" ? editor.record?.id : undefined); setEditor(null); }} />}
@@ -6930,11 +7043,12 @@ export default function App() {
         : [{ ...plan, id: createId() }, ...(previous.educationPlans ?? [])],
     }));
   }
-  function deleteStudentEducationPlan(plan: StudentEducationPlan) {
-    update((previous) => ({
+  function archiveStudentEducationPlan(plan: StudentEducationPlan) {
+    const studentName = data?.studentProfiles?.find((profile) => profile.id === plan.studentProfileId)?.name ?? "Student";
+    update((previous) => withArchivedRecord({
       ...previous,
       educationPlans: (previous.educationPlans ?? []).filter((entry) => entry.id !== plan.id),
-    }));
+    }, `${studentName} · ${plan.academicYear} education plan`, { educationPlans: [plan] }));
   }
   function deleteEducationRecord(record: EducationRecord) {
     update((previous) => ({
@@ -7550,7 +7664,7 @@ export default function App() {
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,
-    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} profiles={data.studentProfiles ?? []} educationPlans={data.educationPlans ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} onSaveProfile={saveStudentProfile} onSavePlan={saveStudentEducationPlan} onDeletePlan={deleteStudentEducationPlan} />,
+    "Schools & Colleges": <EducationRecordsPage records={data.educationRecords ?? []} profiles={data.studentProfiles ?? []} educationPlans={data.educationPlans ?? []} archivedRecords={data.archivedRecords ?? []} onSave={saveEducationRecord} onDelete={deleteEducationRecord} onSaveProfile={saveStudentProfile} onSavePlan={saveStudentEducationPlan} onArchivePlan={archiveStudentEducationPlan} onRestoreArchive={restoreArchivedRecord} onDeleteArchive={permanentlyDeleteArchivedRecord} />,
     Vehicles: <VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,

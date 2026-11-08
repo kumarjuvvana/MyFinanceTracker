@@ -309,6 +309,14 @@ export interface StudentProfile {
   photoStoragePath: string;
   interests: string[];
   notes?: string;
+  educationPlanFilters?: StudentEducationPlanFilterPreference;
+}
+
+export interface StudentEducationPlanFilterPreference {
+  academicYears: string[];
+  feeTypes: string[];
+  knownAcademicYears: string[];
+  knownFeeTypes: string[];
 }
 
 export const EDUCATION_PLAN_COST_CATEGORIES = [

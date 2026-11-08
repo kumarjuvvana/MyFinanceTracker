@@ -344,6 +344,15 @@ export function validateData(value: unknown): value is TrackerData {
     typeof profile.address === "string" && typeof profile.photoStoragePath === "string" &&
     (profile.photoStoragePath === "" || isDocumentStoragePath(profile.photoStoragePath)) &&
     (profile.notes === undefined || typeof profile.notes === "string" && profile.notes.length <= 20000) &&
+    (profile.educationPlanFilters === undefined || (isRecord(profile.educationPlanFilters) &&
+      Array.isArray(profile.educationPlanFilters.academicYears) &&
+      profile.educationPlanFilters.academicYears.every((year) => typeof year === "string" && year.length <= 40) &&
+      Array.isArray(profile.educationPlanFilters.feeTypes) &&
+      profile.educationPlanFilters.feeTypes.every((feeType) => typeof feeType === "string" && feeType.length <= 80) &&
+      Array.isArray(profile.educationPlanFilters.knownAcademicYears) &&
+      profile.educationPlanFilters.knownAcademicYears.every((year) => typeof year === "string" && year.length <= 40) &&
+      Array.isArray(profile.educationPlanFilters.knownFeeTypes) &&
+      profile.educationPlanFilters.knownFeeTypes.every((feeType) => typeof feeType === "string" && feeType.length <= 80))) &&
     Array.isArray(profile.interests) && profile.interests.every((interest) =>
       typeof interest === "string" && interest.trim().length > 0 && interest.length <= 80)));
   const educationPlansOk = value.educationPlans === undefined || (Array.isArray(value.educationPlans) && value.educationPlans.every((plan) =>
@@ -634,7 +643,7 @@ export function validateData(value: unknown): value is TrackerData {
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings", "subscriptions",
     "devotionalEntries", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
-    "familyMembers", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
+    "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
   ];
   const archivedRecordsOk = value.archivedRecords === undefined ||
     (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {

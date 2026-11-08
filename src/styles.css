@@ -527,9 +527,28 @@ body{background:#f3f5ef}
 .student-notes-card{padding:18px}
 .student-notes-input{min-height:240px!important;line-height:1.55}
 .student-plan-list{display:grid;gap:12px}
+.student-plan-view-tabs,.student-plan-filter-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.student-plan-view-tabs{margin:8px 0 12px}
+.student-plan-filter-card{margin-bottom:12px;padding:15px}
+.student-plan-filter-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.student-plan-filter-heading h3,.student-plan-matrix-section h3{margin:0;color:var(--text-main,#303830);font:700 13px Manrope,sans-serif}
+.student-plan-filter-actions .button{height:30px;padding:0 9px;font-size:10px}
+.student-plan-filter-group{display:grid;gap:8px;margin-top:13px}
+.student-plan-filter-group>strong{font-size:11px;color:var(--text-main,#303830)}
+.student-plan-filter-options{display:flex;gap:7px;flex-wrap:wrap}
+.student-plan-filter-options>label{display:flex;align-items:center;gap:6px;max-width:100%;padding:6px 9px;border:1px solid var(--panel-line,#eef0ec);border-radius:8px;color:var(--text-main,#303830);font-size:11px;overflow-wrap:anywhere;cursor:pointer}
+.student-plan-filter-options input{margin:0;accent-color:var(--user-accent,#56815d)}
+.student-plan-save-filters{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--panel-line,#eef0ec);font-size:11px;color:var(--text-muted,#858d83)}
 .student-plan-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0;padding:12px 15px;border:1px solid var(--panel-line,#eef0ec);border-radius:10px;background:var(--panel,#fff);font-size:12px;color:var(--text-main,#303830)}
 .student-plan-summary>span{color:var(--text-muted,#858d83)}
 .student-plan-summary>strong{color:var(--user-accent,#56815d);text-align:right}
+.student-plan-matrices{display:grid;gap:12px;margin-bottom:12px}
+.student-plan-matrix-section{min-width:0;padding:14px;border:1px solid var(--panel-line,#eef0ec);border-radius:10px;background:var(--panel,#fff)}
+.student-plan-matrix-section h3{margin-bottom:9px}
+.student-plan-matrix-scroll{max-width:100%;overflow-x:auto}
+.student-plan-matrix{min-width:max-content}
+.student-plan-matrix th,.student-plan-matrix td{white-space:nowrap}
+.student-plan-matrix tfoot th{border-top:2px solid var(--panel-line,#eef0ec);color:var(--text-main,#303830)}
 .student-plan-card{min-width:0;padding:16px}
 .student-plan-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .student-plan-card-head h3{margin:0;color:var(--text-main,#303830);font:700 14px Manrope,sans-serif;overflow-wrap:anywhere}
@@ -574,8 +593,9 @@ body{background:#f3f5ef}
 .app-shell.dark .student-directory-avatar,.app-shell.dark .student-directory-open>img,.app-shell.dark .student-profile-heading>img{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .student-directory-open>strong,.app-shell.dark .student-profile-heading h2,.app-shell.dark .student-profile-details strong{color:#e3e8e2}
 .app-shell.dark .student-profile-details>div,.app-shell.dark .student-image-preview{border-color:#343d35}
-.app-shell.dark .student-plan-costs,.app-shell.dark .student-plan-total,.app-shell.dark .student-plan-cost-list,.app-shell.dark .student-plan-cost-list>div{border-color:#343d35}
+.app-shell.dark .student-plan-costs,.app-shell.dark .student-plan-total,.app-shell.dark .student-plan-cost-list,.app-shell.dark .student-plan-cost-list>div,.app-shell.dark .student-plan-filter-options>label,.app-shell.dark .student-plan-save-filters,.app-shell.dark .student-plan-matrix-section,.app-shell.dark .student-plan-matrix tfoot th{border-color:#343d35}
 .app-shell.dark .student-plan-card-head h3,.app-shell.dark .student-plan-toggle,.app-shell.dark .student-plan-toggle strong,.app-shell.dark .student-plan-costs h3{color:#e3e8e2}
+.app-shell.dark .student-plan-filter-heading h3,.app-shell.dark .student-plan-filter-group>strong,.app-shell.dark .student-plan-filter-options>label,.app-shell.dark .student-plan-matrix-section h3,.app-shell.dark .student-plan-matrix tfoot th{color:#e3e8e2}
 .app-shell.dark .student-profile-details span,.app-shell.dark .student-profile-heading p,.app-shell.dark .student-directory-open>span:not(.student-directory-avatar){color:#a7b0a7}
 @media(max-width:600px){
   .student-directory-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -594,6 +614,9 @@ body{background:#f3f5ef}
   .student-plan-card-actions{width:100%;justify-content:flex-end}
   .student-plan-summary{align-items:flex-start;flex-direction:column;gap:5px;padding:10px 12px}
   .student-plan-summary>strong{text-align:left}
+  .student-plan-filter-heading{flex-direction:column}
+  .student-plan-save-filters{align-items:flex-start;flex-direction:column}
+  .student-plan-matrix-section{padding:10px}
   .student-plan-cost-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:end}
   .student-plan-cost-row>.button{grid-column:2;justify-self:end}
   .student-plan-cost-list>div{align-items:flex-start;font-size:10px}
