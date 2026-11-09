@@ -183,11 +183,13 @@ function FavoritesPage({ pages, saving, onNavigate, onRemove }: {
   </>;
 }
 
-function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onResetSession, onResetAll }: {
+function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSetSessionChecked, onSetAllChecked, onResetSession, onResetAll }: {
   sessions: ActivityChecklistSession[];
   completedItemIds: string[];
   onSave: (sessions: ActivityChecklistSession[]) => void;
   onToggleItem: (itemId: string) => void;
+  onSetSessionChecked: (sessionId: string, checked: boolean) => void;
+  onSetAllChecked: (checked: boolean) => void;
   onResetSession: (sessionId: string) => void;
   onResetAll: () => void;
 }) {
@@ -238,7 +240,12 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onRe
     <PageHeading eyebrow="Your reusable routine" title="Activities" subtitle="Your checklist and completion marks are saved to Supabase until you reset them." />
     <Card className="activity-checklist-summary">
       <div><h2 className="section-title">Checklist progress</h2><p className="section-description">Completion marks remain saved until you clear them. Drag the handle to reorder activities within a session.</p></div>
-      <div className="activity-summary-actions"><Badge>{completedCount} / {taskCount} done</Badge><button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button></div>
+      <div className="activity-summary-actions">
+        <Badge>{completedCount} / {taskCount} done</Badge>
+        <Button type="button" variant="outline" size="sm" disabled={!taskCount || completedCount === taskCount} onClick={() => onSetAllChecked(true)}><Check size={13} />Check all</Button>
+        <Button type="button" variant="outline" size="sm" disabled={!completedCount} onClick={() => onSetAllChecked(false)}><X size={13} />Uncheck all</Button>
+        <button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button>
+      </div>
     </Card>
     <form className="activity-add-session" onSubmit={addSession}>
       <Input aria-label="New session name" placeholder="Add a session, e.g. Before bed" maxLength={60} value={newSessionName} onChange={(event) => setNewSessionName(event.target.value)} />
@@ -268,6 +275,10 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onRe
             <button type="button" className="icon-button" disabled={!sessionDone} aria-label={`Reset ${session.name} completion marks`} title={`Reset ${session.name} completion marks`} onClick={() => onResetSession(session.id)}><RefreshCw size={15} /></button>
             <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
           </div>
+        </div>
+        <div className="activity-session-bulk-actions" aria-label={`${session.name} checklist actions`}>
+          <Button type="button" variant="outline" size="sm" disabled={!session.items.length || sessionDone === session.items.length} onClick={() => onSetSessionChecked(session.id, true)}><Check size={13} />Check all</Button>
+          <Button type="button" variant="outline" size="sm" disabled={!sessionDone} onClick={() => onSetSessionChecked(session.id, false)}><X size={13} />Uncheck all</Button>
         </div>
         {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) =>
           <div
@@ -9891,6 +9902,22 @@ export default function App() {
           activityCompletedItemIds: completed.includes(itemId)
             ? completed.filter((id) => id !== itemId)
             : [...completed, itemId],
+        };
+      })}
+      onSetSessionChecked={(sessionId, checked) => updatePreferences((current) => {
+        const sessionItemIds = (current.activitySessions ?? []).find((session) => session.id === sessionId)?.items.map((item) => item.id) ?? [];
+        const sessionItemIdSet = new Set(sessionItemIds);
+        const existing = (current.activityCompletedItemIds ?? []).filter((id) => !sessionItemIdSet.has(id));
+        return {
+          ...current,
+          activityCompletedItemIds: checked ? [...existing, ...sessionItemIds] : existing,
+        };
+      })}
+      onSetAllChecked={(checked) => updatePreferences((current) => {
+        const allItemIds = (current.activitySessions ?? []).flatMap((session) => session.items.map((item) => item.id));
+        return {
+          ...current,
+          activityCompletedItemIds: checked ? allItemIds : [],
         };
       })}
       onResetSession={(sessionId) => {
