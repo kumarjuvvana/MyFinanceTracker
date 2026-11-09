@@ -158,6 +158,9 @@ button{cursor:pointer}
 .reminder-card{display:grid;grid-template-columns:32px minmax(0,1fr) auto auto;align-items:center;gap:8px 10px;padding:14px 16px}
 .reminder-card.completed .recent-name{text-decoration:line-through;color:#939a92}
 .reminder-card .recent-meta{white-space:normal;overflow-wrap:anywhere}
+.reminder-details-toggle{display:inline-flex;align-items:center;gap:3px;padding:0;border:0;background:transparent;color:var(--user-accent,#55785a);font:inherit;font-weight:600;white-space:nowrap;cursor:pointer}
+.reminder-details-toggle svg{flex:none;transition:transform .15s}
+.reminder-details-toggle[aria-expanded=true] svg{transform:rotate(90deg)}
 .reminder-card>.recent-info{grid-column:2;min-width:0}
 .reminder-card>.table-actions{grid-column:2/-1;justify-self:end}
 .master-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
