@@ -183,7 +183,7 @@ async function loadReminderCategories(): Promise<string[]> {
 }
 
 async function saveData(data: TrackerData, expectedRevision: string | null): Promise<string | null> {
-  const response = await supabaseRequest("rpc/save_daybook_data_with_account_credentials", {
+  const response = await supabaseRequest("rpc/save_daybook_data_with_cooking_inventory", {
     method: "POST",
     body: JSON.stringify({ p_data: data, p_expected_revision: expectedRevision }),
   });

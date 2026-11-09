@@ -659,6 +659,18 @@ export interface CookingInventoryItem {
   measures: CookingStockMeasure[];
 }
 
+export interface CookingInventoryUsage {
+  logId: string;
+  recipeId: string;
+  recipeName: string;
+  date: string;
+  inventoryItemId: string;
+  itemName: string;
+  inventoryMeasureId: string;
+  unit: string;
+  quantity: number;
+}
+
 export interface CookingRecipeIngredient {
   id: string;
   inventoryItemId: string | null;

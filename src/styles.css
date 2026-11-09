@@ -912,6 +912,14 @@ body{background:#f3f5ef}
 .cooking-saved-ingredients{display:grid;gap:5px;margin-top:10px;font-size:10px;color:#667066}
 .cooking-saved-ingredients>strong{color:#414a42}
 .cooking-saved-ingredients>span{padding-left:8px}
+.cooking-usage-card{padding:12px}
+.cooking-usage-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cooking-usage-top>div{display:grid;gap:4px;min-width:0}
+.cooking-usage-top strong{font-size:11px;color:#414a42}
+.cooking-usage-top span{font-size:10px;color:#858d83}
+.cooking-usage-top .badge{flex:none}
+.app-shell.dark .cooking-usage-top strong{color:#e3e8e2}
+.app-shell.dark .cooking-usage-top span{color:#a7b0a7}
 .cooking-selected-dishes{display:grid;gap:6px}
 .cooking-selected-dishes>strong{font-size:11px;color:#414a42}
 .cooking-selected-dishes>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border:1px solid #e8ebe6;border-radius:8px;font-size:11px;color:#586258}

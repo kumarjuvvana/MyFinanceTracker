@@ -1,5 +1,5 @@
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
-import type { CookingInventoryItem } from "../src/types";
+import type { CookingInventoryItem, CookingInventoryUsage } from "../src/types";
 
 interface ApiRequest {
   method?: string;
@@ -44,6 +44,10 @@ function isOptionalAmount(value: unknown): boolean {
   return value === null || typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+function isOptionalStockAmount(value: unknown): boolean {
+  return value === null || typeof value === "number" && Number.isFinite(value);
+}
+
 function validateInventory(value: unknown): value is CookingInventoryItem[] {
   if (!Array.isArray(value) || value.length > 5000) return false;
   const itemIds = new Set<string>();
@@ -57,7 +61,7 @@ function validateInventory(value: unknown): value is CookingInventoryItem[] {
     return item.measures.every((measure) => {
       if (!isRecord(measure) || typeof measure.id !== "string" || !measure.id.trim() ||
         measureIds.has(measure.id) || typeof measure.unit !== "string" || !measure.unit.trim() ||
-        measure.unit.length > 40 || !isOptionalAmount(measure.stockQuantity) ||
+        measure.unit.length > 40 || !isOptionalStockAmount(measure.stockQuantity) ||
         !isOptionalAmount(measure.unitPrice) ||
         measure.piecesPerKg !== undefined && measure.piecesPerKg !== null &&
           (typeof measure.piecesPerKg !== "number" || !Number.isFinite(measure.piecesPerKg) || measure.piecesPerKg <= 0)) return false;
@@ -65,6 +69,21 @@ function validateInventory(value: unknown): value is CookingInventoryItem[] {
       return true;
     });
   });
+}
+
+function validateUsage(value: unknown): value is CookingInventoryUsage[] {
+  if (!Array.isArray(value)) return false;
+  return value.every((entry) =>
+    isRecord(entry) &&
+    typeof entry.logId === "string" && entry.logId.length > 0 &&
+    typeof entry.recipeId === "string" && entry.recipeId.length > 0 &&
+    typeof entry.recipeName === "string" &&
+    typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+    typeof entry.inventoryItemId === "string" && entry.inventoryItemId.length > 0 &&
+    typeof entry.itemName === "string" &&
+    typeof entry.inventoryMeasureId === "string" && entry.inventoryMeasureId.length > 0 &&
+    typeof entry.unit === "string" &&
+    typeof entry.quantity === "number" && Number.isFinite(entry.quantity) && entry.quantity > 0);
 }
 
 function supabaseCredentials(): { baseUrl: string; key: string } {
@@ -125,10 +144,11 @@ export default async function cookingInventoryHandler(request: ApiRequest, respo
     try {
       const result = await supabaseRequest("load_cooking_inventory", {});
       if (!Array.isArray(result) || !isRecord(result[0]) ||
-        typeof result[0].revision !== "string" || !validateInventory(result[0].items)) {
+        typeof result[0].revision !== "string" || !validateInventory(result[0].items) ||
+        !validateUsage(result[0].usage)) {
         throw new Error("Supabase returned an invalid cooking inventory response.");
       }
-      respond(response, 200, { revision: result[0].revision, items: result[0].items });
+      respond(response, 200, { revision: result[0].revision, items: result[0].items, usage: result[0].usage });
     } catch (caught) {
       if (caught instanceof SupabaseApiError) console.error("Cooking inventory API failed:", caught);
       const error = caught instanceof Error ? caught : new Error("Could not load cooking inventory.");

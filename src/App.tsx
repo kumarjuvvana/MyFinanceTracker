@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell,
+  Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell, History,
   ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
@@ -20,6 +20,7 @@ import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAUL
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
+import type { CookingInventoryUsage } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -140,13 +141,14 @@ const isCookingCountUnit = (unit: string) => {
 };
 const isCookingKgUnit = (unit: string) => ["kg", "kgs", "kilogram", "kilograms", "kilo", "kilos"]
   .includes(unit.trim().toLocaleLowerCase());
+const roundCookingPrice = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
 function cookingMeasurePrice(item: CookingInventoryItem, measure: CookingStockMeasure): number | null {
   if (isCookingCountUnit(measure.unit)) {
     const kgMeasure = item.measures.find((entry) => isCookingKgUnit(entry.unit));
     if (kgMeasure) {
       return kgMeasure.unitPrice !== null && kgMeasure.unitPrice !== undefined &&
         measure.piecesPerKg !== null && measure.piecesPerKg !== undefined && measure.piecesPerKg > 0
-        ? kgMeasure.unitPrice / measure.piecesPerKg
+        ? roundCookingPrice(kgMeasure.unitPrice / measure.piecesPerKg)
         : null;
     }
   }
@@ -6599,12 +6601,12 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
       const usesKgConversion = isCookingCountUnit(measure.unit) && Boolean(kgMeasure);
       const kgPrice = kgMeasure?.unitPrice.trim() ? Number(kgMeasure.unitPrice) : null;
       const unitPrice = usesKgConversion
-        ? kgPrice !== null && piecesPerKg !== null && piecesPerKg > 0 ? kgPrice / piecesPerKg : null
+        ? kgPrice !== null && piecesPerKg !== null && piecesPerKg > 0 ? roundCookingPrice(kgPrice / piecesPerKg) : null
         : measure.unitPrice.trim() ? Number(measure.unitPrice) : null;
-      if (stockQuantity !== null && (!Number.isFinite(stockQuantity) || stockQuantity < 0) ||
+      if (stockQuantity !== null && !Number.isFinite(stockQuantity) ||
         unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0) ||
         piecesPerKg !== null && (!Number.isFinite(piecesPerKg) || piecesPerKg <= 0)) {
-        setError("Stock quantity and price must be zero or more; pieces per kg must be greater than zero.");
+        setError("Prices must be zero or more; stock can be negative, and pieces per kg must be greater than zero.");
         return;
       }
       savedMeasures.push({ id: measure.id, unit: measure.unit.trim(), stockQuantity, unitPrice, piecesPerKg });
@@ -6627,12 +6629,12 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
           const countBased = isCookingCountUnit(measure.unit);
           const sourceWeight = measures.find((entry) => isCookingKgUnit(entry.unit));
           const derivedPrice = sourceWeight?.unitPrice.trim() && Number(measure.piecesPerKg) > 0
-            ? Number(sourceWeight.unitPrice) / Number(measure.piecesPerKg)
+            ? roundCookingPrice(Number(sourceWeight.unitPrice) / Number(measure.piecesPerKg))
             : null;
           const usesKgConversion = countBased && Boolean(sourceWeight);
           return <div className="cooking-inventory-measure" key={measure.id}>
           <Field label="Unit"><Input required maxLength={40} placeholder="kg, piece, no of vankayas..." value={measure.unit} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unit: event.target.value } : entry))} /></Field>
-          <Field label="Stock on hand"><Input type="number" min="0" step="any" value={measure.stockQuantity} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, stockQuantity: event.target.value } : entry))} /></Field>
+          <Field label="Stock on hand"><Input type="number" step="any" value={measure.stockQuantity} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, stockQuantity: event.target.value } : entry))} /></Field>
           <Field label={usesKgConversion ? "Calculated price / piece" : "Price per unit"}><Input type="number" min="0" step="any" readOnly={usesKgConversion} value={usesKgConversion ? derivedPrice ?? "" : measure.unitPrice} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unitPrice: event.target.value } : entry))} /></Field>
           {countBased && sourceWeight && <Field label="Pieces per kg"><Input type="number" min="0.001" step="any" required value={measure.piecesPerKg} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, piecesPerKg: event.target.value } : entry))} /><span className="field-hint">Used to calculate one-piece price from the kg price.</span></Field>}
           <button type="button" className="icon-button" aria-label={`Remove stock measure ${index + 1}`} onClick={() => setMeasures((current) => current.filter((entry) => entry.id !== measure.id))}><X size={14} /></button>
@@ -6696,7 +6698,7 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   initial: CookingLog | null;
   recipes: CookingRecipe[];
   onClose: () => void;
-  onSave: (log: Omit<CookingLog, "id">) => void;
+  onSave: (log: Omit<CookingLog, "id">) => Promise<void>;
 }) {
   const [date, setDate] = useState(initial?.date ?? today());
   const [occasion, setOccasion] = useState(initial?.occasion ?? "");
@@ -6707,6 +6709,7 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   const [learning, setLearning] = useState(initial?.learning ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   function addRecipe() {
     const recipe = recipes.find((entry) => entry.id === recipeId);
@@ -6722,8 +6725,9 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
     setCustomDish("");
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (saving) return;
     if (!date) {
       setError("Choose the date for this cooking log.");
       return;
@@ -6737,7 +6741,16 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       setError("Choose a rating from 1 to 5.");
       return;
     }
-    onSave({ date, occasion: occasion.trim(), dishes, rating: parsedRating, learning: learning.trim(), notes: notes.trim() });
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({ date, occasion: occasion.trim(), dishes, rating: parsedRating, learning: learning.trim(), notes: notes.trim() });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save this cooking log.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return <Modal title={initial ? "Edit daily cooking log" : "Add daily cooking log"} onClose={onClose} wide>
@@ -6751,7 +6764,7 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
       <Field className="full" label="Daily notes"><textarea className="field textarea" rows={2} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
-      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save daily log"}</Button></div>
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : initial ? "Save changes" : "Save daily log"}</Button></div>
     </form>
   </Modal>;
 }
@@ -6763,13 +6776,14 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
   onSave: (plan: CookingPlan) => void;
   onCopy: (plan: CookingPlan) => void;
   onDelete: (plan: CookingPlan) => void;
-  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const [expanded, setExpanded] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [nameDraft, setNameDraft] = useState(plan.name);
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const [logError, setLogError] = useState("");
   const productById = new Map(products.map((product) => [product.id, product]));
   const plannedCost = plan.ingredients.reduce((total, ingredient) => {
     const product = productById.get(ingredient.productId);
@@ -6784,16 +6798,21 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
     });
   }
 
-  function addToLog() {
+  async function addToLog() {
+    setLogError("");
     const matchingLog = logs.find((log) => log.date === plan.date);
-    if (matchingLog) {
-      if (!matchingLog.dishes.some((dish) => dish.name === plan.name)) {
-        onSaveLog({ ...matchingLog, dishes: [...matchingLog.dishes, { recipeId: null, name: plan.name }] }, matchingLog.id);
+    try {
+      if (matchingLog) {
+        if (!matchingLog.dishes.some((dish) => dish.name === plan.name)) {
+          await onSaveLog({ ...matchingLog, dishes: [...matchingLog.dishes, { recipeId: null, name: plan.name }] }, matchingLog.id);
+        }
+      } else {
+        await onSaveLog({ date: plan.date, occasion: "", dishes: [{ recipeId: null, name: plan.name }], rating: null, learning: "", notes: "" });
       }
-    } else {
-      onSaveLog({ date: plan.date, occasion: "", dishes: [{ recipeId: null, name: plan.name }], rating: null, learning: "", notes: "" });
+      onSave({ ...plan, status: "Cooked" });
+    } catch (caught) {
+      setLogError(caught instanceof Error ? caught.message : "Could not add this item to the cooking log.");
     }
-    onSave({ ...plan, status: "Cooked" });
   }
 
   return <Card className="cooking-plan-card">
@@ -6807,11 +6826,12 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
       </Select>
       <div className="table-actions">
         <button className="icon-button" type="button" aria-label={`${expanded ? "Hide" : "Edit"} plan details for ${plan.name}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronRight size={14} style={{ transform: "rotate(90deg)" }} /> : <Pencil size={13} />}</button>
-        <button className="icon-button" type="button" disabled={alreadyLogged} aria-label={`Add ${plan.name} to daily cooking log`} title={alreadyLogged ? "Already in daily cooking log" : "Add to daily cooking log"} onClick={addToLog}><Utensils size={13} /></button>
+        <button className="icon-button" type="button" disabled={alreadyLogged} aria-label={`Add ${plan.name} to daily cooking log`} title={alreadyLogged ? "Already in daily cooking log" : "Add to daily cooking log"} onClick={() => void addToLog()}><Utensils size={13} /></button>
         <button className="icon-button" type="button" aria-label={`Copy plan for ${plan.name}`} onClick={() => onCopy(plan)}><Copy size={13} /></button>
         <button className="icon-button" type="button" aria-label={`Archive plan for ${plan.name}`} onClick={() => { if (window.confirm(`Move the plan for "${plan.name}" to the archive?`)) onDelete(plan); }}><Archive size={13} /></button>
       </div>
     </div>
+    {logError && <div className="alert alert-error" role="alert">{logError}</div>}
     {expanded && <div className="cooking-plan-details">
       <div className="cooking-plan-edit-fields">
         <Field label="Planned item"><Input maxLength={160} value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} onBlur={() => {
@@ -6863,7 +6883,7 @@ function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDelet
   onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
   onCopyPlan: (plan: CookingPlan) => void;
   onDeletePlan: (plan: CookingPlan) => void;
-  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const [selectedDate, setSelectedDate] = useState(today());
@@ -6933,37 +6953,52 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
   products: Product[];
   onSaveRecipe: (recipe: Omit<CookingRecipe, "id">, id?: string) => void;
   onDeleteRecipe: (recipe: CookingRecipe) => void;
-  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => void;
-  onDeleteLog: (log: CookingLog) => void;
+  onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
+  onDeleteLog: (log: CookingLog) => Promise<void>;
   onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
   onCopyPlan: (plan: CookingPlan) => void;
   onDeletePlan: (plan: CookingPlan) => void;
 }) {
   const [recipeEditor, setRecipeEditor] = useState<CookingRecipe | null | undefined>(undefined);
   const [logEditor, setLogEditor] = useState<CookingLog | null | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<"planner" | "recipes" | "logs" | "stock">("planner");
+  const [activeTab, setActiveTab] = useState<"planner" | "recipes" | "logs" | "stock" | "usage">("planner");
   const [search, setSearch] = useState("");
   const [inventory, setInventory] = useState<CookingInventoryItem[]>([]);
+  const [inventoryUsage, setInventoryUsage] = useState<CookingInventoryUsage[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventorySaving, setInventorySaving] = useState(false);
   const [inventoryError, setInventoryError] = useState("");
+  const [usageMonth, setUsageMonth] = useState("");
   const inventoryRevision = useRef<string | null>(null);
   const query = search.trim().toLocaleLowerCase();
   const formatCurrency = useCurrencyFormatter();
-  useEffect(() => {
-    let active = true;
-    void loadCookingInventory().then((result) => {
-      if (!active) return;
+  async function refreshInventory() {
+    setInventoryLoading(true);
+    try {
+      const result = await loadCookingInventory();
       setInventory(result.items);
+      setInventoryUsage(result.usage);
       inventoryRevision.current = result.revision;
       setInventoryError("");
-    }).catch((caught: unknown) => {
-      if (active) setInventoryError(caught instanceof Error ? caught.message : "Could not load cooking inventory.");
-    }).finally(() => {
-      if (active) setInventoryLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
+    } catch (caught) {
+      setInventoryError(caught instanceof Error ? caught.message : "Could not load cooking inventory.");
+    } finally {
+      setInventoryLoading(false);
+    }
+  }
+  useEffect(() => {
+    if (activeTab === "stock" || activeTab === "usage") void refreshInventory();
+  }, [activeTab, logs]);
+
+  async function saveAndRefreshLog(log: Omit<CookingLog, "id">, id?: string) {
+    await onSaveLog(log, id);
+    await refreshInventory();
+  }
+
+  async function deleteAndRefreshLog(log: CookingLog) {
+    await onDeleteLog(log);
+    await refreshInventory();
+  }
 
   async function saveInventory(items: CookingInventoryItem[]) {
     const revision = inventoryRevision.current;
@@ -6981,6 +7016,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
           const latest = await loadCookingInventory();
           inventoryRevision.current = latest.revision;
           setInventory(latest.items);
+          setInventoryUsage(latest.usage);
         } catch (reloadError) {
           setInventoryError(`${message} Could not reload the latest inventory: ${reloadError instanceof Error ? reloadError.message : "unknown error"}`);
         }
@@ -7003,6 +7039,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
     !query || [log.occasion, log.learning, log.notes, ...log.dishes.map((dish) => dish.name)].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const todayCount = logs.filter((log) => log.date === today()).length;
+  const visibleUsage = inventoryUsage.filter((entry) => !usageMonth || entry.date.startsWith(usageMonth));
 
   return <>
     <PageHeading eyebrow="Kitchen journal" title="Cooking" subtitle="Plan meals, keep a recipe book, and record what you cook each day." action={activeTab === "recipes" ? <Button onClick={() => setRecipeEditor(null)}><Plus size={15} /> Add recipe / item</Button> : activeTab === "logs" ? <Button onClick={() => setLogEditor(null)}><Plus size={15} /> Log today</Button> : undefined} />
@@ -7018,10 +7055,20 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
       <Button variant={activeTab === "recipes" ? "primary" : "outline"} aria-pressed={activeTab === "recipes"} onClick={() => setActiveTab("recipes")}><CookingPot size={14} />Recipe book<Badge>{recipes.length}</Badge></Button>
       <Button variant={activeTab === "logs" ? "primary" : "outline"} aria-pressed={activeTab === "logs"} onClick={() => setActiveTab("logs")}><Utensils size={14} />Daily cooking log<Badge>{logs.length}</Badge></Button>
       <Button variant={activeTab === "stock" ? "primary" : "outline"} aria-pressed={activeTab === "stock"} onClick={() => setActiveTab("stock")}><ShoppingBasket size={14} />Kitchen stock<Badge>{inventory.length}</Badge></Button>
+      <Button variant={activeTab === "usage" ? "primary" : "outline"} aria-pressed={activeTab === "usage"} onClick={() => setActiveTab("usage")}><History size={14} />Stock usage<Badge>{inventoryUsage.length}</Badge></Button>
     </nav>
-    {activeTab === "planner" && <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={onSaveLog} />}
+    {inventoryError && <div className="alert alert-error" role="alert">{inventoryError}</div>}
+    {activeTab === "planner" && <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={saveAndRefreshLog} />}
     {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
     {activeTab === "stock" && <CookingInventoryPage items={inventory} loading={inventoryLoading} saving={inventorySaving} error={inventoryError} onSave={saveInventory} onDelete={deleteInventoryItem} />}
+    {activeTab === "usage" && <section className="cooking-section cooking-records">
+      <div className="devotional-section-head"><div><h2><History size={15} /> Stock usage history</h2><p>Recipe ingredient usage by cooking-log date. Editing or removing a log reconciles the recorded stock use.</p></div><Field label="Month"><Input type="month" value={usageMonth} onChange={(event) => setUsageMonth(event.target.value)} /></Field></div>
+      {inventoryLoading ? <Card><p className="section-description">Loading stock usage…</p></Card> :
+        visibleUsage.length ? <div className="cooking-list">{visibleUsage.map((entry, index) => <Card className="cooking-usage-card" key={`${entry.logId}-${entry.recipeId}-${entry.inventoryMeasureId}-${index}`}>
+          <div className="cooking-usage-top"><div><strong>{entry.itemName}</strong><span>{dateLabel(entry.date)} · {entry.recipeName}</span></div><Badge tone="amber">−{entry.quantity} {entry.unit}</Badge></div>
+        </Card>)}</div> :
+        <Card><EmptyState icon={<History size={18} />} title="No stock usage recorded" description={usageMonth ? "No linked recipe ingredients were used in this month." : "Usage is recorded when you add a saved recipe with quantified kitchen-stock ingredients to a daily cooking log."} /></Card>}
+    </section>}
     {activeTab === "recipes" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div></div>
         {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <details className="cooking-card compact-details" key={recipe.id}>
           <summary className="devotional-card-head compact-summary"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={(event) => { event.preventDefault(); setRecipeEditor(recipe); }}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${recipe.name}`} onClick={(event) => { event.preventDefault(); const { id, ...copy } = recipe; void id; onSaveRecipe({ ...copy, name: copyLabel(copy.name, 120) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${recipe.name}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${recipe.name}" to the archive? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Archive size={13} /></button></div></summary>
@@ -7033,12 +7080,12 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
           <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3>{log.dishes.some((dish) => dish.recipeId && recipes.some((recipe) => recipe.id === dish.recipeId && recipe.inventoryIngredients?.length)) && <span className="devotional-date">Linked recipe estimate: {formatCurrency(log.dishes.reduce((total, dish) => {
             const recipe = recipes.find((entry) => entry.id === dish.recipeId);
             return total + (recipe?.inventoryIngredients ?? []).reduce((cost, ingredient) => cost + (ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : 0), 0);
-          }, 0))}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; onSaveLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) onDeleteLog(log); }}><Archive size={13} /></button></div></div>
+          }, 0))}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; void saveAndRefreshLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not copy this cooking log.")); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) void deleteAndRefreshLog(log).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not delete this cooking log.")); }}><Archive size={13} /></button></div></div>
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> <LinkifiedText>{log.learning}</LinkifiedText></p>}{log.notes && <p><strong>Notes:</strong> <LinkifiedText>{log.notes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
     </section>}
     {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} inventory={inventory} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
-    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
+    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}
   </>;
 }
 
@@ -10026,16 +10073,16 @@ export default function App() {
       cookingRecipes: (previous.cookingRecipes ?? []).filter((current) => current.id !== recipe.id),
     }));
   }
-  function saveCookingLog(log: Omit<CookingLog, "id">, id?: string) {
-    update((previous) => ({
+  function saveCookingLog(log: Omit<CookingLog, "id">, id?: string): Promise<void> {
+    return persistUpdate((previous) => ({
       ...previous,
       cookingLogs: id
         ? (previous.cookingLogs ?? []).map((current) => current.id === id ? { ...log, id } : current)
         : [{ ...log, id: createId() }, ...(previous.cookingLogs ?? [])],
     }));
   }
-  function deleteCookingLog(log: CookingLog) {
-    update((previous) => ({
+  function deleteCookingLog(log: CookingLog): Promise<void> {
+    return persistUpdate((previous) => ({
       ...withArchivedRecord(previous, `Cooking log · ${log.date}`, { cookingLogs: [log] }),
       cookingLogs: (previous.cookingLogs ?? []).filter((current) => current.id !== log.id),
     }));

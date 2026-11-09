@@ -1,7 +1,8 @@
-import type { CookingInventoryItem } from "../types";
+import type { CookingInventoryItem, CookingInventoryUsage } from "../types";
 
 export interface CookingInventoryResponse {
   items: CookingInventoryItem[];
+  usage: CookingInventoryUsage[];
   revision: string;
 }
 
