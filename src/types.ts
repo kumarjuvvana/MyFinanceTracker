@@ -232,6 +232,24 @@ export interface EducationDailyAttendance {
   notes: string;
 }
 
+export interface EducationHoliday {
+  id: string;
+  name: string;
+  type: "Single-day" | "Seasonal";
+  startDate: string;
+  endDate: string;
+  notes: string;
+}
+
+export interface EducationAward {
+  id: string;
+  type: "Award" | "Certificate";
+  name: string;
+  issuer: string;
+  date: string;
+  details: string;
+}
+
 export interface EducationFeeCharge {
   id: string;
   feeType: EducationFeeType;
@@ -306,6 +324,8 @@ export interface EducationRecord {
   reportSummary?: EducationReportSummary;
   monthlyAttendance?: EducationMonthlyAttendance[];
   dailyAttendance?: EducationDailyAttendance[];
+  schoolHolidays?: EducationHoliday[];
+  awards?: EducationAward[];
   feeCharges?: EducationFeeCharge[];
 }
 

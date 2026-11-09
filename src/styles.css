@@ -1127,6 +1127,22 @@ body{background:#f3f5ef}
 .education-entry span,.education-entry small{font-size:10px;color:#858d83;line-height:1.45;overflow-wrap:anywhere;word-break:break-word}
 .education-entry .table-actions{flex:none}
 .education-empty{font-size:10px;color:#92998f;margin:11px 0 0}
+.education-compact-record-list{display:grid;gap:6px;margin-top:9px}
+.education-compact-record{min-width:0;border:1px solid #eef0ec;border-radius:8px;overflow:hidden}
+.education-compact-record>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;cursor:pointer;list-style:none}
+.education-compact-record>summary::-webkit-details-marker{display:none}
+.education-compact-record>summary>span{display:grid;gap:3px;min-width:0}
+.education-compact-record>summary strong{font-size:10px;color:#414a42;overflow-wrap:anywhere}
+.education-compact-record>summary small{font-size:9px;color:#858d83;overflow-wrap:anywhere}
+.education-compact-record>summary>svg{flex:none;color:#858d83;transition:transform .15s ease}
+.education-compact-record[open]>summary>svg{transform:rotate(90deg)}
+.education-compact-record-details{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border-top:1px solid #eef0ec}
+.education-compact-record-details p{margin:0;color:#747d73;font-size:10px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.education-compact-record-details .table-actions{flex:none}
+.app-shell.dark .education-compact-record{border-color:#343d35}
+.app-shell.dark .education-compact-record>summary strong{color:#e3e8e2}
+.app-shell.dark .education-compact-record>summary small,.app-shell.dark .education-compact-record>summary>svg,.app-shell.dark .education-compact-record-details p{color:#a7b0a7}
+.app-shell.dark .education-compact-record-details{border-color:#343d35}
 .student-marks-attendance{display:grid;gap:12px}
 .student-marks-attendance-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .student-marks-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end}

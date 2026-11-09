@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -1873,6 +1873,8 @@ const emptyEducationRecord = (studentName = "", studentProfileId?: string): Omit
   contact: "",
   link: "",
   notes: "",
+  schoolHolidays: [],
+  awards: [],
 });
 
 function EducationRecordModal({ initial, initialStudentName = "", initialStudentProfileId, copyMode = false, onClose, onSave }: {
@@ -2331,8 +2333,122 @@ function normalizeEducationSubjectName(name: string) {
   return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
-function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, onDelete, onUpdate }: {
+function EducationHolidayModal({ initial, onClose, onSave }: {
+  initial: EducationHoliday | null;
+  onClose: () => void;
+  onSave: (holiday: Omit<EducationHoliday, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [type, setType] = useState<EducationHoliday["type"]>(initial?.type ?? "Single-day");
+  const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? initial?.startDate ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const resolvedEndDate = type === "Single-day" ? startDate : endDate;
+    if (!name.trim() || !startDate || !resolvedEndDate) {
+      setError("Enter a holiday name and date or date range.");
+      return;
+    }
+    if (resolvedEndDate < startDate) {
+      setError("The holiday end date cannot be before its start date.");
+      return;
+    }
+    onSave({ name: name.trim(), type, startDate, endDate: resolvedEndDate, notes: notes.trim() });
+  }
+
+  return <Modal title={initial ? "Edit school holiday" : "Add school holiday"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Holiday / break name"><Input autoFocus required maxLength={120} placeholder="e.g. Summer vacation, Diwali" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field label="Holiday type"><Select value={type} onChange={(event) => setType(event.target.value as EducationHoliday["type"])}><option>Single-day</option><option>Seasonal</option></Select></Field>
+      <Field label={type === "Single-day" ? "Holiday date" : "Start date"}><DateInput required value={startDate} onValueChange={setStartDate} /></Field>
+      {type === "Seasonal" && <Field label="End date"><DateInput required value={endDate} onValueChange={setEndDate} /></Field>}
+      <Field className="full" label="Notes (optional)"><textarea className="field textarea" maxLength={2000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save holiday" : "Add holiday"}</Button></div></form>
+  </Modal>;
+}
+
+function EducationAwardModal({ initial, onClose, onSave }: {
+  initial: EducationAward | null;
+  onClose: () => void;
+  onSave: (award: Omit<EducationAward, "id">) => void;
+}) {
+  const [type, setType] = useState<EducationAward["type"]>(initial?.type ?? "Award");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [issuer, setIssuer] = useState(initial?.issuer ?? "");
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [details, setDetails] = useState(initial?.details ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim() || !date) {
+      setError("Enter a title and date received.");
+      return;
+    }
+    onSave({ type, name: name.trim(), issuer: issuer.trim(), date, details: details.trim() });
+  }
+
+  return <Modal title={initial ? `Edit ${initial.type.toLocaleLowerCase()}` : "Add award or certificate"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Recognition type"><Select value={type} onChange={(event) => setType(event.target.value as EducationAward["type"])}><option>Award</option><option>Certificate</option></Select></Field>
+      <Field label="Date received"><DateInput required value={date} onValueChange={setDate} /></Field>
+      <Field className="full" label="Award / certificate name"><Input autoFocus required maxLength={160} placeholder="e.g. Science fair winner, Completion certificate" value={name} onChange={(event) => setName(event.target.value)} /></Field>
+      <Field className="full" label="Issued by (optional)"><Input maxLength={160} placeholder="School, organization, or awarding body" value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
+      <Field className="full" label="Details (optional)"><textarea className="field textarea" maxLength={3000} value={details} onChange={(event) => setDetails(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add recognition"}</Button></div></form>
+  </Modal>;
+}
+
+function EducationHolidayCopyModal({ source, targets, onClose, onCopy }: {
+  source: EducationRecord;
+  targets: EducationRecord[];
+  onClose: () => void;
+  onCopy: (target: EducationRecord, copied: EducationHoliday[]) => void;
+}) {
+  const [targetId, setTargetId] = useState(targets[0]?.id ?? "");
+  const [message, setMessage] = useState("");
+
+  function copyHolidays(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const target = targets.find((entry) => entry.id === targetId);
+    if (!target) {
+      setMessage("Select a destination academic year.");
+      return;
+    }
+    const existing = target.schoolHolidays ?? [];
+    const holidayKey = (holiday: EducationHoliday) =>
+      [holiday.type, holiday.name.trim().toLocaleLowerCase(), holiday.startDate, holiday.endDate].join("|");
+    const existingKeys = new Set(existing.map(holidayKey));
+    const copied = (source.schoolHolidays ?? []).filter((holiday) => {
+      const key = holidayKey(holiday);
+      if (existingKeys.has(key)) return false;
+      existingKeys.add(key);
+      return true;
+    })
+      .map((holiday) => ({ ...holiday, id: createId() }));
+    if (!copied.length) {
+      setMessage("All of these holidays already exist in the selected academic year.");
+      return;
+    }
+    onCopy(target, copied);
+    setMessage(`${copied.length} holiday${copied.length === 1 ? "" : "s"} copied to ${target.studentName} · ${target.academicYear}.`);
+  }
+
+  return <Modal title="Copy school holidays" onClose={onClose}>
+    <form onSubmit={copyHolidays}><p className="section-description">Copy the holiday list from {source.studentName} · {source.academicYear} to another academic year at {source.institution}. Existing matching holidays will not be duplicated.</p>
+      <Field label="Student and academic year"><Select required value={targetId} onChange={(event) => { setTargetId(event.target.value); setMessage(""); }}>{targets.map((target) => <option key={target.id} value={target.id}>{target.studentName} · {target.academicYear}{target.gradeCourse ? ` · ${target.gradeCourse}` : ""}</option>)}</Select></Field>
+      {message && <div className="alert" style={{ marginTop: 12 }} role="status">{message}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>{message.startsWith("All of") || message.includes("copied to") ? "Done" : "Cancel"}</Button><Button type="submit" disabled={!targets.length || message.startsWith("All of") || message.includes("copied to")}>Copy holidays</Button></div>
+    </form>
+  </Modal>;
+}
+
+function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdit, onCopy, onDelete, onUpdate }: {
   record: EducationRecord;
+  allRecords: EducationRecord[];
   defaultExpanded?: boolean;
   onEdit: () => void;
   onCopy: () => void;
@@ -2346,6 +2462,8 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
     | { kind: "expense"; initial: EducationExpense | null }
     | { kind: "attendance"; mode: "monthly" | "daily"; initial: EducationMonthlyAttendance | EducationDailyAttendance | null }
     | { kind: "charge"; initial: EducationFeeCharge | null }
+    | { kind: "holiday"; initial: EducationHoliday | null }
+    | { kind: "award"; initial: EducationAward | null }
     | null
   >(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -2355,6 +2473,9 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
   const [subjectsExpanded, setSubjectsExpanded] = useState(false);
   const [feeChargesExpanded, setFeeChargesExpanded] = useState(false);
   const [spendingExpanded, setSpendingExpanded] = useState(false);
+  const [holidaysExpanded, setHolidaysExpanded] = useState(false);
+  const [awardsExpanded, setAwardsExpanded] = useState(false);
+  const [copyHolidaysOpen, setCopyHolidaysOpen] = useState(false);
   const [examView, setExamView] = useState<"table" | "list">("table");
   const [attendanceView, setAttendanceView] = useState<"list" | "calendar-days" | "calendar">("calendar-days");
   const subjects = record.subjects ?? [];
@@ -2382,6 +2503,12 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
   const feeCharges = record.feeCharges ?? [];
   const monthlyAttendance = record.monthlyAttendance ?? [];
   const dailyAttendance = record.dailyAttendance ?? [];
+  const schoolHolidays = record.schoolHolidays ?? [];
+  const awards = record.awards ?? [];
+  const holidayCopyTargets = allRecords.filter((entry) => entry.id !== record.id &&
+    entry.institution.trim().toLocaleLowerCase() === record.institution.trim().toLocaleLowerCase())
+    .sort((a, b) => a.studentName.localeCompare(b.studentName) ||
+      b.academicYear.localeCompare(a.academicYear, undefined, { numeric: true, sensitivity: "base" }));
   const attendanceCalendarMonths = [...new Set([
     ...monthlyAttendance.map((entry) => entry.month),
     ...dailyAttendance.map((entry) => entry.date.slice(0, 7)),
@@ -2458,6 +2585,18 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
     }
     if (window.confirm(`Move the ${charge.description} charge to the archive?`)) {
       onUpdate({ ...record, feeCharges: feeCharges.filter((entry) => entry.id !== charge.id) });
+    }
+  }
+
+  function removeHoliday(holiday: EducationHoliday) {
+    if (window.confirm(`Archive ${holiday.name} from ${record.academicYear}?`)) {
+      onUpdate({ ...record, schoolHolidays: schoolHolidays.filter((entry) => entry.id !== holiday.id) });
+    }
+  }
+
+  function removeAward(award: EducationAward) {
+    if (window.confirm(`Archive ${award.name} from ${record.academicYear}?`)) {
+      onUpdate({ ...record, awards: awards.filter((entry) => entry.id !== award.id) });
     }
   }
 
@@ -2656,6 +2795,37 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
       </div>
     </section>
     <section className="education-section">
+      <div className="education-section-head">
+        <button type="button" className="education-section-toggle" aria-expanded={holidaysExpanded} onClick={() => setHolidaysExpanded((value) => !value)}>
+          <ChevronRight size={14} className={holidaysExpanded ? "is-expanded" : ""} /><span><h3><CalendarDays size={14} />School holidays</h3><p>{schoolHolidays.length} holidays for {record.academicYear} · {holidaysExpanded ? "Hide details" : "Show details"}</p></span>
+        </button>
+        <div className="table-actions">
+          <Button size="sm" variant="outline" onClick={() => setEditor({ kind: "holiday", initial: null })}><Plus size={12} />Add holiday</Button>
+          <Button size="sm" variant="outline" disabled={!schoolHolidays.length || !holidayCopyTargets.length} title={!holidayCopyTargets.length ? "No other academic year for this school is available" : undefined} onClick={() => setCopyHolidaysOpen(true)}><Copy size={12} />Copy to student year</Button>
+        </div>
+      </div>
+      {holidaysExpanded && <div className="education-compact-record-list">
+        {schoolHolidays.length ? [...schoolHolidays].sort((a, b) => a.startDate.localeCompare(b.startDate)).map((holiday) => <details className="education-compact-record" key={holiday.id}>
+          <summary><span><strong>{holiday.name}</strong><small>{holiday.type} · {dateLabel(holiday.startDate)}{holiday.endDate !== holiday.startDate ? ` – ${dateLabel(holiday.endDate)}` : ""}</small></span><ChevronRight size={14} /></summary>
+          <div className="education-compact-record-details">{holiday.notes && <p>{holiday.notes}</p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "holiday", initial: holiday })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${holiday.name}`} onClick={() => removeHoliday(holiday)}><Archive size={13} /></button></div></div>
+        </details>) : <p className="education-empty">Add single-day holidays or seasonal breaks for this academic year.</p>}
+      </div>}
+    </section>
+    <section className="education-section">
+      <div className="education-section-head">
+        <button type="button" className="education-section-toggle" aria-expanded={awardsExpanded} onClick={() => setAwardsExpanded((value) => !value)}>
+          <ChevronRight size={14} className={awardsExpanded ? "is-expanded" : ""} /><span><h3><Award size={14} />Awards &amp; certificates</h3><p>{awards.length} recognitions for {record.academicYear} · {awardsExpanded ? "Hide details" : "Show details"}</p></span>
+        </button>
+        <Button size="sm" variant="outline" onClick={() => setEditor({ kind: "award", initial: null })}><Plus size={12} />Add award / certificate</Button>
+      </div>
+      {awardsExpanded && <div className="education-compact-record-list">
+        {awards.length ? [...awards].sort((a, b) => b.date.localeCompare(a.date)).map((award) => <details className="education-compact-record" key={award.id}>
+          <summary><span><strong>{award.name}</strong><small>{award.type}{award.issuer ? ` · ${award.issuer}` : ""} · {dateLabel(award.date)}</small></span><ChevronRight size={14} /></summary>
+          <div className="education-compact-record-details">{award.details && <p>{award.details}</p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "award", initial: award })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${award.name}`} onClick={() => removeAward(award)}><Archive size={13} /></button></div></div>
+        </details>) : <p className="education-empty">Record awards and certificates received during this academic year.</p>}
+      </div>}
+    </section>
+    <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={feeChargesExpanded} onClick={() => setFeeChargesExpanded((value) => !value)}><ChevronRight size={14} className={feeChargesExpanded ? "is-expanded" : ""} /><span><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed · {feeChargesExpanded ? "Hide details" : "Show details"}</p></span></button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
       {feeChargesExpanded && <><p className="section-description">Charges are amounts billed by the school and determine the fee balance. Record money actually paid, or outside school purchases, in the ledger below.</p>
       {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
@@ -2755,6 +2925,23 @@ function EducationRecordCard({ record, defaultExpanded = true, onEdit, onCopy, o
       const current = editor.initial;
       onUpdate({ ...record, feeCharges: current ? feeCharges.map((entry) => entry.id === current.id ? { ...charge, id: current.id } : entry) : [{ ...charge, id: createId() }, ...feeCharges] });
       setEditor(null);
+    }} />}
+    {editor?.kind === "holiday" && <EducationHolidayModal key={editor.initial?.id ?? "new-school-holiday"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(holiday) => {
+      const current = editor.initial;
+      onUpdate({ ...record, schoolHolidays: current
+        ? schoolHolidays.map((entry) => entry.id === current.id ? { ...holiday, id: current.id } : entry)
+        : [{ ...holiday, id: createId() }, ...schoolHolidays] });
+      setEditor(null);
+    }} />}
+    {editor?.kind === "award" && <EducationAwardModal key={editor.initial?.id ?? "new-student-award"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(award) => {
+      const current = editor.initial;
+      onUpdate({ ...record, awards: current
+        ? awards.map((entry) => entry.id === current.id ? { ...award, id: current.id } : entry)
+        : [{ ...award, id: createId() }, ...awards] });
+      setEditor(null);
+    }} />}
+    {copyHolidaysOpen && <EducationHolidayCopyModal source={record} targets={holidayCopyTargets} onClose={() => setCopyHolidaysOpen(false)} onCopy={(target, copied) => {
+      onUpdate({ ...target, schoolHolidays: [...(target.schoolHolidays ?? []), ...copied] });
     }} />}
   </Card>;
 }
@@ -3397,6 +3584,8 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
         reportSummary: undefined,
         monthlyAttendance: [],
         dailyAttendance: [],
+        schoolHolidays: [],
+        awards: [],
         feeCharges: [],
       },
     });
@@ -3512,7 +3701,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
       {activeSection === "education" && <>
         <div className="education-section-head student-education-heading"><div><h2 className="section-title">Education timeline</h2><p className="section-description">Each entry represents one academic year or course; student ID-card images are optional.</p></div><Button onClick={() => setEditor({ record: null, mode: "new" })}><Plus size={14} />Add education record</Button></div>
         <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education records" placeholder="Search school, subject, exam, fees..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[levelFilter !== "All levels", gradeFilter !== "All classes / grades", statusFilter !== "All statuses", sortBy !== "student-year"].filter(Boolean).length}><Field label="Education level"><Select aria-label="Filter education level" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{EDUCATION_LEVELS.map((level) => <option key={level}>{level}</option>)}</Select></Field><Field label="Class or grade"><Select aria-label="Filter class or grade" value={gradeFilter} onChange={(event) => setGradeFilter(event.target.value)}><option>All classes / grades</option>{grades.map((grade) => <option key={grade}>{grade}</option>)}</Select></Field><Field label="Status"><Select aria-label="Filter education status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Current</option><option>Completed</option><option>On hold</option></Select></Field><Field label="Sort by"><Select aria-label="Sort education records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="student-year">Newest year</option><option value="academic-newest">Academic year (newest)</option><option value="academic-oldest">Academic year (oldest)</option><option value="payment-recent">Recent payment</option><option value="paid-highest">Fees paid (highest)</option><option value="balance-highest">Fee balance (highest)</option><option value="institution">Institution (A–Z)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "year" : "years"}</Badge></div>
-        <div className="education-list">{visible.map((record, index) => <EducationRecordCard key={record.id} record={record} defaultExpanded={index === 0} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
+        <div className="education-list">{visible.map((record, index) => <EducationRecordCard key={record.id} record={record} allRecords={records} defaultExpanded={index === 0} onEdit={() => setEditor({ record, mode: "edit" })} onCopy={() => copyRecord(record)} onDelete={() => deleteRecord(record)} onUpdate={updateRecord} />)}</div>
         {!visible.length && <Card><EmptyState icon={<GraduationCap size={18} />} title={profileRecords.length ? "No matching records" : "No education records yet"} description={profileRecords.length ? "Try another search or filter." : "Add an academic year or course to start this student's education timeline."} /></Card>}
       </>}
       {activeSection === "interests" && <Card className="student-interests-card">

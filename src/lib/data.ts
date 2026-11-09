@@ -170,6 +170,23 @@ function isEducationRecord(value: unknown): boolean {
     (attendance.status === "Present" || attendance.status === "Absent" || attendance.status === "Leave" || attendance.status === "Late" || attendance.status === "Other") &&
     typeof attendance.notes === "string"))) return false;
 
+  if (value.schoolHolidays !== undefined && (!Array.isArray(value.schoolHolidays) || !value.schoolHolidays.every((holiday) =>
+    isRecord(holiday) && typeof holiday.id === "string" && Boolean(holiday.id) &&
+    typeof holiday.name === "string" && Boolean(holiday.name.trim()) &&
+    (holiday.type === "Single-day" || holiday.type === "Seasonal") &&
+    typeof holiday.startDate === "string" && !Number.isNaN(Date.parse(holiday.startDate)) &&
+    typeof holiday.endDate === "string" && !Number.isNaN(Date.parse(holiday.endDate)) &&
+    holiday.endDate >= holiday.startDate && (holiday.type !== "Single-day" || holiday.startDate === holiday.endDate) &&
+    typeof holiday.notes === "string"))) return false;
+
+  if (value.awards !== undefined && (!Array.isArray(value.awards) || !value.awards.every((award) =>
+    isRecord(award) && typeof award.id === "string" && Boolean(award.id) &&
+    (award.type === "Award" || award.type === "Certificate") &&
+    typeof award.name === "string" && Boolean(award.name.trim()) &&
+    typeof award.issuer === "string" &&
+    typeof award.date === "string" && !Number.isNaN(Date.parse(award.date)) &&
+    typeof award.details === "string"))) return false;
+
   return true;
 }
 
@@ -976,6 +993,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       otherFee: record.otherFee ?? null,
       subjects: record.subjects ?? [],
       exams: record.exams ?? [],
+      schoolHolidays: record.schoolHolidays ?? [],
+      awards: record.awards ?? [],
       payments: (record.payments ?? []).map((payment) => ({
         ...payment,
         feeType: payment.feeType ?? inferLegacyEducationFeeType(payment.period),
