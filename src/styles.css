@@ -905,6 +905,15 @@ body{background:#f3f5ef}
 .cooking-inventory-card{display:grid;gap:12px;padding:14px}
 .cooking-inventory-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .cooking-inventory-card-head>div:first-child{display:flex;align-items:center;gap:8px;min-width:0}
+.cooking-inventory-card-head>div:first-child{flex-wrap:wrap}
+.cooking-inventory-summary-meta{font-size:10px;color:#858d83}
+.cooking-inventory-expanded{display:grid;gap:10px}
+.cooking-record-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cooking-usage-card{padding:10px 12px}
+.cooking-usage-details{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:10px;color:#667066}
+.cooking-usage-details strong{color:#414a42}
+.cooking-plan-summary{grid-template-columns:minmax(0,1fr) auto 20px}
+.cooking-plan-summary::after{grid-column:3}
 .cooking-inventory-card h3{margin:0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
 .cooking-inventory-measure-list{display:grid;gap:6px}
 .cooking-inventory-measure-list>div{display:grid;grid-template-columns:minmax(70px,.6fr) repeat(2,minmax(120px,1fr));gap:10px;padding:8px;border:1px solid #edf0ec;border-radius:8px;font-size:10px;color:#667066}
@@ -933,6 +942,8 @@ body{background:#f3f5ef}
 .app-shell.dark .cooking-stock-heading strong,.app-shell.dark .cooking-recipe-ingredient-cost strong,.app-shell.dark .cooking-log-ingredient-cost strong,.app-shell.dark .cooking-inventory-card h3,.app-shell.dark .cooking-inventory-measure-list strong,.app-shell.dark .cooking-saved-ingredients>strong{color:#e3e8e2}
 .app-shell.dark .cooking-stock-heading span,.app-shell.dark .cooking-recipe-ingredient-cost,.app-shell.dark .cooking-inventory-measure-list,.app-shell.dark .cooking-saved-ingredients{color:#a7b0a7}
 .app-shell.dark .cooking-recipe-stock,.app-shell.dark .cooking-inventory-measures,.app-shell.dark .cooking-recipe-ingredient,.app-shell.dark .cooking-log-ingredients,.app-shell.dark .cooking-log-ingredient,.app-shell.dark .cooking-inventory-measure,.app-shell.dark .cooking-inventory-measure-list>div{border-color:#343d35}
+.app-shell.dark .cooking-inventory-summary-meta,.app-shell.dark .cooking-usage-details{color:#a7b0a7}
+.app-shell.dark .cooking-usage-details strong{color:#e3e8e2}
 .issues-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-bottom:14px}
 .issues-summary .card{display:grid;gap:6px;padding:14px}
 .issues-summary span{font-size:10px;color:#92998f}
