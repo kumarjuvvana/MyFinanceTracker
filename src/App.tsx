@@ -6614,6 +6614,12 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
       visibleItems.length ? <div className="cooking-inventory-list">{visibleItems.map((item) => <Card className="cooking-inventory-card" key={item.id}>
         <div className="cooking-inventory-card-head"><div><h3>{item.name}</h3>{item.category && <Badge>{item.category}</Badge>}</div><div className="table-actions">
           <button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => setEditor(item)}><Pencil size={13} /></button>
+          <button className="icon-button" type="button" disabled={saving} aria-label={`Copy ${item.name}`} title={`Copy ${item.name}`} onClick={() => void onSave([...items, {
+            ...item,
+            id: createId(),
+            name: copyLabel(item.name, 120),
+            measures: item.measures.map((measure) => ({ ...measure, id: createId() })),
+          }]).catch(() => undefined)}><Copy size={13} /></button>
           <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => onDelete(item)}><Trash2 size={13} /></button>
         </div></div>
         {item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => <div key={measure.id}>
