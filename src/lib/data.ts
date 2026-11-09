@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -207,6 +207,29 @@ function isCategory(value: unknown): value is Category {
   return typeof value === "string" && CATEGORIES.some((category) => category === value);
 }
 
+function isValidActivitySessions(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const sessionIds = new Set<string>();
+  for (const session of value) {
+    if (!isRecord(session) || typeof session.id !== "string" || !session.id.trim() ||
+      typeof session.name !== "string" || !session.name.trim() || !Array.isArray(session.items) ||
+      sessionIds.has(session.id)) return false;
+    sessionIds.add(session.id);
+    for (const item of session.items) {
+      if (!isRecord(item) || typeof item.id !== "string" || !item.id.trim() ||
+        typeof item.name !== "string" || !item.name.trim()) return false;
+      if (item.appLink !== undefined) {
+        if (!isRecord(item.appLink) || typeof item.appLink.page !== "string" ||
+          (item.appLink.page !== "Dashboard" && item.appLink.page !== "Favorites" &&
+            !FAVORITABLE_PAGES.includes(item.appLink.page as Page)) ||
+          typeof item.appLink.label !== "string" || !item.appLink.label.trim() ||
+          item.appLink.label.length > 32) return false;
+      }
+    }
+  }
+  return true;
+}
+
 export function validateData(value: unknown): value is TrackerData {
   if (!isRecord(value) || value.version !== STORAGE_VERSION) return false;
   if (!Array.isArray(value.items) || !Array.isArray(value.purchases) || !Array.isArray(value.trips)) return false;
@@ -231,14 +254,7 @@ export function validateData(value: unknown): value is TrackerData {
       typeof preferences.showScreenDescriptions === "boolean" &&
       typeof preferences.groupMenus === "boolean" &&
       (preferences.menuSortOrder === "current" || preferences.menuSortOrder === "ascending") &&
-      (preferences.activitySessions === undefined || (Array.isArray(preferences.activitySessions) &&
-        preferences.activitySessions.every((session) =>
-          isRecord(session) && typeof session.id === "string" && session.id.trim().length > 0 &&
-          typeof session.name === "string" && session.name.trim().length > 0 &&
-          Array.isArray(session.items) && session.items.every((item) =>
-            isRecord(item) && typeof item.id === "string" && item.id.trim().length > 0 &&
-            typeof item.name === "string" && item.name.trim().length > 0)) &&
-        new Set(preferences.activitySessions.map((session) => (session as Record<string, unknown>).id)).size === preferences.activitySessions.length)) &&
+      (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
         preferences.activityCompletedItemIds.every((id) => typeof id === "string" && id.trim().length > 0) &&
         new Set(preferences.activityCompletedItemIds).size === preferences.activityCompletedItemIds.length));

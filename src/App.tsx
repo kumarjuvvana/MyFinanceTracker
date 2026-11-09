@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -199,6 +199,9 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   const [newSessionName, setNewSessionName] = useState("");
   const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [editingLinkItemId, setEditingLinkItemId] = useState<string | null>(null);
+  const [linkDrafts, setLinkDrafts] = useState<Record<string, { page: Page; label: string }>>({});
+  const linkablePages = navigation.filter(({ name }) => name !== "Activities" && name !== "Favorites" && name !== "Global search");
   const completedCount = sessions.reduce((count, session) =>
     count + session.items.filter((item) => checkedItems.has(item.id)).length, 0);
   const taskCount = sessions.reduce((count, session) => count + session.items.length, 0);
@@ -234,6 +237,26 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     if (!name) return;
     updateSession(sessionId, (session) => ({ ...session, items: [...session.items, { id: createId(), name }] }));
     setNewItemNames((current) => ({ ...current, [sessionId]: "" }));
+  }
+
+  function editItemLink(item: ActivityChecklistItem) {
+    setLinkDrafts((current) => ({
+      ...current,
+      [item.id]: current[item.id] ?? item.appLink ?? { page: "Dashboard", label: "" },
+    }));
+    setEditingLinkItemId(item.id);
+  }
+
+  function saveItemLink(event: FormEvent<HTMLFormElement>, sessionId: string, item: ActivityChecklistItem) {
+    event.preventDefault();
+    const draft = linkDrafts[item.id];
+    if (!draft) return;
+    const label = draft.label.trim() || draft.page;
+    updateSession(sessionId, (session) => ({
+      ...session,
+      items: session.items.map((entry) => entry.id === item.id ? { ...entry, appLink: { page: draft.page, label } } : entry),
+    }));
+    setEditingLinkItemId(null);
   }
 
   return <>
@@ -281,30 +304,30 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           <Button type="button" variant="outline" size="sm" disabled={!sessionDone} onClick={() => onSetSessionChecked(session.id, false)}><X size={13} />Uncheck all</Button>
         </div>
         {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) =>
-          <div
-            className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}${dragOverItemId === item.id ? " drag-over" : ""}`}
-            key={item.id}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              setDragOverItemId(item.id);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragOverItemId(null);
-              try {
-                const source: unknown = JSON.parse(event.dataTransfer.getData("text/plain"));
-                if (typeof source !== "object" || source === null ||
-                  !("sessionId" in source) || source.sessionId !== session.id ||
-                  !("itemId" in source) || typeof source.itemId !== "string") return;
-                const sourceIndex = session.items.findIndex((entry) => entry.id === source.itemId);
-                const targetIndex = session.items.findIndex((entry) => entry.id === item.id);
-                reorderItems(session.id, source.itemId, item.id, sourceIndex < targetIndex);
-              } catch {
+          <div className="activity-task-wrap" key={item.id}>
+            <div
+              className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}${dragOverItemId === item.id ? " drag-over" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDragOverItemId(item.id);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
                 setDragOverItemId(null);
-              }
-            }}
-          >
+                try {
+                  const source: unknown = JSON.parse(event.dataTransfer.getData("text/plain"));
+                  if (typeof source !== "object" || source === null ||
+                    !("sessionId" in source) || source.sessionId !== session.id ||
+                    !("itemId" in source) || typeof source.itemId !== "string") return;
+                  const sourceIndex = session.items.findIndex((entry) => entry.id === source.itemId);
+                  const targetIndex = session.items.findIndex((entry) => entry.id === item.id);
+                  reorderItems(session.id, source.itemId, item.id, sourceIndex < targetIndex);
+                } catch {
+                  setDragOverItemId(null);
+                }
+              }}
+            >
             <button
               type="button"
               className="activity-drag-handle"
@@ -346,10 +369,35 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
               }}
               onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
             />
+            {item.appLink ? <div className="activity-item-link">
+              <a href={`${window.location.pathname}?${new URLSearchParams({ page: item.appLink.page }).toString()}`} target="_blank" rel="noopener noreferrer" title={`Open ${item.appLink.page} in a new tab`}>
+                <ExternalLink size={13} /><span>{item.appLink.label}</span>
+              </a>
+              <button type="button" className="icon-button" aria-label={`Edit link for ${item.name}`} title="Edit link" onClick={() => editItemLink(item)}><Pencil size={13} /></button>
+            </div> : <button type="button" className="activity-add-link" onClick={() => editItemLink(item)}><ExternalLink size={13} />Add link</button>}
             <button type="button" className="icon-button" aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => updateSession(session.id, (current) => ({
               ...current,
               items: current.items.filter((entry) => entry.id !== item.id),
             }))}><X size={15} /></button>
+            </div>
+            {editingLinkItemId === item.id && <form className="activity-link-editor" onSubmit={(event) => saveItemLink(event, session.id, item)}>
+              <Field label="App page"><Select aria-label={`App page for ${item.name}`} value={linkDrafts[item.id]?.page ?? "Dashboard"} onChange={(event) => setLinkDrafts((current) => ({ ...current, [item.id]: { page: event.target.value as Page, label: current[item.id]?.label ?? "" } }))}>{linkablePages.map(({ name }) => <option key={name} value={name}>{name}</option>)}</Select></Field>
+              <Field label="Link name"><Input aria-label={`Link name for ${item.name}`} maxLength={32} placeholder={linkDrafts[item.id]?.page ?? "Short label"} value={linkDrafts[item.id]?.label ?? ""} onChange={(event) => setLinkDrafts((current) => ({ ...current, [item.id]: { page: current[item.id]?.page ?? "Dashboard", label: event.target.value } }))} /></Field>
+              <div className="activity-link-editor-actions">
+                <Button type="submit" size="sm"><Check size={13} />Save link</Button>
+                {item.appLink && <Button type="button" variant="ghost" size="sm" onClick={() => {
+                  updateSession(session.id, (current) => ({
+                    ...current,
+                    items: current.items.map((entry) => {
+                      if (entry.id !== item.id) return entry;
+                        return { ...entry, appLink: undefined };
+                    }),
+                  }));
+                  setEditingLinkItemId(null);
+                }}>Remove link</Button>}
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEditingLinkItemId(null)}>Cancel</Button>
+              </div>
+            </form>}
           </div>)}</div> : <p className="activity-empty">Add the first activity for this session.</p>}
         <form className="activity-add-task" onSubmit={(event) => addItem(event, session.id)}>
           <Input aria-label={`New activity for ${session.name}`} placeholder="Add an activity…" maxLength={120} value={newItemNames[session.id] ?? ""} onChange={(event) => setNewItemNames((current) => ({ ...current, [session.id]: event.target.value }))} />

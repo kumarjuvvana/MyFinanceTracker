@@ -928,6 +928,10 @@ export type MenuSortOrder = "current" | "ascending";
 export interface ActivityChecklistItem {
   id: string;
   name: string;
+  appLink?: {
+    page: Page;
+    label: string;
+  };
 }
 
 export interface ActivityChecklistSession {
