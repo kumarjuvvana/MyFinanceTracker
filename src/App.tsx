@@ -183,11 +183,15 @@ function FavoritesPage({ pages, saving, onNavigate, onRemove }: {
   </>;
 }
 
-function ActivitiesPage({ sessions, onSave }: {
+function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onResetSession, onResetAll }: {
   sessions: ActivityChecklistSession[];
+  completedItemIds: string[];
   onSave: (sessions: ActivityChecklistSession[]) => void;
+  onToggleItem: (itemId: string) => void;
+  onResetSession: (sessionId: string) => void;
+  onResetAll: () => void;
 }) {
-  const [checkedItems, setCheckedItems] = useState<Set<string>>(() => new Set());
+  const checkedItems = new Set(completedItemIds);
   const [sessionDrafts, setSessionDrafts] = useState<Record<string, string>>({});
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [newSessionName, setNewSessionName] = useState("");
@@ -217,10 +221,10 @@ function ActivitiesPage({ sessions, onSave }: {
   }
 
   return <>
-    <PageHeading eyebrow="Your reusable routine" title="Activities" subtitle="Keep your session checklist ready to reuse. Completion marks are temporary and reset when this screen reloads." />
+    <PageHeading eyebrow="Your reusable routine" title="Activities" subtitle="Your checklist and completion marks are saved to Supabase until you reset them." />
     <Card className="activity-checklist-summary">
-      <div><h2 className="section-title">Today’s checklist</h2><p className="section-description">Progress is only kept until you refresh or leave this screen.</p></div>
-      <Badge>{completedCount} / {taskCount} done</Badge>
+      <div><h2 className="section-title">Checklist progress</h2><p className="section-description">Completion marks remain saved until you clear them.</p></div>
+      <div className="activity-summary-actions"><Badge>{completedCount} / {taskCount} done</Badge><button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button></div>
     </Card>
     <form className="activity-add-session" onSubmit={addSession}>
       <Input aria-label="New session name" placeholder="Add a session, e.g. Before bed" maxLength={60} value={newSessionName} onChange={(event) => setNewSessionName(event.target.value)} />
@@ -246,7 +250,10 @@ function ActivitiesPage({ sessions, onSave }: {
             />
             <span>{sessionDone} / {session.items.length}</span>
           </div>
-          <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
+          <div className="activity-session-actions">
+            <button type="button" className="icon-button" disabled={!sessionDone} aria-label={`Reset ${session.name} completion marks`} title={`Reset ${session.name} completion marks`} onClick={() => onResetSession(session.id)}><RefreshCw size={15} /></button>
+            <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
+          </div>
         </div>
         {session.items.length ? <div className="activity-task-list">{session.items.map((item) =>
           <div className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}`} key={item.id}>
@@ -254,12 +261,7 @@ function ActivitiesPage({ sessions, onSave }: {
               type="checkbox"
               aria-label={`Mark ${item.name} as done`}
               checked={checkedItems.has(item.id)}
-              onChange={() => setCheckedItems((current) => {
-                const next = new Set(current);
-                if (next.has(item.id)) next.delete(item.id);
-                else next.add(item.id);
-                return next;
-              })}
+              onChange={() => onToggleItem(item.id)}
             />
             <Input
               aria-label="Checklist item"
@@ -9817,7 +9819,33 @@ export default function App() {
       }))} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
-    Activities: <ActivitiesPage sessions={data.preferences?.activitySessions ?? DEFAULT_TRACKER_PREFERENCES.activitySessions ?? []} onSave={(sessions) => updatePreferences((current) => ({ ...current, activitySessions: sessions }))} />,
+    Activities: <ActivitiesPage
+      sessions={data.preferences?.activitySessions ?? DEFAULT_TRACKER_PREFERENCES.activitySessions ?? []}
+      completedItemIds={data.preferences?.activityCompletedItemIds ?? []}
+      onSave={(sessions) => updatePreferences((current) => ({
+        ...current,
+        activitySessions: sessions,
+        activityCompletedItemIds: (current.activityCompletedItemIds ?? []).filter((id) =>
+          sessions.some((session) => session.items.some((item) => item.id === id))),
+      }))}
+      onToggleItem={(itemId) => updatePreferences((current) => {
+        const completed = current.activityCompletedItemIds ?? [];
+        return {
+          ...current,
+          activityCompletedItemIds: completed.includes(itemId)
+            ? completed.filter((id) => id !== itemId)
+            : [...completed, itemId],
+        };
+      })}
+      onResetSession={(sessionId) => {
+        const sessionItemIds = new Set((data.preferences?.activitySessions ?? []).find((session) => session.id === sessionId)?.items.map((item) => item.id) ?? []);
+        updatePreferences((current) => ({
+          ...current,
+          activityCompletedItemIds: (current.activityCompletedItemIds ?? []).filter((id) => !sessionItemIds.has(id)),
+        }));
+      }}
+      onResetAll={() => updatePreferences((current) => ({ ...current, activityCompletedItemIds: [] }))}
+    />,
     "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLogs} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,

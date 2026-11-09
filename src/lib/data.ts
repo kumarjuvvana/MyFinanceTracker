@@ -238,7 +238,10 @@ export function validateData(value: unknown): value is TrackerData {
           Array.isArray(session.items) && session.items.every((item) =>
             isRecord(item) && typeof item.id === "string" && item.id.trim().length > 0 &&
             typeof item.name === "string" && item.name.trim().length > 0)) &&
-        new Set(preferences.activitySessions.map((session) => (session as Record<string, unknown>).id)).size === preferences.activitySessions.length));
+        new Set(preferences.activitySessions.map((session) => (session as Record<string, unknown>).id)).size === preferences.activitySessions.length)) &&
+      (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
+        preferences.activityCompletedItemIds.every((id) => typeof id === "string" && id.trim().length > 0) &&
+        new Set(preferences.activityCompletedItemIds).size === preferences.activityCompletedItemIds.length));
   })();
   if (!preferencesOk) return false;
   const storesOk = value.stores === undefined || (Array.isArray(value.stores) && value.stores.every((store) =>

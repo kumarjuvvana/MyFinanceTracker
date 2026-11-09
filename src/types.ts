@@ -957,6 +957,7 @@ export interface TrackerPreferences {
   groupMenus: boolean;
   menuSortOrder: MenuSortOrder;
   activitySessions?: ActivityChecklistSession[];
+  activityCompletedItemIds?: string[];
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
