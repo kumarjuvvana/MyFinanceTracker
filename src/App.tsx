@@ -3154,6 +3154,74 @@ function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
   </form>;
 }
 
+function StudentMarksAttendance({ studentName, records }: { studentName: string; records: EducationRecord[] }) {
+  const academicYears = [...new Set(records.map((record) => record.academicYear.trim()).filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+  const [selectedYear, setSelectedYear] = useState("");
+  const activeYear = academicYears.includes(selectedYear) ? selectedYear : academicYears[0] ?? "";
+  const yearRecords = records.filter((record) => record.academicYear.trim() === activeYear)
+    .sort((a, b) => a.institution.localeCompare(b.institution, undefined, { sensitivity: "base" }));
+  const marksCount = yearRecords.reduce((total, record) => total + (record.exams?.length ?? 0) +
+    (record.reportSummary && (
+      record.reportSummary.totalMarksObtained !== null || record.reportSummary.totalMaximumMarks !== null ||
+      record.reportSummary.percentage !== null || record.reportSummary.grade || record.reportSummary.rank || record.reportSummary.result
+    ) ? 1 : 0), 0);
+  const attendanceCount = yearRecords.reduce((total, record) =>
+    total + (record.monthlyAttendance?.length ?? 0) + (record.dailyAttendance?.length ?? 0), 0);
+
+  return <div className="student-marks-attendance">
+    {academicYears.length ? <>
+      <div className="student-marks-attendance-toolbar">
+        <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">View exam results and attendance for one academic year.</p></div>
+        <Field label="Academic year"><Select aria-label="Select academic year" value={activeYear} onChange={(event) => setSelectedYear(event.target.value)}>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+      </div>
+      {yearRecords.map((record) => {
+        const exams = [...(record.exams ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+        const monthlyAttendance = [...(record.monthlyAttendance ?? [])].sort((a, b) => b.month.localeCompare(a.month));
+        const dailyAttendance = [...(record.dailyAttendance ?? [])].sort((a, b) => b.date.localeCompare(a.date));
+        const summary = record.reportSummary;
+        const hasMarks = exams.length > 0 || Boolean(summary && (
+          summary.totalMarksObtained !== null || summary.totalMaximumMarks !== null ||
+          summary.percentage !== null || summary.grade || summary.rank || summary.result
+        ));
+        return <Card className="student-marks-year-card" key={record.id}>
+          <div className="student-marks-year-heading"><h3>{record.academicYear}</h3><span>{[record.institution, record.gradeCourse].filter(Boolean).join(" · ")}</span></div>
+          <section className="student-marks-section" aria-label={`${record.academicYear} marks`}>
+            <h4><ClipboardList size={14} />Marks</h4>
+            {summary && <div className="student-marks-summary">
+              {summary.totalMarksObtained !== null && summary.totalMaximumMarks !== null && <div><span>Total marks</span><strong>{summary.totalMarksObtained} / {summary.totalMaximumMarks}</strong></div>}
+              {summary.percentage !== null && <div><span>Percentage</span><strong>{summary.percentage}%</strong></div>}
+              {summary.grade && <div><span>Grade</span><strong>{summary.grade}</strong></div>}
+              {summary.rank && <div><span>Rank</span><strong>{summary.rank}</strong></div>}
+              {summary.result && <div><span>Result</span><strong>{summary.result}</strong></div>}
+            </div>}
+            {exams.length ? <div className="student-marks-entry-list">{exams.map((exam) => <div className="student-marks-entry" key={exam.id}>
+              <div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span></div>
+              <div className="student-marks-result">
+                <strong>{exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}` : exam.resultStatus ?? "—"}</strong>
+                {exam.maximumMarks !== null && exam.maximumMarks > 0 && exam.marksObtained !== null && <small>{(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%</small>}
+                {exam.grade && <small>Grade {exam.grade}</small>}
+              </div>
+            </div>)}</div> : !hasMarks && <p className="education-empty">No marks recorded for this academic year.</p>}
+          </section>
+          <section className="student-marks-section" aria-label={`${record.academicYear} attendance`}>
+            <h4><CalendarDays size={14} />Attendance</h4>
+            {monthlyAttendance.length > 0 && <div className="student-marks-entry-list">{monthlyAttendance.map((entry) => <div className="student-marks-entry" key={entry.id}>
+              <div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>Monthly summary</span></div>
+              <div className="student-marks-result"><strong>{entry.daysPresent} / {entry.workingDays} days</strong>{entry.workingDays > 0 && <small>{(entry.daysPresent / entry.workingDays * 100).toFixed(1)}% present</small>}</div>
+            </div>)}</div>}
+            {dailyAttendance.length > 0 && <div className="student-marks-entry-list">{dailyAttendance.map((entry) => <div className="student-marks-entry" key={entry.id}>
+              <div><strong>{dateLabel(entry.date)}</strong><span>Day-wise attendance</span></div><div className={`student-attendance-status status-${entry.status.toLocaleLowerCase()}`}>{entry.status}</div>
+            </div>)}</div>}
+            {!monthlyAttendance.length && !dailyAttendance.length && <p className="education-empty">No attendance recorded for this academic year.</p>}
+          </section>
+        </Card>;
+      })}
+      {!marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries for {activeYear} yet. Add them in the Education tab.</p>}
+    </> : <Card><EmptyState icon={<ClipboardList size={18} />} title="No academic years yet" description={`Add education records for ${studentName} to view marks and attendance by year.`} /></Card>}
+  </div>;
+}
+
 function EducationRecordsPage({ records, profiles, educationPlans, archivedRecords, onSave, onDelete, onSaveProfile, onSavePlan, onArchivePlan, onRestoreArchive, onDeleteArchive }: {
   records: EducationRecord[];
   profiles: StudentProfile[];
@@ -3177,7 +3245,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
   const [gradeFilter, setGradeFilter] = useState("All classes / grades");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes" | "plans">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes" | "marks-attendance" | "plans">("overview");
   const [planProfileId, setPlanProfileId] = useState("");
   const [sortBy, setSortBy] = useState("student-year");
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
@@ -3397,6 +3465,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
         <Button variant={activeSection === "education" ? "primary" : "outline"} aria-pressed={activeSection === "education"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{profileRecords.length}</Badge></Button>
         <Button variant={activeSection === "interests" ? "primary" : "outline"} aria-pressed={activeSection === "interests"} onClick={() => setActiveSection("interests")}><Heart size={14} />Hobbies & interests</Button>
         <Button variant={activeSection === "notes" ? "primary" : "outline"} aria-pressed={activeSection === "notes"} onClick={() => setActiveSection("notes")}><FileText size={14} />Notes</Button>
+        <Button variant={activeSection === "marks-attendance" ? "primary" : "outline"} aria-pressed={activeSection === "marks-attendance"} onClick={() => setActiveSection("marks-attendance")}><ClipboardList size={14} />Marks & Attendances</Button>
         <Button variant={activeSection === "plans" ? "primary" : "outline"} aria-pressed={activeSection === "plans"} onClick={() => setActiveSection("plans")}><CalendarDays size={14} />Plan for education</Button>
       </nav>
       {activeSection === "overview" && <Card className="student-profile-card">
@@ -3430,6 +3499,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
         <div className="card-head"><div><h2 className="section-title">{selectedEntry.name}'s notes</h2><p className="section-description">Save details, reminders, or other information specific to this student. Notes sync automatically across devices.</p></div><FileText size={17} /></div>
         <Field label="Student notes"><textarea className="field textarea student-notes-input" maxLength={20000} aria-label={`Notes for ${selectedEntry.name}`} placeholder="Write any details you want to keep for this student..." value={shownProfile?.notes ?? ""} onChange={(event) => saveStudentNotes(event.target.value)} /></Field>
       </Card>}
+      {activeSection === "marks-attendance" && <StudentMarksAttendance studentName={selectedEntry.name} records={profileRecords} />}
       {activeSection === "plans" && <StudentEducationPlans
         studentName={selectedEntry.name}
         studentProfileId={shownProfile?.id ?? (planProfileId || undefined)}
