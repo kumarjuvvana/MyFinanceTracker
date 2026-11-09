@@ -1522,7 +1522,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     </div>}
     {stockTab === "stocks" && <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">Showing {filteredStocks.length} of {stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
       <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></div><FilterDrawer activeCount={[stockBrokerFilter !== "all", stockExchangeFilter !== "all", stockHoldingFilter !== "all", stockQuoteFilter !== "all", stockSortBy !== "symbol", stockSortOrder !== "asc", stockGroupBy !== "none"].filter(Boolean).length}><Field label="Exchange"><Select value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field label="Broker"><Select value={stockBrokerFilter} onChange={(event) => setStockBrokerFilter(event.target.value)}><option value="all">All brokers</option><option value="unassigned">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Position"><Select value={stockHoldingFilter} onChange={(event) => setStockHoldingFilter(event.target.value)}><option value="all">All stocks</option><option value="holdings">Holdings</option><option value="watchlist">Watchlist only</option></Select></Field><Field label="Quote"><Select value={stockQuoteFilter} onChange={(event) => setStockQuoteFilter(event.target.value)}><option value="all">Any price status</option><option value="priced">Has a price</option><option value="unpriced">No price yet</option></Select></Field><Field label="Sort by"><Select value={stockSortBy} onChange={(event) => setStockSortBy(event.target.value as typeof stockSortBy)}><option value="symbol">Stock code</option><option value="name">Name</option><option value="broker">Broker</option><option value="price">Latest price</option><option value="quantity">Shares owned</option><option value="value">Holding value</option><option value="profitLoss">Profit / loss</option></Select></Field><Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field><Field label="Group by"><Select value={stockGroupBy} onChange={(event) => { setStockGroupBy(event.target.value as typeof stockGroupBy); setCollapsedStockGroups(new Set()); }}><option value="none">No grouping</option><option value="broker">Broker</option><option value="exchange">Exchange</option></Select></Field>{activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}</FilterDrawer></div>
-      {stocks.length ? filteredStocks.length ? <div className="stock-list"><div className={`stock-list-header${stockGroupBy !== "none" ? " stock-list-header-grouped" : ""}`} aria-hidden="true"><span>Stock</span><span>Latest price</span><span>Shares</span><span>Current value</span><span>Actions</span><span /></div>{stockGroups.map((group) => {
+      {stocks.length ? filteredStocks.length ? <div className="stock-list"><div className={`stock-list-header${stockGroupBy !== "none" ? " stock-list-header-grouped" : ""}`} aria-hidden="true"><span>Stock</span><span>Latest price</span><span>Volume</span><span>Avg price</span><span>Invested amount</span><span>Current value</span><span>Actions</span><span /></div>{stockGroups.map((group) => {
         const collapsed = collapsedStockGroups.has(group.key);
         return <div className={`stock-group ${stockGroupBy === "none" ? "stock-group-ungrouped" : ""}`} key={group.key}>
           {stockGroupBy !== "none" && <button className="stock-group-heading" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedStockGroups((current) => {
@@ -1533,18 +1533,31 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           {!collapsed && <div className={`stock-group-children ${stockGroupBy !== "none" ? "stock-group-tree" : ""}`}>{group.stocks.map((stock) => {
         const latest = latestQuotes.get(stock.id);
         const history = sortedHistory(stock.id);
+        const investedAmount = stock.averageBuyPrice != null && stock.quantity != null ? stock.averageBuyPrice * stock.quantity : null;
+        const currentValue = latest && stock.quantity != null ? latest.price * stock.quantity : null;
+        const profitLoss = currentValue !== null && investedAmount !== null ? currentValue - investedAmount : null;
+        const comparablePosition = latest?.currency === "INR" && investedAmount !== null && investedAmount > 0 && profitLoss !== null;
+        const performanceClass = comparablePosition && profitLoss !== null
+          ? profitLoss >= 0 ? "positive" : "negative"
+          : "";
         return <details className="stock-row stock-row-details" key={stock.id}>
           <summary className="stock-summary stock-row-summary compact-summary">
             <div className="stock-identity"><span className="stock-code">{stock.symbol}</span><span className="stock-exchange">{stock.exchange}</span><span className="stock-name">{stock.name}</span></div>
             <div className="stock-current">
-              <strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
+              <strong className={performanceClass}>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
               <small>{latest ? marketStateLabel(latest.marketState) : "No price"}</small>
             </div>
             <div className="stock-position">
               {stock.quantity ? <strong>{stock.quantity}</strong> : <span>Watchlist</span>}
             </div>
+            <div className="stock-metric">
+              {stock.averageBuyPrice != null ? <strong className={performanceClass}>{formatQuote(stock.averageBuyPrice, "INR")}</strong> : <span>—</span>}
+            </div>
+            <div className="stock-metric">
+              {investedAmount !== null ? <strong className={performanceClass}>{formatQuote(investedAmount, "INR")}</strong> : <span>—</span>}
+            </div>
             <div className="stock-value">
-              {latest && stock.quantity ? <strong>{formatQuote(latest.price * stock.quantity, latest.currency)}</strong> : <span>—</span>}
+              {currentValue !== null ? <strong className={performanceClass}>{formatQuote(currentValue, latest?.currency ?? "INR")}</strong> : <span>—</span>}
             </div>
             <div className="table-actions">
               <button className="icon-button" aria-label={`Refresh ${stock.symbol}`} disabled={busy} onClick={(event) => { event.preventDefault(); refreshStock(stock); }}><RefreshCw size={14} /></button>
@@ -1559,12 +1572,16 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
                 <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price snapshot yet"}</small>
                 <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
               </div>
+              <div className="stock-metric"><span>Volume</span><strong>{stock.quantity ?? "—"}</strong></div>
+              <div className="stock-metric"><span>Avg price</span><strong className={performanceClass}>{stock.averageBuyPrice != null ? formatQuote(stock.averageBuyPrice, "INR") : "—"}</strong></div>
+              <div className="stock-metric"><span>Invested amount</span><strong className={performanceClass}>{investedAmount !== null ? formatQuote(investedAmount, "INR") : "—"}</strong></div>
+              <div className="stock-metric"><span>Current value</span><strong className={performanceClass}>{currentValue !== null ? formatQuote(currentValue, latest?.currency ?? "INR") : "—"}</strong></div>
               <div className="stock-position">
-                <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} average · ${stock.quantity} shares` : "Add average price and shares to track a position"}</span>
-                {latest && stock.quantity ? <strong>{formatQuote(latest.price * stock.quantity, latest.currency)} current value</strong> : null}
-                {latest && stock.averageBuyPrice && stock.quantity ? latest.currency === "INR" ? <>
-                  <small className={(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "positive" : "negative"}>{(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "+" : ""}{formatQuote((latest.price - stock.averageBuyPrice) * stock.quantity, "INR")} ({((latest.price - stock.averageBuyPrice) / stock.averageBuyPrice * 100).toFixed(2)}%)</small>
-                </> : <small>P/L needs an INR quote</small> : null}
+                <span>{comparablePosition ? "Unrealized gain / loss" : "Add average price and volume to track profit / loss"}</span>
+                {comparablePosition && profitLoss !== null && investedAmount !== null ? <>
+                  <strong className={performanceClass}>{profitLoss >= 0 ? "+" : ""}{formatQuote(profitLoss, "INR")}</strong>
+                  <small className={performanceClass}>{profitLoss >= 0 ? "+" : ""}{(profitLoss / investedAmount * 100).toFixed(2)}%</small>
+                </> : null}
               </div>
               <div className="stock-broker">Broker · {stock.broker || "No broker"}</div>
             </div>
