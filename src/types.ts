@@ -250,6 +250,12 @@ export interface EducationAward {
   details: string;
 }
 
+export interface EducationLeave {
+  id: string;
+  date: string;
+  reason: string;
+}
+
 export interface EducationFeeCharge {
   id: string;
   feeType: EducationFeeType;
@@ -326,6 +332,7 @@ export interface EducationRecord {
   dailyAttendance?: EducationDailyAttendance[];
   schoolHolidays?: EducationHoliday[];
   awards?: EducationAward[];
+  studentLeaves?: EducationLeave[];
   feeCharges?: EducationFeeCharge[];
 }
 

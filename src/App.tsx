@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -1875,6 +1875,7 @@ const emptyEducationRecord = (studentName = "", studentProfileId?: string): Omit
   notes: "",
   schoolHolidays: [],
   awards: [],
+  studentLeaves: [],
 });
 
 function EducationRecordModal({ initial, initialStudentName = "", initialStudentProfileId, copyMode = false, onClose, onSave }: {
@@ -2402,6 +2403,32 @@ function EducationAwardModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
+function EducationLeaveModal({ initial, onClose, onSave }: {
+  initial: EducationLeave | null;
+  onClose: () => void;
+  onSave: (leave: Omit<EducationLeave, "id">) => void;
+}) {
+  const [date, setDate] = useState(initial?.date ?? today());
+  const [reason, setReason] = useState(initial?.reason ?? "");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!date || !reason.trim()) {
+      setError("Enter the leave date and reason.");
+      return;
+    }
+    onSave({ date, reason: reason.trim() });
+  }
+
+  return <Modal title={initial ? "Edit student leave" : "Record student leave"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field label="Leave date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
+      <Field className="full" label="Reason for leave"><textarea className="field textarea" required maxLength={2000} placeholder="Enter why the student was on leave" value={reason} onChange={(event) => setReason(event.target.value)} /></Field>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save leave" : "Add leave"}</Button></div></form>
+  </Modal>;
+}
+
 function EducationHolidayCopyModal({ source, targets, onClose, onCopy }: {
   source: EducationRecord;
   targets: EducationRecord[];
@@ -2464,6 +2491,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
     | { kind: "charge"; initial: EducationFeeCharge | null }
     | { kind: "holiday"; initial: EducationHoliday | null }
     | { kind: "award"; initial: EducationAward | null }
+    | { kind: "leave"; initial: EducationLeave | null }
     | null
   >(null);
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -2475,6 +2503,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
   const [spendingExpanded, setSpendingExpanded] = useState(false);
   const [holidaysExpanded, setHolidaysExpanded] = useState(false);
   const [awardsExpanded, setAwardsExpanded] = useState(false);
+  const [leavesExpanded, setLeavesExpanded] = useState(false);
   const [copyHolidaysOpen, setCopyHolidaysOpen] = useState(false);
   const [examView, setExamView] = useState<"table" | "list">("table");
   const [attendanceView, setAttendanceView] = useState<"list" | "calendar-days" | "calendar">("calendar-days");
@@ -2505,6 +2534,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
   const dailyAttendance = record.dailyAttendance ?? [];
   const schoolHolidays = record.schoolHolidays ?? [];
   const awards = record.awards ?? [];
+  const studentLeaves = record.studentLeaves ?? [];
   const holidayCopyTargets = allRecords.filter((entry) => entry.id !== record.id &&
     entry.institution.trim().toLocaleLowerCase() === record.institution.trim().toLocaleLowerCase())
     .sort((a, b) => a.studentName.localeCompare(b.studentName) ||
@@ -2597,6 +2627,12 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
   function removeAward(award: EducationAward) {
     if (window.confirm(`Archive ${award.name} from ${record.academicYear}?`)) {
       onUpdate({ ...record, awards: awards.filter((entry) => entry.id !== award.id) });
+    }
+  }
+
+  function removeStudentLeave(leave: EducationLeave) {
+    if (window.confirm(`Archive the leave record for ${dateLabel(leave.date)}?`)) {
+      onUpdate({ ...record, studentLeaves: studentLeaves.filter((entry) => entry.id !== leave.id) });
     }
   }
 
@@ -2826,6 +2862,20 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       </div>}
     </section>
     <section className="education-section">
+      <div className="education-section-head">
+        <button type="button" className="education-section-toggle" aria-expanded={leavesExpanded} onClick={() => setLeavesExpanded((value) => !value)}>
+          <ChevronRight size={14} className={leavesExpanded ? "is-expanded" : ""} /><span><h3><CalendarDays size={14} />Student leave</h3><p>{studentLeaves.length} leave records for {record.academicYear} · separate from attendance · {leavesExpanded ? "Hide details" : "Show details"}</p></span>
+        </button>
+        <Button size="sm" variant="outline" onClick={() => setEditor({ kind: "leave", initial: null })}><Plus size={12} />Record leave</Button>
+      </div>
+      {leavesExpanded && <div className="education-compact-record-list">
+        {studentLeaves.length ? [...studentLeaves].sort((a, b) => b.date.localeCompare(a.date)).map((leave) => <details className="education-compact-record" key={leave.id}>
+          <summary><span><strong>{dateLabel(leave.date)}</strong><small>{leave.reason}</small></span><ChevronRight size={14} /></summary>
+          <div className="education-compact-record-details"><p>{leave.reason}</p><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "leave", initial: leave })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive leave entry for ${dateLabel(leave.date)}`} onClick={() => removeStudentLeave(leave)}><Archive size={13} /></button></div></div>
+        </details>) : <p className="education-empty">Manually record leave dates and reasons for this student and academic year. These entries do not change attendance.</p>}
+      </div>}
+    </section>
+    <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={feeChargesExpanded} onClick={() => setFeeChargesExpanded((value) => !value)}><ChevronRight size={14} className={feeChargesExpanded ? "is-expanded" : ""} /><span><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed · {feeChargesExpanded ? "Hide details" : "Show details"}</p></span></button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
       {feeChargesExpanded && <><p className="section-description">Charges are amounts billed by the school and determine the fee balance. Record money actually paid, or outside school purchases, in the ledger below.</p>
       {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
@@ -2938,6 +2988,13 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       onUpdate({ ...record, awards: current
         ? awards.map((entry) => entry.id === current.id ? { ...award, id: current.id } : entry)
         : [{ ...award, id: createId() }, ...awards] });
+      setEditor(null);
+    }} />}
+    {editor?.kind === "leave" && <EducationLeaveModal key={editor.initial?.id ?? "new-student-leave"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(leave) => {
+      const current = editor.initial;
+      onUpdate({ ...record, studentLeaves: current
+        ? studentLeaves.map((entry) => entry.id === current.id ? { ...leave, id: current.id } : entry)
+        : [{ ...leave, id: createId() }, ...studentLeaves] });
       setEditor(null);
     }} />}
     {copyHolidaysOpen && <EducationHolidayCopyModal source={record} targets={holidayCopyTargets} onClose={() => setCopyHolidaysOpen(false)} onCopy={(target, copied) => {
@@ -3586,6 +3643,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
         dailyAttendance: [],
         schoolHolidays: [],
         awards: [],
+        studentLeaves: [],
         feeCharges: [],
       },
     });

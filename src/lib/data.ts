@@ -187,6 +187,11 @@ function isEducationRecord(value: unknown): boolean {
     typeof award.date === "string" && !Number.isNaN(Date.parse(award.date)) &&
     typeof award.details === "string"))) return false;
 
+  if (value.studentLeaves !== undefined && (!Array.isArray(value.studentLeaves) || !value.studentLeaves.every((leave) =>
+    isRecord(leave) && typeof leave.id === "string" && Boolean(leave.id) &&
+    typeof leave.date === "string" && !Number.isNaN(Date.parse(leave.date)) &&
+    typeof leave.reason === "string" && Boolean(leave.reason.trim())))) return false;
+
   return true;
 }
 
@@ -995,6 +1000,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       exams: record.exams ?? [],
       schoolHolidays: record.schoolHolidays ?? [],
       awards: record.awards ?? [],
+      studentLeaves: record.studentLeaves ?? [],
       payments: (record.payments ?? []).map((payment) => ({
         ...payment,
         feeType: payment.feeType ?? inferLegacyEducationFeeType(payment.period),
