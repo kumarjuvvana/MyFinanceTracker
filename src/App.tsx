@@ -3157,8 +3157,10 @@ function InterestQuickAdd({ onAdd }: { onAdd: (interest: string) => void }) {
 function StudentMarksAttendance({ studentName, records }: { studentName: string; records: EducationRecord[] }) {
   const academicYears = [...new Set(records.map((record) => record.academicYear.trim()).filter(Boolean))]
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
-  const [selectedYear, setSelectedYear] = useState("");
-  const yearRecords = records.filter((record) => !selectedYear || record.academicYear.trim() === selectedYear)
+  const [selectedYear, setSelectedYear] = useState("all");
+  const [search, setSearch] = useState("");
+  const searchTerm = search.trim().toLocaleLowerCase();
+  const yearRecords = records.filter((record) => selectedYear === "all" || record.academicYear.trim() === selectedYear)
     .sort((a, b) => a.institution.localeCompare(b.institution, undefined, { sensitivity: "base" }));
   const marksCount = yearRecords.reduce((total, record) => total + (record.exams?.length ?? 0) +
     (record.reportSummary && (
@@ -3171,23 +3173,39 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
   return <div className="student-marks-attendance">
     {academicYears.length ? <>
       <div className="student-marks-attendance-toolbar">
-        <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">All academic years are shown by default. Choose a year to filter.</p></div>
-        <Field label="Academic year"><Select aria-label="Select academic year" value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}><option value="">All academic years</option>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+        <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">All academic years are shown by default. Choose a year or search the records.</p></div>
+        <div className="student-marks-controls">
+          <div className="search-wrap"><Search size={15} /><Input aria-label="Search marks and attendance" placeholder="Search marks, subjects, attendance..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+          <Field label="Academic year"><Select aria-label="Select academic year" value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}><option value="all">All academic years (all records)</option>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+        </div>
       </div>
       <div className="student-marks-year-grid">{yearRecords.map((record) => {
-        const exams = [...(record.exams ?? [])].sort((a, b) => b.date.localeCompare(a.date));
-        const monthlyAttendance = [...(record.monthlyAttendance ?? [])].sort((a, b) => b.month.localeCompare(a.month));
-        const dailyAttendance = [...(record.dailyAttendance ?? [])].sort((a, b) => b.date.localeCompare(a.date));
         const summary = record.reportSummary;
-        const hasMarks = exams.length > 0 || Boolean(summary && (
+        const recordMatches = !searchTerm || [record.academicYear, record.institution, record.gradeCourse, record.boardUniversity]
+          .some((value) => value.toLocaleLowerCase().includes(searchTerm));
+        const exams = [...(record.exams ?? [])].sort((a, b) => b.date.localeCompare(a.date)).filter((exam) =>
+          recordMatches || !searchTerm || [exam.name, exam.assessmentType, exam.subject, exam.date, exam.marksObtained?.toString() ?? "",
+            exam.maximumMarks?.toString() ?? "", exam.grade, exam.resultStatus ?? "", exam.teacherRemark ?? "", exam.notes]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+        const monthlyAttendance = [...(record.monthlyAttendance ?? [])].sort((a, b) => b.month.localeCompare(a.month)).filter((entry) =>
+          recordMatches || !searchTerm || [entry.month, entry.notes, entry.daysPresent.toString(), entry.workingDays.toString()]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+        const dailyAttendance = [...(record.dailyAttendance ?? [])].sort((a, b) => b.date.localeCompare(a.date)).filter((entry) =>
+          recordMatches || !searchTerm || [entry.date, entry.status, entry.notes]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+        const summaryText = summary ? [summary.totalMarksObtained?.toString() ?? "", summary.totalMaximumMarks?.toString() ?? "",
+          summary.percentage?.toString() ?? "", summary.grade, summary.rank, summary.result, summary.teacherRemark].join(" ").toLocaleLowerCase() : "";
+        const summaryMatches = !!summary && (!searchTerm || recordMatches || summaryText.includes(searchTerm));
+        const hasMarks = exams.length > 0 || Boolean(summaryMatches && summary && (
           summary.totalMarksObtained !== null || summary.totalMaximumMarks !== null ||
           summary.percentage !== null || summary.grade || summary.rank || summary.result
         ));
+        if (searchTerm && !recordMatches && !exams.length && !monthlyAttendance.length && !dailyAttendance.length && !summaryMatches) return null;
         return <Card className="student-marks-year-card" key={record.id}>
           <div className="student-marks-year-heading"><h3>{record.academicYear}</h3><span>{[record.institution, record.gradeCourse].filter(Boolean).join(" · ")}</span></div>
           <section className="student-marks-section" aria-label={`${record.academicYear} marks`}>
             <h4><ClipboardList size={14} />Marks</h4>
-            {summary && <div className="student-marks-summary">
+            {summaryMatches && summary && <div className="student-marks-summary">
               {summary.totalMarksObtained !== null && summary.totalMaximumMarks !== null && <div><span>Total marks</span><strong>{summary.totalMarksObtained} / {summary.totalMaximumMarks}</strong></div>}
               {summary.percentage !== null && <div><span>Percentage</span><strong>{summary.percentage}%</strong></div>}
               {summary.grade && <div><span>Grade</span><strong>{summary.grade}</strong></div>}
@@ -3216,7 +3234,16 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
           </section>
         </Card>;
       })}</div>
-      {!marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries {selectedYear ? `for ${selectedYear}` : "for these academic years"} yet. Add them in the Education tab.</p>}
+      {searchTerm && !yearRecords.some((record) => {
+        const summaryText = record.reportSummary ? Object.values(record.reportSummary).join(" ").toLocaleLowerCase() : "";
+        return [record.academicYear, record.institution, record.gradeCourse, record.boardUniversity, summaryText,
+          ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.date, exam.marksObtained?.toString() ?? "",
+            exam.maximumMarks?.toString() ?? "", exam.grade, exam.resultStatus ?? "", exam.teacherRemark ?? "", exam.notes]),
+          ...(record.monthlyAttendance ?? []).flatMap((entry) => [entry.month, new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }), entry.notes, entry.daysPresent.toString(), entry.workingDays.toString()]),
+          ...(record.dailyAttendance ?? []).flatMap((entry) => [entry.date, entry.status, entry.notes])]
+          .some((value) => value.toLocaleLowerCase().includes(searchTerm));
+      }) && <p className="student-marks-attendance-footnote">No marks or attendance records match “{search}”.</p>}
+      {!searchTerm && !marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries {selectedYear !== "all" ? `for ${selectedYear}` : "for these academic years"} yet. Add them in the Education tab.</p>}
     </> : <Card><EmptyState icon={<ClipboardList size={18} />} title="No academic years yet" description={`Add education records for ${studentName} to view marks and attendance by year.`} /></Card>}
   </div>;
 }

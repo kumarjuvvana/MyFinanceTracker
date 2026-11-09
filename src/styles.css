@@ -1129,7 +1129,9 @@ body{background:#f3f5ef}
 .education-empty{font-size:10px;color:#92998f;margin:11px 0 0}
 .student-marks-attendance{display:grid;gap:12px}
 .student-marks-attendance-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.student-marks-attendance-toolbar .field-wrap{min-width:170px}
+.student-marks-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end}
+.student-marks-controls>.search-wrap{flex:1;max-width:380px;min-width:220px}
+.student-marks-controls>.field-wrap{min-width:210px}
 .student-marks-year-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start;gap:10px}
 .student-marks-year-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:10px;padding:13px}
 .student-marks-year-heading{display:grid;gap:4px;padding-bottom:10px;border-bottom:1px solid #eef0ec}
@@ -1168,7 +1170,7 @@ body{background:#f3f5ef}
 .app-shell.dark .student-attendance-status.status-leave{background:#453a29;color:#e5c27e}
 .app-shell.dark .student-attendance-status.status-late{background:#2c3b4d;color:#a9c5e6}
 .app-shell.dark .student-attendance-status.status-other{background:#393247;color:#c5b6e8}
-@media(max-width:700px){.student-marks-year-card{grid-template-columns:minmax(0,1fr)}.student-marks-year-heading{grid-column:auto}}
+@media(max-width:700px){.student-marks-attendance-toolbar{align-items:stretch}.student-marks-controls{justify-content:stretch}.student-marks-controls>.search-wrap,.student-marks-controls>.field-wrap{flex:1 1 100%;max-width:none;min-width:0}.student-marks-year-card{grid-template-columns:minmax(0,1fr)}.student-marks-year-heading{grid-column:auto}}
 .app-shell.dark .education-icon{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .education-card-title h2,.app-shell.dark .education-details strong{color:#e3e8e2}
 .app-shell.dark .education-card-title p,.app-shell.dark .education-details span{color:#a7b0a7}
