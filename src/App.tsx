@@ -15,7 +15,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingLog, type CookingRecipe, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -83,6 +83,7 @@ const navigation: NavigationItem[] = [
   { name: "Bank accounts", icon: Landmark, group: "Finance" },
   { name: "Learning", icon: BookOpen, group: "Personal growth" },
   { name: "Mind & habits", icon: Heart, group: "Personal growth" },
+  { name: "Activities", icon: ListChecks, group: "Personal growth" },
   { name: "Morning exercise", icon: Dumbbell, group: "Personal growth" },
   { name: "AI Prompts", icon: Sparkles, group: "Personal growth" },
   { name: "Training & classes", icon: CalendarDays, group: "Personal growth" },
@@ -179,6 +180,114 @@ function FavoritesPage({ pages, saving, onNavigate, onRemove }: {
       <button type="button" className="favorite-page-open" onClick={() => onNavigate(name)}><span><Icon size={18} /><strong>{name}</strong></span><ChevronRight size={16} /></button>
       <button type="button" className="icon-button favorite-page-remove" disabled={saving} aria-label={`Remove ${name} from favorites`} title={`Remove ${name} from favorites`} onClick={() => onRemove(name)}><Star size={15} fill="currentColor" /></button>
     </Card>)}</div> : <Card><EmptyState icon={<Star size={18} />} title="No favorite screens yet" description="Open any screen and select the star in the top bar, or choose screens in Data management." /></Card>}
+  </>;
+}
+
+function ActivitiesPage({ sessions, onSave }: {
+  sessions: ActivityChecklistSession[];
+  onSave: (sessions: ActivityChecklistSession[]) => void;
+}) {
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(() => new Set());
+  const [sessionDrafts, setSessionDrafts] = useState<Record<string, string>>({});
+  const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
+  const [newSessionName, setNewSessionName] = useState("");
+  const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
+  const completedCount = sessions.reduce((count, session) =>
+    count + session.items.filter((item) => checkedItems.has(item.id)).length, 0);
+  const taskCount = sessions.reduce((count, session) => count + session.items.length, 0);
+
+  function updateSession(sessionId: string, update: (session: ActivityChecklistSession) => ActivityChecklistSession) {
+    onSave(sessions.map((session) => session.id === sessionId ? update(session) : session));
+  }
+
+  function addSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newSessionName.trim();
+    if (!name) return;
+    onSave([...sessions, { id: createId(), name, items: [] }]);
+    setNewSessionName("");
+  }
+
+  function addItem(event: FormEvent<HTMLFormElement>, sessionId: string) {
+    event.preventDefault();
+    const name = newItemNames[sessionId]?.trim();
+    if (!name) return;
+    updateSession(sessionId, (session) => ({ ...session, items: [...session.items, { id: createId(), name }] }));
+    setNewItemNames((current) => ({ ...current, [sessionId]: "" }));
+  }
+
+  return <>
+    <PageHeading eyebrow="Your reusable routine" title="Activities" subtitle="Keep your session checklist ready to reuse. Completion marks are temporary and reset when this screen reloads." />
+    <Card className="activity-checklist-summary">
+      <div><h2 className="section-title">Today’s checklist</h2><p className="section-description">Progress is only kept until you refresh or leave this screen.</p></div>
+      <Badge>{completedCount} / {taskCount} done</Badge>
+    </Card>
+    <form className="activity-add-session" onSubmit={addSession}>
+      <Input aria-label="New session name" placeholder="Add a session, e.g. Before bed" maxLength={60} value={newSessionName} onChange={(event) => setNewSessionName(event.target.value)} />
+      <Button type="submit" disabled={!newSessionName.trim()}><Plus size={14} />Add session</Button>
+    </form>
+    {sessions.length ? <div className="activity-session-grid">{sessions.map((session) => {
+      const sessionDone = session.items.filter((item) => checkedItems.has(item.id)).length;
+      return <Card className="activity-session-card" key={session.id}>
+        <div className="activity-session-head">
+          <div className="activity-session-title">
+            <Input
+              aria-label={`${session.name} session name`}
+              maxLength={60}
+              value={sessionDrafts[session.id] ?? session.name}
+              onFocus={() => setSessionDrafts((current) => ({ ...current, [session.id]: current[session.id] ?? session.name }))}
+              onChange={(event) => setSessionDrafts((current) => ({ ...current, [session.id]: event.target.value }))}
+              onBlur={() => {
+                const name = sessionDrafts[session.id]?.trim();
+                if (name && name !== session.name) updateSession(session.id, (current) => ({ ...current, name }));
+                setSessionDrafts((current) => { const next = { ...current }; delete next[session.id]; return next; });
+              }}
+              onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+            />
+            <span>{sessionDone} / {session.items.length}</span>
+          </div>
+          <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
+        </div>
+        {session.items.length ? <div className="activity-task-list">{session.items.map((item) =>
+          <div className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}`} key={item.id}>
+            <input
+              type="checkbox"
+              aria-label={`Mark ${item.name} as done`}
+              checked={checkedItems.has(item.id)}
+              onChange={() => setCheckedItems((current) => {
+                const next = new Set(current);
+                if (next.has(item.id)) next.delete(item.id);
+                else next.add(item.id);
+                return next;
+              })}
+            />
+            <Input
+              aria-label="Checklist item"
+              maxLength={120}
+              value={itemDrafts[item.id] ?? item.name}
+              onFocus={() => setItemDrafts((current) => ({ ...current, [item.id]: current[item.id] ?? item.name }))}
+              onChange={(event) => setItemDrafts((current) => ({ ...current, [item.id]: event.target.value }))}
+              onBlur={() => {
+                const name = itemDrafts[item.id]?.trim();
+                if (name && name !== item.name) updateSession(session.id, (current) => ({
+                  ...current,
+                  items: current.items.map((entry) => entry.id === item.id ? { ...entry, name } : entry),
+                }));
+                setItemDrafts((current) => { const next = { ...current }; delete next[item.id]; return next; });
+              }}
+              onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+            />
+            <button type="button" className="icon-button" aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => updateSession(session.id, (current) => ({
+              ...current,
+              items: current.items.filter((entry) => entry.id !== item.id),
+            }))}><X size={15} /></button>
+          </div>)}</div> : <p className="activity-empty">Add the first activity for this session.</p>}
+        <form className="activity-add-task" onSubmit={(event) => addItem(event, session.id)}>
+          <Input aria-label={`New activity for ${session.name}`} placeholder="Add an activity…" maxLength={120} value={newItemNames[session.id] ?? ""} onChange={(event) => setNewItemNames((current) => ({ ...current, [session.id]: event.target.value }))} />
+          <Button type="submit" variant="outline" size="sm" disabled={!newItemNames[session.id]?.trim()}><Plus size={13} />Add</Button>
+        </form>
+      </Card>;
+    })}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
   </>;
 }
 
@@ -9708,6 +9817,7 @@ export default function App() {
       }))} />,
     "Learning": <LearningPage records={data.learningRecords ?? []} onSave={saveLearningRecord} onDelete={deleteLearningRecord} />,
     "Mind & habits": <MindfulnessPage habits={data.mindfulHabits ?? []} logs={data.mindfulnessLogs ?? []} onSaveHabit={saveMindfulHabit} onArchiveHabit={archiveMindfulHabit} onSaveLog={saveMindfulnessLog} onArchiveLog={archiveMindfulnessLog} />,
+    Activities: <ActivitiesPage sessions={data.preferences?.activitySessions ?? DEFAULT_TRACKER_PREFERENCES.activitySessions ?? []} onSave={(sessions) => updatePreferences((current) => ({ ...current, activitySessions: sessions }))} />,
     "Morning exercise": <MorningExercisePage logs={data.morningExerciseLogs ?? []} activities={data.morningExerciseActivities ?? [...MORNING_EXERCISE_OPTIONS]} onSave={saveMorningExerciseLogs} onArchive={archiveMorningExerciseLog} onSaveActivities={saveMorningExerciseActivities} />,
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,

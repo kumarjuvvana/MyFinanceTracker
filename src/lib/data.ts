@@ -230,7 +230,15 @@ export function validateData(value: unknown): value is TrackerData {
       new Set(preferences.dashboardWidgets).size === preferences.dashboardWidgets.length &&
       typeof preferences.showScreenDescriptions === "boolean" &&
       typeof preferences.groupMenus === "boolean" &&
-      (preferences.menuSortOrder === "current" || preferences.menuSortOrder === "ascending");
+      (preferences.menuSortOrder === "current" || preferences.menuSortOrder === "ascending") &&
+      (preferences.activitySessions === undefined || (Array.isArray(preferences.activitySessions) &&
+        preferences.activitySessions.every((session) =>
+          isRecord(session) && typeof session.id === "string" && session.id.trim().length > 0 &&
+          typeof session.name === "string" && session.name.trim().length > 0 &&
+          Array.isArray(session.items) && session.items.every((item) =>
+            isRecord(item) && typeof item.id === "string" && item.id.trim().length > 0 &&
+            typeof item.name === "string" && item.name.trim().length > 0)) &&
+        new Set(preferences.activitySessions.map((session) => (session as Record<string, unknown>).id)).size === preferences.activitySessions.length));
   })();
   if (!preferencesOk) return false;
   const storesOk = value.stores === undefined || (Array.isArray(value.stores) && value.stores.every((store) =>
@@ -972,6 +980,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       ...DEFAULT_TRACKER_PREFERENCES,
       ...data.preferences,
       dashboardWidgets: data.preferences?.dashboardWidgets ?? [...DEFAULT_TRACKER_PREFERENCES.dashboardWidgets],
+      activitySessions: data.preferences?.activitySessions ?? DEFAULT_TRACKER_PREFERENCES.activitySessions?.map((session) => ({ ...session, items: [] })),
     },
     stores: data.stores ?? [],
     products: data.products ?? [],

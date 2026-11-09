@@ -27,6 +27,7 @@ export type Page =
   | "Bank accounts"
   | "Learning"
   | "Mind & habits"
+  | "Activities"
   | "Morning exercise"
   | "Training & classes"
   | "Devotional"
@@ -50,7 +51,7 @@ export type Page =
 export const FAVORITABLE_PAGES: Page[] = [
   "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
   "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager", "Bank accounts",
-  "Learning", "Mind & habits", "Morning exercise", "Training & classes", "Devotional", "Cooking",
+  "Learning", "Mind & habits", "Activities", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
   "Database manager", "Hosting & storage", "Archive", "Account credentials",
@@ -924,6 +925,24 @@ export const DASHBOARD_WIDGETS = [
 export type DashboardWidget = (typeof DASHBOARD_WIDGETS)[number];
 export type MenuSortOrder = "current" | "ascending";
 
+export interface ActivityChecklistItem {
+  id: string;
+  name: string;
+}
+
+export interface ActivityChecklistSession {
+  id: string;
+  name: string;
+  items: ActivityChecklistItem[];
+}
+
+export const DEFAULT_ACTIVITY_SESSIONS: ActivityChecklistSession[] = [
+  { id: "morning", name: "Morning", items: [] },
+  { id: "afternoon", name: "Afternoon", items: [] },
+  { id: "evening", name: "Evening", items: [] },
+  { id: "night", name: "Night", items: [] },
+];
+
 export interface TrackerPreferences {
   currency: Currency;
   darkMode: boolean;
@@ -937,6 +956,7 @@ export interface TrackerPreferences {
   showScreenDescriptions: boolean;
   groupMenus: boolean;
   menuSortOrder: MenuSortOrder;
+  activitySessions?: ActivityChecklistSession[];
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
@@ -952,6 +972,7 @@ export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
   showScreenDescriptions: true,
   groupMenus: true,
   menuSortOrder: "current",
+  activitySessions: DEFAULT_ACTIVITY_SESSIONS.map((session) => ({ ...session, items: [] })),
 };
 
 export interface ArchivedRecord {
