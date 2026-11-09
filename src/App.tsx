@@ -1524,12 +1524,30 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></div><FilterDrawer activeCount={[stockBrokerFilter !== "all", stockExchangeFilter !== "all", stockHoldingFilter !== "all", stockQuoteFilter !== "all", stockSortBy !== "symbol", stockSortOrder !== "asc", stockGroupBy !== "none"].filter(Boolean).length}><Field label="Exchange"><Select value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field label="Broker"><Select value={stockBrokerFilter} onChange={(event) => setStockBrokerFilter(event.target.value)}><option value="all">All brokers</option><option value="unassigned">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Position"><Select value={stockHoldingFilter} onChange={(event) => setStockHoldingFilter(event.target.value)}><option value="all">All stocks</option><option value="holdings">Holdings</option><option value="watchlist">Watchlist only</option></Select></Field><Field label="Quote"><Select value={stockQuoteFilter} onChange={(event) => setStockQuoteFilter(event.target.value)}><option value="all">Any price status</option><option value="priced">Has a price</option><option value="unpriced">No price yet</option></Select></Field><Field label="Sort by"><Select value={stockSortBy} onChange={(event) => setStockSortBy(event.target.value as typeof stockSortBy)}><option value="symbol">Stock code</option><option value="name">Name</option><option value="broker">Broker</option><option value="price">Latest price</option><option value="quantity">Shares owned</option><option value="value">Holding value</option><option value="profitLoss">Profit / loss</option></Select></Field><Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field><Field label="Group by"><Select value={stockGroupBy} onChange={(event) => { setStockGroupBy(event.target.value as typeof stockGroupBy); setCollapsedStockGroups(new Set()); }}><option value="none">No grouping</option><option value="broker">Broker</option><option value="exchange">Exchange</option></Select></Field>{activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}</FilterDrawer></div>
       {stocks.length ? filteredStocks.length ? <div className="stock-list"><div className={`stock-list-header${stockGroupBy !== "none" ? " stock-list-header-grouped" : ""}`} aria-hidden="true"><span>Stock</span><span>Latest price</span><span>Volume</span><span>Avg price</span><span>Invested amount</span><span>Current value</span><span>Actions</span><span /></div>{stockGroups.map((group) => {
         const collapsed = collapsedStockGroups.has(group.key);
+        const groupTotals = group.stocks.reduce((totals, stock) => {
+          const latest = latestQuotes.get(stock.id);
+          const quantity = stock.quantity ?? 0;
+          const averageBuyPrice = stock.averageBuyPrice ?? null;
+          if (!latest || latest.currency !== "INR" || averageBuyPrice === null || averageBuyPrice <= 0 || quantity <= 0) return totals;
+          const invested = averageBuyPrice * quantity;
+          const currentValue = latest.price * quantity;
+          return {
+            invested: totals.invested + invested,
+            currentValue: totals.currentValue + currentValue,
+            profitLoss: totals.profitLoss + currentValue - invested,
+            positions: totals.positions + 1,
+          };
+        }, { invested: 0, currentValue: 0, profitLoss: 0, positions: 0 });
         return <div className={`stock-group ${stockGroupBy === "none" ? "stock-group-ungrouped" : ""}`} key={group.key}>
           {stockGroupBy !== "none" && <button className="stock-group-heading" type="button" aria-expanded={!collapsed} onClick={() => setCollapsedStockGroups((current) => {
             const next = new Set(current);
             if (next.has(group.key)) next.delete(group.key); else next.add(group.key);
             return next;
-          })}><ChevronRight size={15} className={`stock-group-chevron ${collapsed ? "" : "expanded"}`} /><strong>{group.label}</strong><span>{group.stocks.length} {group.stocks.length === 1 ? "stock" : "stocks"}</span></button>}
+          })}><ChevronRight size={15} className={`stock-group-chevron ${collapsed ? "" : "expanded"}`} /><strong>{group.label}</strong>{stockGroupBy === "broker" && <span className="stock-broker-group-totals" title={`${groupTotals.positions} of ${group.stocks.length} positions have average price, volume, and an INR quote`}>
+            <span><small>Invested</small><strong>{groupTotals.positions ? formatQuote(groupTotals.invested, "INR") : "—"}</strong></span>
+            <span><small>Current</small><strong>{groupTotals.positions ? formatQuote(groupTotals.currentValue, "INR") : "—"}</strong></span>
+            <span className={groupTotals.profitLoss >= 0 ? "positive" : "negative"}><small>P/L</small><strong>{groupTotals.positions ? `${groupTotals.profitLoss >= 0 ? "+" : ""}${formatQuote(groupTotals.profitLoss, "INR")}` : "—"}</strong></span>
+          </span>}<span className="stock-group-count">{group.stocks.length} {group.stocks.length === 1 ? "stock" : "stocks"}</span></button>}
           {!collapsed && <div className={`stock-group-children ${stockGroupBy !== "none" ? "stock-group-tree" : ""}`}>{group.stocks.map((stock) => {
         const latest = latestQuotes.get(stock.id);
         const history = sortedHistory(stock.id);
