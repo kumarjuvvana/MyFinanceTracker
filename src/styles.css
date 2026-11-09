@@ -1554,3 +1554,43 @@ body{background:#f3f5ef}
   .devotional-reading-card .table-actions{gap:1px;flex:none}
   .devotional-reading-card .table-actions .icon-button{width:28px;height:28px}
 }
+
+.compact-details{min-width:0;background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;box-shadow:0 6px 18px color-mix(in srgb,var(--text-main) 4%,transparent)}
+.compact-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;cursor:pointer}
+.compact-summary::-webkit-details-marker{display:none}
+.compact-summary::after{content:"+";flex:none;width:20px;height:20px;border:1px solid var(--panel-line);border-radius:50%;display:grid;place-items:center;color:var(--text-muted);font-size:13px}
+.compact-details[open]>.compact-summary::after{content:"-"}
+.compact-details-body{padding-top:10px}
+.cooking-card{padding:11px 13px}
+.cooking-card>.compact-summary{align-items:center}
+.cooking-card>.compact-summary>div:first-child{min-width:0}
+.cooking-card .table-actions{flex:none}
+.vehicle-card{padding:11px 13px}
+.vehicle-card>.compact-summary{align-items:center}
+.vehicle-card>.compact-summary>div:first-child{min-width:0;flex:1}
+.vehicle-card>.compact-summary .table-actions{flex:none}
+.career-card{padding:9px 11px}
+.career-card>.compact-summary{align-items:center}
+.career-card>.compact-summary>div:first-child{min-width:0;flex:1}
+.career-card>.compact-summary h3{font-size:12px}
+.career-card>.compact-summary p{margin-top:2px}
+.career-card .compact-details-body{padding-top:8px}
+.credential-card.compact-details{padding:10px 12px}
+.credential-card.compact-details>.compact-summary{align-items:center}
+.credential-card.compact-details>.compact-summary .table-actions{flex:none}
+.subscription-transactions{margin-top:8px;padding:8px 10px;background:color-mix(in srgb,var(--panel) 90%,var(--text-main));border-radius:9px}
+.subscription-transactions-summary{justify-content:flex-start;gap:8px;font-size:10px;color:var(--text-muted)}
+.subscription-transactions-summary strong{color:var(--text-main)}
+.subscription-transactions-summary::after{margin-left:auto}
+.app-shell.dark .compact-details{background:var(--panel);border-color:var(--panel-line)}
+.app-shell.dark .subscription-transactions{background:color-mix(in srgb,var(--panel) 88%,#000)}
+@media(max-width:600px){
+  .compact-details{border:0;border-bottom:1px solid var(--panel-line);border-radius:0;box-shadow:none;background:transparent}
+  .compact-summary{gap:6px}
+  .compact-summary::after{width:18px;height:18px}
+  .cooking-card,.vehicle-card,.career-card,.credential-card.compact-details{padding:9px 2px}
+  .vehicle-card>.compact-summary .vehicle-heading{gap:6px}
+  .vehicle-card>.compact-summary .vehicle-icon{width:29px;height:29px}
+  .career-list{grid-template-columns:minmax(0,1fr)}
+  .app-shell.dark .compact-details{background:transparent;border-bottom-color:var(--line,#343d35)}
+}

@@ -124,7 +124,12 @@ const defaultItem = (): Omit<ShoppingItem, "id"> => ({
   name: "", quantity: 1, unit: "pcs", category: "Groceries", estimatedPrice: 0, purchased: false,
 });
 const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-const copyLabel = (value: string, maxLength: number) => `${value.slice(0, Math.max(0, maxLength - 7))} (copy)`;
+const timeLabel = (time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return time;
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${hours < 12 ? "AM" : "PM"}`;
+};
+const copyLabel = (value: string, maxLength: number) => `${value.replace(/ \(copy\)$/i, "").slice(0, Math.max(0, maxLength - 7))} (copy)`;
 const marketStateLabel = (state: string) => {
   const normalized = state.trim().toUpperCase();
   const labels: Record<string, string> = {
@@ -577,7 +582,7 @@ function ReminderCard({ reminder, onEdit, onSave, onDelete, onToggle }: {
     <div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{dateLabel(reminder.date)}</div>{expanded && reminder.details && <div className="reminder-details"><LinkifiedText>{reminder.details}</LinkifiedText></div>}</div>
     <Badge className="reminder-category-badge">{reminder.category || "General"}</Badge>
     <Badge className="reminder-status-badge" tone={reminder.completed ? "neutral" : reminder.date < today() ? "amber" : reminder.date === today() ? "green" : "blue"}>{reminder.completed ? "Done" : reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : "Upcoming"}</Badge>
-    <div className="table-actions">{reminder.details && <button className="reminder-details-toggle" aria-label={`${expanded ? "Hide" : "Show"} details for ${reminder.title}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide" : "Show"}</button>}<button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={onEdit}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button></div>
+    <div className="table-actions">{reminder.details && <button className="reminder-details-toggle" aria-label={`${expanded ? "Hide" : "Show"} details for ${reminder.title}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide" : "Show"}</button>}<button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={onEdit}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button></div>
   </Card>;
 }
 
@@ -947,6 +952,7 @@ function mergeArchiveSnapshot(previous: TrackerData, snapshot: ArchiveSnapshot):
         mindfulnessLogs: mergeArchivedRows(previous.mindfulnessLogs, snapshot.mindfulnessLogs),
         morningExerciseLogs: mergeArchivedRows(previous.morningExerciseLogs, snapshot.morningExerciseLogs),
         bankAccounts: mergeArchivedRows(previous.bankAccounts, snapshot.bankAccounts),
+        credentialRecords: mergeArchivedRows(previous.credentialRecords, snapshot.credentialRecords),
   };
 }
 
@@ -2957,6 +2963,7 @@ function StudentEducationPlans({ studentName, studentProfileId, profile, plans, 
     const planDraft = { ...plan, id: undefined };
     onSave({
       ...planDraft,
+      gradeCourse: copyLabel(plan.gradeCourse, 160),
       costs: copyCosts ? plan.costs.map((cost) => ({ ...cost, id: createId() })) : [],
     });
   }
@@ -3235,6 +3242,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
       record: {
         ...record,
         id: createId(),
+        studentName: copyLabel(record.studentName, 160),
         studentProfileId: selectedEntry?.profile?.id ?? record.studentProfileId,
         paidFee: null,
         idCardImageStoragePath: "",
@@ -3836,7 +3844,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
   type ExerciseRowDraft = Omit<MorningExerciseLog, "id" | "date"> & { id?: string };
-  const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("log");
+  const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("records");
   const [exerciseDate, setExerciseDate] = useState(today);
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [copyingDate, setCopyingDate] = useState<string | null>(null);
@@ -4426,7 +4434,7 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>This log is separate from daily Learning. Add one entry for each class or study date to track the subject, format, materials, and what you learned.</span></div>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search training sessions" placeholder="Search course, date, topic, learning..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={modeFilter === "All formats" ? 0 : 1}><Field label="Training format"><Select aria-label="Filter training format" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option>All formats</option>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
     {visible.length ? <div className="training-session-list">{visible.map((session) => <Card className="training-session-card" key={session.id}>
-      <div className="training-session-head"><div className="training-session-title"><div className="training-session-icon"><BookOpen size={16} /></div><div><h2>{session.courseName}</h2><p>{[session.institution, session.topic].filter(Boolean).join(" · ") || "Class session"}</p></div></div><div className="table-actions"><Badge>{session.mode}</Badge><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></div>
+      <div className="training-session-head"><div className="training-session-title"><div className="training-session-icon"><BookOpen size={16} /></div><div><h2>{session.courseName}</h2><p>{[session.institution, session.topic].filter(Boolean).join(" · ") || "Class session"}</p></div></div><div className="table-actions"><Badge>{session.mode}</Badge><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave({ ...copy, courseName: copyLabel(copy.courseName, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></div>
       <div className="training-session-meta"><span>{dateLabel(session.date)}{session.startTime ? ` · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}` : ""}</span>{session.instructor && <span>Instructor: {session.instructor}</span>}</div>
       <div className="training-session-learning"><strong>What I learned</strong><p><LinkifiedText>{session.learned}</LinkifiedText></p></div>
       {session.notes && <p className="training-session-notes"><LinkifiedText>{session.notes}</LinkifiedText></p>}
@@ -4615,21 +4623,23 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
           (journey.odometerStart !== null && journey.odometerEnd !== null ? journey.odometerEnd - journey.odometerStart : 0), 0);
         const maintenanceCost = vehicleMaintenance.reduce((total, entry) => total + entry.cost, 0);
         const travelCost = vehicleJourneys.reduce((total, journey) => total + journey.cost, 0);
-        return <Card className="vehicle-card" key={vehicle.id}>
-          <div className="vehicle-card-head"><div className="vehicle-heading"><div className="vehicle-icon"><Car size={18} /></div><div><h2 className="section-title">{vehicle.name}</h2><p className="section-description">{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}{vehicle.fuelType ? ` · ${vehicle.fuelType}` : ""}</p></div></div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={() => setVehicleEditor({ initial: vehicle })}><Pencil size={14} /></button>            <button className="icon-button" aria-label={`Copy ${vehicle.name} without its logs`} title="Copy vehicle details without travel or service history" onClick={() => onCopyVehicle(vehicle)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${vehicle.name}`} onClick={() => onDeleteVehicle(vehicle)}><Archive size={14} /></button></div></div>
+        return <details className="vehicle-card compact-details" key={vehicle.id}>
+          <summary className="vehicle-card-head compact-summary"><div className="vehicle-heading"><div className="vehicle-icon"><Car size={18} /></div><div><h2 className="section-title">{vehicle.name}</h2><p className="section-description">{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}{vehicle.fuelType ? ` · ${vehicle.fuelType}` : ""} · {vehicleJourneys.length} travel · {vehicleMaintenance.length} service/repair</p></div></div>
+            <div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${vehicle.name}`} onClick={(event) => { event.preventDefault(); setVehicleEditor({ initial: vehicle }); }}><Pencil size={14} /></button><button type="button" className="icon-button" aria-label={`Copy ${vehicle.name} without its logs`} title="Copy vehicle details without travel or service history" onClick={(event) => { event.preventDefault(); onCopyVehicle(vehicle); }}><Copy size={14} /></button><button type="button" className="icon-button" aria-label={`Archive ${vehicle.name}`} onClick={(event) => { event.preventDefault(); onDeleteVehicle(vehicle); }}><Archive size={14} /></button></div></summary>
+          <div className="compact-details-body">
           {vehicle.notes && <p className="vehicle-notes"><LinkifiedText>{vehicle.notes}</LinkifiedText></p>}
           <div className="vehicle-stats"><div><span>Travel logs</span><strong>{vehicleJourneys.length}</strong></div><div><span>Recorded distance</span><strong>{recordedDistance.toLocaleString()} km</strong></div><div><span>Travel costs</span><strong>{formatCurrency(travelCost)}</strong></div><div><span>Service & repair cost</span><strong>{formatCurrency(maintenanceCost)}</strong></div></div>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><MapPin size={14} /></span>Travel log</h3><p>{vehicleJourneys.length} recorded {vehicleJourneys.length === 1 ? "journey" : "journeys"}</p></div><Button variant="outline" onClick={() => setJourneyEditor({ vehicle, initial: null })}><Plus size={13} /> Log travel</Button></div>
             {vehicleJourneys.length ? <div className="vehicle-record-list">{vehicleJourneys.map((journey) => {
               const distance = journey.odometerStart !== null && journey.odometerEnd !== null ? journey.odometerEnd - journey.odometerStart : null;
-              return <div className="vehicle-record" key={journey.id}><div className="vehicle-record-main"><strong>{journey.startLocation || "Start"} → {journey.endLocation || "Destination"}</strong><span>{dateLabel(journey.date)}{journey.purpose ? ` · ${journey.purpose}` : ""}</span><small><LinkifiedText>{[distance === null ? "Distance not recorded" : `${distance.toLocaleString()} km`, journey.cost ? formatCurrency(journey.cost) : "", journey.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit travel log" onClick={() => setJourneyEditor({ vehicle, initial: journey })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy travel log" onClick={() => { const { id, vehicleId, ...copy } = journey; void id; onSaveJourney(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive travel log" onClick={() => onDeleteJourney(journey)}><Archive size={13} /></button></div></div>;
+              return <div className="vehicle-record" key={journey.id}><div className="vehicle-record-main"><strong>{journey.startLocation || "Start"} → {journey.endLocation || "Destination"}</strong><span>{dateLabel(journey.date)}{journey.purpose ? ` · ${journey.purpose}` : ""}</span><small><LinkifiedText>{[distance === null ? "Distance not recorded" : `${distance.toLocaleString()} km`, journey.cost ? formatCurrency(journey.cost) : "", journey.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit travel log" onClick={() => setJourneyEditor({ vehicle, initial: journey })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy travel log" onClick={() => { const { id, vehicleId, ...copy } = journey; void id; onSaveJourney({ ...copy, startLocation: copyLabel(copy.startLocation || "Travel log", 120) }, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive travel log" onClick={() => onDeleteJourney(journey)}><Archive size={13} /></button></div></div>;
             })}</div> : <p className="vehicle-empty">{journeys.some((journey) => journey.vehicleId === vehicle.id) ? "No travel logs match these filters." : "No travel logs yet."}</p>}
           </section>
           <section className="vehicle-section"><div className="vehicle-section-head"><div><h3><span><Wrench size={14} /></span>Services & repairs</h3><p>{vehicleMaintenance.length} records · {formatCurrency(maintenanceCost)} total</p></div><Button variant="outline" onClick={() => setMaintenanceEditor({ vehicle, initial: null })}><Plus size={13} /> Add record</Button></div>
-            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small><LinkifiedText>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy service or repair record" onClick={() => { const { id, vehicleId, ...copy } = entry; void id; onSaveMaintenance(copy, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive service or repair record" onClick={() => onDeleteMaintenance(entry)}><Archive size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">{maintenance.some((entry) => entry.vehicleId === vehicle.id) ? "No service or repair records match these filters." : "No service or repair records yet."}</p>}
+            {vehicleMaintenance.length ? <div className="vehicle-record-list">{vehicleMaintenance.map((entry) => <div className="vehicle-record" key={entry.id}><div className="vehicle-record-main"><strong>{entry.description} <Badge tone={entry.type === "Service" ? "green" : "amber"}>{entry.type}</Badge></strong><span>{dateLabel(entry.date)}{entry.odometer !== null ? ` · ${entry.odometer.toLocaleString()} km` : ""}{entry.provider ? ` · ${entry.provider}` : ""} · {formatCurrency(entry.cost)}</span><small><LinkifiedText>{[entry.nextDueDate ? `Next due ${dateLabel(entry.nextDueDate)}` : "", entry.nextDueOdometer !== null ? `${entry.nextDueOdometer.toLocaleString()} km` : "", entry.notes].filter(Boolean).join(" · ") || "No follow-up details"}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label="Edit service or repair record" onClick={() => setMaintenanceEditor({ vehicle, initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy service or repair record" onClick={() => { const { id, vehicleId, ...copy } = entry; void id; onSaveMaintenance({ ...copy, description: copyLabel(copy.description, 160) }, vehicleId); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive service or repair record" onClick={() => onDeleteMaintenance(entry)}><Archive size={13} /></button></div></div>)}</div> : <p className="vehicle-empty">{maintenance.some((entry) => entry.vehicleId === vehicle.id) ? "No service or repair records match these filters." : "No service or repair records yet."}</p>}
           </section>
-        </Card>;
+          </div>
+        </details>;
       })}</div> : <Card><EmptyState icon={<Search size={18} />} title="No vehicles match" description="Try changing the search, fuel type, record type, or date range." /></Card>}
     {vehicleEditor && <VehicleModal key={vehicleEditor.initial?.id ?? "new-vehicle"} initial={vehicleEditor.initial} onClose={() => setVehicleEditor(null)} onSave={(vehicle) => { onSaveVehicle(vehicle, vehicleEditor.initial?.id); setVehicleEditor(null); }} />}
     {journeyEditor && <VehicleJourneyModal key={journeyEditor.initial?.id ?? `new-journey-${journeyEditor.vehicle.id}`} vehicle={journeyEditor.vehicle} initial={journeyEditor.initial} onClose={() => setJourneyEditor(null)} onSave={(journey) => { onSaveJourney(journey, journeyEditor.vehicle.id, journeyEditor.initial?.id); setJourneyEditor(null); }} />}
@@ -4948,7 +4958,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       return <Card className="electricity-card" key={account.id}>
         <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div>        <div className="table-actions"><Button variant="outline" onClick={() => setTransactionEditor({ account, transaction: null })}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={() => setAccountEditor(account)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={() => onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={() => archiveAccount(account)}><Archive size={13} /></button></div></div>
         <div className="electricity-meter-latest"><span>{nextDue ? `${nextDue.dueDate < currentDate ? "Overdue since" : "Next due"} · ${dateLabel(nextDue.dueDate)}` : "Next due"}{account.notes ? ` · ${account.notes}` : ""}</span></div>
-        {sorted.length ? <div className="electricity-record-list">{sorted.map((entry) => {
+        {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel(sorted[0].transactionDate)}</span></summary><div className="electricity-record-list">{sorted.map((entry) => {
           const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
           const isOverdue = !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
           return <div className="electricity-record" key={entry.id}>
@@ -4958,7 +4968,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
               <small><LinkifiedText>{[entry.paymentDate ? `Paid ${dateLabel(entry.paymentDate)}` : "", entry.reference, entry.notes].filter(Boolean).join(" · ") || "No additional details"}</LinkifiedText></small></div>
             <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.type} for ${account.name}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveTransaction(account.id, copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
           </div>;
-        })}</div> : <p className="vehicle-empty">No transactions recorded yet.</p>}
+        })}</div></details> : <p className="vehicle-empty">No transactions recorded yet.</p>}
       </Card>;
     })}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title={accounts.length ? "No matching services or bills" : "No subscriptions or bills yet"} description={accounts.length ? "Try another search or filter." : "Add a service first, then record its bills, recharges, bookings, and renewal dates."} /></Card>}
     {accountEditor !== undefined && <SubscriptionAccountModal key={accountEditor?.id ?? "new-subscription"} initial={accountEditor} onClose={() => setAccountEditor(undefined)} onSave={(account) => { onSaveAccount(account, accountEditor?.id); setAccountEditor(undefined); }} />}
@@ -5018,6 +5028,7 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
   const [toChapterName, setToChapterName] = useState(initial?.toChapterName ?? "");
   const [toChapterNumber, setToChapterNumber] = useState(initial?.toChapterNumber?.toString() ?? "1");
   const [toVerseNumber, setToVerseNumber] = useState(initial?.toVerseNumber?.toString() ?? "1");
+  const [people, setPeople] = useState(initial?.people ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [error, setError] = useState("");
   const fromBookReference = getBibleBook(fromTestament, fromBook);
@@ -5106,6 +5117,7 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
       toChapterName: toChapterName.trim(),
       toChapterNumber: toChapter,
       toVerseNumber: toVerse,
+      people: people.trim(),
       notes: notes.trim(),
     });
   }
@@ -5137,6 +5149,7 @@ function DailyBibleReadingModal({ initial, initialDate, onClose, onSave }: {
       <Field label={toVerseLimit ? `Verse (1–${toVerseLimit})` : "Verse number"}>{toVerseLimit
         ? <Select required value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)}>{Array.from({ length: toVerseLimit }, (_, index) => <option key={index + 1} value={index + 1}>Verse {index + 1}</option>)}</Select>
         : <Input required type="number" min="1" step="1" value={toVerseNumber} onChange={(event) => setToVerseNumber(event.target.value)} />}</Field>
+      <Field className="full" label="People identified in the verses (optional)"><Input maxLength={1000} placeholder="e.g. Abraham, Sarah, Paul" value={people} onChange={(event) => setPeople(event.target.value)} /></Field>
       <Field className="full" label="Comments / notes (optional)"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Notes about your reading" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save reading"}</Button></div>
@@ -5152,6 +5165,7 @@ function DailyPrayerLogModal({ initial, initialDate, onClose, onSave }: {
 }) {
   const [date, setDate] = useState(initial?.date ?? initialDate ?? today());
   const [period, setPeriod] = useState<PrayerPeriod>(initial?.period ?? "Morning");
+  const [time, setTime] = useState(initial?.time ?? "");
   const [prayerType, setPrayerType] = useState<DailyPrayerType>(initial?.prayerType ?? "Personal request");
   const [prayerNotes, setPrayerNotes] = useState(initial?.prayerNotes ?? "");
   const [error, setError] = useState("");
@@ -5162,13 +5176,14 @@ function DailyPrayerLogModal({ initial, initialDate, onClose, onSave }: {
       setError("Enter the date and what you prayed about.");
       return;
     }
-    onSave({ date, period, prayerType, prayerNotes: prayerNotes.trim() });
+    onSave({ date, period, time, prayerType, prayerNotes: prayerNotes.trim() });
   }
 
   return <Modal title={initial ? "Edit daily prayer" : "Record daily prayer"} onClose={onClose} wide inline={Boolean(initial)}>
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Prayer date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Time of day"><Select value={period} onChange={(event) => setPeriod(event.target.value as PrayerPeriod)}><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Night</option></Select></Field>
+      <Field label="Prayer time (optional)"><Input type="time" value={time} onChange={(event) => setTime(event.target.value)} /></Field>
       <Field label="Prayer type"><Select value={prayerType} onChange={(event) => setPrayerType(event.target.value as DailyPrayerType)}><option>Praise & worship</option><option>Thanksgiving</option><option>Confession</option><option>Personal request</option><option>Intercession</option><option>Guidance</option><option>Other</option></Select></Field>
       <Field className="full" label="What did you pray about?"><textarea className="field textarea" rows={4} maxLength={5000} required placeholder="Record your prayer, focus, or anything you want to remember." value={prayerNotes} onChange={(event) => setPrayerNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -5303,7 +5318,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   const visibleReadings = [...readings].filter((reading) =>
     !query || [
       reading.fromTestament, reading.fromBook, reading.fromChapterName, String(reading.fromChapterNumber), String(reading.fromVerseNumber),
-      reading.toTestament, reading.toBook, reading.toChapterName, String(reading.toChapterNumber), String(reading.toVerseNumber), reading.notes,
+      reading.toTestament, reading.toBook, reading.toChapterName, String(reading.toChapterNumber), String(reading.toVerseNumber), reading.people ?? "", reading.notes,
     ].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date));
   const visibleRequests = [...requests].filter((request) =>
@@ -5311,7 +5326,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
     (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))))
     .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
   const visibleDailyPrayerLogs = [...dailyPrayerLogs].filter((log) =>
-    !query || [log.date, log.period, log.prayerType, log.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
+    !query || [log.date, log.period, log.time ?? "", log.prayerType, log.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date) ||
       ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period));
   const visibleResources = [...resources].filter((resource) =>
@@ -5432,19 +5447,20 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
     {activeTab !== "calendar" && <div className={`toolbar${activeTab === "prayers" ? " filter-toolbar" : ""}`}><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>{activeTab === "prayers" && <FilterDrawer activeCount={requestFilter === "Ongoing" ? 0 : 1}><Field label="Request status"><Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select></Field></FilterDrawer>}</div>}
     {activeTab === "readings" && <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div></div>
       {visibleReadings.length ? <div className="devotional-reading-list">{visibleReadings.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
-        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
+        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(reading.date)}</span><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading({ ...copy, notes: copyLabel(copy.notes || "Bible reading", 5000) }); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
+        {reading.people && <p><strong>People in the verses:</strong> <LinkifiedText>{reading.people}</LinkifiedText></p>}
         {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
       </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={readings.length ? "No matching Bible readings" : "No daily Bible readings yet"} description={readings.length ? "Try another search." : "Record a date and the Scripture range you read."} /></Card>}
     </section>}
     {activeTab === "reflections" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div></div>
         {visibleEntries.length ? <div className="devotional-list">{visibleEntries.map((entry) => <Card className="devotional-card" key={entry.id}>
-          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(entry.date)}</span><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(entry.date)}</span><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry({ ...copy, scriptureReference: copyLabel(copy.scriptureReference, 120) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
           {entry.takeaway && <p><strong>Message:</strong> <LinkifiedText>{entry.takeaway}</LinkifiedText></p>}{entry.reflection && <p><strong>Reflection:</strong> <LinkifiedText>{entry.reflection}</LinkifiedText></p>}{entry.prayerNotes && <p><strong>Prayer:</strong> <LinkifiedText>{entry.prayerNotes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={entries.length ? "No matching reflections" : "No Bible reflections yet"} description={entries.length ? "Try another search." : "Save a Scripture reference and your thoughts about it."} /></Card>}
     </section>}
     {activeTab === "prayers" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><Heart size={15} /> Prayer requests</h2><p>{ongoingCount} ongoing · {answeredCount} answered</p></div></div>
         {visibleRequests.length ? <div className="devotional-list">{visibleRequests.map((request) => <Card className="devotional-card" key={request.id}>
-          <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy prayer request: ${request.title}`} onClick={() => { const { id, ...copy } = request; void id; onSaveRequest(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Archive size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy prayer request: ${request.title}`} onClick={() => { const { id, ...copy } = request; void id; onSaveRequest({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Archive size={13} /></button></div></div>
           {request.details && <p><LinkifiedText>{request.details}</LinkifiedText></p>}
           <Button size="sm" variant="outline" onClick={() => onSaveRequest({
             ...request,
@@ -5455,7 +5471,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
     </section>}
     {activeTab === "resources" && <section className="devotional-resource-section" ><div className="devotional-section-head"><div><h2><PlayCircle size={15} /> Music, media & other resources</h2><p>{visibleResources.length} {visibleResources.length === 1 ? "resource" : "resources"} · audio, video, songs, sermons, Scripture study, and more</p></div></div>
       {visibleResources.length ? <div className="devotional-resource-list">{visibleResources.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
-        <div className="devotional-card-head"><div><h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, title: `${resource.title.slice(0, 153)} (copy)` })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
+        <div className="devotional-card-head"><div><h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, title: copyLabel(resource.title, 160) })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
         {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
         <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
       </Card>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
@@ -5463,7 +5479,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
     {activeTab === "daily-prayers" && <section className="devotional-section devotional-tab-panel">
       <div className="devotional-section-head"><div><h2><Heart size={15} /> Daily prayer tracker</h2><p>{visibleDailyPrayerLogs.length} {visibleDailyPrayerLogs.length === 1 ? "prayer" : "prayers"} recorded · {new Set(dailyPrayerLogs.map((log) => log.date)).size} days tracked</p></div></div>
       {visibleDailyPrayerLogs.length ? <div className="devotional-list">{visibleDailyPrayerLogs.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
-        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)} · {log.period}</span><h3>{log.prayerType}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog(copy); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
+        <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)} · {log.period}{log.time ? ` · ${timeLabel(log.time)}` : ""}</span><h3>{log.prayerType}{log.prayerNotes.endsWith(" (copy)") ? " (copy)" : ""}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog({ ...copy, prayerNotes: copyLabel(copy.prayerNotes || copy.prayerType, 5000) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
         <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
       </Card>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={dailyPrayerLogs.length ? "No matching daily prayers" : "No daily prayers recorded"} description={dailyPrayerLogs.length ? "Try another search." : "Record a prayer by date, time of day, type, and notes."} /></Card>}
     </section>}
@@ -5897,14 +5913,14 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
     {activeTab === "planner" && <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={onSaveLog} />}
     {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
     {activeTab === "recipes" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div></div>
-        {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <Card className="cooking-card" key={recipe.id}>
-          <div className="devotional-card-head"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={() => setRecipeEditor(recipe)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${recipe.name}`} onClick={() => { const { id, ...copy } = recipe; void id; onSaveRecipe(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${recipe.name}`} onClick={() => { if (window.confirm(`Move "${recipe.name}" to the archive? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Archive size={13} /></button></div></div>
-          {recipe.ingredients && <p><strong>Ingredients:</strong> <LinkifiedText>{recipe.ingredients}</LinkifiedText></p>}{recipe.steps && <p><strong>Steps:</strong> <LinkifiedText>{recipe.steps}</LinkifiedText></p>}{recipe.allergens.length > 0 && <p><strong>Allergens:</strong> {recipe.allergens.join(", ")}</p>}{recipe.nutritionNotes && <p><strong>Nutrition / vitamins:</strong> <LinkifiedText>{recipe.nutritionNotes}</LinkifiedText></p>}{recipe.healthNotes && <p><strong>Health notes:</strong> <LinkifiedText>{recipe.healthNotes}</LinkifiedText></p>}{recipe.notes && <p><strong>Notes:</strong> <LinkifiedText>{recipe.notes}</LinkifiedText></p>}
-        </Card>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
+        {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <details className="cooking-card compact-details" key={recipe.id}>
+          <summary className="devotional-card-head compact-summary"><div><div className="cooking-tags"><Badge>{recipe.dishType}</Badge>{recipe.dietaryTags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div><h3>{recipe.name}</h3><span className="devotional-date">{[recipe.cuisine, recipe.country, recipe.servings ? `${recipe.servings} servings` : "", recipe.prepMinutes !== null ? `${recipe.prepMinutes} min prep` : "", recipe.cookMinutes !== null ? `${recipe.cookMinutes} min cook` : ""].filter(Boolean).join(" · ") || "No cuisine or timing details"}</span></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${recipe.name}`} onClick={(event) => { event.preventDefault(); setRecipeEditor(recipe); }}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${recipe.name}`} onClick={(event) => { event.preventDefault(); const { id, ...copy } = recipe; void id; onSaveRecipe({ ...copy, name: copyLabel(copy.name, 120) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${recipe.name}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${recipe.name}" to the archive? Existing daily logs will retain the prepared-item name.`)) onDeleteRecipe(recipe); }}><Archive size={13} /></button></div></summary>
+          <div className="compact-details-body">{recipe.ingredients && <p><strong>Ingredients:</strong> <LinkifiedText>{recipe.ingredients}</LinkifiedText></p>}{recipe.steps && <p><strong>Steps:</strong> <LinkifiedText>{recipe.steps}</LinkifiedText></p>}{recipe.allergens.length > 0 && <p><strong>Allergens:</strong> {recipe.allergens.join(", ")}</p>}{recipe.nutritionNotes && <p><strong>Nutrition / vitamins:</strong> <LinkifiedText>{recipe.nutritionNotes}</LinkifiedText></p>}{recipe.healthNotes && <p><strong>Health notes:</strong> <LinkifiedText>{recipe.healthNotes}</LinkifiedText></p>}{recipe.notes && <p><strong>Notes:</strong> <LinkifiedText>{recipe.notes}</LinkifiedText></p>}</div>
+        </details>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
     </section>}
     {activeTab === "logs" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div></div>
         {visibleLogs.length ? <div className="cooking-list">{visibleLogs.map((log) => <Card className="cooking-card" key={log.id}>
-          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; onSaveLog(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) onDeleteLog(log); }}><Archive size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; onSaveLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) onDeleteLog(log); }}><Archive size={13} /></button></div></div>
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> <LinkifiedText>{log.learning}</LinkifiedText></p>}{log.notes && <p><strong>Notes:</strong> <LinkifiedText>{log.notes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
     </section>}
@@ -6265,11 +6281,15 @@ function CareerEntry({ title, subtitle, details, description, link, onEdit, onCo
   onCopy: () => void;
   onDelete: () => void;
 }) {
-  return <Card className="career-card"><div className="career-card-head"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${title}`} onClick={onEdit}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${title}`} onClick={onCopy}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${title}`} onClick={onDelete}><Archive size={13} /></button></div></div>
+  return <details className="career-card compact-details"><summary className="career-card-head compact-summary"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div><div className="table-actions">
+    <button type="button" className="icon-button" aria-label={`Edit ${title}`} onClick={(event) => { event.preventDefault(); onEdit(); }}><Pencil size={13} /></button>
+    <button type="button" className="icon-button" aria-label={`Copy ${title}`} onClick={(event) => { event.preventDefault(); onCopy(); }}><Copy size={13} /></button>
+    <button type="button" className="icon-button" aria-label={`Archive ${title}`} onClick={(event) => { event.preventDefault(); onDelete(); }}><Archive size={13} /></button>
+  </div></summary><div className="compact-details-body">
     {details.filter(Boolean).length > 0 && <div className="career-card-details">{details.filter(Boolean).map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}</div>}
     {description && <p className="career-card-description"><LinkifiedText>{description}</LinkifiedText></p>}
     {link && <a className="career-card-link" href={link} target="_blank" rel="noopener noreferrer">Open link</a>}
-  </Card>;
+  </div></details>;
 }
 
 function EducationCareerPage({ education, qualifications, experience, skills, onSaveEducation, onDeleteEducation, onSaveQualification, onDeleteQualification, onSaveExperience, onDeleteExperience, onSaveSkill, onDeleteSkill }: {
@@ -6287,13 +6307,27 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   onDeleteSkill: (record: ProfessionalSkill) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [activeSection, setActiveSection] = useState<"education" | "qualifications" | "experience" | "skills">("education");
+  const [sortBy, setSortBy] = useState("recent");
+  const [educationStatus, setEducationStatus] = useState("All statuses");
+  const [experienceStatus, setExperienceStatus] = useState("All roles");
+  const [skillProficiency, setSkillProficiency] = useState("All levels");
   const [editor, setEditor] = useState<{ type: "education"; record: PersonalEducationRecord | null } | { type: "qualification"; record: ProfessionalQualification | null } | { type: "experience"; record: WorkExperience | null } | { type: "skill"; record: ProfessionalSkill | null } | null>(null);
   const query = search.trim().toLocaleLowerCase();
   const matches = (...values: string[]) => !query || values.some((value) => value.toLocaleLowerCase().includes(query));
-  const filteredEducation = [...education].filter((entry) => matches(entry.institution, entry.qualification, entry.fieldOfStudy, entry.location, entry.grade, entry.notes)).sort((a, b) => b.startDate.localeCompare(a.startDate));
-  const filteredQualifications = [...qualifications].filter((entry) => matches(entry.name, entry.issuer, entry.credentialId, entry.notes)).sort((a, b) => b.issueDate.localeCompare(a.issueDate));
-  const filteredExperience = [...experience].filter((entry) => matches(entry.company, entry.jobTitle, entry.location, entry.employmentType, entry.summary, entry.skills)).sort((a, b) => Number(b.current) - Number(a.current) || b.startDate.localeCompare(a.startDate));
-  const filteredSkills = [...skills].filter((entry) => matches(entry.name, entry.category, entry.proficiency, entry.notes)).sort((a, b) => a.name.localeCompare(b.name));
+  const filteredEducation = [...education].filter((entry) =>
+    (educationStatus === "All statuses" || entry.status === educationStatus) &&
+    matches(entry.institution, entry.qualification, entry.fieldOfStudy, entry.location, entry.grade, entry.notes))
+    .sort((a, b) => sortBy === "name" ? a.qualification.localeCompare(b.qualification) : b.startDate.localeCompare(a.startDate));
+  const filteredQualifications = [...qualifications].filter((entry) => matches(entry.name, entry.issuer, entry.credentialId, entry.notes))
+    .sort((a, b) => sortBy === "name" ? a.name.localeCompare(b.name) : b.issueDate.localeCompare(a.issueDate));
+  const filteredExperience = [...experience].filter((entry) =>
+    (experienceStatus === "All roles" || (experienceStatus === "Current" ? entry.current : !entry.current)) &&
+    matches(entry.company, entry.jobTitle, entry.location, entry.employmentType, entry.summary, entry.skills))
+    .sort((a, b) => sortBy === "name" ? a.company.localeCompare(b.company) || a.jobTitle.localeCompare(b.jobTitle) : Number(b.current) - Number(a.current) || b.startDate.localeCompare(a.startDate));
+  const filteredSkills = [...skills].filter((entry) =>
+    (skillProficiency === "All levels" || entry.proficiency === skillProficiency) &&
+    matches(entry.name, entry.category, entry.proficiency, entry.notes)).sort((a, b) => a.name.localeCompare(b.name));
   const totalItems = education.length + qualifications.length + experience.length + skills.length;
 
   function confirmDelete(label: string, remove: () => void) {
@@ -6301,26 +6335,41 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   }
 
   return <>
-    <PageHeading eyebrow="Personal profile" title="Education & career" subtitle="Keep your education, credentials, work history, and professional skills together in one private profile." />
+    <PageHeading eyebrow="Personal profile" title="Education & career" subtitle="Keep your education, credentials, work history, and professional skills together in one private profile." action={<Button onClick={() => setEditor({ type: activeSection === "education" ? "education" : activeSection === "qualifications" ? "qualification" : activeSection === "experience" ? "experience" : "skill", record: null })}><Plus size={15} />Add {activeSection === "education" ? "education" : activeSection === "qualifications" ? "qualification" : activeSection === "experience" ? "work history" : "skill"}</Button>} />
     <div className="career-summary">
       <Card><span>Education</span><strong>{education.length}</strong></Card><Card><span>Qualifications</span><strong>{qualifications.length}</strong></Card><Card><span>Work roles</span><strong>{experience.length}</strong></Card><Card><span>Skills</span><strong>{skills.length}</strong></Card>
     </div>
     <div className="alert"><Briefcase size={15} style={{ flex: "none", marginTop: 1 }} /><span>This is your own career profile, separate from the Schools & Colleges records and Learning goals. Profile details are stored as shared Daybook data and included in JSON backups.</span></div>
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education and career profile" placeholder="Search schools, qualifications, employers, or skills..." value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+    <nav className="student-profile-tabs" aria-label="Education and career sections">
+      <Button variant={activeSection === "education" ? "primary" : "outline"} aria-pressed={activeSection === "education"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{education.length}</Badge></Button>
+      <Button variant={activeSection === "qualifications" ? "primary" : "outline"} aria-pressed={activeSection === "qualifications"} onClick={() => setActiveSection("qualifications")}><Award size={14} />Qualifications <Badge>{qualifications.length}</Badge></Button>
+      <Button variant={activeSection === "experience" ? "primary" : "outline"} aria-pressed={activeSection === "experience"} onClick={() => setActiveSection("experience")}><Briefcase size={14} />Work history <Badge>{experience.length}</Badge></Button>
+      <Button variant={activeSection === "skills" ? "primary" : "outline"} aria-pressed={activeSection === "skills"} onClick={() => setActiveSection("skills")}><Sparkles size={14} />Skills <Badge>{skills.length}</Badge></Button>
+    </nav>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search education and career profile" placeholder="Search schools, qualifications, employers, or skills..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(sortBy !== "recent" ? 1 : 0) + (activeSection === "education" && educationStatus !== "All statuses" ? 1 : 0) + (activeSection === "experience" && experienceStatus !== "All roles" ? 1 : 0) + (activeSection === "skills" && skillProficiency !== "All levels" ? 1 : 0)}>
+      {activeSection === "education" && <Field label="Status"><Select value={educationStatus} onChange={(event) => setEducationStatus(event.target.value)}><option>All statuses</option><option>Completed</option><option>In progress</option><option>On hold</option></Select></Field>}
+      {activeSection === "experience" && <Field label="Role"><Select value={experienceStatus} onChange={(event) => setExperienceStatus(event.target.value)}><option>All roles</option><option>Current</option><option>Previous</option></Select></Field>}
+      {activeSection === "skills" && <Field label="Proficiency"><Select value={skillProficiency} onChange={(event) => setSkillProficiency(event.target.value)}><option>All levels</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Expert</option></Select></Field>}
+      {activeSection !== "skills" && <Field label="Sort by"><Select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="recent">Most recent</option><option value="name">Name (A–Z)</option></Select></Field>}
+    </FilterDrawer><Badge>{activeSection === "education" ? filteredEducation.length : activeSection === "qualifications" ? filteredQualifications.length : activeSection === "experience" ? filteredExperience.length : filteredSkills.length} records</Badge></div>
     {totalItems === 0 && !query ? <Card><EmptyState icon={<Briefcase size={18} />} title="Start your professional profile" description="Add your education, qualifications, work history, and professional skills below." /></Card> : null}
     <div className="career-sections">
+      {activeSection === "education" &&
       <CareerSection title="Education history" description={`${filteredEducation.length} ${filteredEducation.length === 1 ? "record" : "records"}`} icon={<GraduationCap size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "education", record: null })}><Plus size={13} /> Add education</Button>}>
-        {filteredEducation.length ? <div className="career-list">{filteredEducation.map((entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveEducation(copy); }} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />)}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
-      </CareerSection>
+        {filteredEducation.length ? <div className="career-list">{filteredEducation.map((entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveEducation({ ...copy, qualification: copyLabel(copy.qualification, 120) }); }} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />)}</div> : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
+      </CareerSection>}
+      {activeSection === "qualifications" &&
       <CareerSection title="Qualifications & certificates" description={`${filteredQualifications.length} ${filteredQualifications.length === 1 ? "record" : "records"}`} icon={<Award size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "qualification", record: null })}><Plus size={13} /> Add qualification</Button>}>
-        {filteredQualifications.length ? <div className="career-list">{filteredQualifications.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveQualification(copy); }} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />)}</div> : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search." : "Add professional certificates, licenses, and credentials."} /></Card>}
-      </CareerSection>
+        {filteredQualifications.length ? <div className="career-list">{filteredQualifications.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveQualification({ ...copy, name: copyLabel(copy.name, 160) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />)}</div> : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search." : "Add professional certificates, licenses, and credentials."} /></Card>}
+      </CareerSection>}
+      {activeSection === "experience" &&
       <CareerSection title="Work history" description={`${filteredExperience.length} ${filteredExperience.length === 1 ? "role" : "roles"}`} icon={<Briefcase size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "experience", record: null })}><Plus size={13} /> Add work</Button>}>
-        {filteredExperience.length ? <div className="career-list">{filteredExperience.map((entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveExperience(copy); }} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />)}</div> : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
-      </CareerSection>
+        {filteredExperience.length ? <div className="career-list">{filteredExperience.map((entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveExperience({ ...copy, jobTitle: copyLabel(copy.jobTitle, 120) }); }} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />)}</div> : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
+      </CareerSection>}
+      {activeSection === "skills" &&
       <CareerSection title="Skills & languages" description={`${filteredSkills.length} ${filteredSkills.length === 1 ? "skill" : "skills"}`} icon={<Sparkles size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "skill", record: null })}><Plus size={13} /> Add skill</Button>}>
-        {filteredSkills.length ? <div className="career-list">{filteredSkills.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveSkill(copy); }} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />)}</div> : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
-      </CareerSection>
+        {filteredSkills.length ? <div className="career-list">{filteredSkills.map((entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveSkill({ ...copy, name: copyLabel(copy.name, 120) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />)}</div> : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
+      </CareerSection>}
     </div>
     {editor?.type === "education" && <PersonalEducationModal key={editor.record?.id ?? "new-personal-education"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveEducation(record, editor.record?.id); setEditor(null); }} />}
     {editor?.type === "qualification" && <ProfessionalQualificationModal key={editor.record?.id ?? "new-professional-qualification"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveQualification(record, editor.record?.id); setEditor(null); }} />}
@@ -6433,7 +6482,7 @@ function FamilyPage({ members, onSave, onDelete }: {
     <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Daybook data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer></div>
     {visibleMembers.length ? <div className="family-list">{visibleMembers.map((member) => <Card className="family-card" key={member.id}>
-      <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${member.name}`} onClick={() => { const { id, ...copy } = member; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${member.name}`} onClick={() => confirmDelete(member)}><Archive size={13} /></button></div></div>
+      <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${member.name}`} onClick={() => { const { id, ...copy } = member; void id; onSave({ ...copy, name: copyLabel(copy.name, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${member.name}`} onClick={() => confirmDelete(member)}><Archive size={13} /></button></div></div>
       <div className="family-details">{member.birthPlace && <div><span>Place of birth</span><strong>{member.birthPlace}</strong></div>}{member.currentResidence && <div><span>Current residence</span><strong>{member.currentResidence}</strong></div>}{member.education && <div><span>Education</span><strong>{member.education}{member.institution ? ` · ${member.institution}` : ""}</strong></div>}{member.occupation && <div><span>Occupation</span><strong>{member.occupation}{member.organization ? ` · ${member.organization}` : ""}</strong></div>}</div>
       {(member.phone || member.email) && <div className="family-contact">{member.phone && <span>Phone: {member.phone}</span>}{member.email && <a href={`mailto:${member.email}`}>Email: {member.email}</a>}</div>}
       {member.notes && <p className="family-notes"><LinkifiedText>{member.notes}</LinkifiedText></p>}
@@ -6550,7 +6599,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
     <div className="personal-record-list">{visibleRecords.map((record) => {
       const due = dueLabel(record);
       return <Card className="personal-record-card" key={record.id}>
-        <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave(copy); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => onDelete(record)}><Archive size={14} /></button></div></div>
+        <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => onDelete(record)}><Archive size={14} /></button></div></div>
         <div className="personal-record-details">
           {record.recordNumber && <div><span>Document / policy number</span><strong>{record.recordNumber}</strong></div>}
           {record.issueDate && <div><span>Issue date</span><strong>{dateLabel(record.issueDate)}</strong></div>}
@@ -6876,22 +6925,24 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
     <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details are stored in a separate, readable Supabase table and included in JSON backups. Anyone with database/service-role access can read them. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search bank accounts" placeholder="Search bank, account holder, branch, code..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge></div>
-    {filteredAccounts.length ? <div className="credential-list">{filteredAccounts.map((account) => <Card className="credential-card" key={account.id}>
-      <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
-        <button className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={() => setEditor(account)}><Pencil size={14} /></button>
-        <button className="icon-button" aria-label={`Copy ${account.bankName} bank account`} title="Create a separately editable copy" onClick={() => {
+    {filteredAccounts.length ? <div className="credential-list">{filteredAccounts.map((account) => <details className="credential-card compact-details" key={account.id}>
+      <summary className="credential-card-head compact-summary"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
+        <button type="button" className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={(event) => { event.preventDefault(); setEditor(account); }}><Pencil size={14} /></button>
+        <button type="button" className="icon-button" aria-label={`Copy ${account.bankName} bank account`} title="Create a separately editable copy" onClick={(event) => {
+          event.preventDefault();
           if (window.confirm(`Create a copy of the ${account.bankName} bank account?`)) {
             void onSave({ ...account, id: createId(), bankName: copyLabel(account.bankName, 120) }).catch((caught: unknown) =>
               setError(caught instanceof Error ? caught.message : "Could not copy the bank account."));
           }
         }}><Copy size={14} /></button>
-        <button className="icon-button" aria-label={`Archive ${account.bankName} bank account`} onClick={() => {
+        <button type="button" className="icon-button" aria-label={`Archive ${account.bankName} bank account`} onClick={(event) => {
+          event.preventDefault();
           if (window.confirm(`Move the ${account.bankName} bank account to the Archive?`)) {
             void onArchive(account).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the bank account."));
           }
         }}><Trash2 size={14} /></button>
-      </div></div>
-      <div className="personal-record-details">
+      </div></summary>
+      <div className="compact-details-body"><div className="personal-record-details">
         <div className="credential-bank-number"><span>Account number</span><div><strong>{visibleAccountNumbers.has(account.id) ? account.accountNumber : `•••• •••• ${account.accountNumber.slice(-4)}`}</strong><button type="button" className="icon-button" aria-label={visibleAccountNumbers.has(account.id) ? `Hide ${account.bankName} account number` : `Show ${account.bankName} account number`} onClick={() => setVisibleAccountNumbers((visible) => { const next = new Set(visible); if (next.has(account.id)) next.delete(account.id); else next.add(account.id); return next; })}>{visibleAccountNumbers.has(account.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
         {account.routingCode && <div><span>IFSC / routing code</span><strong>{account.routingCode}</strong></div>}
         {account.branch && <div><span>Branch</span><strong>{account.branch}</strong></div>}
@@ -6899,8 +6950,105 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       </div>
       {account.website && <a className="personal-document-link" href={account.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
       {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
-    </Card>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try another search." : "Add a bank account for quick reference."} /></Card>}
+      </div>
+    </details>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try another search." : "Add a bank account for quick reference."} /></Card>}
     {editor !== undefined && <DirectBankAccountModal key={editor?.id ?? "new-direct-bank-account"} initial={editor} onClose={() => setEditor(undefined)} onSave={onSave} />}
+  </>;
+}
+
+function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLegacy }: {
+  records: CredentialRecord[];
+  vault?: EncryptedCredentialVault;
+  onSave: (record: CredentialRecord) => Promise<void>;
+  onArchive: (record: CredentialRecord) => Promise<void>;
+  onImportLegacy: (credentials: CredentialRecord[], banks: BankAccount[]) => Promise<void>;
+}) {
+  const [search, setSearch] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
+  const [importOpen, setImportOpen] = useState(false);
+  const [legacyPassphrase, setLegacyPassphrase] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const query = search.trim().toLocaleLowerCase();
+  const filteredRecords = [...records].filter((record) =>
+    record.kind !== "bank-account" &&
+    [record.provider, record.category, record.website, record.username, record.recoveryInfo,
+      record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value])]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.provider.localeCompare(b.provider));
+
+  async function importLegacyRecords(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!vault) return;
+    setBusy(true);
+    setError("");
+    try {
+      const unlocked = await unlockCredentialVault(vault, legacyPassphrase);
+      const credentials = unlocked.records.filter((record) => record.kind !== "bank-account");
+      const banks = unlocked.records.filter((record) => record.kind === "bank-account").map((record) => ({
+        id: record.id,
+        bankName: record.provider,
+        accountHolder: record.accountHolder ?? "",
+        accountType: record.accountType ?? "Other",
+        accountNumber: record.accountNumber ?? "",
+        routingCode: record.routingCode ?? "",
+        branch: record.branch ?? "",
+        website: record.website,
+        customerService: record.customerService ?? "",
+        notes: record.notes,
+      }));
+      if (!credentials.length && !banks.length) {
+        setError("The legacy vault contains no account records to move.");
+        return;
+      }
+      await onImportLegacy(credentials, banks);
+      setLegacyPassphrase("");
+      setImportOpen(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not import records from the encrypted vault.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <>
+    <PageHeading eyebrow="Finance & account references" title="Account credentials" subtitle="Search and manage account sign-in details." action={<Button onClick={() => setEditor(null)}><Plus size={15} />Add account</Button>} />
+    <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored in a separate, readable Supabase table and included in JSON backups. Anyone with database/service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
+    {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
+    {error && <div className="alert alert-error" role="alert">{error}</div>}
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
+    {filteredRecords.length ? <div className="credential-list">{filteredRecords.map((record) => <details className="credential-card credential-record compact-details" key={record.id}>
+      <summary className="credential-card-head compact-summary">
+        <div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p>{record.category}{record.username ? ` · ${record.username}` : ""}</p></div></div>
+        <div className="table-actions">
+          <button type="button" className="icon-button" aria-label={`Edit ${record.provider}`} onClick={(event) => { event.preventDefault(); setEditor(record); }}><Pencil size={14} /></button>
+          <button type="button" className="icon-button" aria-label={`Copy ${record.provider}`} title="Create a separately editable copy" onClick={(event) => { event.preventDefault(); void onSave({ ...record, id: createId(), provider: copyLabel(record.provider, 120) }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the account credential.")); }}><Copy size={14} /></button>
+          <button type="button" className="icon-button" aria-label={`Archive ${record.provider}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${record.provider}" to the Archive?`)) void onArchive(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the account credential.")); }}><Archive size={14} /></button>
+        </div>
+      </summary>
+      <div className="compact-details-body">
+        <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password || "Not saved" : record.password ? "••••••••••••" : "Not saved"}</code><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
+        <div className="credential-secondary">
+          {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open sign-in page</a>}
+          {record.recoveryInfo && <p><strong>Recovery:</strong> {record.recoveryInfo}</p>}
+          {record.tags.length > 0 && <p><strong>Tags:</strong> {record.tags.join(", ")}</p>}
+          {record.additionalFields.map((field, index) => <p key={`${record.id}-${index}`}><strong>{field.label}:</strong> {field.value}</p>)}
+          {record.notes && <p><LinkifiedText>{record.notes}</LinkifiedText></p>}
+        </div>
+      </div>
+    </details>)}</div> : <Card><EmptyState icon={<KeyRound size={18} />} title={records.length ? "No matching accounts" : "No account credentials saved"} description={records.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
+    {editor !== undefined && <CredentialModal key={editor?.id ?? "new-direct-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
+      await onSave({ ...record, id: editor?.id ?? createId() });
+    }} />}
+    {importOpen && <Modal title="Import encrypted account vault" onClose={() => { if (!busy) { setImportOpen(false); setLegacyPassphrase(""); } }}>
+      <form onSubmit={(event) => void importLegacyRecords(event)}>
+        <p className="section-description">Enter the old vault passphrase to decrypt and move both account credentials and any remaining legacy bank entries into their respective direct-access tables. The encrypted vault will be removed after a successful transfer.</p>
+        <Field label="Legacy vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={legacyPassphrase} onChange={(event) => setLegacyPassphrase(event.target.value)} /></Field>
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        <div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={() => { setImportOpen(false); setLegacyPassphrase(""); }}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Importing..." : "Decrypt and move records"}</Button></div>
+      </form>
+    </Modal>}
   </>;
 }
 
@@ -6985,7 +7133,7 @@ function BankAccountModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete, onMigrateBankAccounts }: {
+export function CredentialVaultPage({ vault, section, onNavigate, onSave, onDelete, onMigrateBankAccounts }: {
   vault?: EncryptedCredentialVault;
   section: "credentials" | "banks";
   onNavigate: (page: Page) => void;
@@ -7600,6 +7748,7 @@ function emptyTrackerData(): TrackerData {
     mindfulHabits: [],
     mindfulnessLogs: [],
     bankAccounts: [],
+    credentialRecords: [],
     morningExerciseLogs: [],
     educationRecords: [],
     studentProfiles: [],
@@ -8202,7 +8351,7 @@ export default function App() {
   function copyTrip(trip: ShoppingTrip) {
     update((previous) => ({
       ...previous,
-      trips: [{ ...trip, id: createId(), purchaseIds: [] }, ...previous.trips],
+      trips: [{ ...trip, id: createId(), store: copyLabel(trip.store, 120), purchaseIds: [] }, ...previous.trips],
     }));
   }
   function saveTripEdits(trip: ShoppingTrip) {
@@ -8238,7 +8387,7 @@ export default function App() {
     }));
   }
   function copyPurchase(purchase: Purchase) {
-    const standalonePurchase = { ...purchase, id: createId() };
+    const standalonePurchase = { ...purchase, id: createId(), itemName: copyLabel(purchase.itemName, 160) };
     delete standalonePurchase.tripId;
     update((previous) => ({ ...previous, purchases: [standalonePurchase, ...previous.purchases] }));
   }
@@ -9183,11 +9332,20 @@ export default function App() {
     "Database manager": <DatabaseManagerPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
-    "Account credentials": <CredentialVaultPage vault={data.credentialVault} section="credentials" onNavigate={changePage} onSave={(credentialVault) => update((previous) => ({ ...previous, credentialVault }))} onDelete={() => update((previous) => ({ ...previous, credentialVault: undefined }))}
-      onMigrateBankAccounts={(credentialVault, accounts) => persistUpdate((previous) => ({
+    "Account credentials": <AccountCredentialsPage records={data.credentialRecords ?? []} vault={data.credentialVault}
+      onSave={(record) => persistUpdate((previous) => ({
         ...previous,
-        credentialVault,
-        bankAccounts: [...accounts, ...(previous.bankAccounts ?? []).filter((entry) => !accounts.some((account) => account.id === entry.id))],
+        credentialRecords: [record, ...(previous.credentialRecords ?? []).filter((entry) => entry.id !== record.id)],
+      }))}
+      onArchive={(record) => persistUpdate((previous) => ({
+        ...withArchivedRecord(previous, `Account credential: ${record.provider}`, { credentialRecords: [record] }),
+        credentialRecords: (previous.credentialRecords ?? []).filter((entry) => entry.id !== record.id),
+      }))}
+      onImportLegacy={(credentials, banks) => persistUpdate((previous) => ({
+        ...previous,
+        credentialVault: undefined,
+        credentialRecords: [...credentials, ...(previous.credentialRecords ?? []).filter((entry) => !credentials.some((record) => record.id === entry.id))],
+        bankAccounts: [...banks, ...(previous.bankAccounts ?? []).filter((entry) => !banks.some((account) => account.id === entry.id))],
       }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors />,

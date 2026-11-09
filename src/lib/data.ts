@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -511,6 +511,7 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.toChapterName === "string" && entry.toChapterName.length <= 100 &&
       typeof entry.toChapterNumber === "number" && Number.isInteger(entry.toChapterNumber) && entry.toChapterNumber > 0 &&
       typeof entry.toVerseNumber === "number" && Number.isInteger(entry.toVerseNumber) && entry.toVerseNumber > 0 &&
+      (entry.people === undefined || typeof entry.people === "string" && entry.people.length <= 1000) &&
       typeof entry.notes === "string" && entry.notes.length <= 5000));
   const dailyPrayerLogsOk = value.dailyPrayerLogs === undefined ||
     (Array.isArray(value.dailyPrayerLogs) && value.dailyPrayerLogs.every((entry) =>
@@ -519,7 +520,8 @@ export function validateData(value: unknown): value is TrackerData {
       (entry.period === "Morning" || entry.period === "Afternoon" || entry.period === "Evening" || entry.period === "Night") &&
       (entry.prayerType === "Praise & worship" || entry.prayerType === "Thanksgiving" || entry.prayerType === "Confession" ||
         entry.prayerType === "Personal request" || entry.prayerType === "Intercession" || entry.prayerType === "Guidance" || entry.prayerType === "Other") &&
-      typeof entry.prayerNotes === "string" && entry.prayerNotes.trim().length > 0 && entry.prayerNotes.length <= 5000));
+      typeof entry.prayerNotes === "string" && entry.prayerNotes.trim().length > 0 && entry.prayerNotes.length <= 5000 &&
+      (entry.time === undefined || typeof entry.time === "string" && (entry.time === "" || /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.time)))));
   const devotionalResourcesOk = value.devotionalResources === undefined ||
     (Array.isArray(value.devotionalResources) && value.devotionalResources.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -737,6 +739,28 @@ export function validateData(value: unknown): value is TrackerData {
     typeof account.website === "string" && account.website.length <= 2000 && isSafeExternalLink(account.website) &&
     typeof account.customerService === "string" && account.customerService.length <= 500 &&
     typeof account.notes === "string" && account.notes.length <= 3000));
+  const credentialRecordsOk = value.credentialRecords === undefined || (Array.isArray(value.credentialRecords) && value.credentialRecords.every((record) =>
+    isRecord(record) && typeof record.id === "string" && record.id.length > 0 &&
+    (record.kind === undefined || record.kind === "bank-account") &&
+    typeof record.provider === "string" && record.provider.trim().length > 0 && record.provider.length <= 120 &&
+    typeof record.category === "string" && record.category.length <= 80 &&
+    typeof record.website === "string" && record.website.length <= 2000 && isSafeExternalLink(record.website) &&
+    typeof record.username === "string" && record.username.length <= 300 &&
+    typeof record.password === "string" && record.password.length <= 2000 &&
+    typeof record.recoveryInfo === "string" && record.recoveryInfo.length <= 500 &&
+    typeof record.notes === "string" && record.notes.length <= 5000 &&
+    Array.isArray(record.tags) && record.tags.length <= 100 &&
+    record.tags.every((tag) => typeof tag === "string" && tag.length <= 80) &&
+    Array.isArray(record.additionalFields) && record.additionalFields.length <= 100 &&
+    record.additionalFields.every((field) => isRecord(field) &&
+      typeof field.label === "string" && field.label.length <= 80 &&
+      typeof field.value === "string" && field.value.length <= 500) &&
+    (record.accountHolder === undefined || typeof record.accountHolder === "string") &&
+    (record.accountType === undefined || typeof record.accountType === "string") &&
+    (record.accountNumber === undefined || typeof record.accountNumber === "string") &&
+    (record.routingCode === undefined || typeof record.routingCode === "string") &&
+    (record.branch === undefined || typeof record.branch === "string") &&
+    (record.customerService === undefined || typeof record.customerService === "string")));
   const archiveCollections = [
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
@@ -744,7 +768,7 @@ export function validateData(value: unknown): value is TrackerData {
     "devotionalEntries", "dailyBibleReadings", "dailyPrayerLogs", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
-    "morningExerciseLogs", "bankAccounts",
+    "morningExerciseLogs", "bankAccounts", "credentialRecords",
   ];
   const archivedRecordsOk = value.archivedRecords === undefined ||
     (Array.isArray(value.archivedRecords) && value.archivedRecords.every((entry) => {
@@ -790,11 +814,13 @@ export function validateData(value: unknown): value is TrackerData {
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
     !devotionalEntriesOk || !dailyBibleReadingsOk || !dailyPrayerLogsOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk || !morningExerciseLogsOk || !morningExerciseActivitiesOk ||
-    !archivedRecordsOk || !bankAccountsOk ||
+    !archivedRecordsOk || !bankAccountsOk || !credentialRecordsOk ||
     !credentialVaultOk) return false;
   if (Array.isArray(value.stores) && new Set((value.stores as Store[]).map((store) => store.id)).size !== value.stores.length) return false;
   if (Array.isArray(value.bankAccounts) &&
     new Set((value.bankAccounts as BankAccount[]).map((account) => account.id)).size !== value.bankAccounts.length) return false;
+  if (Array.isArray(value.credentialRecords) &&
+    new Set((value.credentialRecords as CredentialRecord[]).map((record) => record.id)).size !== value.credentialRecords.length) return false;
   if (Array.isArray(value.products) && new Set((value.products as Product[]).map((product) => product.id)).size !== value.products.length) return false;
   if (Array.isArray(value.reminders) && new Set((value.reminders as Reminder[]).map((reminder) => reminder.id)).size !== value.reminders.length) return false;
   if (Array.isArray(value.stocks) && new Set((value.stocks as TrackedStock[]).map((stock) => stock.id)).size !== value.stocks.length) return false;
@@ -963,8 +989,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     electricityReadings: data.electricityReadings ?? [],
     subscriptions: data.subscriptions ?? [],
     devotionalEntries: data.devotionalEntries ?? [],
-    dailyBibleReadings: data.dailyBibleReadings ?? [],
-    dailyPrayerLogs: data.dailyPrayerLogs ?? [],
+    dailyBibleReadings: (data.dailyBibleReadings ?? []).map((reading) => ({ ...reading, people: reading.people ?? "" })),
+    dailyPrayerLogs: (data.dailyPrayerLogs ?? []).map((log) => ({ ...log, time: log.time ?? "" })),
     devotionalResources: data.devotionalResources ?? [],
     prayerRequests: data.prayerRequests ?? [],
     cookingRecipes: data.cookingRecipes ?? [],
@@ -996,6 +1022,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
       .map((activity) => activity.trim()).filter(Boolean)
       .map((activity) => [activity.toLocaleLowerCase(), activity])).values()],
     bankAccounts: data.bankAccounts ?? [],
+    credentialRecords: data.credentialRecords ?? [],
   };
 }
 

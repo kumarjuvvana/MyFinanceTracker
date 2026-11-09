@@ -562,6 +562,7 @@ export interface DailyBibleReading {
   toChapterName: string;
   toChapterNumber: number;
   toVerseNumber: number;
+  people: string;
   notes: string;
 }
 
@@ -572,6 +573,7 @@ export interface DailyPrayerLog {
   id: string;
   date: string;
   period: PrayerPeriod;
+  time?: string;
   prayerType: DailyPrayerType;
   prayerNotes: string;
 }
@@ -881,6 +883,7 @@ export interface TrackerData {
   morningExerciseLogs?: MorningExerciseLog[];
   morningExerciseActivities?: string[];
   bankAccounts?: BankAccount[];
+  credentialRecords?: CredentialRecord[];
   credentialVault?: EncryptedCredentialVault;
 }
 
