@@ -627,7 +627,19 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.occasion === "string" &&
       Array.isArray(entry.dishes) && entry.dishes.length > 0 && entry.dishes.every((dish) =>
         isRecord(dish) && (dish.recipeId === null || typeof dish.recipeId === "string") &&
-        typeof dish.name === "string" && dish.name.trim().length > 0) &&
+        typeof dish.name === "string" && dish.name.trim().length > 0 &&
+        (dish.actualIngredients === undefined || Array.isArray(dish.actualIngredients) &&
+          dish.actualIngredients.length <= 200 && dish.actualIngredients.every((ingredient) =>
+            isRecord(ingredient) && typeof ingredient.id === "string" && ingredient.id.length > 0 &&
+            (ingredient.inventoryItemId === null || typeof ingredient.inventoryItemId === "string") &&
+            (ingredient.inventoryMeasureId === null || typeof ingredient.inventoryMeasureId === "string") &&
+            typeof ingredient.name === "string" && ingredient.name.trim().length > 0 &&
+            (ingredient.quantity === null || typeof ingredient.quantity === "number" &&
+              Number.isFinite(ingredient.quantity) && ingredient.quantity > 0) &&
+            typeof ingredient.unit === "string" &&
+            (ingredient.unitPrice === null || typeof ingredient.unitPrice === "number" &&
+              Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0) &&
+            (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean")))) &&
       (entry.rating === null || (typeof entry.rating === "number" && Number.isInteger(entry.rating) && entry.rating >= 1 && entry.rating <= 5)) &&
       typeof entry.learning === "string" && typeof entry.notes === "string"));
   const cookingPlansOk = value.cookingPlans === undefined ||

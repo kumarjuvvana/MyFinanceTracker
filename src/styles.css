@@ -923,12 +923,16 @@ body{background:#f3f5ef}
 .cooking-selected-dishes{display:grid;gap:6px}
 .cooking-selected-dishes>strong{font-size:11px;color:#414a42}
 .cooking-selected-dishes>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 8px;border:1px solid #e8ebe6;border-radius:8px;font-size:11px;color:#586258}
+.cooking-log-ingredients{display:grid;gap:8px;padding:12px;border:1px solid #e8ebe6;border-radius:10px}
+.cooking-log-ingredient{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr)) minmax(100px,.7fr);align-items:end;gap:8px;padding:10px;border:1px solid #edf0ec;border-radius:8px}
+.cooking-log-ingredient-cost{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:36px;font-size:10px;color:#858d83}
+.cooking-log-ingredient-cost strong{color:#414a42}
 .app-shell.dark .cooking-summary strong,.app-shell.dark .cooking-card h3,.app-shell.dark .cooking-card p strong,.app-shell.dark .cooking-selected-dishes>strong{color:#e3e8e2}
 .app-shell.dark .cooking-summary span,.app-shell.dark .cooking-card p{color:#a7b0a7}
 .app-shell.dark .cooking-selected-dishes>div{border-color:#343d35;color:#c2cbc2}
-.app-shell.dark .cooking-stock-heading strong,.app-shell.dark .cooking-recipe-ingredient-cost strong,.app-shell.dark .cooking-inventory-card h3,.app-shell.dark .cooking-inventory-measure-list strong,.app-shell.dark .cooking-saved-ingredients>strong{color:#e3e8e2}
+.app-shell.dark .cooking-stock-heading strong,.app-shell.dark .cooking-recipe-ingredient-cost strong,.app-shell.dark .cooking-log-ingredient-cost strong,.app-shell.dark .cooking-inventory-card h3,.app-shell.dark .cooking-inventory-measure-list strong,.app-shell.dark .cooking-saved-ingredients>strong{color:#e3e8e2}
 .app-shell.dark .cooking-stock-heading span,.app-shell.dark .cooking-recipe-ingredient-cost,.app-shell.dark .cooking-inventory-measure-list,.app-shell.dark .cooking-saved-ingredients{color:#a7b0a7}
-.app-shell.dark .cooking-recipe-stock,.app-shell.dark .cooking-inventory-measures,.app-shell.dark .cooking-recipe-ingredient,.app-shell.dark .cooking-inventory-measure,.app-shell.dark .cooking-inventory-measure-list>div{border-color:#343d35}
+.app-shell.dark .cooking-recipe-stock,.app-shell.dark .cooking-inventory-measures,.app-shell.dark .cooking-recipe-ingredient,.app-shell.dark .cooking-log-ingredients,.app-shell.dark .cooking-log-ingredient,.app-shell.dark .cooking-inventory-measure,.app-shell.dark .cooking-inventory-measure-list>div{border-color:#343d35}
 .issues-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-bottom:14px}
 .issues-summary .card{display:grid;gap:6px;padding:14px}
 .issues-summary span{font-size:10px;color:#92998f}

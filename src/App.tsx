@@ -6688,7 +6688,7 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
 
   return <>
     <div className="devotional-section-head"><div><h2><CookingPot size={15} /> Kitchen stock</h2><p>Cooking-only inventory, stored separately from your general shopping master list.</p></div><Button disabled={loading || saving || Boolean(error)} onClick={() => setEditor(null)}><Plus size={15} />Add stock item</Button></div>
-    <div className="alert"><CookingPot size={15} style={{ flex: "none", marginTop: 1 }} /><span>Kitchen stock is saved in its own Supabase table. Stock levels are informational and are not automatically deducted when you log a recipe.</span></div>
+    <div className="alert"><CookingPot size={15} style={{ flex: "none", marginTop: 1 }} /><span>Kitchen stock is saved separately. Stock is deducted from actual ingredient quantities recorded in daily cooking logs, not from recipe templates.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search kitchen stock" placeholder="Search vegetables, spices, units..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{items.length} items</Badge><Badge>{saving ? "Saving…" : "Saved to Supabase"}</Badge></div>
     {loading ? <Card><p className="section-description">Loading kitchen stock…</p></Card> :
@@ -6723,9 +6723,14 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   onClose: () => void;
   onSave: (log: Omit<CookingLog, "id">) => Promise<void>;
 }) {
+  const formatCurrency = useCurrencyFormatter();
   const [date, setDate] = useState(initial?.date ?? today());
   const [occasion, setOccasion] = useState(initial?.occasion ?? "");
-  const [dishes, setDishes] = useState<CookedDish[]>(initial?.dishes ?? []);
+  const [dishes, setDishes] = useState<CookedDish[]>(() => (initial?.dishes ?? []).map((dish) => {
+    if (dish.actualIngredients) return dish;
+    const recipe = recipes.find((entry) => entry.id === dish.recipeId);
+    return recipe ? { ...dish, actualIngredients: recipe.inventoryIngredients?.map((ingredient) => ({ ...ingredient, id: createId() })) ?? [] } : dish;
+  }));
   const [recipeId, setRecipeId] = useState("");
   const [customDish, setCustomDish] = useState("");
   const [rating, setRating] = useState(initial?.rating?.toString() ?? "");
@@ -6737,8 +6742,34 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   function addRecipe() {
     const recipe = recipes.find((entry) => entry.id === recipeId);
     if (!recipe) return;
-    setDishes((current) => [...current, { recipeId: recipe.id, name: recipe.name }]);
+    setDishes((current) => [...current, {
+      recipeId: recipe.id,
+      name: recipe.name,
+      actualIngredients: (recipe.inventoryIngredients ?? []).map((ingredient) => ({ ...ingredient, id: createId() })),
+    }]);
     setRecipeId("");
+  }
+
+  function updateActualIngredient(dishIndex: number, ingredientId: string, changes: Partial<CookingRecipeIngredient>) {
+    setDishes((current) => current.map((dish, index) => index !== dishIndex ? dish : {
+      ...dish,
+      actualIngredients: (dish.actualIngredients ?? []).map((ingredient) =>
+        ingredient.id === ingredientId ? { ...ingredient, ...changes } : ingredient),
+    }));
+  }
+
+  function removeActualIngredient(dishIndex: number, ingredientId: string) {
+    setDishes((current) => current.map((dish, index) => index !== dishIndex ? dish : {
+      ...dish,
+      actualIngredients: (dish.actualIngredients ?? []).filter((ingredient) => ingredient.id !== ingredientId),
+    }));
+  }
+
+  function actualIngredientCost(ingredients: CookingRecipeIngredient[]) {
+    return ingredients.reduce((total, ingredient) =>
+      total + (ingredient.quantity !== null && ingredient.unitPrice !== null
+        ? ingredient.quantity * ingredient.unitPrice
+        : 0), 0);
   }
 
   function addCustomDish() {
@@ -6759,6 +6790,13 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       setError("Add at least one prepared dish, drink, or other item.");
       return;
     }
+    if (dishes.some((dish) => (dish.actualIngredients ?? []).some((ingredient) =>
+      !ingredient.name.trim() ||
+      ingredient.quantity !== null && (!Number.isFinite(ingredient.quantity) || ingredient.quantity <= 0) ||
+      ingredient.unitPrice !== null && (!Number.isFinite(ingredient.unitPrice) || ingredient.unitPrice < 0)))) {
+      setError("Ingredient names are required. Actual quantities must be positive, and prices must be zero or more.");
+      return;
+    }
     const parsedRating = rating ? Number(rating) : null;
     if (parsedRating !== null && (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5)) {
       setError("Choose a rating from 1 to 5.");
@@ -6767,7 +6805,21 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
     setSaving(true);
     setError("");
     try {
-      await onSave({ date, occasion: occasion.trim(), dishes, rating: parsedRating, learning: learning.trim(), notes: notes.trim() });
+      await onSave({
+        date,
+        occasion: occasion.trim(),
+        dishes: dishes.map((dish) => ({
+          ...dish,
+          actualIngredients: (dish.actualIngredients ?? []).map((ingredient) => ({
+            ...ingredient,
+            name: ingredient.name.trim(),
+            unit: ingredient.unit.trim(),
+          })),
+        })),
+        rating: parsedRating,
+        learning: learning.trim(),
+        notes: notes.trim(),
+      });
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save this cooking log.");
@@ -6780,9 +6832,21 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Meal / occasion"><Input maxLength={100} placeholder="Breakfast, lunch, snack, family dinner..." value={occasion} onChange={(event) => setOccasion(event.target.value)} /></Field>
-      <Field className="full" label="Add from your recipe book">{recipes.length ? <div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
+      <Field className="full" label="Add from your recipe book">{recipes.length ? <><div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div><span className="field-hint">Recipe ingredient quantities and prices are copied as starting values. Adjust them below to record what you actually used today.</span></> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
       <Field className="full" label="Add a one-off dish, drink, or prepared item"><div className="cooking-add-dish"><Input maxLength={120} placeholder="e.g. Fresh lime juice" value={customDish} onChange={(event) => setCustomDish(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomDish(); } }} /><Button type="button" variant="outline" disabled={!customDish.trim()} onClick={addCustomDish}><Plus size={13} /> Add item</Button></div></Field>
-      {dishes.length > 0 && <div className="full cooking-selected-dishes"><strong>Prepared today</strong>{dishes.map((dish, index) => <div key={`${dish.recipeId ?? "custom"}-${index}`}><span>{dish.name}</span><button className="icon-button" type="button" aria-label={`Remove ${dish.name}`} onClick={() => setDishes((current) => current.filter((_, dishIndex) => dishIndex !== index))}><X size={13} /></button></div>)}</div>}
+      {dishes.length > 0 && <div className="full cooking-selected-dishes"><strong>Prepared today</strong>{dishes.map((dish, index) => <div key={`${dish.recipeId ?? "custom"}-${index}`}><span>{dish.name}{dish.actualIngredients?.length ? ` · known ingredient cost ${formatCurrency(actualIngredientCost(dish.actualIngredients))}` : ""}</span><button className="icon-button" type="button" aria-label={`Remove ${dish.name}`} onClick={() => setDishes((current) => current.filter((_, dishIndex) => dishIndex !== index))}><X size={13} /></button></div>)}</div>}
+      {dishes.map((dish, dishIndex) => dish.actualIngredients && dish.actualIngredients.length > 0 && <section className="full cooking-log-ingredients" key={`${dish.recipeId ?? "custom"}-${dishIndex}`}>
+        <div className="cooking-stock-heading"><div><strong>Actual ingredients · {dish.name}</strong><span>Adjust quantities and unit prices to what you used today. Stock is deducted from the saved actual quantities.</span></div></div>
+        {dish.actualIngredients.map((ingredient) => <div className="cooking-log-ingredient" key={ingredient.id}>
+          <Field label="Ingredient"><Input maxLength={120} value={ingredient.name} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { name: event.target.value })} /></Field>
+          <Field label="Actual quantity"><Input type="number" min="0.001" step="any" placeholder="Not used" value={ingredient.quantity ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { quantity: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+          <Field label="Unit"><Input maxLength={40} value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>
+          <Field label="Actual price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} /></Field>
+          <div className="cooking-log-ingredient-cost"><span>Actual cost</span><strong>{ingredient.quantity !== null && ingredient.unitPrice !== null ? formatCurrency(ingredient.quantity * ingredient.unitPrice) : "—"}</strong>
+            <button type="button" className="icon-button" aria-label={`Remove ${ingredient.name} from ${dish.name}`} onClick={() => removeActualIngredient(dishIndex, ingredient.id)}><X size={13} /></button>
+          </div>
+        </div>)}
+      </section>)}
       <Field label="How did it turn out?"><Select value={rating} onChange={(event) => setRating(event.target.value)}><option value="">Not rated</option><option value="1">1 · Needs practice</option><option value="2">2 · Fair</option><option value="3">3 · Good</option><option value="4">4 · Very good</option><option value="5">5 · Excellent</option></Select></Field>
       <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
       <Field className="full" label="Daily notes"><textarea className="field textarea" rows={2} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
@@ -7090,7 +7154,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
         visibleUsage.length ? <div className="cooking-list">{visibleUsage.map((entry, index) => <Card className="cooking-usage-card" key={`${entry.logId}-${entry.recipeId}-${entry.inventoryMeasureId}-${index}`}>
           <div className="cooking-usage-top"><div><strong>{entry.itemName}</strong><span>{dateLabel(entry.date)} · {entry.recipeName}</span></div><Badge tone="amber">−{entry.quantity} {entry.unit}</Badge></div>
         </Card>)}</div> :
-        <Card><EmptyState icon={<History size={18} />} title="No stock usage recorded" description={usageMonth ? "No linked recipe ingredients were used in this month." : "Usage is recorded when you add a saved recipe with quantified kitchen-stock ingredients to a daily cooking log."} /></Card>}
+        <Card><EmptyState icon={<History size={18} />} title="No stock usage recorded" description={usageMonth ? "No linked ingredients were actually used in this month." : "Usage is recorded when a daily cooking log is saved with actual quantities for linked kitchen-stock ingredients."} /></Card>}
     </section>}
     {activeTab === "recipes" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div></div>
         {visibleRecipes.length ? <div className="cooking-list">{visibleRecipes.map((recipe) => <details className="cooking-card compact-details" key={recipe.id}>
@@ -7100,10 +7164,9 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
     </section>}
     {activeTab === "logs" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div></div>
         {visibleLogs.length ? <div className="cooking-list">{visibleLogs.map((log) => <Card className="cooking-card" key={log.id}>
-          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3>{log.dishes.some((dish) => dish.recipeId && recipes.some((recipe) => recipe.id === dish.recipeId && recipe.inventoryIngredients?.length)) && <span className="devotional-date">Linked recipe estimate: {formatCurrency(log.dishes.reduce((total, dish) => {
-            const recipe = recipes.find((entry) => entry.id === dish.recipeId);
-            return total + (recipe?.inventoryIngredients ?? []).reduce((cost, ingredient) => cost + (ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : 0), 0);
-          }, 0))}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; void saveAndRefreshLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not copy this cooking log.")); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) void deleteAndRefreshLog(log).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not delete this cooking log.")); }}><Archive size={13} /></button></div></div>
+          <div className="devotional-card-head"><div><span className="devotional-date">{dateLabel(log.date)}{log.occasion ? ` · ${log.occasion}` : ""}</span><h3>{log.dishes.map((dish) => dish.name).join(", ")}</h3>{log.dishes.some((dish) => dish.actualIngredients !== undefined) && <span className="devotional-date">Known actual ingredient cost: {formatCurrency(log.dishes.reduce((total, dish) => total + (dish.actualIngredients ?? []).reduce((dishTotal, ingredient) => dishTotal + (ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : 0), 0), 0))}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit cooking log for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy cooking log for ${log.date}`} onClick={() => { const { id, ...copy } = log; void id; void saveAndRefreshLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not copy this cooking log.")); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive cooking log for ${log.date}`} onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) void deleteAndRefreshLog(log).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not delete this cooking log.")); }}><Archive size={13} /></button></div></div>
+          {log.dishes.some((dish) => (dish.actualIngredients?.length ?? 0) > 0) && <div className="cooking-saved-ingredients"><strong>Actual ingredients</strong>{log.dishes.flatMap((dish) => (dish.actualIngredients ?? []).map((ingredient) =>
+            <span key={`${dish.recipeId ?? dish.name}-${ingredient.id}`}>{dish.name}: {ingredient.name}{ingredient.quantity !== null ? ` · ${ingredient.quantity} ${ingredient.unit}` : ""}{ingredient.unitPrice !== null ? ` · ${formatCurrency(ingredient.unitPrice)} / ${ingredient.unit}` : ""}{ingredient.quantity !== null && ingredient.unitPrice !== null ? ` · cost ${formatCurrency(ingredient.quantity * ingredient.unitPrice)}` : ""}</span>))}</div>}
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> <LinkifiedText>{log.learning}</LinkifiedText></p>}{log.notes && <p><strong>Notes:</strong> <LinkifiedText>{log.notes}</LinkifiedText></p>}
         </Card>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
     </section>}

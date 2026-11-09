@@ -685,6 +685,7 @@ export interface CookingRecipeIngredient {
 export interface CookedDish {
   recipeId: string | null;
   name: string;
+  actualIngredients?: CookingRecipeIngredient[];
 }
 
 export interface CookingLog {
