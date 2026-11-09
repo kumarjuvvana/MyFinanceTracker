@@ -67,7 +67,8 @@ begin
     return;
   end if;
 
-  delete from public.cooking_inventory_items;
+  delete from public.cooking_inventory_items
+  where id is not null;
 
   for entry in select pg_catalog.jsonb_array_elements(p_items)
   loop
