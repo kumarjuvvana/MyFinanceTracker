@@ -1147,7 +1147,8 @@ body{background:#f3f5ef}
 .student-marks-attendance-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .student-marks-controls{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;flex:1;justify-content:flex-end}
 .student-marks-controls>.search-wrap{flex:1;max-width:380px;min-width:220px}
-.student-marks-controls>.field-wrap{min-width:210px}
+.student-marks-controls>.field-wrap{flex:1 1 155px;min-width:155px}
+.student-marks-controls>.field-wrap.student-marks-year-filter{flex-basis:205px;min-width:205px}
 .student-marks-year-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start;gap:10px}
 .student-marks-year-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:10px;padding:13px}
 .student-marks-year-heading{display:grid;gap:4px;padding-bottom:10px;border-bottom:1px solid #eef0ec}

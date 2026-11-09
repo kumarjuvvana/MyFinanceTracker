@@ -3581,9 +3581,38 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
   const [selectedYear, setSelectedYear] = useState("all");
   const [search, setSearch] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedMarks, setSelectedMarks] = useState("all");
+  const [selectedDays, setSelectedDays] = useState("all");
   const searchTerm = search.trim().toLocaleLowerCase();
   const yearRecords = records.filter((record) => selectedYear === "all" || record.academicYear.trim() === selectedYear)
     .sort((a, b) => a.institution.localeCompare(b.institution, undefined, { sensitivity: "base" }));
+  const subjectOptions = [...new Set(yearRecords.flatMap((record) => (record.exams ?? [])
+    .map((exam) => exam.subject.trim()).filter(Boolean)))].sort((a, b) => a.localeCompare(b));
+  const monthOptions = [...new Set(yearRecords.flatMap((record) => [
+    ...(record.exams ?? []).map((exam) => exam.date.slice(0, 7)),
+    ...(record.monthlyAttendance ?? []).map((entry) => entry.month),
+    ...(record.dailyAttendance ?? []).map((entry) => entry.date.slice(0, 7)),
+  ]).filter((month) => /^\d{4}-\d{2}$/.test(month)))].sort((a, b) => b.localeCompare(a));
+  const marksOptions = [...new Set(yearRecords.flatMap((record) => [
+    ...(record.exams ?? []).flatMap((exam) => exam.marksObtained !== null && exam.maximumMarks !== null
+      ? [`${exam.marksObtained}/${exam.maximumMarks}`] : []),
+    ...(record.reportSummary?.totalMarksObtained !== null && record.reportSummary?.totalMarksObtained !== undefined &&
+      record.reportSummary.totalMaximumMarks !== null
+      ? [`${record.reportSummary.totalMarksObtained}/${record.reportSummary.totalMaximumMarks}`] : []),
+  ]))].sort((a, b) => {
+    const [aObtained, aMaximum] = a.split("/").map(Number);
+    const [bObtained, bMaximum] = b.split("/").map(Number);
+    return bObtained / bMaximum - aObtained / aMaximum;
+  });
+  const daysOptions = [...new Set(yearRecords.flatMap((record) => (record.monthlyAttendance ?? [])
+    .map((entry) => `${entry.daysPresent}/${entry.workingDays}`)))].sort((a, b) => {
+    const [aPresent, aWorking] = a.split("/").map(Number);
+    const [bPresent, bWorking] = b.split("/").map(Number);
+    return bPresent / Math.max(1, bWorking) - aPresent / Math.max(1, aWorking);
+  });
+  const formatMonth = (month: string) => new Date(`${month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const marksCount = yearRecords.reduce((total, record) => total + (record.exams?.length ?? 0) +
     (record.reportSummary && (
       record.reportSummary.totalMarksObtained !== null || record.reportSummary.totalMaximumMarks !== null ||
@@ -3598,7 +3627,17 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
         <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">All academic years are shown by default. Choose a year or search the records.</p></div>
         <div className="student-marks-controls">
           <div className="search-wrap"><Search size={15} /><Input aria-label="Search marks and attendance" placeholder="Search marks, subjects, attendance..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-          <Field label="Academic year"><Select aria-label="Select academic year" value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}><option value="all">All academic years (all records)</option>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+          <Field label="Academic year" className="student-marks-year-filter"><Select aria-label="Select academic year" value={selectedYear} onChange={(event) => {
+            setSelectedYear(event.target.value);
+            setSelectedSubject("all");
+            setSelectedMonth("all");
+            setSelectedMarks("all");
+            setSelectedDays("all");
+          }}><option value="all">All academic years (all records)</option>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+          <Field label="Subject"><Select aria-label="Filter by subject" value={selectedSubject} onChange={(event) => setSelectedSubject(event.target.value)}><option value="all">All subjects</option>{subjectOptions.map((subject) => <option key={subject} value={subject}>{subject}</option>)}</Select></Field>
+          <Field label="Month"><Select aria-label="Filter by month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)}><option value="all">All months</option>{monthOptions.map((month) => <option key={month} value={month}>{formatMonth(month)}</option>)}</Select></Field>
+          <Field label="Marks"><Select aria-label="Filter by marks" value={selectedMarks} onChange={(event) => setSelectedMarks(event.target.value)}><option value="all">All marks</option>{marksOptions.map((marks) => <option key={marks} value={marks}>{marks.replace("/", " / ")}</option>)}</Select></Field>
+          <Field label="Days present"><Select aria-label="Filter by days present" value={selectedDays} onChange={(event) => setSelectedDays(event.target.value)}><option value="all">All days</option>{daysOptions.map((days) => <option key={days} value={days}>{days.replace("/", " / ")} days</option>)}</Select></Field>
         </div>
       </div>
       <div className="student-marks-year-grid">{yearRecords.map((record) => {
@@ -3606,23 +3645,38 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
         const recordMatches = !searchTerm || [record.academicYear, record.institution, record.gradeCourse, record.boardUniversity]
           .some((value) => value.toLocaleLowerCase().includes(searchTerm));
         const exams = [...(record.exams ?? [])].sort((a, b) => b.date.localeCompare(a.date)).filter((exam) =>
-          recordMatches || !searchTerm || [exam.name, exam.assessmentType, exam.subject, exam.date, exam.marksObtained?.toString() ?? "",
+          (!searchTerm || recordMatches || [exam.name, exam.assessmentType, exam.subject, exam.date, exam.marksObtained?.toString() ?? "",
             exam.maximumMarks?.toString() ?? "", exam.grade, exam.resultStatus ?? "", exam.teacherRemark ?? "", exam.notes]
-            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+          (selectedSubject === "all" || exam.subject.trim() === selectedSubject) &&
+          (selectedMonth === "all" || exam.date.startsWith(selectedMonth)) &&
+          selectedDays === "all" &&
+          (selectedMarks === "all" || (exam.marksObtained !== null && exam.maximumMarks !== null &&
+            `${exam.marksObtained}/${exam.maximumMarks}` === selectedMarks)));
         const monthlyAttendance = [...(record.monthlyAttendance ?? [])].sort((a, b) => b.month.localeCompare(a.month)).filter((entry) =>
-          recordMatches || !searchTerm || [entry.month, entry.notes, entry.daysPresent.toString(), entry.workingDays.toString()]
-            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+          (!searchTerm || recordMatches || [entry.month, formatMonth(entry.month), entry.notes, entry.daysPresent.toString(), entry.workingDays.toString()]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+          (selectedMonth === "all" || entry.month === selectedMonth) &&
+          selectedSubject === "all" && selectedMarks === "all" &&
+          (selectedDays === "all" || `${entry.daysPresent}/${entry.workingDays}` === selectedDays));
         const dailyAttendance = [...(record.dailyAttendance ?? [])].sort((a, b) => b.date.localeCompare(a.date)).filter((entry) =>
-          recordMatches || !searchTerm || [entry.date, entry.status, entry.notes]
-            .some((value) => value.toLocaleLowerCase().includes(searchTerm)));
+          (!searchTerm || recordMatches || [entry.date, entry.status, entry.notes]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+          selectedSubject === "all" && selectedMarks === "all" && selectedDays === "all" &&
+          (selectedMonth === "all" || entry.date.startsWith(selectedMonth)));
         const summaryText = summary ? [summary.totalMarksObtained?.toString() ?? "", summary.totalMaximumMarks?.toString() ?? "",
           summary.percentage?.toString() ?? "", summary.grade, summary.rank, summary.result, summary.teacherRemark].join(" ").toLocaleLowerCase() : "";
-        const summaryMatches = !!summary && (!searchTerm || recordMatches || summaryText.includes(searchTerm));
+        const summaryMarks = summary?.totalMarksObtained !== null && summary?.totalMarksObtained !== undefined &&
+          summary.totalMaximumMarks !== null ? `${summary.totalMarksObtained}/${summary.totalMaximumMarks}` : "";
+        const summaryMatches = !!summary && (!searchTerm || recordMatches || summaryText.includes(searchTerm)) &&
+          selectedSubject === "all" && selectedMonth === "all" && selectedDays === "all" &&
+          (selectedMarks === "all" || summaryMarks === selectedMarks);
         const hasMarks = exams.length > 0 || Boolean(summaryMatches && summary && (
           summary.totalMarksObtained !== null || summary.totalMaximumMarks !== null ||
           summary.percentage !== null || summary.grade || summary.rank || summary.result
         ));
-        if (searchTerm && !recordMatches && !exams.length && !monthlyAttendance.length && !dailyAttendance.length && !summaryMatches) return null;
+        if ((searchTerm || selectedSubject !== "all" || selectedMonth !== "all" || selectedMarks !== "all" || selectedDays !== "all") &&
+          !exams.length && !monthlyAttendance.length && !dailyAttendance.length && !summaryMatches) return null;
         return <Card className="student-marks-year-card" key={record.id}>
           <div className="student-marks-year-heading"><h3>{record.academicYear}</h3><span>{[record.institution, record.gradeCourse].filter(Boolean).join(" · ")}</span></div>
           <section className="student-marks-section" aria-label={`${record.academicYear} marks`}>
@@ -3656,15 +3710,40 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
           </section>
         </Card>;
       })}</div>
-      {searchTerm && !yearRecords.some((record) => {
-        const summaryText = record.reportSummary ? Object.values(record.reportSummary).join(" ").toLocaleLowerCase() : "";
-        return [record.academicYear, record.institution, record.gradeCourse, record.boardUniversity, summaryText,
-          ...(record.exams ?? []).flatMap((exam) => [exam.name, exam.assessmentType, exam.subject, exam.date, exam.marksObtained?.toString() ?? "",
-            exam.maximumMarks?.toString() ?? "", exam.grade, exam.resultStatus ?? "", exam.teacherRemark ?? "", exam.notes]),
-          ...(record.monthlyAttendance ?? []).flatMap((entry) => [entry.month, new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }), entry.notes, entry.daysPresent.toString(), entry.workingDays.toString()]),
-          ...(record.dailyAttendance ?? []).flatMap((entry) => [entry.date, entry.status, entry.notes])]
-          .some((value) => value.toLocaleLowerCase().includes(searchTerm));
-      }) && <p className="student-marks-attendance-footnote">No marks or attendance records match “{search}”.</p>}
+      {(searchTerm || selectedSubject !== "all" || selectedMonth !== "all" || selectedMarks !== "all" || selectedDays !== "all") &&
+        !yearRecords.some((record) => {
+          const recordMatches = !searchTerm || [record.academicYear, record.institution, record.gradeCourse, record.boardUniversity]
+            .some((value) => value.toLocaleLowerCase().includes(searchTerm));
+          const matchingExams = (record.exams ?? []).some((exam) =>
+            (!searchTerm || recordMatches || [exam.name, exam.assessmentType, exam.subject, exam.date,
+              exam.marksObtained?.toString() ?? "", exam.maximumMarks?.toString() ?? "", exam.grade,
+              exam.resultStatus ?? "", exam.teacherRemark ?? "", exam.notes]
+              .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+            (selectedSubject === "all" || exam.subject.trim() === selectedSubject) &&
+            (selectedMonth === "all" || exam.date.startsWith(selectedMonth)) &&
+            selectedDays === "all" &&
+            (selectedMarks === "all" || (exam.marksObtained !== null && exam.maximumMarks !== null &&
+              `${exam.marksObtained}/${exam.maximumMarks}` === selectedMarks)));
+          const matchingMonthlyAttendance = (record.monthlyAttendance ?? []).some((entry) =>
+            (!searchTerm || recordMatches || [entry.month, formatMonth(entry.month), entry.notes,
+              entry.daysPresent.toString(), entry.workingDays.toString()]
+              .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+            (selectedMonth === "all" || entry.month === selectedMonth) &&
+            selectedSubject === "all" && selectedMarks === "all" &&
+            (selectedDays === "all" || `${entry.daysPresent}/${entry.workingDays}` === selectedDays));
+          const matchingDailyAttendance = (record.dailyAttendance ?? []).some((entry) =>
+            (!searchTerm || recordMatches || [entry.date, entry.status, entry.notes]
+              .some((value) => value.toLocaleLowerCase().includes(searchTerm))) &&
+            selectedSubject === "all" && selectedMarks === "all" && selectedDays === "all" &&
+            (selectedMonth === "all" || entry.date.startsWith(selectedMonth)));
+          const summary = record.reportSummary;
+          const matchingSummary = !!summary && (!searchTerm || recordMatches ||
+            Object.values(summary).some((value) => String(value).toLocaleLowerCase().includes(searchTerm))) &&
+            selectedSubject === "all" && selectedMonth === "all" && selectedDays === "all" &&
+            (selectedMarks === "all" || (summary.totalMarksObtained !== null && summary.totalMaximumMarks !== null &&
+              `${summary.totalMarksObtained}/${summary.totalMaximumMarks}` === selectedMarks));
+          return matchingExams || matchingMonthlyAttendance || matchingDailyAttendance || matchingSummary;
+        }) && <p className="student-marks-attendance-footnote">No marks or attendance records match the selected filters.</p>}
       {!searchTerm && !marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries {selectedYear !== "all" ? `for ${selectedYear}` : "for these academic years"} yet. Add them in the Education tab.</p>}
     </> : <Card><EmptyState icon={<ClipboardList size={18} />} title="No academic years yet" description={`Add education records for ${studentName} to view marks and attendance by year.`} /></Card>}
   </div>;
