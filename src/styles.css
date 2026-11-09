@@ -1130,8 +1130,10 @@ body{background:#f3f5ef}
 .student-marks-attendance{display:grid;gap:12px}
 .student-marks-attendance-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .student-marks-attendance-toolbar .field-wrap{min-width:170px}
-.student-marks-year-card{display:grid;gap:14px}
+.student-marks-year-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start;gap:10px}
+.student-marks-year-card{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:10px;padding:13px}
 .student-marks-year-heading{display:grid;gap:4px;padding-bottom:10px;border-bottom:1px solid #eef0ec}
+.student-marks-year-heading{grid-column:1/-1}
 .student-marks-year-heading h3{margin:0;font-size:13px;color:#354238}
 .student-marks-year-heading>span{font-size:10px;color:#858d83}
 .student-marks-section{display:grid;gap:7px}
@@ -1141,9 +1143,9 @@ body{background:#f3f5ef}
 .student-marks-summary>div{display:grid;gap:3px;min-width:100px;padding:8px 10px;border:1px solid #eef0ec;border-radius:8px}
 .student-marks-summary span{font-size:9px;color:#858d83}
 .student-marks-summary strong{font-size:11px;color:#414a42}
-.student-marks-entry-list{display:grid}
-.student-marks-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:9px 0;border-bottom:1px solid #f0f1ee}
-.student-marks-entry:last-child{border-bottom:0}
+.student-marks-entry-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));align-content:start;gap:5px}
+.student-marks-entry{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;padding:7px}
+.student-marks-mini-card{border:1px solid #eef0ec;border-radius:7px}
 .student-marks-entry>div:first-child{display:grid;gap:3px;min-width:0}
 .student-marks-entry>div:first-child strong{font-size:10px;color:#414a42}
 .student-marks-entry>div:first-child span,.student-marks-result small{font-size:9px;color:#858d83;line-height:1.4}
@@ -1160,12 +1162,13 @@ body{background:#f3f5ef}
 .app-shell.dark .student-marks-year-heading h3,.app-shell.dark .student-marks-section h4,.app-shell.dark .student-marks-summary strong,.app-shell.dark .student-marks-result>strong,.app-shell.dark .student-marks-entry>div:first-child strong{color:#e3e8e2}
 .app-shell.dark .student-marks-year-heading>span,.app-shell.dark .student-marks-summary span,.app-shell.dark .student-marks-result small,.app-shell.dark .student-marks-entry>div:first-child span,.app-shell.dark .student-marks-attendance-footnote{color:#a7b0a7}
 .app-shell.dark .student-marks-summary>div{border-color:#343d35}
-.app-shell.dark .student-marks-entry{border-color:#343d35}
+.app-shell.dark .student-marks-mini-card{border-color:#343d35}
 .app-shell.dark .student-attendance-status.status-present{background:#294332;color:#a8d1ad}
 .app-shell.dark .student-attendance-status.status-absent{background:#482f2d;color:#efaaa1}
 .app-shell.dark .student-attendance-status.status-leave{background:#453a29;color:#e5c27e}
 .app-shell.dark .student-attendance-status.status-late{background:#2c3b4d;color:#a9c5e6}
 .app-shell.dark .student-attendance-status.status-other{background:#393247;color:#c5b6e8}
+@media(max-width:700px){.student-marks-year-card{grid-template-columns:minmax(0,1fr)}.student-marks-year-heading{grid-column:auto}}
 .app-shell.dark .education-icon{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .education-card-title h2,.app-shell.dark .education-details strong{color:#e3e8e2}
 .app-shell.dark .education-card-title p,.app-shell.dark .education-details span{color:#a7b0a7}

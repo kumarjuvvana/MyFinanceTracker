@@ -3158,8 +3158,7 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
   const academicYears = [...new Set(records.map((record) => record.academicYear.trim()).filter(Boolean))]
     .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
   const [selectedYear, setSelectedYear] = useState("");
-  const activeYear = academicYears.includes(selectedYear) ? selectedYear : academicYears[0] ?? "";
-  const yearRecords = records.filter((record) => record.academicYear.trim() === activeYear)
+  const yearRecords = records.filter((record) => !selectedYear || record.academicYear.trim() === selectedYear)
     .sort((a, b) => a.institution.localeCompare(b.institution, undefined, { sensitivity: "base" }));
   const marksCount = yearRecords.reduce((total, record) => total + (record.exams?.length ?? 0) +
     (record.reportSummary && (
@@ -3172,10 +3171,10 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
   return <div className="student-marks-attendance">
     {academicYears.length ? <>
       <div className="student-marks-attendance-toolbar">
-        <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">View exam results and attendance for one academic year.</p></div>
-        <Field label="Academic year"><Select aria-label="Select academic year" value={activeYear} onChange={(event) => setSelectedYear(event.target.value)}>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
+        <div><h2 className="section-title">{studentName}'s marks & attendance</h2><p className="section-description">All academic years are shown by default. Choose a year to filter.</p></div>
+        <Field label="Academic year"><Select aria-label="Select academic year" value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}><option value="">All academic years</option>{academicYears.map((year) => <option key={year} value={year}>{year}</option>)}</Select></Field>
       </div>
-      {yearRecords.map((record) => {
+      <div className="student-marks-year-grid">{yearRecords.map((record) => {
         const exams = [...(record.exams ?? [])].sort((a, b) => b.date.localeCompare(a.date));
         const monthlyAttendance = [...(record.monthlyAttendance ?? [])].sort((a, b) => b.month.localeCompare(a.month));
         const dailyAttendance = [...(record.dailyAttendance ?? [])].sort((a, b) => b.date.localeCompare(a.date));
@@ -3195,7 +3194,7 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
               {summary.rank && <div><span>Rank</span><strong>{summary.rank}</strong></div>}
               {summary.result && <div><span>Result</span><strong>{summary.result}</strong></div>}
             </div>}
-            {exams.length ? <div className="student-marks-entry-list">{exams.map((exam) => <div className="student-marks-entry" key={exam.id}>
+            {exams.length ? <div className="student-marks-entry-list">{exams.map((exam) => <div className="student-marks-entry student-marks-mini-card" key={exam.id}>
               <div><strong>{exam.name}</strong><span>{[exam.assessmentType, exam.subject, exam.date ? dateLabel(exam.date) : ""].filter(Boolean).join(" · ")}</span></div>
               <div className="student-marks-result">
                 <strong>{exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}` : exam.resultStatus ?? "—"}</strong>
@@ -3206,18 +3205,18 @@ function StudentMarksAttendance({ studentName, records }: { studentName: string;
           </section>
           <section className="student-marks-section" aria-label={`${record.academicYear} attendance`}>
             <h4><CalendarDays size={14} />Attendance</h4>
-            {monthlyAttendance.length > 0 && <div className="student-marks-entry-list">{monthlyAttendance.map((entry) => <div className="student-marks-entry" key={entry.id}>
+            {monthlyAttendance.length > 0 && <div className="student-marks-entry-list">{monthlyAttendance.map((entry) => <div className="student-marks-entry student-marks-mini-card" key={entry.id}>
               <div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>Monthly summary</span></div>
               <div className="student-marks-result"><strong>{entry.daysPresent} / {entry.workingDays} days</strong>{entry.workingDays > 0 && <small>{(entry.daysPresent / entry.workingDays * 100).toFixed(1)}% present</small>}</div>
             </div>)}</div>}
-            {dailyAttendance.length > 0 && <div className="student-marks-entry-list">{dailyAttendance.map((entry) => <div className="student-marks-entry" key={entry.id}>
+            {dailyAttendance.length > 0 && <div className="student-marks-entry-list">{dailyAttendance.map((entry) => <div className="student-marks-entry student-marks-mini-card" key={entry.id}>
               <div><strong>{dateLabel(entry.date)}</strong><span>Day-wise attendance</span></div><div className={`student-attendance-status status-${entry.status.toLocaleLowerCase()}`}>{entry.status}</div>
             </div>)}</div>}
             {!monthlyAttendance.length && !dailyAttendance.length && <p className="education-empty">No attendance recorded for this academic year.</p>}
           </section>
         </Card>;
-      })}
-      {!marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries for {activeYear} yet. Add them in the Education tab.</p>}
+      })}</div>
+      {!marksCount && !attendanceCount && <p className="student-marks-attendance-footnote">There are no marks or attendance entries {selectedYear ? `for ${selectedYear}` : "for these academic years"} yet. Add them in the Education tab.</p>}
     </> : <Card><EmptyState icon={<ClipboardList size={18} />} title="No academic years yet" description={`Add education records for ${studentName} to view marks and attendance by year.`} /></Card>}
   </div>;
 }
