@@ -619,6 +619,7 @@ export function validateData(value: unknown): value is TrackerData {
           (ingredient.quantity === null || (typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0)) &&
           typeof ingredient.unit === "string" &&
           (ingredient.unitPrice === null || (typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)) &&
+          (ingredient.measureNote === undefined || typeof ingredient.measureNote === "string" && ingredient.measureNote.length <= 1000) &&
           (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean"))))));
   const cookingLogsOk = value.cookingLogs === undefined ||
     (Array.isArray(value.cookingLogs) && value.cookingLogs.every((entry) =>
@@ -639,6 +640,7 @@ export function validateData(value: unknown): value is TrackerData {
             typeof ingredient.unit === "string" &&
             (ingredient.unitPrice === null || typeof ingredient.unitPrice === "number" &&
               Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0) &&
+            (ingredient.measureNote === undefined || typeof ingredient.measureNote === "string" && ingredient.measureNote.length <= 1000) &&
             (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean")))) &&
       (entry.rating === null || (typeof entry.rating === "number" && Number.isInteger(entry.rating) && entry.rating >= 1 && entry.rating <= 5)) &&
       typeof entry.learning === "string" && typeof entry.notes === "string"));
@@ -658,7 +660,8 @@ export function validateData(value: unknown): value is TrackerData {
         (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean") &&
         typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0 &&
         typeof ingredient.unit === "string" && ingredient.unit.length > 0 &&
-        (ingredient.unitPrice === null || typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)) &&
+        (ingredient.unitPrice === null || typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0) &&
+        (ingredient.measureNote === undefined || typeof ingredient.measureNote === "string" && ingredient.measureNote.length <= 1000)) &&
       typeof entry.notes === "string"));
   const issueRecordsOk = value.issueRecords === undefined ||
     (Array.isArray(value.issueRecords) && value.issueRecords.every((entry) =>

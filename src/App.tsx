@@ -6678,13 +6678,58 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete }: {
+function AddCookingStockButton({ item, measure, disabled = false, onAdd }: {
+  item: CookingInventoryItem;
+  measure: CookingStockMeasure;
+  disabled?: boolean;
+  onAdd: (itemId: string, measureId: string, quantity: number) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [quantity, setQuantity] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const currentQuantity = measure.stockQuantity ?? 0;
+  const addition = Number(quantity);
+  const validAddition = quantity.trim() !== "" && Number.isFinite(addition) && addition > 0;
+
+  async function submit() {
+    if (!validAddition || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onAdd(item.id, measure.id, addition);
+      setOpen(false);
+      setQuantity("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not add this stock.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <>
+    <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => { setError(""); setQuantity(""); setOpen(true); }}><Plus size={13} />Add stock</Button>
+    {open && <Modal title={`Add ${item.name} stock`} onClose={() => !saving && setOpen(false)}>
+      <div className="cooking-add-stock-dialog">
+        <p className="section-description">Enter the amount newly received. It will be added to the current on-hand stock.</p>
+        <Field label={`Current stock (${measure.unit})`}><Input readOnly value={measure.stockQuantity === null ? "Not set (treated as 0)" : currentQuantity} /></Field>
+        <Field label={`New stock to add (${measure.unit})`}><Input autoFocus type="number" min="0.001" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field>
+        <div className="cooking-add-stock-total"><span>Updated stock</span><strong>{validAddition ? `${currentQuantity + addition} ${measure.unit}` : `${currentQuantity} ${measure.unit}`}</strong></div>
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
+        <div className="modal-actions"><Button type="button" variant="outline" disabled={saving} onClick={() => setOpen(false)}>Cancel</Button><Button type="button" disabled={!validAddition || saving} onClick={() => void submit()}>{saving ? "Adding…" : "Add to stock"}</Button></div>
+      </div>
+    </Modal>}
+  </>;
+}
+
+function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete, onAddStock }: {
   items: CookingInventoryItem[];
   loading: boolean;
   saving: boolean;
   error: string;
   onSave: (items: CookingInventoryItem[]) => Promise<void>;
   onDelete: (item: CookingInventoryItem) => void;
+  onAddStock: (itemId: string, measureId: string, quantity: number) => Promise<void>;
 }) {
   const [editor, setEditor] = useState<CookingInventoryItem | null | undefined>(undefined);
   const [search, setSearch] = useState("");
@@ -6708,7 +6753,7 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
         {item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => {
           const unitPrice = cookingMeasurePrice(item, measure);
           return <div key={measure.id}>
-            <strong>{measure.unit}</strong><span>On hand: {measure.stockQuantity ?? "Not set"}</span><span>Price / unit: {unitPrice === null ? "Not set" : formatCurrency(unitPrice)}</span>
+            <strong>{measure.unit}</strong><span>On hand: {measure.stockQuantity ?? "Not set"}</span><span>Price / unit: {unitPrice === null ? "Not set" : formatCurrency(unitPrice)}</span><AddCookingStockButton item={item} measure={measure} disabled={loading || saving} onAdd={onAddStock} />
           </div>;
         })}</div> : <p className="section-description">No stock units or prices added.</p>}
         <div className="table-actions cooking-record-actions">
@@ -6729,10 +6774,12 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
   </>;
 }
 
-function CookingLogModal({ initial, recipes, inventory, onClose, onSave }: {
+function CookingLogModal({ initial, recipes, inventory, stockSaving, onAddStock, onClose, onSave }: {
   initial: CookingLog | null;
   recipes: CookingRecipe[];
   inventory: CookingInventoryItem[];
+  stockSaving: boolean;
+  onAddStock: (itemId: string, measureId: string, quantity: number) => Promise<void>;
   onClose: () => void;
   onSave: (log: Omit<CookingLog, "id">) => Promise<void>;
 }) {
@@ -6815,7 +6862,8 @@ function CookingLogModal({ initial, recipes, inventory, onClose, onSave }: {
     updateActualIngredient(dishIndex, ingredient.id, {
       inventoryMeasureId: measure?.id ?? null,
       unit: measure?.unit ?? "",
-      unitPrice: item && measure && !ingredient.unitPriceOverride ? cookingMeasurePrice(item, measure) : ingredient.unitPrice,
+      unitPrice: item && measure && !ingredient.unitPriceOverride ? cookingMeasurePrice(item, measure) : measure ? ingredient.unitPrice : null,
+      measureNote: measure ? "" : ingredient.measureNote,
     });
   }
 
@@ -6899,14 +6947,17 @@ function CookingLogModal({ initial, recipes, inventory, onClose, onSave }: {
         </div>
         {(dish.actualIngredients ?? []).map((ingredient) => {
           const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
+          const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
           const lineCost = ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : null;
           return <div className="cooking-log-ingredient" key={ingredient.id}>
           <Field label="Ingredient"><Input maxLength={120} value={ingredient.name} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { name: event.target.value })} /></Field>
-          {ingredient.inventoryItemId && <Field label="Kitchen stock unit"><Select value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => updateActualMeasure(dishIndex, ingredient, event.target.value)}><option value="">Choose unit</option>{item?.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select></Field>}
+          {ingredient.inventoryItemId && <Field label="Kitchen stock unit"><Select value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => updateActualMeasure(dishIndex, ingredient, event.target.value)}><option value="">No measure</option>{item?.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select></Field>}
           <Field label="Actual quantity"><Input type="number" min="0.001" step="any" placeholder="Not used" value={ingredient.quantity ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { quantity: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-          {!ingredient.inventoryItemId && <Field label="Unit"><Input maxLength={40} value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>}
+          {(!ingredient.inventoryItemId || !ingredient.inventoryMeasureId) && <Field label="Actual unit"><Input maxLength={40} placeholder="e.g. pieces, portion" value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>}
           <Field label="Actual price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} /></Field>
+          {ingredient.inventoryItemId && !ingredient.inventoryMeasureId && <Field className="full" label="Why is there no stock measure?"><Input maxLength={1000} placeholder="e.g. Received from relatives; not counted or weighed" value={ingredient.measureNote ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { measureNote: event.target.value })} /></Field>}
           <div className="cooking-log-ingredient-cost"><span>Actual cost</span><strong>{lineCost !== null ? formatCurrency(lineCost) : "—"}</strong>
+            {item && measure && <AddCookingStockButton item={item} measure={measure} disabled={stockSaving} onAdd={onAddStock} />}
             <button type="button" className="icon-button" aria-label={`Remove ${ingredient.name} from ${dish.name}`} onClick={() => removeActualIngredient(dishIndex, ingredient.id)}><X size={13} /></button>
           </div>
         </div>;
@@ -6921,11 +6972,13 @@ function CookingLogModal({ initial, recipes, inventory, onClose, onSave }: {
   </Modal>;
 }
 
-function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDelete, onEditRecipe, onSaveLog }: {
+function CookingPlanCard({ plan, recipes, inventory, logs, stockSaving, onAddStock, onSave, onCopy, onDelete, onEditRecipe, onSaveLog }: {
   plan: CookingPlan;
   recipes: CookingRecipe[];
   inventory: CookingInventoryItem[];
   logs: CookingLog[];
+  stockSaving: boolean;
+  onAddStock: (itemId: string, measureId: string, quantity: number) => Promise<void>;
   onSave: (plan: CookingPlan) => void;
   onCopy: (plan: CookingPlan, date: string) => void;
   onDelete: (plan: CookingPlan) => void;
@@ -6958,6 +7011,7 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
         quantity: ingredient.quantity,
         unit: ingredient.unit,
         unitPrice: cookingPlanIngredientPrice(ingredient, inventory),
+        measureNote: ingredient.measureNote,
         unitPriceOverride: ingredient.unitPriceOverride,
       })),
     };
@@ -6978,6 +7032,7 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
       productName: item?.name ?? ingredient.productName,
       inventoryItemId: item?.id ?? null,
       inventoryMeasureId: measure?.id ?? null,
+      measureNote: "",
       unit: measure?.unit ?? (item ? "unit" : ingredient.unit),
       unitPrice: item && measure ? cookingMeasurePrice(item, measure) : ingredient.unitPrice,
       unitPriceOverride: false,
@@ -6991,6 +7046,7 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
       inventoryMeasureId: measure?.id ?? null,
       unit: measure?.unit ?? "unit",
       unitPrice: item ? (measure ? cookingMeasurePrice(item, measure) : null) : ingredient.unitPrice,
+      measureNote: measure ? "" : ingredient.measureNote,
       unitPriceOverride: false,
     });
   }
@@ -7070,6 +7126,7 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
         {recipe && <div className="cooking-record-actions"><span className="field-hint">Based on recipe: {recipe.name}</span><Button type="button" size="sm" variant="outline" onClick={() => onEditRecipe(recipe)}><Pencil size={13} />Edit saved template</Button><Button type="button" size="sm" variant="outline" onClick={reloadRecipeIngredients}><Copy size={13} />Reload template into plan</Button></div>}
         {plan.ingredients.map((ingredient) => {
           const item = ingredient.inventoryItemId ? inventoryById.get(ingredient.inventoryItemId) : undefined;
+          const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
           const unitPrice = cookingPlanIngredientPrice(ingredient, inventory);
           return <div className="cooking-plan-ingredient" key={ingredient.id}>
             <Select aria-label={`Kitchen stock item for ${plan.name}`} value={ingredient.inventoryItemId ?? ""} onChange={(event) => selectInventoryItem(ingredient, event.target.value)}>
@@ -7077,14 +7134,17 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
               {inventory.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
             </Select>
             <Input aria-label={`Ingredient name for ${plan.name}`} maxLength={120} value={ingredient.productName} onChange={(event) => saveIngredient(ingredient.id, { productName: event.target.value })} />
-            {item ? <Select aria-label={`Stock unit for ${ingredient.productName}`} value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => selectMeasure(ingredient, event.target.value)}><option value="">Choose unit</option>{item.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select> : <Input aria-label={`Unit for ${ingredient.productName}`} maxLength={40} placeholder="Unit" value={ingredient.unit} onChange={(event) => saveIngredient(ingredient.id, { unit: event.target.value })} />}
+            {item ? <Select aria-label={`Stock unit for ${ingredient.productName}`} value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => selectMeasure(ingredient, event.target.value)}><option value="">No measure</option>{item.measures.map((measureOption) => <option key={measureOption.id} value={measureOption.id}>{measureOption.unit}</option>)}</Select> : <Input aria-label={`Unit for ${ingredient.productName}`} maxLength={40} placeholder="Unit" value={ingredient.unit} onChange={(event) => saveIngredient(ingredient.id, { unit: event.target.value })} />}
             <Input aria-label={`Quantity of ${ingredient.productName}`} type="number" min="0.001" step="any" value={quantityDrafts[ingredient.id] ?? String(ingredient.quantity)} onChange={(event) => setQuantityDrafts((current) => ({ ...current, [ingredient.id]: event.target.value }))} onBlur={() => {
               const quantity = Number(quantityDrafts[ingredient.id]);
               if (Number.isFinite(quantity) && quantity > 0) saveIngredient(ingredient.id, { quantity });
               setQuantityDrafts((current) => ({ ...current, [ingredient.id]: String(Number.isFinite(quantity) && quantity > 0 ? quantity : ingredient.quantity) }));
             }} />
             <Input aria-label={`Price per ${ingredient.unit || "unit"} for ${ingredient.productName}`} type="number" min="0" step="any" value={unitPrice ?? ""} onChange={(event) => saveIngredient(ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} />
-            <span className="cooking-plan-ingredient-cost">{ingredient.quantity} {ingredient.unit} · {unitPrice === null ? "price not set" : formatCurrency(ingredient.quantity * unitPrice)}</span>
+            {ingredient.inventoryItemId && !ingredient.inventoryMeasureId && <Field className="cooking-plan-measure-note" label="Why is there no stock measure?"><Input maxLength={1000} placeholder="e.g. Received from relatives; not counted or weighed" value={ingredient.measureNote ?? ""} onChange={(event) => saveIngredient(ingredient.id, { measureNote: event.target.value })} /></Field>}
+            <div className="cooking-plan-ingredient-cost"><span>{ingredient.quantity} {ingredient.unit} · {unitPrice === null ? "price not set" : formatCurrency(ingredient.quantity * unitPrice)}</span>
+              {item && measure && <AddCookingStockButton item={item} measure={measure} disabled={stockSaving} onAdd={onAddStock} />}
+            </div>
             <button className="icon-button" type="button" aria-label={`Remove ${ingredient.productName}`} onClick={() => onSave({ ...plan, ingredients: plan.ingredients.filter((entry) => entry.id !== ingredient.id) })}><X size={13} /></button>
           </div>;
         })}
@@ -7102,11 +7162,13 @@ function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDel
   </details>;
 }
 
-function CookingPlanner({ plans, recipes, inventory, logs, onSavePlan, onCopyPlan, onDeletePlan, onEditRecipe, onSaveLog }: {
+function CookingPlanner({ plans, recipes, inventory, logs, stockSaving, onAddStock, onSavePlan, onCopyPlan, onDeletePlan, onEditRecipe, onSaveLog }: {
   plans: CookingPlan[];
   recipes: CookingRecipe[];
   inventory: CookingInventoryItem[];
   logs: CookingLog[];
+  stockSaving: boolean;
+  onAddStock: (itemId: string, measureId: string, quantity: number) => Promise<void>;
   onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
   onCopyPlan: (plan: CookingPlan, date: string) => void;
   onDeletePlan: (plan: CookingPlan) => void;
@@ -7286,7 +7348,7 @@ function CookingPlanner({ plans, recipes, inventory, logs, onSavePlan, onCopyPla
         <div className="cooking-day-heading"><div><h3>{dateLabel(selectedDate)}</h3><span>{selectedPlans.length} planned {selectedPlans.length === 1 ? "item" : "items"} · estimated total {formatCurrency(selectedDayEstimate)}</span></div></div>
         {recipes.length > 0 && <div className="cooking-plan-add-recipe"><Select aria-label="Choose a recipe to plan" value={selectedRecipeId} onChange={(event) => setSelectedRecipeId(event.target.value)}><option value="">Choose an existing recipe template</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" disabled={!selectedRecipeId} onClick={addRecipePlan}><Plus size={14} />Plan recipe</Button></div>}
         <form className="cooking-plan-add" onSubmit={addPlan}><Input aria-label="New planned dish or meal" maxLength={160} placeholder="Plan a curry, biryani, tiffin, coffee..." value={newPlanName} onChange={(event) => setNewPlanName(event.target.value)} /><Button type="submit" disabled={!newPlanName.trim()}><Plus size={14} /> Add plan</Button></form>
-        {selectedPlans.length ? <div className="cooking-plan-list">{selectedPlans.map((plan) => <CookingPlanCard key={plan.id} plan={plan} recipes={recipes} inventory={inventory} logs={logs} onSave={(updated) => onSavePlan(updated, updated.id)} onCopy={onCopyPlan} onDelete={onDeletePlan} onEditRecipe={onEditRecipe} onSaveLog={onSaveLog} />)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title="Nothing planned for this day" description="Choose a saved recipe template or add a custom dish. Ingredients are optional." /></Card>}
+        {selectedPlans.length ? <div className="cooking-plan-list">{selectedPlans.map((plan) => <CookingPlanCard key={plan.id} plan={plan} recipes={recipes} inventory={inventory} logs={logs} stockSaving={stockSaving} onAddStock={onAddStock} onSave={(updated) => onSavePlan(updated, updated.id)} onCopy={onCopyPlan} onDelete={onDeletePlan} onEditRecipe={onEditRecipe} onSaveLog={onSaveLog} />)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title="Nothing planned for this day" description="Choose a saved recipe template or add a custom dish. Ingredients are optional." /></Card>}
       </div>
     </div>
     {bulkCopyOpen && <Modal title="Copy cooking plans" onClose={() => setBulkCopyOpen(false)} wide>
@@ -7387,6 +7449,21 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
     }
   }
 
+  async function addCookingStock(itemId: string, measureId: string, quantity: number) {
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Enter a stock amount greater than zero.");
+    const item = inventory.find((entry) => entry.id === itemId);
+    const measure = item?.measures.find((entry) => entry.id === measureId);
+    if (!item || !measure) throw new Error("This Kitchen stock measure is no longer available. Reload the page and try again.");
+    const updatedItems = inventory.map((entry) => entry.id !== itemId ? entry : {
+      ...entry,
+      measures: entry.measures.map((current) => current.id !== measureId ? current : {
+        ...current,
+        stockQuantity: (current.stockQuantity ?? 0) + quantity,
+      }),
+    });
+    await saveInventory(updatedItems);
+  }
+
   function deleteInventoryItem(item: CookingInventoryItem) {
     if (!window.confirm(`Remove "${item.name}" from kitchen stock? Existing recipes will retain their saved name and price.`)) return;
     void saveInventory(inventory.filter((entry) => entry.id !== item.id)).catch(() => undefined);
@@ -7418,9 +7495,9 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
       <Button variant={activeTab === "usage" ? "primary" : "outline"} aria-pressed={activeTab === "usage"} onClick={() => setActiveTab("usage")}><History size={14} />Stock usage<Badge>{inventoryUsage.length}</Badge></Button>
     </nav>
     {inventoryError && <div className="alert alert-error" role="alert">{inventoryError}</div>}
-    {activeTab === "planner" && <CookingPlanner plans={plans} recipes={recipes} inventory={inventory} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onEditRecipe={(recipe) => setRecipeEditor(recipe)} onSaveLog={saveAndRefreshLog} />}
+    {activeTab === "planner" && <CookingPlanner plans={plans} recipes={recipes} inventory={inventory} logs={logs} stockSaving={inventorySaving} onAddStock={addCookingStock} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onEditRecipe={(recipe) => setRecipeEditor(recipe)} onSaveLog={saveAndRefreshLog} />}
     {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
-    {activeTab === "stock" && <CookingInventoryPage items={inventory} loading={inventoryLoading} saving={inventorySaving} error={inventoryError} onSave={saveInventory} onDelete={deleteInventoryItem} />}
+    {activeTab === "stock" && <CookingInventoryPage items={inventory} loading={inventoryLoading} saving={inventorySaving} error={inventoryError} onSave={saveInventory} onDelete={deleteInventoryItem} onAddStock={addCookingStock} />}
     {activeTab === "usage" && <section className="cooking-section cooking-records">
       <div className="devotional-section-head"><div><h2><History size={15} /> Stock usage history</h2><p>Recipe ingredient usage by cooking-log date. Editing or removing a log reconciles the recorded stock use.</p></div><Field label="Month"><Input type="month" value={usageMonth} onChange={(event) => setUsageMonth(event.target.value)} /></Field></div>
       {inventoryLoading ? <Card><p className="section-description">Loading stock usage…</p></Card> :
@@ -7449,13 +7526,13 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
           <div className="compact-details-body"><div className="table-actions cooking-record-actions"><Button type="button" size="sm" variant="outline" onClick={() => setLogEditor(log)}><Pencil size={13} />Edit log</Button><Button type="button" size="sm" variant="outline" onClick={() => { const { id, ...copy } = log; void id; void saveAndRefreshLog({ ...copy, dishes: copy.dishes.map((dish, index) => index === 0 ? { ...dish, name: copyLabel(dish.name, 120) } : dish) }).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not copy this cooking log.")); }}><Copy size={13} />Copy</Button><Button type="button" size="sm" variant="outline" onClick={() => { if (window.confirm(`Move the cooking log for ${dateLabel(log.date)} to the archive?`)) void deleteAndRefreshLog(log).catch((caught: unknown) => setInventoryError(caught instanceof Error ? caught.message : "Could not delete this cooking log.")); }}><Archive size={13} />Archive</Button></div>
           {log.dishes.some((dish) => dish.actualIngredients !== undefined) && <p><strong>Known actual ingredient cost:</strong> {formatCurrency(log.dishes.reduce((total, dish) => total + (dish.actualIngredients ?? []).reduce((dishTotal, ingredient) => dishTotal + (ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : 0), 0), 0))}</p>}
           {log.dishes.some((dish) => (dish.actualIngredients?.length ?? 0) > 0) && <div className="cooking-saved-ingredients"><strong>Actual ingredients</strong>{log.dishes.flatMap((dish) => (dish.actualIngredients ?? []).map((ingredient) =>
-            <span key={`${dish.recipeId ?? dish.name}-${ingredient.id}`}>{dish.name}: {ingredient.name}{ingredient.quantity !== null ? ` · ${ingredient.quantity} ${ingredient.unit}` : ""}{ingredient.unitPrice !== null ? ` · ${formatCurrency(ingredient.unitPrice)} / ${ingredient.unit}` : ""}{ingredient.quantity !== null && ingredient.unitPrice !== null ? ` · cost ${formatCurrency(ingredient.quantity * ingredient.unitPrice)}` : ""}</span>))}</div>}
+            <span key={`${dish.recipeId ?? dish.name}-${ingredient.id}`}>{dish.name}: {ingredient.name}{ingredient.quantity !== null ? ` · ${ingredient.quantity} ${ingredient.unit}` : ""}{ingredient.unitPrice !== null ? ` · ${formatCurrency(ingredient.unitPrice)} / ${ingredient.unit}` : ""}{ingredient.quantity !== null && ingredient.unitPrice !== null ? ` · cost ${formatCurrency(ingredient.quantity * ingredient.unitPrice)}` : ""}{ingredient.measureNote ? ` · No-measure note: ${ingredient.measureNote}` : ""}</span>))}</div>}
           {log.rating !== null && <Badge tone={log.rating >= 4 ? "green" : log.rating <= 2 ? "amber" : undefined}>Rating {log.rating}/5</Badge>}{log.learning && <p><strong>What I learned:</strong> <LinkifiedText>{log.learning}</LinkifiedText></p>}{log.notes && <p><strong>Notes:</strong> <LinkifiedText>{log.notes}</LinkifiedText></p>}
           </div>
         </details>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
     </section>}
     {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} inventory={inventory} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
-    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} inventory={inventory} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}
+    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} inventory={inventory} stockSaving={inventorySaving} onAddStock={addCookingStock} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}
   </>;
 }
 

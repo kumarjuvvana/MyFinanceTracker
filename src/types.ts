@@ -679,6 +679,7 @@ export interface CookingRecipeIngredient {
   quantity: number | null;
   unit: string;
   unitPrice: number | null;
+  measureNote?: string;
   unitPriceOverride?: boolean;
 }
 
@@ -706,6 +707,7 @@ export interface CookingPlanIngredient {
   productName: string;
   inventoryItemId?: string | null;
   inventoryMeasureId?: string | null;
+  measureNote?: string;
   unitPriceOverride?: boolean;
   quantity: number;
   unit: string;
