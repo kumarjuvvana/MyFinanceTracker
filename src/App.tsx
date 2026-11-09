@@ -1533,34 +1533,44 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           {!collapsed && <div className={`stock-group-children ${stockGroupBy !== "none" ? "stock-group-tree" : ""}`}>{group.stocks.map((stock) => {
         const latest = latestQuotes.get(stock.id);
         const history = sortedHistory(stock.id);
-        return <div className="stock-row" key={stock.id}>
-          <div className="stock-summary">
+        return <details className="stock-row stock-row-details" key={stock.id}>
+          <summary className="stock-summary stock-row-summary compact-summary">
             <div className="stock-identity"><span className="stock-code">{stock.symbol}</span><span className="stock-exchange">{stock.exchange}</span><span className="stock-name">{stock.name}</span></div>
             <div className="stock-current">
               <strong>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
-              <small>{latest ? `${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price yet — refresh"}</small>
-              <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
+              <small>{latest ? marketStateLabel(latest.marketState) : "No price"}</small>
             </div>
             <div className="stock-position">
-              <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} avg · ${stock.quantity} shares` : "Add avg price & shares"}</span>
-              {latest && stock.averageBuyPrice && stock.quantity ? latest.currency === "INR" ? <>
-                <strong className={(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "positive" : "negative"}>{formatQuote(latest.price * stock.quantity, "INR")} value</strong>
-                <small className={(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "positive" : "negative"}>{(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "+" : ""}{formatQuote((latest.price - stock.averageBuyPrice) * stock.quantity, "INR")} ({((latest.price - stock.averageBuyPrice) / stock.averageBuyPrice * 100).toFixed(2)}%)</small>
-              </> : <small>P/L needs an INR quote</small> : null}
+              {latest && stock.averageBuyPrice && stock.quantity ? <><strong>{formatQuote(latest.price * stock.quantity, latest.currency)} value</strong><small>{stock.quantity} shares</small></> : <span>Watchlist only</span>}
             </div>
-            <div className="stock-broker">{stock.broker || "No broker"}</div>
             <div className="table-actions">
-              <button className="icon-button" aria-label={`Refresh ${stock.symbol}`} disabled={busy} onClick={() => refreshStock(stock)}><RefreshCw size={14} /></button>
-              <button className="icon-button" aria-label={`Edit ${stock.symbol}`} onClick={() => editStock(stock)}><Pencil size={14} /></button>
-              <button className="icon-button" aria-label={`Copy ${stock.symbol} as a new stock`} onClick={() => copyStock(stock)}><Copy size={14} /></button>
-              <button className="icon-button" aria-label={`Archive ${stock.symbol}`} onClick={() => { if (window.confirm(`Move ${stock.symbol} and its saved price history to the archive?`)) onDeleteStock(stock.id); }}><Archive size={14} /></button>
+              <button className="icon-button" aria-label={`Refresh ${stock.symbol}`} disabled={busy} onClick={(event) => { event.preventDefault(); refreshStock(stock); }}><RefreshCw size={14} /></button>
+              <button className="icon-button" aria-label={`Edit ${stock.symbol}`} onClick={(event) => { event.preventDefault(); editStock(stock); }}><Pencil size={14} /></button>
+              <button className="icon-button" aria-label={`Copy ${stock.symbol} as a new stock`} onClick={(event) => { event.preventDefault(); copyStock(stock); }}><Copy size={14} /></button>
+              <button className="icon-button" aria-label={`Archive ${stock.symbol}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move ${stock.symbol} and its saved price history to the archive?`)) onDeleteStock(stock.id); }}><Archive size={14} /></button>
             </div>
-          </div>
+          </summary>
+          <div className="stock-row-expanded">
+            <div className="stock-expanded-grid">
+              <div className="stock-current">
+                <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price snapshot yet"}</small>
+                <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
+              </div>
+              <div className="stock-position">
+                <span>{stock.averageBuyPrice && stock.quantity ? `${formatQuote(stock.averageBuyPrice, "INR")} average · ${stock.quantity} shares` : "Add average price and shares to track a position"}</span>
+                {latest && stock.averageBuyPrice && stock.quantity ? latest.currency === "INR" ? <>
+                  <strong className={(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "positive" : "negative"}>{formatQuote(latest.price * stock.quantity, "INR")} current value</strong>
+                  <small className={(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "positive" : "negative"}>{(latest.price - stock.averageBuyPrice) * stock.quantity >= 0 ? "+" : ""}{formatQuote((latest.price - stock.averageBuyPrice) * stock.quantity, "INR")} ({((latest.price - stock.averageBuyPrice) / stock.averageBuyPrice * 100).toFixed(2)}%)</small>
+                </> : <small>P/L needs an INR quote</small> : null}
+              </div>
+              <div className="stock-broker">Broker · {stock.broker || "No broker"}</div>
+            </div>
           <details className="stock-history">
             <summary>Price history ({history.length} snapshots)</summary>
             {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">Refresh this stock to save its first price snapshot.</p>}
           </details>
-        </div>;
+          </div>
+        </details>;
       })}</div>}
         </div>;
       })}</div> : <EmptyState icon={<Filter size={18} />} title="No stocks match these filters" description="Try changing your search or filters to see more stocks." /> : <EmptyState icon={<TrendingUp size={18} />} title="No stocks tracked yet" description="Add an NSE or BSE code above, then refresh it to save its current price." />}
