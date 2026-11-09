@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, Select } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
-import { createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
+import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
@@ -16,7 +16,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -223,7 +223,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const [editingLinkItemId, setEditingLinkItemId] = useState<string | null>(null);
-  const [linkDrafts, setLinkDrafts] = useState<Record<string, { url: string; label: string }>>({});
+  const [linkDrafts, setLinkDrafts] = useState<Record<string, ActivityChecklistLink[]>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
   const completedCount = sessions.reduce((count, session) =>
     count + session.items.filter((item) => checkedItems.has(item.id)).length, 0);
@@ -265,12 +265,13 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   function editItemLink(item: ActivityChecklistItem) {
     setLinkDrafts((current) => ({
       ...current,
-      [item.id]: current[item.id] ?? {
-        url: item.appLink?.url ?? (item.appLink?.page
+      [item.id]: current[item.id] ?? item.links ?? (item.appLink ? [{
+        id: createId(),
+        url: item.appLink.url ?? (item.appLink.page
           ? new URL(`${window.location.pathname}?${new URLSearchParams({ page: item.appLink.page })}`, window.location.origin).toString()
           : ""),
-        label: item.appLink?.label ?? "",
-      },
+        label: item.appLink.label,
+      }] : [{ id: createId(), url: "", label: "" }]),
     }));
     setLinkErrors((current) => ({ ...current, [item.id]: "" }));
     setEditingLinkItemId(item.id);
@@ -278,20 +279,39 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
 
   function saveItemLink(event: FormEvent<HTMLFormElement>, sessionId: string, item: ActivityChecklistItem) {
     event.preventDefault();
-    const draft = linkDrafts[item.id];
-    if (!draft) return;
-    const url = draft.url.trim();
-    if (!isSafeExternalLink(url)) {
-      setLinkErrors((current) => ({ ...current, [item.id]: "Enter a complete HTTPS link." }));
+    const drafts = linkDrafts[item.id];
+    if (!drafts) return;
+    const links = drafts.filter((link) => link.url.trim() || link.label.trim());
+    if (links.length > 20) {
+      setLinkErrors((current) => ({ ...current, [item.id]: "An activity can have up to 20 links." }));
       return;
     }
-    const label = draft.label.trim() || new URL(url).hostname;
+    const invalidLink = links.find((link) => !isSafeActivityLink(link.url));
+    if (invalidLink) {
+      setLinkErrors((current) => ({ ...current, [item.id]: "Use an HTTP/HTTPS URL, a file URL, or a Windows drive/shared-folder path." }));
+      return;
+    }
+    if (links.some((link) => !link.label.trim())) {
+      setLinkErrors((current) => ({ ...current, [item.id]: "Enter a name for each link." }));
+      return;
+    }
     updateSession(sessionId, (session) => ({
       ...session,
-      items: session.items.map((entry) => entry.id === item.id ? { ...entry, appLink: { url, label } } : entry),
+      items: session.items.map((entry) => entry.id === item.id
+        ? { ...entry, links: links.map((link) => ({ ...link, url: link.url.trim(), label: link.label.trim() })), appLink: undefined }
+        : entry),
     }));
     setEditingLinkItemId(null);
     setLinkErrors((current) => ({ ...current, [item.id]: "" }));
+    setLinkDrafts((current) => { const next = { ...current }; delete next[item.id]; return next; });
+  }
+
+  function updateLinkDraft(itemId: string, linkId: string, update: Partial<ActivityChecklistLink>) {
+    setLinkDrafts((current) => ({
+      ...current,
+      [itemId]: (current[itemId] ?? []).map((link) => link.id === linkId ? { ...link, ...update } : link),
+    }));
+    setLinkErrors((current) => ({ ...current, [itemId]: "" }));
   }
 
   return <>
@@ -338,8 +358,15 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           <Button type="button" variant="outline" size="sm" disabled={!session.items.length || sessionDone === session.items.length} onClick={() => onSetSessionChecked(session.id, true)}><Check size={13} />Check all</Button>
           <Button type="button" variant="outline" size="sm" disabled={!sessionDone} onClick={() => onSetSessionChecked(session.id, false)}><X size={13} />Uncheck all</Button>
         </div>
-        {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) =>
-          <div className="activity-task-wrap" key={item.id}>
+        {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) => {
+          const itemLinks = item.links ?? (item.appLink ? [{
+            id: `legacy-${item.id}`,
+            url: item.appLink.url ?? (item.appLink.page
+              ? `${window.location.pathname}?${new URLSearchParams({ page: item.appLink.page })}`
+              : ""),
+            label: item.appLink.label,
+          }] : []);
+          return <div className="activity-task-wrap" key={item.id}>
             <div
               className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}${dragOverItemId === item.id ? " drag-over" : ""}`}
               onDragOver={(event) => {
@@ -404,11 +431,11 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
               }}
               onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
             />
-            {item.appLink ? <div className="activity-item-link">
-              <a href={item.appLink.url ?? (item.appLink.page ? `${window.location.pathname}?${new URLSearchParams({ page: item.appLink.page })}` : "#")} target="_blank" rel="noopener noreferrer" title={`Open ${item.appLink.label} in a new tab`}>
-                <ExternalLink size={13} /><span>{item.appLink.label}</span>
-              </a>
-              <button type="button" className="icon-button" aria-label={`Edit link for ${item.name}`} title="Edit link" onClick={() => editItemLink(item)}><Pencil size={13} /></button>
+            {itemLinks.length ? <div className="activity-item-links">
+              {itemLinks.map((link) => <a key={link.id} href={activityLinkHref(link.url)} target="_blank" rel="noopener noreferrer" title={`Open ${link.label} in a new tab`}>
+                <ExternalLink size={13} /><span>{link.label}</span>
+              </a>)}
+              <button type="button" className="icon-button" aria-label={`Edit links for ${item.name}`} title="Edit links" onClick={() => editItemLink(item)}><Pencil size={13} /></button>
             </div> : <button type="button" className="activity-add-link" onClick={() => editItemLink(item)}><ExternalLink size={13} />Add link</button>}
             <button type="button" className="icon-button" aria-label={`Remove ${item.name}`} title={`Remove ${item.name}`} onClick={() => updateSession(session.id, (current) => ({
               ...current,
@@ -416,28 +443,24 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
             }))}><X size={15} /></button>
             </div>
             {editingLinkItemId === item.id && <form className="activity-link-editor" onSubmit={(event) => saveItemLink(event, session.id, item)}>
-              <Field label="URL"><Input aria-label={`URL for ${item.name}`} type="url" required maxLength={2000} placeholder="https://example.com" value={linkDrafts[item.id]?.url ?? ""} onChange={(event) => {
-                setLinkDrafts((current) => ({ ...current, [item.id]: { url: event.target.value, label: current[item.id]?.label ?? "" } }));
-                setLinkErrors((current) => ({ ...current, [item.id]: "" }));
-              }} /></Field>
-              <Field label="Link name"><Input aria-label={`Link name for ${item.name}`} maxLength={32} placeholder="Short label" value={linkDrafts[item.id]?.label ?? ""} onChange={(event) => setLinkDrafts((current) => ({ ...current, [item.id]: { url: current[item.id]?.url ?? "", label: event.target.value } }))} /></Field>
+              <div className="activity-link-editor-list">{(linkDrafts[item.id] ?? []).map((link, index) => <div className="activity-link-editor-row" key={link.id}>
+                <Field label={`Link ${index + 1} · URL or shared path`}><Input aria-label={`Link ${index + 1} path for ${item.name}`} type="text" required maxLength={2048} placeholder="https://example.com or \\\\server\\share\\folder or Z:\\folder" value={link.url} onChange={(event) => updateLinkDraft(item.id, link.id, { url: event.target.value })} /></Field>
+                <Field label="Link name"><Input aria-label={`Link ${index + 1} name for ${item.name}`} maxLength={80} required placeholder="Short label" value={link.label} onChange={(event) => updateLinkDraft(item.id, link.id, { label: event.target.value })} /></Field>
+                <button type="button" className="icon-button" aria-label={`Remove link ${index + 1}`} title="Remove link" onClick={() => setLinkDrafts((current) => ({ ...current, [item.id]: (current[item.id] ?? []).filter((entry) => entry.id !== link.id) }))}><X size={14} /></button>
+              </div>)}
+                <Button type="button" variant="outline" size="sm" disabled={(linkDrafts[item.id]?.length ?? 0) >= 20} onClick={() => setLinkDrafts((current) => ({
+                  ...current,
+                  [item.id]: [...(current[item.id] ?? []), { id: createId(), url: "", label: "" }],
+                }))}><Plus size={13} />Add another link</Button>
+              </div>
               {linkErrors[item.id] && <span className="field-error" role="alert">{linkErrors[item.id]}</span>}
               <div className="activity-link-editor-actions">
-                <Button type="submit" size="sm"><Check size={13} />Save link</Button>
-                {item.appLink && <Button type="button" variant="ghost" size="sm" onClick={() => {
-                  updateSession(session.id, (current) => ({
-                    ...current,
-                    items: current.items.map((entry) => {
-                      if (entry.id !== item.id) return entry;
-                        return { ...entry, appLink: undefined };
-                    }),
-                  }));
-                  setEditingLinkItemId(null);
-                }}>Remove link</Button>}
+                <Button type="submit" size="sm"><Check size={13} />Save links</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setEditingLinkItemId(null)}>Cancel</Button>
               </div>
             </form>}
-          </div>)}</div> : <p className="activity-empty">Add the first activity for this session.</p>}
+          </div>;
+        })}</div> : <p className="activity-empty">Add the first activity for this session.</p>}
         <form className="activity-add-task" onSubmit={(event) => addItem(event, session.id)}>
           <Input aria-label={`New activity for ${session.name}`} placeholder="Add an activity…" maxLength={120} value={newItemNames[session.id] ?? ""} onChange={(event) => setNewItemNames((current) => ({ ...current, [session.id]: event.target.value }))} />
           <Button type="submit" variant="outline" size="sm" disabled={!newItemNames[session.id]?.trim()}><Plus size={13} />Add</Button>

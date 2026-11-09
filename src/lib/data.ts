@@ -218,11 +218,16 @@ function isValidActivitySessions(value: unknown): boolean {
     for (const item of session.items) {
       if (!isRecord(item) || typeof item.id !== "string" || !item.id.trim() ||
         typeof item.name !== "string" || !item.name.trim()) return false;
+      if (item.links !== undefined && (!Array.isArray(item.links) || item.links.length > 20 ||
+        !item.links.every((link) => isRecord(link) &&
+          typeof link.id === "string" && Boolean(link.id.trim()) &&
+          typeof link.label === "string" && Boolean(link.label.trim()) && link.label.length <= 80 &&
+          typeof link.url === "string" && link.url.trim().length > 0 && isSafeActivityLink(link.url)))) return false;
       if (item.appLink !== undefined) {
         if (!isRecord(item.appLink) ||
           typeof item.appLink.label !== "string" || !item.appLink.label.trim() ||
-          item.appLink.label.length > 32 ||
-          !(typeof item.appLink.url === "string" && item.appLink.url.trim().length > 0 && isSafeExternalLink(item.appLink.url) ||
+          item.appLink.label.length > 80 ||
+          !(typeof item.appLink.url === "string" && item.appLink.url.trim().length > 0 && isSafeActivityLink(item.appLink.url) ||
             typeof item.appLink.page === "string" &&
             (item.appLink.page === "Dashboard" || item.appLink.page === "Favorites" ||
               FAVORITABLE_PAGES.includes(item.appLink.page as Page)))) return false;
@@ -1099,6 +1104,38 @@ export function isSafeExternalLink(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function isSafeActivityLink(value: string): boolean {
+  const link = value.trim();
+  if (!link || link.length > 2048) return false;
+  if (/^[a-zA-Z]:[\\/]/.test(link) || /^\\\\[^\\]+\\[^\\]+/.test(link) || /^\/\/[^/]+\/[^/]+/.test(link)) {
+    return true;
+  }
+  try {
+    const url = new URL(link);
+    if (url.protocol === "http:" || url.protocol === "https:") return Boolean(url.hostname);
+    return url.protocol === "file:" && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
+export function activityLinkHref(value: string): string {
+  const link = value.trim();
+  if (/^[a-zA-Z]:[\\/]/.test(link)) {
+    return `file:///${link.replace(/\\/g, "/").split("/").map((part, index) =>
+      index === 0 ? part : encodeURIComponent(part)).join("/")}`;
+  }
+  if (/^\\\\[^\\]+\\[^\\]+/.test(link)) {
+    const [server, ...parts] = link.slice(2).split("\\");
+    return `file://${server}/${parts.map(encodeURIComponent).join("/")}`;
+  }
+  if (/^\/\/[^/]+\/[^/]+/.test(link)) {
+    const [server, ...parts] = link.slice(2).split("/");
+    return `file://${server}/${parts.map(encodeURIComponent).join("/")}`;
+  }
+  return link;
 }
 
 export function formatCurrency(amount: number, currency: Currency = "INR"): string {

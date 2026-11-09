@@ -1470,26 +1470,30 @@ body{background:#f3f5ef}
 .activity-session-title>.field{min-width:0;max-width:260px;font-weight:700}
 .activity-session-title>span{flex:none;color:var(--text-muted,#858d83);font-size:10px}
 .activity-task-list{display:grid;gap:7px}
-.activity-task-wrap{display:grid;gap:5px;min-width:0}
-.activity-task{min-width:0}
+.activity-task-wrap{display:grid;gap:5px;min-width:0;width:100%}
+.activity-task{display:grid;grid-template-columns:24px 16px minmax(0,1fr) 26px;grid-template-rows:minmax(34px,auto) auto;align-items:center;gap:3px 6px;min-width:0;width:100%}
 .activity-drag-handle{width:24px;height:30px;flex:none;border:0;border-radius:6px;background:transparent;color:var(--text-muted,#858d83);display:grid;place-items:center;cursor:grab;touch-action:none}
 .activity-drag-handle:hover,.activity-drag-handle:focus-visible{background:var(--user-accent-soft,#edf4ee);color:var(--user-accent,#356a4a);outline:none}
 .activity-drag-handle:active{cursor:grabbing}
-.activity-task>input[type=checkbox]{width:16px;height:16px;flex:none;accent-color:var(--user-accent,#356a4a)}
-.activity-task>.field{min-width:0;flex:1;height:34px;background:transparent;border-color:transparent;padding:0 8px}
+.activity-task>input[type=checkbox]{grid-column:2;grid-row:1;width:16px;height:16px;flex:none;accent-color:var(--user-accent,#356a4a)}
+.activity-task>.activity-drag-handle{grid-column:1;grid-row:1}
+.activity-task>.field{grid-column:3;grid-row:1;width:100%;min-width:0;height:34px;background:transparent;border-color:transparent;padding:0 8px}
 .activity-task>.field:focus{background:var(--surface,#fff);border-color:var(--border,#e4e8e2)}
 .activity-task.drag-over{border-radius:8px;outline:2px solid var(--user-accent,#356a4a);outline-offset:1px;background:var(--user-accent-soft,#edf4ee)}
-.activity-task>.icon-button{flex:none}
-.activity-add-link,.activity-item-link,.activity-item-link>a{display:flex;align-items:center;gap:5px;min-width:0}
+.activity-task>.icon-button:last-child{grid-column:4;grid-row:1;flex:none}
+.activity-add-link,.activity-item-links,.activity-item-links>a{display:flex;align-items:center;gap:5px;min-width:0}
 .activity-add-link{flex:none;border:0;border-radius:6px;padding:5px 6px;background:transparent;color:var(--user-accent,#356a4a);font-size:10px;white-space:nowrap}
 .activity-add-link:hover{background:var(--user-accent-soft,#edf4ee)}
-.activity-item-link{flex:none;gap:2px}
-.activity-item-link>a{max-width:110px;overflow:hidden;color:var(--user-accent,#356a4a);font-size:10px;text-decoration:none}
-.activity-item-link>a:hover{text-decoration:underline}
-.activity-item-link>a svg{flex:none}
-.activity-item-link>a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.activity-item-link>.icon-button{width:26px;height:26px;flex:none}
-.activity-link-editor{display:grid;grid-template-columns:minmax(180px,1fr) minmax(120px,.8fr) auto;align-items:end;gap:8px;padding:10px;border:1px solid var(--border,#e4e8e2);border-radius:8px;background:var(--surface,#fff)}
+.activity-task>.activity-add-link,.activity-task>.activity-item-links{grid-column:3/5;grid-row:2}
+.activity-item-links{flex-wrap:wrap;gap:4px;max-width:100%;padding:2px 6px 5px}
+.activity-item-links>a{max-width:min(160px,100%);overflow:hidden;color:var(--user-accent,#356a4a);font-size:10px;text-decoration:none}
+.activity-item-links>a:hover{text-decoration:underline}
+.activity-item-links>a svg{flex:none}
+.activity-item-links>a span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-item-links>.icon-button{width:26px;height:26px;flex:none}
+.activity-link-editor{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;width:100%;min-width:0;max-width:100%;padding:10px;border:1px solid var(--border,#e4e8e2);border-radius:8px;background:var(--surface,#fff)}
+.activity-link-editor-list{display:grid;gap:8px;min-width:0;max-width:100%;grid-column:1/-1}
+.activity-link-editor-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.5fr) 28px;align-items:end;gap:7px;min-width:0}
 .activity-link-editor .field-wrap{min-width:0}
 .activity-link-editor>.field-error{grid-column:1/-1}
 .activity-link-editor-actions{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
@@ -1502,7 +1506,7 @@ body{background:#f3f5ef}
 @media(max-width:900px){.activity-checklist-summary{align-items:flex-start;flex-direction:column}.activity-summary-actions{flex-wrap:wrap}}
 .app-shell.dark .activity-link-editor{background:#252d26;border-color:#343d35}
 @media(max-width:760px){.activity-session-grid{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:620px){.activity-task{flex-wrap:wrap}.activity-task>.field{min-width:calc(100% - 85px);order:3}.activity-link-editor{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:620px){.activity-link-editor{grid-template-columns:minmax(0,1fr)}.activity-link-editor-row{grid-template-columns:minmax(0,1fr) 28px}.activity-link-editor-row>.field-wrap:nth-child(2){grid-column:1}.activity-link-editor-row>.icon-button{grid-column:2;grid-row:1/3}}
 .app-shell.dark .credential-password-row{border-color:#343d35}
 .app-shell.dark .credential-secondary strong{color:#c4d1c5}
 .app-shell.dark .personal-record-title h2,.app-shell.dark .personal-record-details strong{color:#e3e8e2}
