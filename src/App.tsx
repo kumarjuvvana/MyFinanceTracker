@@ -3,7 +3,7 @@ import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell,
   ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
-  ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree,
+  ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, Select } from "./components/ui";
@@ -196,12 +196,26 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onRe
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [newSessionName, setNewSessionName] = useState("");
   const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const completedCount = sessions.reduce((count, session) =>
     count + session.items.filter((item) => checkedItems.has(item.id)).length, 0);
   const taskCount = sessions.reduce((count, session) => count + session.items.length, 0);
 
   function updateSession(sessionId: string, update: (session: ActivityChecklistSession) => ActivityChecklistSession) {
     onSave(sessions.map((session) => session.id === sessionId ? update(session) : session));
+  }
+
+  function reorderItems(sessionId: string, sourceItemId: string, targetItemId: string, afterTarget: boolean) {
+    updateSession(sessionId, (session) => {
+      const sourceIndex = session.items.findIndex((item) => item.id === sourceItemId);
+      if (sourceIndex < 0 || sourceItemId === targetItemId) return session;
+      const items = [...session.items];
+      const [movedItem] = items.splice(sourceIndex, 1);
+      const targetIndex = items.findIndex((item) => item.id === targetItemId);
+      if (targetIndex < 0) return session;
+      items.splice(targetIndex + (afterTarget ? 1 : 0), 0, movedItem);
+      return { ...session, items };
+    });
   }
 
   function addSession(event: FormEvent<HTMLFormElement>) {
@@ -223,7 +237,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onRe
   return <>
     <PageHeading eyebrow="Your reusable routine" title="Activities" subtitle="Your checklist and completion marks are saved to Supabase until you reset them." />
     <Card className="activity-checklist-summary">
-      <div><h2 className="section-title">Checklist progress</h2><p className="section-description">Completion marks remain saved until you clear them.</p></div>
+      <div><h2 className="section-title">Checklist progress</h2><p className="section-description">Completion marks remain saved until you clear them. Drag the handle to reorder activities within a session.</p></div>
       <div className="activity-summary-actions"><Badge>{completedCount} / {taskCount} done</Badge><button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button></div>
     </Card>
     <form className="activity-add-session" onSubmit={addSession}>
@@ -255,8 +269,50 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onRe
             <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
           </div>
         </div>
-        {session.items.length ? <div className="activity-task-list">{session.items.map((item) =>
-          <div className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}`} key={item.id}>
+        {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) =>
+          <div
+            className={`activity-task${checkedItems.has(item.id) ? " completed" : ""}${dragOverItemId === item.id ? " drag-over" : ""}`}
+            key={item.id}
+            onDragOver={(event) => {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "move";
+              setDragOverItemId(item.id);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragOverItemId(null);
+              try {
+                const source: unknown = JSON.parse(event.dataTransfer.getData("text/plain"));
+                if (typeof source !== "object" || source === null ||
+                  !("sessionId" in source) || source.sessionId !== session.id ||
+                  !("itemId" in source) || typeof source.itemId !== "string") return;
+                const sourceIndex = session.items.findIndex((entry) => entry.id === source.itemId);
+                const targetIndex = session.items.findIndex((entry) => entry.id === item.id);
+                reorderItems(session.id, source.itemId, item.id, sourceIndex < targetIndex);
+              } catch {
+                setDragOverItemId(null);
+              }
+            }}
+          >
+            <button
+              type="button"
+              className="activity-drag-handle"
+              draggable
+              aria-label={`Reorder ${item.name}`}
+              title="Drag to reorder; use arrow keys while focused"
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", JSON.stringify({ sessionId: session.id, itemId: item.id }));
+              }}
+              onDragEnd={() => setDragOverItemId(null)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+                const targetItem = session.items[itemIndex + (event.key === "ArrowUp" ? -1 : 1)];
+                if (!targetItem) return;
+                event.preventDefault();
+                reorderItems(session.id, item.id, targetItem.id, event.key === "ArrowDown");
+              }}
+            ><GripVertical size={16} /></button>
             <input
               type="checkbox"
               aria-label={`Mark ${item.name} as done`}

@@ -1403,10 +1403,13 @@ body{background:#f3f5ef}
 .activity-session-title>span{flex:none;color:var(--text-muted,#858d83);font-size:10px}
 .activity-task-list{display:grid;gap:5px}
 .activity-task{min-width:0}
+.activity-drag-handle{width:24px;height:30px;flex:none;border:0;border-radius:6px;background:transparent;color:var(--text-muted,#858d83);display:grid;place-items:center;cursor:grab;touch-action:none}
+.activity-drag-handle:hover,.activity-drag-handle:focus-visible{background:var(--user-accent-soft,#edf4ee);color:var(--user-accent,#356a4a);outline:none}
+.activity-drag-handle:active{cursor:grabbing}
 .activity-task>input[type=checkbox]{width:16px;height:16px;flex:none;accent-color:var(--user-accent,#356a4a)}
 .activity-task>.field{min-width:0;flex:1;height:34px;background:transparent;border-color:transparent;padding:0 8px}
 .activity-task>.field:focus{background:var(--surface,#fff);border-color:var(--border,#e4e8e2)}
-.activity-task.completed>.field{text-decoration:line-through;color:var(--text-muted,#858d83)}
+.activity-task.drag-over{border-radius:8px;outline:2px solid var(--user-accent,#356a4a);outline-offset:1px;background:var(--user-accent-soft,#edf4ee)}
 .activity-task>.icon-button{flex:none}
 .activity-empty{margin:8px 0 12px;color:var(--text-muted,#858d83);font-size:11px}
 .activity-add-task{margin-top:12px}
