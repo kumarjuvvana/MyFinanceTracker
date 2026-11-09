@@ -58,7 +58,9 @@ function validateInventory(value: unknown): value is CookingInventoryItem[] {
       if (!isRecord(measure) || typeof measure.id !== "string" || !measure.id.trim() ||
         measureIds.has(measure.id) || typeof measure.unit !== "string" || !measure.unit.trim() ||
         measure.unit.length > 40 || !isOptionalAmount(measure.stockQuantity) ||
-        !isOptionalAmount(measure.unitPrice)) return false;
+        !isOptionalAmount(measure.unitPrice) ||
+        measure.piecesPerKg !== undefined && measure.piecesPerKg !== null &&
+          (typeof measure.piecesPerKg !== "number" || !Number.isFinite(measure.piecesPerKg) || measure.piecesPerKg <= 0)) return false;
       measureIds.add(measure.id);
       return true;
     });

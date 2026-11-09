@@ -649,6 +649,7 @@ export interface CookingStockMeasure {
   unit: string;
   stockQuantity: number | null;
   unitPrice: number | null;
+  piecesPerKg?: number | null;
 }
 
 export interface CookingInventoryItem {
@@ -666,6 +667,7 @@ export interface CookingRecipeIngredient {
   quantity: number | null;
   unit: string;
   unitPrice: number | null;
+  unitPriceOverride?: boolean;
 }
 
 export interface CookedDish {

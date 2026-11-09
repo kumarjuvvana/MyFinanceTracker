@@ -613,7 +613,8 @@ export function validateData(value: unknown): value is TrackerData {
           typeof ingredient.name === "string" && ingredient.name.trim().length > 0 &&
           (ingredient.quantity === null || (typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0)) &&
           typeof ingredient.unit === "string" &&
-          (ingredient.unitPrice === null || (typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)))))));
+          (ingredient.unitPrice === null || (typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)) &&
+          (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean"))))));
   const cookingLogsOk = value.cookingLogs === undefined ||
     (Array.isArray(value.cookingLogs) && value.cookingLogs.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&

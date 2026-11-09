@@ -132,6 +132,26 @@ const timeLabel = (time: string) => {
   return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${hours < 12 ? "AM" : "PM"}`;
 };
 const copyLabel = (value: string, maxLength: number) => `${value.replace(/ \(copy\)$/i, "").slice(0, Math.max(0, maxLength - 7))} (copy)`;
+const isCookingCountUnit = (unit: string) => {
+  const normalized = unit.toLocaleLowerCase().replace(/[^a-z]/g, "");
+  return ["piece", "pieces", "pc", "pcs", "no", "nos", "noof", "number", "numbers", "count", "each"]
+    .includes(normalized) || normalized.startsWith("noof") ||
+    normalized.startsWith("numberof") || normalized.startsWith("countof");
+};
+const isCookingKgUnit = (unit: string) => ["kg", "kgs", "kilogram", "kilograms", "kilo", "kilos"]
+  .includes(unit.trim().toLocaleLowerCase());
+function cookingMeasurePrice(item: CookingInventoryItem, measure: CookingStockMeasure): number | null {
+  if (isCookingCountUnit(measure.unit)) {
+    const kgMeasure = item.measures.find((entry) => isCookingKgUnit(entry.unit));
+    if (kgMeasure) {
+      return kgMeasure.unitPrice !== null && kgMeasure.unitPrice !== undefined &&
+        measure.piecesPerKg !== null && measure.piecesPerKg !== undefined && measure.piecesPerKg > 0
+        ? kgMeasure.unitPrice / measure.piecesPerKg
+        : null;
+    }
+  }
+  return measure.unitPrice;
+}
 const marketStateLabel = (state: string) => {
   const normalized = state.trim().toUpperCase();
   const labels: Record<string, string> = {
@@ -6384,10 +6404,20 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
   const [inventoryIngredients, setInventoryIngredients] = useState<CookingRecipeIngredient[]>(initial?.inventoryIngredients ?? []);
   const [error, setError] = useState("");
   const formatCurrency = useCurrencyFormatter();
-  const ingredientCost = inventoryIngredients.reduce((total, ingredient) =>
-    total + (ingredient.quantity !== null && ingredient.unitPrice !== null
-      ? ingredient.quantity * ingredient.unitPrice
-      : 0), 0);
+  function ingredientPrice(ingredient: CookingRecipeIngredient): number | null {
+    if (ingredient.inventoryItemId && ingredient.inventoryMeasureId && !ingredient.unitPriceOverride) {
+      const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
+      const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
+      if (item && measure) return cookingMeasurePrice(item, measure);
+    }
+    return ingredient.unitPrice;
+  }
+  const ingredientCost = inventoryIngredients.reduce((total, ingredient) => {
+    const unitPrice = ingredientPrice(ingredient);
+    return total + (ingredient.quantity !== null && unitPrice !== null
+      ? ingredient.quantity * unitPrice
+      : 0);
+  }, 0);
 
   function addInventoryIngredient() {
     setInventoryIngredients((current) => [...current, {
@@ -6398,6 +6428,7 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
       quantity: null,
       unit: "",
       unitPrice: null,
+      unitPriceOverride: false,
     }]);
   }
 
@@ -6414,7 +6445,8 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
       inventoryMeasureId: measure?.id ?? null,
       name: item?.name ?? "",
       unit: measure?.unit ?? "",
-      unitPrice: measure?.unitPrice ?? null,
+      unitPrice: item && measure ? cookingMeasurePrice(item, measure) : null,
+      unitPriceOverride: false,
     }));
   }
 
@@ -6463,7 +6495,12 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
       dietaryTags: dietaryTags.split(",").map((tag) => tag.trim()).filter(Boolean),
       allergens: allergens.split(",").map((allergen) => allergen.trim()).filter(Boolean),
       notes: notes.trim(),
-      inventoryIngredients: inventoryIngredients.map((ingredient) => ({ ...ingredient, name: ingredient.name.trim(), unit: ingredient.unit.trim() })),
+      inventoryIngredients: inventoryIngredients.map((ingredient) => ({
+        ...ingredient,
+        name: ingredient.name.trim(),
+        unit: ingredient.unit.trim(),
+        unitPrice: ingredientPrice(ingredient),
+      })),
     });
   }
 
@@ -6479,8 +6516,9 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
         {inventoryIngredients.map((ingredient) => {
           const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
           const selectedMeasure = item?.measures.find((measure) => measure.id === ingredient.inventoryMeasureId);
-          const lineTotal = ingredient.quantity !== null && ingredient.unitPrice !== null
-            ? ingredient.quantity * ingredient.unitPrice
+          const currentUnitPrice = ingredientPrice(ingredient);
+          const lineTotal = ingredient.quantity !== null && currentUnitPrice !== null
+            ? ingredient.quantity * currentUnitPrice
             : null;
           return <div className="cooking-recipe-ingredient" key={ingredient.id}>
             <Field label="Kitchen item"><Select aria-label="Select kitchen stock item" value={ingredient.inventoryItemId ?? ""} onChange={(event) => selectInventoryItem(ingredient, event.target.value)}>
@@ -6493,13 +6531,14 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
                 ...current,
                 inventoryMeasureId: measure?.id ?? null,
                 unit: measure?.unit ?? "",
-                unitPrice: measure?.unitPrice ?? null,
+                unitPrice: item && measure ? cookingMeasurePrice(item, measure) : null,
+                unitPriceOverride: false,
               }));
             }}><option value="">No measure</option>{item?.measures.map((measure) => <option value={measure.id} key={measure.id}>{measure.unit}</option>)}</Select></Field>}
             <Field label="Ingredient name"><Input required maxLength={120} value={ingredient.name} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, name: event.target.value }))} /></Field>
             <Field label="Quantity"><Input type="number" min="0.001" step="any" value={ingredient.quantity ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, quantity: event.target.value === "" ? null : Number(event.target.value) }))} /></Field>
             <Field label="Unit"><Input maxLength={40} placeholder={selectedMeasure?.unit ?? "e.g. kg, piece"} value={ingredient.unit} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unit: event.target.value }))} /></Field>
-            <Field label="Price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unitPrice: event.target.value === "" ? null : Number(event.target.value) }))} /></Field>
+            <Field label="Price / unit"><Input type="number" min="0" step="any" value={currentUnitPrice ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true }))} /></Field>
             <div className="cooking-recipe-ingredient-cost"><span>Line cost</span><strong>{lineTotal === null ? "—" : formatCurrency(lineTotal)}</strong><button className="icon-button" type="button" aria-label={`Remove ${ingredient.name || "ingredient"}`} onClick={() => setInventoryIngredients((current) => current.filter((entry) => entry.id !== ingredient.id))}><X size={14} /></button></div>
           </div>;
         })}
@@ -6532,12 +6571,13 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
     unit: measure.unit,
     stockQuantity: measure.stockQuantity?.toString() ?? "",
     unitPrice: measure.unitPrice?.toString() ?? "",
+    piecesPerKg: measure.piecesPerKg?.toString() ?? "",
   })));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   function addMeasure() {
-    setMeasures((current) => [...current, { id: createId(), unit: "", stockQuantity: "", unitPrice: "" }]);
+    setMeasures((current) => [...current, { id: createId(), unit: "", stockQuantity: "", unitPrice: "", piecesPerKg: "" }]);
   }
 
   function submit(event: FormEvent) {
@@ -6548,19 +6588,26 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
       return;
     }
     const savedMeasures: CookingStockMeasure[] = [];
+    const kgMeasure = measures.find((measure) => isCookingKgUnit(measure.unit));
     for (const measure of measures) {
       if (!measure.unit.trim()) {
         setError("Enter a unit for each stock measure or remove the empty row.");
         return;
       }
       const stockQuantity = measure.stockQuantity.trim() ? Number(measure.stockQuantity) : null;
-      const unitPrice = measure.unitPrice.trim() ? Number(measure.unitPrice) : null;
+      const piecesPerKg = measure.piecesPerKg.trim() ? Number(measure.piecesPerKg) : null;
+      const usesKgConversion = isCookingCountUnit(measure.unit) && Boolean(kgMeasure);
+      const kgPrice = kgMeasure?.unitPrice.trim() ? Number(kgMeasure.unitPrice) : null;
+      const unitPrice = usesKgConversion
+        ? kgPrice !== null && piecesPerKg !== null && piecesPerKg > 0 ? kgPrice / piecesPerKg : null
+        : measure.unitPrice.trim() ? Number(measure.unitPrice) : null;
       if (stockQuantity !== null && (!Number.isFinite(stockQuantity) || stockQuantity < 0) ||
-        unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0)) {
-        setError("Stock quantity and price must be zero or more.");
+        unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice < 0) ||
+        piecesPerKg !== null && (!Number.isFinite(piecesPerKg) || piecesPerKg <= 0)) {
+        setError("Stock quantity and price must be zero or more; pieces per kg must be greater than zero.");
         return;
       }
-      savedMeasures.push({ id: measure.id, unit: measure.unit.trim(), stockQuantity, unitPrice });
+      savedMeasures.push({ id: measure.id, unit: measure.unit.trim(), stockQuantity, unitPrice, piecesPerKg });
     }
     setSaving(true);
     setError("");
@@ -6575,13 +6622,22 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
       <Field label="Item name"><Input autoFocus required maxLength={120} placeholder="e.g. Tomatoes, cumin seeds, curry leaves" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Category (optional)"><Input maxLength={60} placeholder="Vegetables, spices, seeds..." value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
       <div className="full cooking-inventory-measures">
-        <div className="cooking-stock-heading"><div><strong>Stock measures and prices</strong><span>Add independent units such as kg and piece; quantity and price can be left blank.</span></div><Button type="button" size="sm" variant="outline" onClick={addMeasure}><Plus size={13} />Add measure</Button></div>
-        {measures.map((measure, index) => <div className="cooking-inventory-measure" key={measure.id}>
-          <Field label="Unit"><Input required maxLength={40} placeholder="kg, piece, bunch..." value={measure.unit} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unit: event.target.value } : entry))} /></Field>
+        <div className="cooking-stock-heading"><div><strong>Stock measures and prices</strong><span>Add weight (kg) and count units separately. Count price is calculated from kg price ÷ pieces per kg.</span></div><Button type="button" size="sm" variant="outline" onClick={addMeasure}><Plus size={13} />Add measure</Button></div>
+        {measures.map((measure, index) => {
+          const countBased = isCookingCountUnit(measure.unit);
+          const sourceWeight = measures.find((entry) => isCookingKgUnit(entry.unit));
+          const derivedPrice = sourceWeight?.unitPrice.trim() && Number(measure.piecesPerKg) > 0
+            ? Number(sourceWeight.unitPrice) / Number(measure.piecesPerKg)
+            : null;
+          const usesKgConversion = countBased && Boolean(sourceWeight);
+          return <div className="cooking-inventory-measure" key={measure.id}>
+          <Field label="Unit"><Input required maxLength={40} placeholder="kg, piece, no of vankayas..." value={measure.unit} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unit: event.target.value } : entry))} /></Field>
           <Field label="Stock on hand"><Input type="number" min="0" step="any" value={measure.stockQuantity} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, stockQuantity: event.target.value } : entry))} /></Field>
-          <Field label="Price per unit"><Input type="number" min="0" step="any" value={measure.unitPrice} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unitPrice: event.target.value } : entry))} /></Field>
+          <Field label={usesKgConversion ? "Calculated price / piece" : "Price per unit"}><Input type="number" min="0" step="any" readOnly={usesKgConversion} value={usesKgConversion ? derivedPrice ?? "" : measure.unitPrice} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unitPrice: event.target.value } : entry))} /></Field>
+          {countBased && sourceWeight && <Field label="Pieces per kg"><Input type="number" min="0.001" step="any" required value={measure.piecesPerKg} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, piecesPerKg: event.target.value } : entry))} /><span className="field-hint">Used to calculate one-piece price from the kg price.</span></Field>}
           <button type="button" className="icon-button" aria-label={`Remove stock measure ${index + 1}`} onClick={() => setMeasures((current) => current.filter((entry) => entry.id !== measure.id))}><X size={14} /></button>
-        </div>)}
+        </div>;
+        })}
       </div>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving…" : initial ? "Save changes" : "Add to kitchen stock"}</Button></div>
@@ -6622,9 +6678,12 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
           }]).catch(() => undefined)}><Copy size={13} /></button>
           <button className="icon-button" aria-label={`Remove ${item.name}`} onClick={() => onDelete(item)}><Trash2 size={13} /></button>
         </div></div>
-        {item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => <div key={measure.id}>
-          <strong>{measure.unit}</strong><span>On hand: {measure.stockQuantity ?? "Not set"}</span><span>Price / unit: {measure.unitPrice === null ? "Not set" : formatCurrency(measure.unitPrice)}</span>
-        </div>)}</div> : <p className="section-description">No stock units or prices added.</p>}
+        {item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => {
+          const unitPrice = cookingMeasurePrice(item, measure);
+          return <div key={measure.id}>
+            <strong>{measure.unit}</strong><span>On hand: {measure.stockQuantity ?? "Not set"}</span><span>Price / unit: {unitPrice === null ? "Not set" : formatCurrency(unitPrice)}</span>
+          </div>;
+        })}</div> : <p className="section-description">No stock units or prices added.</p>}
       </Card>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={items.length ? "No matching kitchen stock" : "Kitchen stock is empty"} description={items.length ? "Try another search." : "Add vegetables, spices, seeds, or other cooking-only ingredients."} /></Card>}
     {editor !== undefined && <CookingInventoryModal key={editor?.id ?? "new-kitchen-stock"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (item) => {
       const next = editor ? items.map((entry) => entry.id === item.id ? item : entry) : [...items, item];
