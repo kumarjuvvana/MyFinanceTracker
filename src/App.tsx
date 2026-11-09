@@ -154,6 +154,14 @@ function cookingMeasurePrice(item: CookingInventoryItem, measure: CookingStockMe
   }
   return measure.unitPrice;
 }
+function cookingPlanIngredientPrice(ingredient: CookingPlan["ingredients"][number], inventory: CookingInventoryItem[]): number | null {
+  if (ingredient.inventoryItemId && ingredient.inventoryMeasureId && !ingredient.unitPriceOverride) {
+    const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
+    const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
+    if (item && measure) return cookingMeasurePrice(item, measure);
+  }
+  return ingredient.unitPrice;
+}
 const marketStateLabel = (state: string) => {
   const normalized = state.trim().toUpperCase();
   const labels: Record<string, string> = {
@@ -6721,9 +6729,10 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete 
   </>;
 }
 
-function CookingLogModal({ initial, recipes, onClose, onSave }: {
+function CookingLogModal({ initial, recipes, inventory, onClose, onSave }: {
   initial: CookingLog | null;
   recipes: CookingRecipe[];
+  inventory: CookingInventoryItem[];
   onClose: () => void;
   onSave: (log: Omit<CookingLog, "id">) => Promise<void>;
 }) {
@@ -6737,6 +6746,7 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   }));
   const [recipeId, setRecipeId] = useState("");
   const [customDish, setCustomDish] = useState("");
+  const [selectedInventoryByDish, setSelectedInventoryByDish] = useState<Record<number, string>>({});
   const [rating, setRating] = useState(initial?.rating?.toString() ?? "");
   const [learning, setLearning] = useState(initial?.learning ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
@@ -6767,6 +6777,46 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       ...dish,
       actualIngredients: (dish.actualIngredients ?? []).filter((ingredient) => ingredient.id !== ingredientId),
     }));
+  }
+
+  function addStockIngredient(dishIndex: number) {
+    const item = inventory.find((entry) => entry.id === selectedInventoryByDish[dishIndex]);
+    if (!item) return;
+    const measure = item.measures[0];
+    setDishes((current) => current.map((dish, index) => index !== dishIndex ? dish : {
+      ...dish,
+      actualIngredients: [...(dish.actualIngredients ?? []), {
+        id: createId(),
+        inventoryItemId: item.id,
+        inventoryMeasureId: measure?.id ?? null,
+        name: item.name,
+        quantity: null,
+        unit: measure?.unit ?? "",
+        unitPrice: measure ? cookingMeasurePrice(item, measure) : null,
+        unitPriceOverride: false,
+      }],
+    }));
+    setSelectedInventoryByDish((current) => ({ ...current, [dishIndex]: "" }));
+  }
+
+  function addCustomActualIngredient(dishIndex: number) {
+    setDishes((current) => current.map((dish, index) => index !== dishIndex ? dish : {
+      ...dish,
+      actualIngredients: [...(dish.actualIngredients ?? []), {
+        id: createId(), inventoryItemId: null, inventoryMeasureId: null,
+        name: "", quantity: null, unit: "", unitPrice: null, unitPriceOverride: false,
+      }],
+    }));
+  }
+
+  function updateActualMeasure(dishIndex: number, ingredient: CookingRecipeIngredient, measureId: string) {
+    const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
+    const measure = item?.measures.find((entry) => entry.id === measureId);
+    updateActualIngredient(dishIndex, ingredient.id, {
+      inventoryMeasureId: measure?.id ?? null,
+      unit: measure?.unit ?? "",
+      unitPrice: item && measure && !ingredient.unitPriceOverride ? cookingMeasurePrice(item, measure) : ingredient.unitPrice,
+    });
   }
 
   function actualIngredientCost(ingredients: CookingRecipeIngredient[]) {
@@ -6839,17 +6889,28 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
       <Field className="full" label="Add from your recipe book">{recipes.length ? <><div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div><span className="field-hint">Recipe ingredient quantities and prices are copied as starting values. Adjust them below to record what you actually used today.</span></> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
       <Field className="full" label="Add a one-off dish, drink, or prepared item"><div className="cooking-add-dish"><Input maxLength={120} placeholder="e.g. Fresh lime juice" value={customDish} onChange={(event) => setCustomDish(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addCustomDish(); } }} /><Button type="button" variant="outline" disabled={!customDish.trim()} onClick={addCustomDish}><Plus size={13} /> Add item</Button></div></Field>
       {dishes.length > 0 && <div className="full cooking-selected-dishes"><strong>Prepared today</strong>{dishes.map((dish, index) => <div key={`${dish.recipeId ?? "custom"}-${index}`}><span>{dish.name}{dish.actualIngredients?.length ? ` · known ingredient cost ${formatCurrency(actualIngredientCost(dish.actualIngredients))}` : ""}</span><button className="icon-button" type="button" aria-label={`Remove ${dish.name}`} onClick={() => setDishes((current) => current.filter((_, dishIndex) => dishIndex !== index))}><X size={13} /></button></div>)}</div>}
-      {dishes.map((dish, dishIndex) => dish.actualIngredients && dish.actualIngredients.length > 0 && <section className="full cooking-log-ingredients" key={`${dish.recipeId ?? "custom"}-${dishIndex}`}>
-        <div className="cooking-stock-heading"><div><strong>Actual ingredients · {dish.name}</strong><span>Adjust quantities and unit prices to what you used today. Stock is deducted from the saved actual quantities.</span></div></div>
-        {dish.actualIngredients.map((ingredient) => <div className="cooking-log-ingredient" key={ingredient.id}>
+      {dishes.map((dish, dishIndex) => <section className="full cooking-log-ingredients" key={`${dish.recipeId ?? "custom"}-${dishIndex}`}>
+        <div className="cooking-stock-heading"><div><strong>Actual ingredients · {dish.name}</strong><span>Choose from Kitchen stock or enter custom ingredients. Quantities recorded here determine stock use.</span></div>
+          <div className="cooking-record-actions">
+            {inventory.length > 0 && <Select aria-label={`Add kitchen stock to ${dish.name}`} value={selectedInventoryByDish[dishIndex] ?? ""} onChange={(event) => setSelectedInventoryByDish((current) => ({ ...current, [dishIndex]: event.target.value }))}><option value="">Choose kitchen stock</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}
+            <Button type="button" size="sm" variant="outline" disabled={!selectedInventoryByDish[dishIndex]} onClick={() => addStockIngredient(dishIndex)}><Plus size={13} />Add stock item</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => addCustomActualIngredient(dishIndex)}><Plus size={13} />Custom ingredient</Button>
+          </div>
+        </div>
+        {(dish.actualIngredients ?? []).map((ingredient) => {
+          const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
+          const lineCost = ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : null;
+          return <div className="cooking-log-ingredient" key={ingredient.id}>
           <Field label="Ingredient"><Input maxLength={120} value={ingredient.name} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { name: event.target.value })} /></Field>
+          {ingredient.inventoryItemId && <Field label="Kitchen stock unit"><Select value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => updateActualMeasure(dishIndex, ingredient, event.target.value)}><option value="">Choose unit</option>{item?.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select></Field>}
           <Field label="Actual quantity"><Input type="number" min="0.001" step="any" placeholder="Not used" value={ingredient.quantity ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { quantity: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-          <Field label="Unit"><Input maxLength={40} value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>
+          {!ingredient.inventoryItemId && <Field label="Unit"><Input maxLength={40} value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>}
           <Field label="Actual price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} /></Field>
-          <div className="cooking-log-ingredient-cost"><span>Actual cost</span><strong>{ingredient.quantity !== null && ingredient.unitPrice !== null ? formatCurrency(ingredient.quantity * ingredient.unitPrice) : "—"}</strong>
+          <div className="cooking-log-ingredient-cost"><span>Actual cost</span><strong>{lineCost !== null ? formatCurrency(lineCost) : "—"}</strong>
             <button type="button" className="icon-button" aria-label={`Remove ${ingredient.name} from ${dish.name}`} onClick={() => removeActualIngredient(dishIndex, ingredient.id)}><X size={13} /></button>
           </div>
-        </div>)}
+        </div>;
+        })}
       </section>)}
       <Field label="How did it turn out?"><Select value={rating} onChange={(event) => setRating(event.target.value)}><option value="">Not rated</option><option value="1">1 · Needs practice</option><option value="2">2 · Fair</option><option value="3">3 · Good</option><option value="4">4 · Very good</option><option value="5">5 · Excellent</option></Select></Field>
       <Field className="full" label="What I learned"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What worked, what you would change, or a new technique to remember" value={learning} onChange={(event) => setLearning(event.target.value)} /></Field>
@@ -6860,26 +6921,47 @@ function CookingLogModal({ initial, recipes, onClose, onSave }: {
   </Modal>;
 }
 
-function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSaveLog }: {
+function CookingPlanCard({ plan, recipes, inventory, logs, onSave, onCopy, onDelete, onEditRecipe, onSaveLog }: {
   plan: CookingPlan;
-  products: Product[];
+  recipes: CookingRecipe[];
+  inventory: CookingInventoryItem[];
   logs: CookingLog[];
   onSave: (plan: CookingPlan) => void;
-  onCopy: (plan: CookingPlan) => void;
+  onCopy: (plan: CookingPlan, date: string) => void;
   onDelete: (plan: CookingPlan) => void;
+  onEditRecipe: (recipe: CookingRecipe) => void;
   onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
 }) {
   const formatCurrency = useCurrencyFormatter();
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedInventoryId, setSelectedInventoryId] = useState("");
+  const [copyDate, setCopyDate] = useState(plan.date);
   const [nameDraft, setNameDraft] = useState(plan.name);
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const [logError, setLogError] = useState("");
-  const productById = new Map(products.map((product) => [product.id, product]));
+  useEffect(() => setCopyDate(plan.date), [plan.date]);
+  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
+  const recipe = recipes.find((entry) => entry.id === plan.recipeId);
   const plannedCost = plan.ingredients.reduce((total, ingredient) => {
-    const product = productById.get(ingredient.productId);
-    return total + ingredient.quantity * (product?.estimatedPrice ?? ingredient.unitPrice);
+    const price = cookingPlanIngredientPrice(ingredient, inventory);
+    return total + (price === null ? 0 : ingredient.quantity * price);
   }, 0);
   const alreadyLogged = logs.some((log) => log.date === plan.date && log.dishes.some((dish) => dish.name === plan.name));
+  function toCookedDish(): CookedDish {
+    return {
+      recipeId: plan.recipeId ?? null,
+      name: plan.name,
+      actualIngredients: plan.ingredients.map((ingredient) => ({
+        id: createId(),
+        inventoryItemId: ingredient.inventoryItemId ?? null,
+        inventoryMeasureId: ingredient.inventoryMeasureId ?? null,
+        name: ingredient.productName,
+        quantity: ingredient.quantity,
+        unit: ingredient.unit,
+        unitPrice: cookingPlanIngredientPrice(ingredient, inventory),
+        unitPriceOverride: ingredient.unitPriceOverride,
+      })),
+    };
+  }
 
   function saveIngredient(ingredientId: string, changes: Partial<CookingPlan["ingredients"][number]>) {
     onSave({
@@ -6888,16 +6970,66 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
     });
   }
 
+  function selectInventoryItem(ingredient: CookingPlan["ingredients"][number], inventoryItemId: string) {
+    const item = inventory.find((entry) => entry.id === inventoryItemId);
+    const measure = item?.measures[0];
+    saveIngredient(ingredient.id, {
+      productId: item?.id ?? `custom-${ingredient.id}`,
+      productName: item?.name ?? ingredient.productName,
+      inventoryItemId: item?.id ?? null,
+      inventoryMeasureId: measure?.id ?? null,
+      unit: measure?.unit ?? (item ? "unit" : ingredient.unit),
+      unitPrice: item && measure ? cookingMeasurePrice(item, measure) : ingredient.unitPrice,
+      unitPriceOverride: false,
+    });
+  }
+
+  function selectMeasure(ingredient: CookingPlan["ingredients"][number], measureId: string) {
+    const item = ingredient.inventoryItemId ? inventoryById.get(ingredient.inventoryItemId) : undefined;
+    const measure = item?.measures.find((entry) => entry.id === measureId);
+    saveIngredient(ingredient.id, {
+      inventoryMeasureId: measure?.id ?? null,
+      unit: measure?.unit ?? "unit",
+      unitPrice: item ? (measure ? cookingMeasurePrice(item, measure) : null) : ingredient.unitPrice,
+      unitPriceOverride: false,
+    });
+  }
+
+  function reloadRecipeIngredients() {
+    if (!recipe) return;
+    onSave({
+      ...plan,
+      name: recipe.name,
+      ingredients: (recipe.inventoryIngredients ?? []).map((ingredient) => {
+        const id = createId();
+        const item = ingredient.inventoryItemId ? inventoryById.get(ingredient.inventoryItemId) : undefined;
+        const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
+        return {
+          id,
+          productId: ingredient.inventoryItemId ?? `custom-${id}`,
+          productName: ingredient.name,
+          inventoryItemId: ingredient.inventoryItemId,
+          inventoryMeasureId: ingredient.inventoryMeasureId,
+          quantity: ingredient.quantity ?? 1,
+          unit: ingredient.unit || "unit",
+          unitPrice: item && measure && !ingredient.unitPriceOverride ? cookingMeasurePrice(item, measure) : ingredient.unitPrice,
+          unitPriceOverride: ingredient.unitPriceOverride,
+        };
+      }),
+    });
+    setNameDraft(recipe.name);
+  }
+
   async function addToLog() {
     setLogError("");
     const matchingLog = logs.find((log) => log.date === plan.date);
     try {
       if (matchingLog) {
         if (!matchingLog.dishes.some((dish) => dish.name === plan.name)) {
-          await onSaveLog({ ...matchingLog, dishes: [...matchingLog.dishes, { recipeId: null, name: plan.name }] }, matchingLog.id);
+          await onSaveLog({ ...matchingLog, dishes: [...matchingLog.dishes, toCookedDish()] }, matchingLog.id);
         }
       } else {
-        await onSaveLog({ date: plan.date, occasion: "", dishes: [{ recipeId: null, name: plan.name }], rating: null, learning: "", notes: "" });
+        await onSaveLog({ date: plan.date, occasion: "", dishes: [toCookedDish()], rating: null, learning: "", notes: "" });
       }
       onSave({ ...plan, status: "Cooked" });
     } catch (caught) {
@@ -6909,7 +7041,7 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
     <summary className="cooking-plan-row cooking-plan-summary">
       <div className="cooking-plan-main">
         <strong>{plan.name}</strong>
-        <span>{plan.ingredients.length} ingredients · estimated {formatCurrency(plannedCost)}</span>
+        <span>{plan.ingredients.length} ingredients · estimated {formatCurrency(plannedCost)}{plan.ingredients.some((ingredient) => cookingPlanIngredientPrice(ingredient, inventory) === null) ? " · some prices not set" : ""}</span>
       </div>
       <Badge>{plan.status}</Badge>
     </summary>
@@ -6920,7 +7052,7 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
         </Select></Field>
         <div className="table-actions">
           <Button type="button" size="sm" variant="outline" disabled={alreadyLogged} onClick={() => void addToLog()}><Utensils size={13} />{alreadyLogged ? "Already logged" : "Add to log"}</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => onCopy(plan)}><Copy size={13} />Copy</Button>
+          <div className="cooking-plan-copy"><Field label="Copy to date"><DateInput required value={copyDate} onValueChange={setCopyDate} /></Field><Button type="button" size="sm" variant="outline" onClick={() => onCopy(plan, copyDate)}><Copy size={13} />Copy day</Button></div>
           <Button type="button" size="sm" variant="outline" onClick={() => { if (window.confirm(`Move the plan for "${plan.name}" to the archive?`)) onDelete(plan); }}><Archive size={13} />Archive</Button>
         </div>
       </div>
@@ -6934,33 +7066,35 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
         <Field label="Date"><DateInput required value={plan.date} onValueChange={(date) => onSave({ ...plan, date })} /></Field>
       </div>
       <div className="cooking-plan-ingredients">
-        <div className="cooking-plan-ingredient-head"><strong>Ingredients</strong><span>Estimated cost uses the current Product master price.</span></div>
+        <div className="cooking-plan-ingredient-head"><strong>Planned ingredients · {plan.ingredients.length}</strong><span>Uses Kitchen stock only; quantities and prices here are editable plan estimates.</span></div>
+        {recipe && <div className="cooking-record-actions"><span className="field-hint">Based on recipe: {recipe.name}</span><Button type="button" size="sm" variant="outline" onClick={() => onEditRecipe(recipe)}><Pencil size={13} />Edit saved template</Button><Button type="button" size="sm" variant="outline" onClick={reloadRecipeIngredients}><Copy size={13} />Reload template into plan</Button></div>}
         {plan.ingredients.map((ingredient) => {
-          const product = productById.get(ingredient.productId);
-          const unitPrice = product?.estimatedPrice ?? ingredient.unitPrice;
+          const item = ingredient.inventoryItemId ? inventoryById.get(ingredient.inventoryItemId) : undefined;
+          const unitPrice = cookingPlanIngredientPrice(ingredient, inventory);
           return <div className="cooking-plan-ingredient" key={ingredient.id}>
-            <Select aria-label={`Ingredient for ${plan.name}`} value={ingredient.productId} onChange={(event) => {
-              const nextProduct = productById.get(event.target.value);
-              if (nextProduct) saveIngredient(ingredient.id, { productId: nextProduct.id, productName: nextProduct.name, unit: nextProduct.unit, unitPrice: nextProduct.estimatedPrice });
-            }}>
-              {!product && <option value={ingredient.productId}>{ingredient.productName} (not in master data)</option>}
-              {products.map((entry) => <option key={entry.id} value={entry.id}>{entry.name} · {formatCurrency(entry.estimatedPrice)} / {entry.unit}</option>)}
+            <Select aria-label={`Kitchen stock item for ${plan.name}`} value={ingredient.inventoryItemId ?? ""} onChange={(event) => selectInventoryItem(ingredient, event.target.value)}>
+              <option value="">Custom ingredient</option>
+              {inventory.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
             </Select>
+            <Input aria-label={`Ingredient name for ${plan.name}`} maxLength={120} value={ingredient.productName} onChange={(event) => saveIngredient(ingredient.id, { productName: event.target.value })} />
+            {item ? <Select aria-label={`Stock unit for ${ingredient.productName}`} value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => selectMeasure(ingredient, event.target.value)}><option value="">Choose unit</option>{item.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select> : <Input aria-label={`Unit for ${ingredient.productName}`} maxLength={40} placeholder="Unit" value={ingredient.unit} onChange={(event) => saveIngredient(ingredient.id, { unit: event.target.value })} />}
             <Input aria-label={`Quantity of ${ingredient.productName}`} type="number" min="0.001" step="any" value={quantityDrafts[ingredient.id] ?? String(ingredient.quantity)} onChange={(event) => setQuantityDrafts((current) => ({ ...current, [ingredient.id]: event.target.value }))} onBlur={() => {
               const quantity = Number(quantityDrafts[ingredient.id]);
               if (Number.isFinite(quantity) && quantity > 0) saveIngredient(ingredient.id, { quantity });
               setQuantityDrafts((current) => ({ ...current, [ingredient.id]: String(Number.isFinite(quantity) && quantity > 0 ? quantity : ingredient.quantity) }));
             }} />
-            <span className="cooking-plan-ingredient-cost">{ingredient.quantity} {product?.unit ?? ingredient.unit} · {formatCurrency(ingredient.quantity * unitPrice)}</span>
+            <Input aria-label={`Price per ${ingredient.unit || "unit"} for ${ingredient.productName}`} type="number" min="0" step="any" value={unitPrice ?? ""} onChange={(event) => saveIngredient(ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} />
+            <span className="cooking-plan-ingredient-cost">{ingredient.quantity} {ingredient.unit} · {unitPrice === null ? "price not set" : formatCurrency(ingredient.quantity * unitPrice)}</span>
             <button className="icon-button" type="button" aria-label={`Remove ${ingredient.productName}`} onClick={() => onSave({ ...plan, ingredients: plan.ingredients.filter((entry) => entry.id !== ingredient.id) })}><X size={13} /></button>
           </div>;
         })}
-        {products.length ? <div className="cooking-add-ingredient"><Select aria-label={`Choose ingredient for ${plan.name}`} value={selectedProductId} onChange={(event) => setSelectedProductId(event.target.value)}><option value="">Choose from Product master</option>{products.map((product) => <option key={product.id} value={product.id}>{product.name} · {formatCurrency(product.estimatedPrice)} / {product.unit}</option>)}</Select><Button type="button" variant="outline" size="sm" disabled={!selectedProductId} onClick={() => {
-          const product = productById.get(selectedProductId);
-          if (!product) return;
-          onSave({ ...plan, ingredients: [...plan.ingredients, { id: createId(), productId: product.id, productName: product.name, quantity: 1, unit: product.unit, unitPrice: product.estimatedPrice }] });
-          setSelectedProductId("");
-        }}><Plus size={13} /> Add ingredient</Button></div> : <p className="section-description">Add vegetables, spices, dairy, or other ingredients in Master data first.</p>}
+        <div className="cooking-add-ingredient"><Select aria-label={`Choose kitchen stock for ${plan.name}`} value={selectedInventoryId} onChange={(event) => setSelectedInventoryId(event.target.value)}><option value="">Choose Kitchen stock</option>{inventory.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Button type="button" variant="outline" size="sm" disabled={!selectedInventoryId} onClick={() => {
+          const item = inventoryById.get(selectedInventoryId);
+          const measure = item?.measures[0];
+          if (!item) return;
+          onSave({ ...plan, ingredients: [...plan.ingredients, { id: createId(), productId: item.id, productName: item.name, inventoryItemId: item.id, inventoryMeasureId: measure?.id ?? null, quantity: 1, unit: measure?.unit ?? "unit", unitPrice: measure ? cookingMeasurePrice(item, measure) : null }] });
+          setSelectedInventoryId("");
+        }}><Plus size={13} />Add stock item</Button><Button type="button" variant="outline" size="sm" onClick={() => onSave({ ...plan, ingredients: [...plan.ingredients, { id: createId(), productId: `custom-${createId()}`, productName: "Custom ingredient", quantity: 1, unit: "unit", unitPrice: 0 }] })}><Plus size={13} />Custom</Button></div>
       </div>
       <Field label="Optional notes"><Input maxLength={1000} placeholder="Optional preparation or shopping notes" value={plan.notes} onChange={(event) => onSave({ ...plan, notes: event.target.value })} /></Field>
       <div className="cooking-plan-footer"><strong>Estimated total: {formatCurrency(plannedCost)}</strong><Button type="button" size="sm" variant="outline" disabled={alreadyLogged} onClick={addToLog}><Utensils size={13} />{alreadyLogged ? "Already in daily log" : "Add to daily cooking log"}</Button></div>
@@ -6968,13 +7102,15 @@ function CookingPlanCard({ plan, products, logs, onSave, onCopy, onDelete, onSav
   </details>;
 }
 
-function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDeletePlan, onSaveLog }: {
+function CookingPlanner({ plans, recipes, inventory, logs, onSavePlan, onCopyPlan, onDeletePlan, onEditRecipe, onSaveLog }: {
   plans: CookingPlan[];
-  products: Product[];
+  recipes: CookingRecipe[];
+  inventory: CookingInventoryItem[];
   logs: CookingLog[];
   onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
-  onCopyPlan: (plan: CookingPlan) => void;
+  onCopyPlan: (plan: CookingPlan, date: string) => void;
   onDeletePlan: (plan: CookingPlan) => void;
+  onEditRecipe: (recipe: CookingRecipe) => void;
   onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
 }) {
   const formatCurrency = useCurrencyFormatter();
@@ -6984,15 +7120,24 @@ function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDelet
     return new Date(date.getFullYear(), date.getMonth(), 1);
   });
   const [newPlanName, setNewPlanName] = useState("");
+  const [selectedRecipeId, setSelectedRecipeId] = useState("");
+  const [bulkCopyOpen, setBulkCopyOpen] = useState(false);
+  const [bulkCopyError, setBulkCopyError] = useState("");
+  const [sourceFrom, setSourceFrom] = useState(selectedDate);
+  const [sourceTo, setSourceTo] = useState(selectedDate);
+  const [destinationFrom, setDestinationFrom] = useState(selectedDate);
+  const [destinationTo, setDestinationTo] = useState(selectedDate);
   const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate();
   const startOffset = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay();
   const monthLabel = visibleMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const planCounts = new Map<string, number>();
   for (const plan of plans) planCounts.set(plan.date, (planCounts.get(plan.date) ?? 0) + 1);
   const selectedPlans = plans.filter((plan) => plan.date === selectedDate);
-  const productsById = new Map(products.map((product) => [product.id, product]));
-  const selectedDayEstimate = selectedPlans.reduce((total, plan) => total + plan.ingredients.reduce((planTotal, ingredient) =>
-    planTotal + ingredient.quantity * (productsById.get(ingredient.productId)?.estimatedPrice ?? ingredient.unitPrice), 0), 0);
+  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
+  const selectedDayEstimate = selectedPlans.reduce((total, plan) => total + plan.ingredients.reduce((planTotal, ingredient) => {
+    const price = cookingPlanIngredientPrice(ingredient, inventory);
+    return planTotal + (price === null ? 0 : ingredient.quantity * price);
+  }, 0), 0);
 
   function changeMonth(offset: number) {
     const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1);
@@ -7013,8 +7158,116 @@ function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDelet
     setNewPlanName("");
   }
 
+  function addRecipePlan() {
+    const recipe = recipes.find((entry) => entry.id === selectedRecipeId);
+    if (!recipe) return;
+    onSavePlan({
+      name: recipe.name,
+      recipeId: recipe.id,
+      date: selectedDate,
+      status: "Planned",
+      ingredients: (recipe.inventoryIngredients ?? []).map((ingredient) => {
+        const id = createId();
+        const item = ingredient.inventoryItemId ? inventoryById.get(ingredient.inventoryItemId) : undefined;
+        const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
+        const unitPrice = item && measure && !ingredient.unitPriceOverride
+          ? cookingMeasurePrice(item, measure)
+          : ingredient.unitPrice;
+        return {
+          id,
+          productId: ingredient.inventoryItemId ?? `custom-${id}`,
+          productName: ingredient.name,
+          inventoryItemId: ingredient.inventoryItemId,
+          inventoryMeasureId: ingredient.inventoryMeasureId,
+          quantity: ingredient.quantity ?? 1,
+          unit: ingredient.unit || measure?.unit || "unit",
+          unitPrice,
+          unitPriceOverride: ingredient.unitPriceOverride,
+        };
+      }),
+      notes: recipe.notes,
+    });
+    setSelectedRecipeId("");
+  }
+
+  function dateAtOffset(date: string, offset: number) {
+    const value = new Date(`${date}T12:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + offset);
+    return value.toISOString().slice(0, 10);
+  }
+
+  function rangeLength(from: string, to: string) {
+    return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+  }
+
+  function setRange(which: "source" | "destination", range: { from: string; to: string }) {
+    if (which === "source") {
+      setSourceFrom(range.from);
+      setSourceTo(range.to);
+    } else {
+      setDestinationFrom(range.from);
+      setDestinationTo(range.to);
+    }
+  }
+
+  function selectedWeekRange(date: string) {
+    const value = new Date(`${date}T12:00:00Z`);
+    const from = dateAtOffset(date, -value.getUTCDay());
+    return { from, to: dateAtOffset(from, 6) };
+  }
+
+  function selectedMonthRange(date: string) {
+    const value = new Date(`${date}T12:00:00Z`);
+    const from = `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, "0")}-01`;
+    const to = dateAtOffset(from, new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth() + 1, 0)).getUTCDate() - 1);
+    return { from, to };
+  }
+
+  function openBulkCopy() {
+    setSourceFrom(selectedDate);
+    setSourceTo(selectedDate);
+    setDestinationFrom(dateAtOffset(selectedDate, 1));
+    setDestinationTo(dateAtOffset(selectedDate, 1));
+    setBulkCopyError("");
+    setBulkCopyOpen(true);
+  }
+
+  function copyBulkPlans(event: FormEvent) {
+    event.preventDefault();
+    setBulkCopyError("");
+    if (!sourceFrom || !sourceTo || !destinationFrom || !destinationTo ||
+      sourceTo < sourceFrom || destinationTo < destinationFrom) {
+      setBulkCopyError("Choose valid start and end dates for both ranges.");
+      return;
+    }
+    const sourceLength = rangeLength(sourceFrom, sourceTo);
+    if (sourceLength !== rangeLength(destinationFrom, destinationTo)) {
+      setBulkCopyError("Source and destination ranges must cover the same number of days.");
+      return;
+    }
+    const sourcePlans = plans.filter((plan) => plan.date >= sourceFrom && plan.date <= sourceTo);
+    if (!sourcePlans.length) {
+      setBulkCopyError("There are no plans in the selected source range.");
+      return;
+    }
+    for (const plan of sourcePlans) {
+      onSavePlan({
+        ...plan,
+        recipeId: plan.recipeId ?? null,
+        date: dateAtOffset(destinationFrom, rangeLength(sourceFrom, plan.date) - 1),
+        status: "Planned",
+        ingredients: plan.ingredients.map((ingredient) => ({ ...ingredient, id: createId() })),
+      });
+    }
+    setBulkCopyOpen(false);
+  }
+
+  function openBulkCopyForRange(which: "source" | "destination", kind: "week" | "month") {
+    setRange(which, kind === "week" ? selectedWeekRange(selectedDate) : selectedMonthRange(selectedDate));
+  }
+
   return <section className="cooking-planner-section">
-    <div className="devotional-section-head"><div><h2><CalendarDays size={15} /> Cooking plan</h2><p>Choose a day, add planned items, and estimate ingredient costs from Master data.</p></div></div>
+    <div className="devotional-section-head"><div><h2><CalendarDays size={15} /> Cooking plan</h2><p>Choose saved recipes or custom dishes, edit planned ingredients, and estimate costs from Kitchen stock.</p></div><Button type="button" variant="outline" onClick={openBulkCopy}><Copy size={14} />Copy date range</Button></div>
     <div className="cooking-planner">
       <Card className="cooking-calendar">
         <div className="cooking-calendar-head"><Button type="button" variant="outline" size="sm" aria-label="Previous month" onClick={() => changeMonth(-1)}><ChevronRight size={14} style={{ transform: "rotate(180deg)" }} /></Button><strong>{monthLabel}</strong><Button type="button" variant="outline" size="sm" aria-label="Next month" onClick={() => changeMonth(1)}><ChevronRight size={14} /></Button></div>
@@ -7031,24 +7284,39 @@ function CookingPlanner({ plans, products, logs, onSavePlan, onCopyPlan, onDelet
       </Card>
       <div className="cooking-plans-for-day">
         <div className="cooking-day-heading"><div><h3>{dateLabel(selectedDate)}</h3><span>{selectedPlans.length} planned {selectedPlans.length === 1 ? "item" : "items"} · estimated total {formatCurrency(selectedDayEstimate)}</span></div></div>
+        {recipes.length > 0 && <div className="cooking-plan-add-recipe"><Select aria-label="Choose a recipe to plan" value={selectedRecipeId} onChange={(event) => setSelectedRecipeId(event.target.value)}><option value="">Choose an existing recipe template</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" disabled={!selectedRecipeId} onClick={addRecipePlan}><Plus size={14} />Plan recipe</Button></div>}
         <form className="cooking-plan-add" onSubmit={addPlan}><Input aria-label="New planned dish or meal" maxLength={160} placeholder="Plan a curry, biryani, tiffin, coffee..." value={newPlanName} onChange={(event) => setNewPlanName(event.target.value)} /><Button type="submit" disabled={!newPlanName.trim()}><Plus size={14} /> Add plan</Button></form>
-        {selectedPlans.length ? <div className="cooking-plan-list">{selectedPlans.map((plan) => <CookingPlanCard key={plan.id} plan={plan} products={products} logs={logs} onSave={(updated) => onSavePlan(updated, updated.id)} onCopy={onCopyPlan} onDelete={onDeletePlan} onSaveLog={onSaveLog} />)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title="Nothing planned for this day" description="Add a dish or drink above. Ingredients are optional." /></Card>}
+        {selectedPlans.length ? <div className="cooking-plan-list">{selectedPlans.map((plan) => <CookingPlanCard key={plan.id} plan={plan} recipes={recipes} inventory={inventory} logs={logs} onSave={(updated) => onSavePlan(updated, updated.id)} onCopy={onCopyPlan} onDelete={onDeletePlan} onEditRecipe={onEditRecipe} onSaveLog={onSaveLog} />)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title="Nothing planned for this day" description="Choose a saved recipe template or add a custom dish. Ingredients are optional." /></Card>}
       </div>
     </div>
+    {bulkCopyOpen && <Modal title="Copy cooking plans" onClose={() => setBulkCopyOpen(false)} wide>
+      <form className="cooking-bulk-copy" onSubmit={copyBulkPlans}>
+        <p className="section-description">Choose matching source and destination date ranges. Plans are copied day-by-day and appended; existing plans are kept.</p>
+        <div className="cooking-bulk-copy-range">
+          <div className="cooking-bulk-copy-range-head"><strong>Copy plans from</strong><div className="table-actions"><Button type="button" size="sm" variant="outline" onClick={() => openBulkCopyForRange("source", "week")}>Selected week</Button><Button type="button" size="sm" variant="outline" onClick={() => openBulkCopyForRange("source", "month")}>Selected month</Button></div></div>
+          <div className="cooking-plan-edit-fields"><Field label="From"><DateInput required value={sourceFrom} onValueChange={setSourceFrom} /></Field><Field label="To"><DateInput required value={sourceTo} onValueChange={setSourceTo} /></Field></div>
+        </div>
+        <div className="cooking-bulk-copy-range">
+          <div className="cooking-bulk-copy-range-head"><strong>Copy plans to</strong><div className="table-actions"><Button type="button" size="sm" variant="outline" onClick={() => openBulkCopyForRange("destination", "week")}>Selected week</Button><Button type="button" size="sm" variant="outline" onClick={() => openBulkCopyForRange("destination", "month")}>Selected month</Button></div></div>
+          <div className="cooking-plan-edit-fields"><Field label="From"><DateInput required value={destinationFrom} onValueChange={setDestinationFrom} /></Field><Field label="To"><DateInput required value={destinationTo} onValueChange={setDestinationTo} /></Field></div>
+        </div>
+        {bulkCopyError && <div className="alert alert-error" role="alert">{bulkCopyError}</div>}
+        <div className="modal-actions"><Button type="button" variant="outline" onClick={() => setBulkCopyOpen(false)}>Cancel</Button><Button type="submit"><Copy size={14} />Copy plans</Button></div>
+      </form>
+    </Modal>}
   </section>;
 }
 
-function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRecipe, onSaveLog, onDeleteLog, onSavePlan, onCopyPlan, onDeletePlan }: {
+function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSaveLog, onDeleteLog, onSavePlan, onCopyPlan, onDeletePlan }: {
   recipes: CookingRecipe[];
   logs: CookingLog[];
   plans: CookingPlan[];
-  products: Product[];
   onSaveRecipe: (recipe: Omit<CookingRecipe, "id">, id?: string) => void;
   onDeleteRecipe: (recipe: CookingRecipe) => void;
   onSaveLog: (log: Omit<CookingLog, "id">, id?: string) => Promise<void>;
   onDeleteLog: (log: CookingLog) => Promise<void>;
   onSavePlan: (plan: Omit<CookingPlan, "id">, id?: string) => void;
-  onCopyPlan: (plan: CookingPlan) => void;
+  onCopyPlan: (plan: CookingPlan, date: string) => void;
   onDeletePlan: (plan: CookingPlan) => void;
 }) {
   const [recipeEditor, setRecipeEditor] = useState<CookingRecipe | null | undefined>(undefined);
@@ -7079,8 +7347,8 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
     }
   }
   useEffect(() => {
-    if (activeTab === "stock" || activeTab === "usage") void refreshInventory();
-  }, [activeTab, logs]);
+    void refreshInventory();
+  }, []);
 
   async function saveAndRefreshLog(log: Omit<CookingLog, "id">, id?: string) {
     await onSaveLog(log, id);
@@ -7150,7 +7418,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
       <Button variant={activeTab === "usage" ? "primary" : "outline"} aria-pressed={activeTab === "usage"} onClick={() => setActiveTab("usage")}><History size={14} />Stock usage<Badge>{inventoryUsage.length}</Badge></Button>
     </nav>
     {inventoryError && <div className="alert alert-error" role="alert">{inventoryError}</div>}
-    {activeTab === "planner" && <CookingPlanner plans={plans} products={products} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onSaveLog={saveAndRefreshLog} />}
+    {activeTab === "planner" && <CookingPlanner plans={plans} recipes={recipes} inventory={inventory} logs={logs} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onEditRecipe={(recipe) => setRecipeEditor(recipe)} onSaveLog={saveAndRefreshLog} />}
     {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>}
     {activeTab === "stock" && <CookingInventoryPage items={inventory} loading={inventoryLoading} saving={inventorySaving} error={inventoryError} onSave={saveInventory} onDelete={deleteInventoryItem} />}
     {activeTab === "usage" && <section className="cooking-section cooking-records">
@@ -7187,7 +7455,7 @@ function CookingPage({ recipes, logs, plans, products, onSaveRecipe, onDeleteRec
         </details>)}</div> : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
     </section>}
     {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} inventory={inventory} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
-    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}
+    {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} inventory={inventory} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}
   </>;
 }
 
@@ -10197,10 +10465,10 @@ export default function App() {
         : [{ ...plan, id: createId() }, ...(previous.cookingPlans ?? [])],
     }));
   }
-  function copyCookingPlan(plan: CookingPlan) {
+  function copyCookingPlan(plan: CookingPlan, date = plan.date) {
     const { id, ...copy } = plan;
     void id;
-    saveCookingPlan({ ...copy, status: "Planned", ingredients: copy.ingredients.map((ingredient) => ({ ...ingredient, id: createId() })) });
+    saveCookingPlan({ ...copy, date, status: "Planned", ingredients: copy.ingredients.map((ingredient) => ({ ...ingredient, id: createId() })) });
   }
   function deleteCookingPlan(plan: CookingPlan) {
     update((previous) => ({
@@ -10625,7 +10893,7 @@ export default function App() {
     "AI Prompts": <PromptManagerPage records={data.promptRecords ?? []} onSave={savePromptRecord} onDelete={deletePromptRecord} onCopy={(record) => void copyPromptToClipboard(record)} />,
     "Training & classes": <TrainingClassesPage sessions={data.trainingSessions ?? []} onSave={saveTrainingSession} onDelete={deleteTrainingSession} />,
     Devotional: <DevotionalPage entries={data.devotionalEntries ?? []} readings={data.dailyBibleReadings ?? []} dailyPrayerLogs={data.dailyPrayerLogs ?? []} resources={data.devotionalResources ?? []} requests={data.prayerRequests ?? []} onSaveEntry={saveDevotionalEntry} onDeleteEntry={deleteDevotionalEntry} onSaveReading={saveDailyBibleReading} onDeleteReading={deleteDailyBibleReading} onSaveDailyPrayerLog={saveDailyPrayerLog} onDeleteDailyPrayerLog={deleteDailyPrayerLog} onSaveResource={saveDevotionalResource} onDeleteResource={deleteDevotionalResource} onSaveRequest={savePrayerRequest} onDeleteRequest={deletePrayerRequest} />,
-    Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} plans={data.cookingPlans ?? []} products={data.products ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} onSavePlan={saveCookingPlan} onCopyPlan={copyCookingPlan} onDeletePlan={deleteCookingPlan} />,
+    Cooking: <CookingPage recipes={data.cookingRecipes ?? []} logs={data.cookingLogs ?? []} plans={data.cookingPlans ?? []} onSaveRecipe={saveCookingRecipe} onDeleteRecipe={deleteCookingRecipe} onSaveLog={saveCookingLog} onDeleteLog={deleteCookingLog} onSavePlan={saveCookingPlan} onCopyPlan={copyCookingPlan} onDeletePlan={deleteCookingPlan} />,
     "Issues & maintenance": <IssuesMaintenancePage records={data.issueRecords ?? []} onSave={saveIssueRecord} onDelete={deleteIssueRecord} />,
     "Education & career": <EducationCareerPage education={data.personalEducation ?? []} qualifications={data.professionalQualifications ?? []} experience={data.workExperiences ?? []} skills={data.professionalSkills ?? []} onSaveEducation={savePersonalEducation} onDeleteEducation={deletePersonalEducation} onSaveQualification={saveProfessionalQualification} onDeleteQualification={deleteProfessionalQualification} onSaveExperience={saveWorkExperience} onDeleteExperience={deleteWorkExperience} onSaveSkill={saveProfessionalSkill} onDeleteSkill={deleteProfessionalSkill} />,
     Family: <FamilyPage members={data.familyMembers ?? []} onSave={saveFamilyMember} onDelete={deleteFamilyMember} />,

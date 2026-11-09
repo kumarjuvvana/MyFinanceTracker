@@ -704,14 +704,18 @@ export interface CookingPlanIngredient {
   id: string;
   productId: string;
   productName: string;
+  inventoryItemId?: string | null;
+  inventoryMeasureId?: string | null;
+  unitPriceOverride?: boolean;
   quantity: number;
   unit: string;
-  unitPrice: number;
+  unitPrice: number | null;
 }
 
 export interface CookingPlan {
   id: string;
   name: string;
+  recipeId?: string | null;
   date: string;
   status: CookingPlanStatus;
   ingredients: CookingPlanIngredient[];

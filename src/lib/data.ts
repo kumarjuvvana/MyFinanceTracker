@@ -646,15 +646,19 @@ export function validateData(value: unknown): value is TrackerData {
     (Array.isArray(value.cookingPlans) && value.cookingPlans.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
       typeof entry.name === "string" && entry.name.trim().length > 0 && entry.name.length <= 160 &&
+      (entry.recipeId === undefined || entry.recipeId === null || typeof entry.recipeId === "string") &&
       typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
       (entry.status === "Planned" || entry.status === "In progress" || entry.status === "Cooked" || entry.status === "Skipped") &&
       Array.isArray(entry.ingredients) && entry.ingredients.every((ingredient) =>
         isRecord(ingredient) && typeof ingredient.id === "string" && ingredient.id.length > 0 &&
         typeof ingredient.productId === "string" && ingredient.productId.length > 0 &&
         typeof ingredient.productName === "string" && ingredient.productName.trim().length > 0 &&
+        (ingredient.inventoryItemId === undefined || ingredient.inventoryItemId === null || typeof ingredient.inventoryItemId === "string") &&
+        (ingredient.inventoryMeasureId === undefined || ingredient.inventoryMeasureId === null || typeof ingredient.inventoryMeasureId === "string") &&
+        (ingredient.unitPriceOverride === undefined || typeof ingredient.unitPriceOverride === "boolean") &&
         typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0 &&
         typeof ingredient.unit === "string" && ingredient.unit.length > 0 &&
-        typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0) &&
+        (ingredient.unitPrice === null || typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)) &&
       typeof entry.notes === "string"));
   const issueRecordsOk = value.issueRecords === undefined ||
     (Array.isArray(value.issueRecords) && value.issueRecords.every((entry) =>
