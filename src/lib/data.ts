@@ -219,11 +219,13 @@ function isValidActivitySessions(value: unknown): boolean {
       if (!isRecord(item) || typeof item.id !== "string" || !item.id.trim() ||
         typeof item.name !== "string" || !item.name.trim()) return false;
       if (item.appLink !== undefined) {
-        if (!isRecord(item.appLink) || typeof item.appLink.page !== "string" ||
-          (item.appLink.page !== "Dashboard" && item.appLink.page !== "Favorites" &&
-            !FAVORITABLE_PAGES.includes(item.appLink.page as Page)) ||
+        if (!isRecord(item.appLink) ||
           typeof item.appLink.label !== "string" || !item.appLink.label.trim() ||
-          item.appLink.label.length > 32) return false;
+          item.appLink.label.length > 32 ||
+          !(typeof item.appLink.url === "string" && item.appLink.url.trim().length > 0 && isSafeExternalLink(item.appLink.url) ||
+            typeof item.appLink.page === "string" &&
+            (item.appLink.page === "Dashboard" || item.appLink.page === "Favorites" ||
+              FAVORITABLE_PAGES.includes(item.appLink.page as Page)))) return false;
       }
     }
   }
@@ -602,7 +604,16 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.nutritionNotes === "string" && typeof entry.healthNotes === "string" &&
       Array.isArray(entry.dietaryTags) && entry.dietaryTags.every((tag) => typeof tag === "string") &&
       Array.isArray(entry.allergens) && entry.allergens.every((allergen) => typeof allergen === "string") &&
-      typeof entry.notes === "string"));
+      typeof entry.notes === "string" &&
+      (entry.inventoryIngredients === undefined || (Array.isArray(entry.inventoryIngredients) &&
+        entry.inventoryIngredients.every((ingredient) =>
+          isRecord(ingredient) && typeof ingredient.id === "string" && ingredient.id.length > 0 &&
+          (ingredient.inventoryItemId === null || typeof ingredient.inventoryItemId === "string") &&
+          (ingredient.inventoryMeasureId === null || typeof ingredient.inventoryMeasureId === "string") &&
+          typeof ingredient.name === "string" && ingredient.name.trim().length > 0 &&
+          (ingredient.quantity === null || (typeof ingredient.quantity === "number" && Number.isFinite(ingredient.quantity) && ingredient.quantity > 0)) &&
+          typeof ingredient.unit === "string" &&
+          (ingredient.unitPrice === null || (typeof ingredient.unitPrice === "number" && Number.isFinite(ingredient.unitPrice) && ingredient.unitPrice >= 0)))))));
   const cookingLogsOk = value.cookingLogs === undefined ||
     (Array.isArray(value.cookingLogs) && value.cookingLogs.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&

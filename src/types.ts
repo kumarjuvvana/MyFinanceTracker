@@ -641,6 +641,31 @@ export interface CookingRecipe {
   dietaryTags: string[];
   allergens: string[];
   notes: string;
+  inventoryIngredients?: CookingRecipeIngredient[];
+}
+
+export interface CookingStockMeasure {
+  id: string;
+  unit: string;
+  stockQuantity: number | null;
+  unitPrice: number | null;
+}
+
+export interface CookingInventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  measures: CookingStockMeasure[];
+}
+
+export interface CookingRecipeIngredient {
+  id: string;
+  inventoryItemId: string | null;
+  inventoryMeasureId: string | null;
+  name: string;
+  quantity: number | null;
+  unit: string;
+  unitPrice: number | null;
 }
 
 export interface CookedDish {
@@ -929,7 +954,8 @@ export interface ActivityChecklistItem {
   id: string;
   name: string;
   appLink?: {
-    page: Page;
+    page?: Page;
+    url?: string;
     label: string;
   };
 }
