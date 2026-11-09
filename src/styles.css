@@ -36,6 +36,8 @@ button{cursor:pointer}
 .inline-editor .modal-head{margin-bottom:16px}
 .inline-editor .modal-head h2{font:700 16px Manrope,sans-serif;color:var(--text,#303830)}
 .app-shell.dark .inline-editor .modal-head h2{color:#e3e8e2}
+.shopping-item-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.shopping-item-form-grid>.field-wrap{min-width:0}
 .field-wrap{display:grid;gap:7px}.field-label{font-size:11px;color:#5e675f;font-weight:600}.field{width:100%;height:39px;border:1px solid #e4e8e2;border-radius:8px;background:#fff;color:#394139;padding:0 11px;font-size:12px;outline:none;transition:border .15s,box-shadow .15s}.field::placeholder{color:#b0b5ad}.field:focus{border-color:#85a78a;box-shadow:0 0 0 3px #e9f1e9}.field.textarea{height:auto;min-height:78px;padding:10px;resize:vertical}.field[type=date]{color:#616960}
 .date-input{width:100%;min-width:0}.date-input-mobile{display:none}
 .table-card{padding:0;overflow:hidden}.data-table{width:100%;border-collapse:collapse;text-align:left}.data-table th{height:41px;background:#fafbf9;color:#92988f;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:0 16px;border-bottom:1px solid #eef0ec;white-space:nowrap}.data-table td{padding:12px 16px;border-bottom:1px solid #f0f1ee;font-size:11px;color:#636b63}.data-table tr:last-child td{border-bottom:0}.table-primary{font-size:12px;font-weight:600;color:#3b443c}.table-secondary{font-size:10px;color:#a0a59e;margin-top:3px}.table-actions{display:flex;gap:2px;justify-content:flex-end}.table-total{font-weight:700;color:#424a42!important;white-space:nowrap}.badge{display:inline-flex;border-radius:20px;padding:4px 8px;font-size:9px;font-weight:600;white-space:nowrap}.badge-neutral{background:#f2f4f1;color:#778077}.badge-green{background:#eaf4eb;color:#57815d}.badge-amber{background:#fff4e5;color:#a3783e}.badge-blue{background:#ebf2f8;color:#5f7b96}.check-button{width:22px;height:22px;border-radius:50%;border:1px solid #dfe5dc;background:white;color:#54805a;display:grid;place-items:center}.check-button.checked{background:#56815d;border-color:#56815d;color:#fff}
@@ -926,6 +928,13 @@ body{background:#f3f5ef}
 .career-card-details{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:9px;font-size:10px;color:#667066}
 .career-card-description{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
 .career-card-link{display:inline-block;margin-top:9px;font-size:10px;color:#4e7e57;text-decoration:none}
+.career-row-list{grid-template-columns:minmax(0,1fr);gap:7px}
+.career-row-card{padding:9px 12px}
+.career-row-card>.compact-summary{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) auto 20px;align-items:center}
+.career-row-card>.compact-summary>div:first-child{min-width:0}
+.career-row-summary-details{display:flex;flex-wrap:wrap;gap:4px 12px;min-width:0;font-size:10px;color:var(--text-muted)}
+.career-row-card>.compact-summary .table-actions{flex:none}
+.career-row-card .career-card-details{margin-top:0}
 .career-card-link:hover{text-decoration:underline}
 .app-shell.dark .career-summary strong,.app-shell.dark .career-section-head h2,.app-shell.dark .career-card h3{color:#e3e8e2}
 .app-shell.dark .career-summary span,.app-shell.dark .career-section-head p,.app-shell.dark .career-card-head p,.app-shell.dark .career-card-details,.app-shell.dark .career-card-description{color:#a7b0a7}
@@ -1582,6 +1591,16 @@ body{background:#f3f5ef}
 .subscription-transactions-summary{justify-content:flex-start;gap:8px;font-size:10px;color:var(--text-muted)}
 .subscription-transactions-summary strong{color:var(--text-main)}
 .subscription-transactions-summary::after{margin-left:auto}
+.subscription-list{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.subscription-card{min-width:0;padding:9px 12px}
+.subscription-card-summary{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(100px,.55fr) auto 20px;align-items:center}
+.subscription-card-summary>.vehicle-heading{min-width:0}
+.subscription-card-summary>.vehicle-heading>div:last-child{min-width:0}
+.subscription-card-summary .table-actions{flex:none}
+.subscription-card-due{display:grid;gap:3px;font-size:10px;color:var(--text-muted)}
+.subscription-card-due strong{font:700 11px Manrope,sans-serif;color:var(--text-main)}
+.subscription-card-notes{margin:0 0 8px;font-size:11px;line-height:1.5;color:var(--text-muted);overflow-wrap:anywhere}
+.subscription-card .compact-details-body{padding-top:8px}
 .app-shell.dark .compact-details{background:var(--panel);border-color:var(--panel-line)}
 .app-shell.dark .subscription-transactions{background:color-mix(in srgb,var(--panel) 88%,#000)}
 @media(max-width:600px){
@@ -1592,5 +1611,19 @@ body{background:#f3f5ef}
   .vehicle-card>.compact-summary .vehicle-heading{gap:6px}
   .vehicle-card>.compact-summary .vehicle-icon{width:29px;height:29px}
   .career-list{grid-template-columns:minmax(0,1fr)}
+  .career-row-card{padding:9px 2px}
+  .career-row-card>.compact-summary{grid-template-columns:minmax(0,1fr) auto 18px;gap:5px}
+  .career-row-summary-details{grid-column:1;grid-row:2}
+  .career-row-card>.compact-summary .table-actions{grid-column:2;grid-row:1 / span 2}
+  .career-row-card>.compact-summary::after{grid-column:3;grid-row:1 / span 2}
+  .subscription-card{padding:9px 2px;border:0;border-bottom:1px solid var(--panel-line);border-radius:0;box-shadow:none;background:transparent}
+  .subscription-card-summary{grid-template-columns:minmax(0,1fr) auto 18px;gap:5px}
+  .subscription-card-summary>.vehicle-heading{grid-column:1;grid-row:1}
+  .subscription-card-summary>.subscription-card-due{grid-column:1;grid-row:2;margin-left:35px}
+  .subscription-card-summary>.table-actions{grid-column:2;grid-row:1 / span 2;gap:0}
+  .subscription-card-summary>.table-actions .button{width:32px;overflow:hidden;padding:0;font-size:0}
+  .subscription-card-summary>.table-actions .button svg{flex:none}
+  .subscription-card-summary::after{grid-column:3;grid-row:1 / span 2}
+  .app-shell.dark .subscription-card{background:transparent;border-bottom-color:var(--line,#343d35)}
   .app-shell.dark .compact-details{background:transparent;border-bottom-color:var(--line,#343d35)}
 }
