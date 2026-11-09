@@ -1188,6 +1188,36 @@ body{background:#f3f5ef}
 .app-shell.dark .student-attendance-status.status-late{background:#2c3b4d;color:#a9c5e6}
 .app-shell.dark .student-attendance-status.status-other{background:#393247;color:#c5b6e8}
 @media(max-width:700px){.student-marks-attendance-toolbar{align-items:stretch}.student-marks-controls{justify-content:stretch}.student-marks-controls>.search-wrap,.student-marks-controls>.field-wrap{flex:1 1 100%;max-width:none;min-width:0}.student-marks-year-card{grid-template-columns:minmax(0,1fr)}.student-marks-year-heading{grid-column:auto}}
+.student-report{display:grid;gap:12px}
+.student-report-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.student-report-toolbar>.field-wrap{min-width:200px}
+.student-report-paper{display:grid;gap:22px;padding:24px}
+.student-report-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid #e8ece6}
+.student-report-header>svg{flex:none;color:var(--user-accent,#356a4a)}
+.student-report-header h2{margin:0;color:#303830;font:700 22px Manrope,sans-serif}
+.student-report-header p{margin:5px 0 0;color:#78857b;font-size:11px}
+.student-report-header .student-report-eyebrow{margin:0 0 6px;color:var(--user-accent,#356a4a);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.student-report-section{display:grid;gap:10px}
+.student-report-section h3{margin:0;color:#354238;font:700 14px Manrope,sans-serif}
+.student-report-table-wrap{overflow-x:auto;border:1px solid #e8ece6;border-radius:8px}
+.student-report-table{width:100%;border-collapse:collapse;font-size:11px}
+.student-report-table th,.student-report-table td{padding:9px 11px;text-align:left;border-bottom:1px solid #eef0ec;white-space:nowrap}
+.student-report-table thead th{background:#f5f7f4;color:#59665a;font-size:10px;font-weight:700}
+.student-report-table tbody td:not(:first-child),.student-report-table thead th:not(:first-child),.student-report-table tfoot th:not(:first-child){text-align:right}
+.student-report-table tbody tr:last-child td{border-bottom:0}
+.student-report-table tfoot th{background:#f5f7f4;color:#354238;border-top:1px solid #e8ece6}
+.student-report-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px}
+.student-report-stats>div{display:grid;gap:5px;padding:11px;border:1px solid #e8ece6;border-radius:8px}
+.student-report-stats span{color:#78857b;font-size:10px}
+.student-report-stats strong{color:#303830;font-size:15px}
+.student-report-note,.student-report-empty{margin:0;color:#78857b;font-size:11px;line-height:1.5}
+.app-shell.dark .student-report-header{border-color:#343d35}
+.app-shell.dark .student-report-header h2,.app-shell.dark .student-report-section h3,.app-shell.dark .student-report-stats strong{color:#e3e8e2}
+.app-shell.dark .student-report-header p,.app-shell.dark .student-report-note,.app-shell.dark .student-report-empty,.app-shell.dark .student-report-stats span{color:#a7b0a7}
+.app-shell.dark .student-report-table-wrap,.app-shell.dark .student-report-stats>div{border-color:#343d35}
+.app-shell.dark .student-report-table th,.app-shell.dark .student-report-table td{border-color:#343d35}
+.app-shell.dark .student-report-table thead th,.app-shell.dark .student-report-table tfoot th{background:#252d26;color:#d4ddd4}
+@media(max-width:600px){.student-report-paper{padding:15px}.student-report-table{font-size:10px}.student-report-table th,.student-report-table td{padding:8px}}
 .app-shell.dark .education-icon{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .education-card-title h2,.app-shell.dark .education-details strong{color:#e3e8e2}
 .app-shell.dark .education-card-title p,.app-shell.dark .education-details span{color:#a7b0a7}
