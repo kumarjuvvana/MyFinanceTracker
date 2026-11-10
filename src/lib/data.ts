@@ -342,6 +342,26 @@ export function validateData(value: unknown): value is TrackerData {
       (scheme.nav === null || (typeof scheme.nav === "number" && Number.isFinite(scheme.nav) && scheme.nav >= 0)) &&
       (scheme.currentValue === null || (typeof scheme.currentValue === "number" &&
         Number.isFinite(scheme.currentValue) && scheme.currentValue >= 0))))) &&
+    (asset.sanctionedAmount === undefined || asset.sanctionedAmount === null ||
+      (typeof asset.sanctionedAmount === "number" && Number.isFinite(asset.sanctionedAmount) && asset.sanctionedAmount >= 0)) &&
+    (asset.principalOutstanding === undefined || asset.principalOutstanding === null ||
+      (typeof asset.principalOutstanding === "number" && Number.isFinite(asset.principalOutstanding) && asset.principalOutstanding >= 0)) &&
+    (asset.interestPaidToDate === undefined || asset.interestPaidToDate === null ||
+      (typeof asset.interestPaidToDate === "number" && Number.isFinite(asset.interestPaidToDate) && asset.interestPaidToDate >= 0)) &&
+    (asset.loanTenureMonths === undefined || asset.loanTenureMonths === null ||
+      (typeof asset.loanTenureMonths === "number" && Number.isInteger(asset.loanTenureMonths) && asset.loanTenureMonths >= 0)) &&
+    (asset.remainingTenureMonths === undefined || asset.remainingTenureMonths === null ||
+      (typeof asset.remainingTenureMonths === "number" && Number.isInteger(asset.remainingTenureMonths) && asset.remainingTenureMonths >= 0)) &&
+    (asset.emiAmount === undefined || asset.emiAmount === null ||
+      (typeof asset.emiAmount === "number" && Number.isFinite(asset.emiAmount) && asset.emiAmount >= 0)) &&
+    (asset.interestRateType === undefined || asset.interestRateType === "Fixed" ||
+      asset.interestRateType === "Floating" || asset.interestRateType === "Mixed" ||
+      asset.interestRateType === "Unknown") &&
+    (asset.lastStatementDate === undefined || (typeof asset.lastStatementDate === "string" &&
+      (asset.lastStatementDate === "" || !Number.isNaN(Date.parse(asset.lastStatementDate))))) &&
+    (asset.firstEmiDate === undefined || (typeof asset.firstEmiDate === "string" &&
+      (asset.firstEmiDate === "" || !Number.isNaN(Date.parse(asset.firstEmiDate))))) &&
+    (asset.lenderLoanType === undefined || typeof asset.lenderLoanType === "string") &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>

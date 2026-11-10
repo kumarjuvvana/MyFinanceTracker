@@ -163,6 +163,7 @@ export const ASSET_TYPES = [
   "NPS",
   "Stock",
   "Loan",
+  "Home loan",
   "Real estate",
   "Bond",
   "Digital gold",
@@ -202,6 +203,16 @@ export interface AssetRecord {
   chargesValue?: number | null;
   lastWithdrawalDate?: string;
   npsSchemes?: NpsSchemeHolding[];
+  sanctionedAmount?: number | null;
+  principalOutstanding?: number | null;
+  interestPaidToDate?: number | null;
+  loanTenureMonths?: number | null;
+  remainingTenureMonths?: number | null;
+  emiAmount?: number | null;
+  interestRateType?: "Fixed" | "Floating" | "Mixed" | "Unknown";
+  lastStatementDate?: string;
+  firstEmiDate?: string;
+  lenderLoanType?: string;
   location: string;
   notes: string;
   tags: string[];
