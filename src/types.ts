@@ -130,6 +130,8 @@ export interface ImportantDate {
   date: string;
   categoryId: string;
   feelingId: string;
+  person: string;
+  note: string;
   link: string;
   reminder: boolean;
 }

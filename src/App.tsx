@@ -129,6 +129,21 @@ const defaultItem = (): Omit<ShoppingItem, "id"> => ({
   name: "", quantity: 1, unit: "pcs", category: "Groceries", estimatedPrice: 0, purchased: false,
 });
 const dateLabel = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+function importantDateElapsed(date: string, now: Date): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const eventStart = new Date(year, month - 1, day);
+  const future = eventStart.getTime() > now.getTime();
+  const [start, end] = future ? [now, eventStart] : [eventStart, now];
+  const elapsedHours = Math.floor((end.getTime() - start.getTime()) / 3_600_000);
+  let elapsedMonths = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth();
+  if (end.getDate() < start.getDate()) elapsedMonths -= 1;
+  const startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  const elapsedDays = Math.floor((endDay - startDay) / 86_400_000);
+  const elapsedYears = Math.floor(elapsedMonths / 12);
+  const duration = `${elapsedYears.toLocaleString()} ${elapsedYears === 1 ? "year" : "years"} · ${elapsedMonths.toLocaleString()} ${elapsedMonths === 1 ? "month" : "months"} · ${elapsedDays.toLocaleString()} ${elapsedDays === 1 ? "day" : "days"} · ${elapsedHours.toLocaleString()} ${elapsedHours === 1 ? "hour" : "hours"}`;
+  return future ? `In ${duration.toLocaleLowerCase()}` : `${duration} since`;
+}
 function groupByDate<T>(items: readonly T[], getDate: (item: T) => string | undefined) {
   const groups = new Map<string, T[]>();
   for (const item of items) {
@@ -804,7 +819,7 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
 }) {
   const [entry, setEntry] = useState<ImportantDate>(initial ?? {
     id: createId(), title: "", date: today(), categoryId: categories[0]?.id ?? "",
-    feelingId: "", link: "", reminder: true,
+    feelingId: "", person: "", note: "", link: "", reminder: true,
   });
   const [error, setError] = useState("");
 
@@ -825,7 +840,7 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
       setError("Enter a valid HTTP or HTTPS link.");
       return;
     }
-    onSave({ ...entry, title: entry.title.trim(), link: entry.link.trim() });
+    onSave({ ...entry, title: entry.title.trim(), person: entry.person.trim(), note: entry.note.trim(), link: entry.link.trim() });
   }
 
   return <Modal title={initial ? "Edit important date" : "Add important date"} onClose={onClose}>
@@ -834,6 +849,8 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
       <Field label="Date"><DateInput required value={entry.date} onValueChange={(date) => setEntry((current) => ({ ...current, date }))} /></Field>
       <Field label="Category"><Select required value={entry.categoryId} onChange={(event) => setEntry((current) => ({ ...current, categoryId: event.target.value }))}>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>
       <Field label="How did it feel?"><Select value={entry.feelingId} onChange={(event) => setEntry((current) => ({ ...current, feelingId: event.target.value }))}><option value="">Not set</option>{feelings.map((feeling) => <option key={feeling.id} value={feeling.id}>{feeling.name}</option>)}</Select></Field>
+      <Field label="Person (optional)"><Input maxLength={120} placeholder="Who does this date belong to?" value={entry.person} onChange={(event) => setEntry((current) => ({ ...current, person: event.target.value }))} /></Field>
+      <Field className="full" label="Note (optional)"><textarea className="field textarea" rows={2} maxLength={500} placeholder="Add a short note" value={entry.note} onChange={(event) => setEntry((current) => ({ ...current, note: event.target.value }))} /></Field>
       <Field label="Link (optional)"><Input type="url" maxLength={2048} placeholder="https://..." value={entry.link} onChange={(event) => setEntry((current) => ({ ...current, link: event.target.value }))} /></Field>
       <label className="important-date-reminder-toggle"><input type="checkbox" checked={entry.reminder} onChange={(event) => setEntry((current) => ({ ...current, reminder: event.target.checked }))} /><span>Show a dashboard reminder for this exact date</span></label>
     </div>
@@ -857,6 +874,7 @@ function ImportantDatesPage() {
   const [feelingDraft, setFeelingDraft] = useState("");
   const [feelingSentiment, setFeelingSentiment] = useState<ImportantDateFeeling["sentiment"]>("Good");
   const [search, setSearch] = useState("");
+  const [elapsedAt, setElapsedAt] = useState(() => new Date());
 
   useEffect(() => {
     let active = true;
@@ -872,6 +890,11 @@ function ImportantDatesPage() {
       if (active) setLoading(false);
     });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setElapsedAt(new Date()), 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   async function persist(nextRecords: ImportantDate[], nextCategories: ImportantDateCategory[], nextFeelings: ImportantDateFeeling[]) {
@@ -979,7 +1002,7 @@ function ImportantDatesPage() {
   const visible = records.filter((entry) => {
     const category = categories.find((item) => item.id === entry.categoryId)?.name ?? "";
     const feeling = feelings.find((item) => item.id === entry.feelingId)?.name ?? "";
-    return [entry.title, entry.date, category, feeling].some((value) => value.toLocaleLowerCase().includes(query));
+    return [entry.title, entry.date, category, feeling, entry.person, entry.note].some((value) => value.toLocaleLowerCase().includes(query));
   }).sort((a, b) => b.date.localeCompare(a.date));
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
   const feelingById = new Map(feelings.map((feeling) => [feeling.id, feeling]));
@@ -998,7 +1021,7 @@ function ImportantDatesPage() {
         <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search important dates" placeholder="Search title, category, feeling..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge></div>
         {visible.length ? <DateGroupedRecords items={visible} getDate={(entry) => entry.date} title={(date) => `Important dates · ${dateLabel(date)}`}>{(dateEntries) => <div className="important-date-list">{dateEntries.map((entry) => {
           const feeling = feelingById.get(entry.feelingId);
-          return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name].filter(Boolean).join(" · ")}</span></div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
+          return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note">{entry.note}</span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
         })}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<CalendarDays size={18} />} title={records.length ? "No matching important dates" : "No important dates yet"} description={records.length ? "Try another search." : "Add a milestone, important purchase, or personal date to start your timeline."} /></Card>}
       </>}
       {activeTab === "categories" && <Card className="important-date-master"><div><h2 className="section-title">Date categories</h2><p className="section-description">Organize events such as education, career, family, and purchases.</p></div><form className="important-date-master-add" onSubmit={(event) => void addCategory(event)}><Input aria-label="New date category" maxLength={80} placeholder="New category name" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} /><Button type="submit" disabled={saving || !categoryDraft.trim()}><Plus size={14} />Add category</Button></form><div className="master-entry-list">{categories.map((category) => <div className="master-entry" key={category.id}><div className="recent-info"><div className="recent-name">{category.name}</div><div className="recent-meta">{records.filter((entry) => entry.categoryId === category.id).length} important dates</div></div><button className="icon-button" disabled={saving} aria-label={`Rename ${category.name}`} onClick={() => void renameCategory(category)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${category.name}`} onClick={() => void deleteCategory(category)}><Archive size={14} /></button></div>)}</div></Card>}

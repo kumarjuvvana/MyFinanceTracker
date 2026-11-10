@@ -21,6 +21,8 @@ create table if not exists public.important_dates (
   event_date date not null,
   category_id text not null references public.important_date_categories(id) on update cascade on delete restrict,
   feeling_id text references public.important_date_feelings(id) on update cascade on delete restrict,
+  person_name text not null default '' check (pg_catalog.length(person_name) <= 120),
+  note text not null default '' check (pg_catalog.length(note) <= 500),
   link text not null default '',
   show_reminder boolean not null default false,
   position integer not null check (position >= 0)
@@ -79,6 +81,8 @@ as $$
         'date', entry.event_date::text,
         'categoryId', entry.category_id,
         'feelingId', coalesce(entry.feeling_id, ''),
+        'person', entry.person_name,
+        'note', entry.note,
         'link', entry.link,
         'reminder', entry.show_reminder
       ) order by entry.position)
@@ -168,7 +172,7 @@ begin
   for entry in select pg_catalog.jsonb_array_elements(p_dates)
   loop
     insert into public.important_dates (
-      id, title, event_date, category_id, feeling_id, link, show_reminder, position
+      id, title, event_date, category_id, feeling_id, person_name, note, link, show_reminder, position
     )
     values (
       entry ->> 'id',
@@ -176,6 +180,8 @@ begin
       (entry ->> 'date')::date,
       entry ->> 'categoryId',
       nullif(entry ->> 'feelingId', ''),
+      coalesce(entry ->> 'person', ''),
+      coalesce(entry ->> 'note', ''),
       coalesce(entry ->> 'link', ''),
       coalesce((entry ->> 'reminder')::boolean, false),
       item_position

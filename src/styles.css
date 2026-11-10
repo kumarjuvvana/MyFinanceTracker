@@ -1816,6 +1816,8 @@ body{background:#f3f5ef}
 .important-date-card-title{display:grid;gap:4px;min-width:0}
 .important-date-card-title>strong{font:700 12px Manrope,sans-serif;color:var(--text-main,#303830);overflow-wrap:anywhere}
 .important-date-card-title>span,.important-date-card-meta{font-size:10px;color:var(--text-muted,#858d83)}
+.important-date-card-title>.important-date-elapsed{font-size:10px;font-weight:650;color:var(--user-accent,#56815d);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.important-date-card-title>.important-date-note{white-space:pre-wrap;overflow-wrap:anywhere}
 .important-date-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .important-date-card-meta .personal-document-link{margin:0}
 .important-date-card-main>.table-actions{flex:none}
@@ -1828,6 +1830,7 @@ body{background:#f3f5ef}
 .important-date-reminder-toggle input{width:16px;height:16px;accent-color:var(--user-accent,#56815d)}
 .app-shell.dark .important-date-card-title>strong{color:#e3e8e2}
 .app-shell.dark .important-date-card-title>span,.app-shell.dark .important-date-card-meta,.app-shell.dark .important-date-reminder-toggle{color:#a7b0a7}
+.app-shell.dark .important-date-card-title>.important-date-elapsed{color:#a6c1a8}
 .app-shell.dark .cooking-planner-section>.devotional-section-head h2,.app-shell.dark .cooking-calendar-head>strong,.app-shell.dark .cooking-day-heading h3,.app-shell.dark .cooking-plan-main strong,.app-shell.dark .cooking-plan-ingredient-head strong{color:#e3e8e2}
 .app-shell.dark .cooking-planner-section>.devotional-section-head p,.app-shell.dark .cooking-day-heading span,.app-shell.dark .cooking-plan-main span,.app-shell.dark .cooking-calendar-weekday,.app-shell.dark .cooking-plan-ingredient-head span,.app-shell.dark .cooking-plan-ingredient-cost{color:#a7b0a7}
 .app-shell.dark .cooking-calendar-day{color:#d4ddd4}

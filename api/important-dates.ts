@@ -61,7 +61,7 @@ function validLink(value: unknown): value is string {
 }
 
 function validateData(value: unknown): value is {
-  dates: Array<{ id: string; title: string; date: string; categoryId: string; feelingId: string; link: string; reminder: boolean }>;
+  dates: Array<{ id: string; title: string; date: string; categoryId: string; feelingId: string; person: string; note: string; link: string; reminder: boolean }>;
   categories: Array<{ id: string; name: string }>;
   feelings: Array<{ id: string; name: string; sentiment: "Good" | "Bad" | "Mixed" }>;
 } {
@@ -93,6 +93,8 @@ function validateData(value: unknown): value is {
       typeof date.title !== "string" || !date.title.trim() || date.title.length > 160 ||
       !validDate(date.date) || !validId(date.categoryId) || !categoryIds.has(date.categoryId) ||
       !(date.feelingId === "" || validId(date.feelingId) && feelingIds.has(date.feelingId)) ||
+      typeof date.person !== "string" || date.person.length > 120 ||
+      typeof date.note !== "string" || date.note.length > 500 ||
       !validLink(date.link) || typeof date.reminder !== "boolean") return false;
     dateIds.add(date.id);
   }
