@@ -2512,6 +2512,7 @@ const emptyAsset = (): Omit<AssetRecord, "id"> => ({
   startDate: "",
   maturityDate: "",
   valuationDate: "",
+  installmentsPaid: null,
   location: "",
   notes: "",
   tags: [],
@@ -2530,6 +2531,7 @@ function AssetModal({ initial, onClose, onSave }: {
   const [currentValue, setCurrentValue] = useState(initial?.currentValue == null ? "" : String(initial.currentValue));
   const [quantity, setQuantity] = useState(initial?.quantity == null ? "" : String(initial.quantity));
   const [interestRate, setInterestRate] = useState(initial?.interestRate == null ? "" : String(initial.interestRate));
+  const [installmentsPaid, setInstallmentsPaid] = useState(initial?.installmentsPaid == null ? "" : String(initial.installmentsPaid));
   const [error, setError] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -2550,14 +2552,16 @@ function AssetModal({ initial, onClose, onSave }: {
     const parsedCurrent = parseOptionalNumber(currentValue);
     const parsedQuantity = parseOptionalNumber(quantity);
     const parsedInterest = parseOptionalNumber(interestRate);
-    if ([investedValue, currentValue, quantity, interestRate].some((value) => value.trim() !== "") &&
-      [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest].some((value, index) =>
-        [investedValue, currentValue, quantity, interestRate][index].trim() !== "" && value === null)) {
+    const parsedInstallments = parseOptionalNumber(installmentsPaid);
+    if ([investedValue, currentValue, quantity, interestRate, installmentsPaid].some((value) => value.trim() !== "") &&
+      [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest, parsedInstallments].some((value, index) =>
+        [investedValue, currentValue, quantity, interestRate, installmentsPaid][index].trim() !== "" && value === null)) {
       setError("Enter valid numeric values, or leave optional fields blank.");
       return;
     }
     if (parsedInvested !== null && parsedInvested < 0 || parsedCurrent !== null && parsedCurrent < 0 ||
-      parsedQuantity !== null && parsedQuantity < 0 || parsedInterest !== null && (parsedInterest < 0 || parsedInterest > 100)) {
+      parsedQuantity !== null && parsedQuantity < 0 || parsedInterest !== null && (parsedInterest < 0 || parsedInterest > 100) ||
+      parsedInstallments !== null && (!Number.isInteger(parsedInstallments) || parsedInstallments < 0)) {
       setError("Amounts and quantities must be non-negative; the interest rate must be between 0 and 100.");
       return;
     }
@@ -2565,6 +2569,7 @@ function AssetModal({ initial, onClose, onSave }: {
       ...asset,
       name: asset.name.trim(),
       valuationDate: asset.valuationDate ?? "",
+      installmentsPaid: parsedInstallments,
       investedValue: parsedInvested,
       currentValue: parsedCurrent,
       quantity: parsedQuantity,
@@ -2589,6 +2594,8 @@ function AssetModal({ initial, onClose, onSave }: {
   }
 
   const isLoan = asset.type === "Loan";
+  const isGold = asset.type === "Digital gold";
+  const isGoldScheme = asset.type === "Gold savings scheme";
   return <Modal title={initial ? "Edit asset" : "Add asset"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Asset name (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Retirement fund, home loan, family home" value={asset.name} onChange={(event) => setAsset((current) => ({ ...current, name: event.target.value }))} /></Field>
@@ -2596,13 +2603,14 @@ function AssetModal({ initial, onClose, onSave }: {
       <Field label="Currency"><Select value={asset.currency} onChange={(event) => setAsset((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
       <Field label="Institution / provider"><Input maxLength={120} placeholder="Optional" value={asset.institution} onChange={(event) => setAsset((current) => ({ ...current, institution: event.target.value }))} /></Field>
       <Field label="Account / reference"><Input maxLength={120} placeholder="Optional (avoid sensitive numbers)" value={asset.reference} onChange={(event) => setAsset((current) => ({ ...current, reference: event.target.value }))} /></Field>
-      {numericInput(isLoan ? "Original loan amount" : "Invested / purchase amount", investedValue, setInvestedValue)}
+      {numericInput(isLoan ? "Original loan amount" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount", investedValue, setInvestedValue)}
       {numericInput(isLoan ? "Outstanding balance" : "Current value", currentValue, setCurrentValue)}
-      {numericInput("Units / quantity", quantity, setQuantity, { step: "any" })}
+      {numericInput(isGold || isGoldScheme ? "Gold weight (grams)" : "Units / quantity", quantity, setQuantity, { step: "any" })}
+      {isGoldScheme && numericInput("Installments paid", installmentsPaid, setInstallmentsPaid, { step: "1" })}
       {numericInput("Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
       <Field label={isLoan ? "Start / disbursal date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
       <Field label="Maturity / renewal date"><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>
-      {asset.type === "Mutual fund" && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
+      {(asset.type === "Mutual fund" || isGold) && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
       <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
@@ -2629,6 +2637,7 @@ function AssetManager({ assets, onSave, onDelete }: {
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
   const visibleMutualFunds = visible.filter((asset) => asset.type === "Mutual fund");
+  const visibleDigitalGold = visible.filter((asset) => asset.type === "Digital gold");
   const mutualFundTotals = new Map<Currency, { invested: number; current: number }>();
   for (const fund of visibleMutualFunds) {
     if (fund.investedValue === null || fund.currentValue === null) continue;
@@ -2636,6 +2645,14 @@ function AssetManager({ assets, onSave, onDelete }: {
     total.invested += fund.investedValue;
     total.current += fund.currentValue;
     mutualFundTotals.set(fund.currency, total);
+  }
+  const digitalGoldTotals = new Map<Currency, { invested: number; current: number; grams: number }>();
+  for (const holding of visibleDigitalGold) {
+    const total = digitalGoldTotals.get(holding.currency) ?? { invested: 0, current: 0, grams: 0 };
+    if (holding.investedValue !== null) total.invested += holding.investedValue;
+    if (holding.currentValue !== null) total.current += holding.currentValue;
+    if (holding.quantity !== null) total.grams += holding.quantity;
+    digitalGoldTotals.set(holding.currency, total);
   }
   const totals = new Map<Currency, { assets: number; liabilities: number }>();
   for (const asset of assets) {
@@ -2661,7 +2678,8 @@ function AssetManager({ assets, onSave, onDelete }: {
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {(["All types", ...ASSET_TYPES] as const).map((type) => {
         const count = type === "All types" ? assets.length : assets.filter((asset) => asset.type === type).length;
-        return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{type === "All types" ? "All" : type}<span>{count}</span></button>;
+        const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes" : type;
+        return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
       })}
     </div>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search assets" placeholder="Search name, provider, reference, tags..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "record" : "records"}</Badge></div>
@@ -2675,8 +2693,22 @@ function AssetManager({ assets, onSave, onDelete }: {
       </Card>;
     })}</div>}
     {activeType === "Mutual fund" && <div className="alert">Mutual fund values are statement snapshots, not live NAV. Implied NAV is current value divided by units; gain percentage is total change, not annualized return. Transaction history is not included.</div>}
+    {activeType === "Digital gold" && digitalGoldTotals.size > 0 && <div className="asset-total-list digital-gold-summary">{[...digitalGoldTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
+      const gain = total.current - total.invested;
+      const returnPercent = total.invested ? gain / total.invested * 100 : null;
+      return <Card className="asset-total-card" key={currency}>
+        <div><span>Gold held</span><strong>{total.grams.toLocaleString(undefined, { maximumFractionDigits: 4 })} g</strong></div>
+        <div><span>Invested · {currency}</span><strong>{formatAmount(total.invested, currency)}</strong></div>
+        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
+      </Card>;
+    })}</div>}
+    {activeType === "Digital gold" && <div className="alert">Digital gold values are manually recorded snapshots, not live provider prices. Per-gram value is derived from current value ÷ grams; returns are not annualized. Update the valuation date when refreshing a provider balance.</div>}
+    {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Amounts and installments are copied from the supplied screenshot; verify whether the amount is cumulative before relying on returns.</div>}
     <div className="asset-list">{visible.map((asset) => {
       const isLoan = asset.type === "Loan";
+      const isGold = asset.type === "Digital gold";
+      const isGoldScheme = asset.type === "Gold savings scheme";
       const performance = asset.investedValue !== null && asset.currentValue !== null
         ? asset.currentValue - asset.investedValue
         : null;
@@ -2686,19 +2718,24 @@ function AssetManager({ assets, onSave, onDelete }: {
       const impliedNav = asset.type === "Mutual fund" && asset.quantity && asset.currentValue !== null
         ? asset.currentValue / asset.quantity
         : null;
+      const impliedGoldPrice = isGold && asset.quantity && asset.currentValue !== null
+        ? asset.currentValue / asset.quantity
+        : null;
       return <Card className="asset-card" key={asset.id}>
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
-          {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
+          {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {asset.currentValue !== null && <div><span>{isLoan ? "Outstanding balance" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
-          {asset.quantity !== null && <div><span>{asset.type === "Mutual fund" ? "Units" : "Units / quantity"}</span><strong>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}</strong></div>}
+          {asset.quantity !== null && <div><span>{isGold || isGoldScheme ? "Gold weight" : asset.type === "Mutual fund" ? "Units" : "Units / quantity"}</span><strong>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: isGold || isGoldScheme ? 4 : 3 })}{isGold || isGoldScheme ? " g" : ""}</strong></div>}
           {impliedNav !== null && <div><span>Implied NAV · statement value / units</span><strong>{formatAmount(impliedNav, asset.currency)}</strong></div>}
+          {impliedGoldPrice !== null && <div><span>Implied value per gram</span><strong>{formatAmount(impliedGoldPrice, asset.currency)}/g</strong></div>}
+          {isGoldScheme && asset.installmentsPaid != null && <div><span>Installments paid</span><strong>{asset.installmentsPaid}</strong></div>}
           {asset.interestRate !== null && <div><span>Interest / coupon</span><strong>{asset.interestRate}%</strong></div>}
           {asset.reference && <div><span>Account / reference</span><strong>{asset.reference}</strong></div>}
           {asset.valuationDate && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
           {asset.startDate && <div><span>{isLoan ? "Start date" : "Purchase / start date"}</span><strong>{dateLabel(asset.startDate)}</strong></div>}
           {asset.maturityDate && <div><span>Maturity / renewal</span><strong>{dateLabel(asset.maturityDate)}</strong></div>}
-          {performance !== null && !isLoan && <div><span>{asset.type === "Mutual fund" ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
+          {performance !== null && !isLoan && <div><span>{asset.type === "Mutual fund" || isGold ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
           {asset.location && <div><span>Location / description</span><strong>{asset.location}</strong></div>}
         </div>
         {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}

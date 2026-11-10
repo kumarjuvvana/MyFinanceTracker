@@ -784,6 +784,7 @@ body{background:#f3f5ef}
 .asset-type-tabs button[aria-selected="true"] span{background:color-mix(in srgb,var(--user-accent,#56815d) 14%,transparent)}
 .app-shell.dark .asset-type-tabs button{border-color:#394239;background:#252d26;color:#a7b0a7}
 .app-shell.dark .asset-type-tabs button[aria-selected="true"]{border-color:#a6c1a8;background:#2c3b2e;color:#a6c1a8}
+.digital-gold-summary .asset-total-card{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
 .asset-total-card{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:15px}
 .asset-total-card>div{display:grid;gap:6px;min-width:0}
 .asset-total-card span{font-size:9px;color:#92998f;overflow-wrap:anywhere}

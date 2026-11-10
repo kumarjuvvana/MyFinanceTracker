@@ -165,6 +165,7 @@ export const ASSET_TYPES = [
   "Real estate",
   "Bond",
   "Digital gold",
+  "Gold savings scheme",
   "Cash / deposit",
   "Other",
 ] as const;
@@ -186,6 +187,7 @@ export interface AssetRecord {
   startDate: string;
   maturityDate: string;
   valuationDate?: string;
+  installmentsPaid?: number | null;
   location: string;
   notes: string;
   tags: string[];

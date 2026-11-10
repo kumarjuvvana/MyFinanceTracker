@@ -325,6 +325,8 @@ export function validateData(value: unknown): value is TrackerData {
     typeof asset.maturityDate === "string" && (asset.maturityDate === "" || !Number.isNaN(Date.parse(asset.maturityDate))) &&
     (asset.valuationDate === undefined || (typeof asset.valuationDate === "string" &&
       (asset.valuationDate === "" || !Number.isNaN(Date.parse(asset.valuationDate))))) &&
+    (asset.installmentsPaid === undefined || asset.installmentsPaid === null ||
+      (typeof asset.installmentsPaid === "number" && Number.isInteger(asset.installmentsPaid) && asset.installmentsPaid >= 0)) &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>
