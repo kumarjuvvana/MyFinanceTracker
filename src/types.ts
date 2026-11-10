@@ -185,6 +185,7 @@ export interface AssetRecord {
   interestRate: number | null;
   startDate: string;
   maturityDate: string;
+  valuationDate?: string;
   location: string;
   notes: string;
   tags: string[];

@@ -2511,6 +2511,7 @@ const emptyAsset = (): Omit<AssetRecord, "id"> => ({
   interestRate: null,
   startDate: "",
   maturityDate: "",
+  valuationDate: "",
   location: "",
   notes: "",
   tags: [],
@@ -2563,6 +2564,7 @@ function AssetModal({ initial, onClose, onSave }: {
     onSave({
       ...asset,
       name: asset.name.trim(),
+      valuationDate: asset.valuationDate ?? "",
       investedValue: parsedInvested,
       currentValue: parsedCurrent,
       quantity: parsedQuantity,
@@ -2600,6 +2602,7 @@ function AssetModal({ initial, onClose, onSave }: {
       {numericInput("Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
       <Field label={isLoan ? "Start / disbursal date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
       <Field label="Maturity / renewal date"><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>
+      {asset.type === "Mutual fund" && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
       <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
@@ -2618,13 +2621,22 @@ function AssetManager({ assets, onSave, onDelete }: {
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("All types");
+  const [activeType, setActiveType] = useState<"All types" | AssetType>("All types");
   const query = search.trim().toLocaleLowerCase();
   const visible = assets.filter((asset) =>
-    (typeFilter === "All types" || asset.type === typeFilter) &&
+    (activeType === "All types" || asset.type === activeType) &&
     [asset.name, asset.type, asset.institution, asset.reference, asset.location, asset.notes, ...asset.tags]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
+  const visibleMutualFunds = visible.filter((asset) => asset.type === "Mutual fund");
+  const mutualFundTotals = new Map<Currency, { invested: number; current: number }>();
+  for (const fund of visibleMutualFunds) {
+    if (fund.investedValue === null || fund.currentValue === null) continue;
+    const total = mutualFundTotals.get(fund.currency) ?? { invested: 0, current: 0 };
+    total.invested += fund.investedValue;
+    total.current += fund.currentValue;
+    mutualFundTotals.set(fund.currency, total);
+  }
   const totals = new Map<Currency, { assets: number; liabilities: number }>();
   for (const asset of assets) {
     if (asset.currentValue === null) continue;
@@ -2646,23 +2658,47 @@ function AssetManager({ assets, onSave, onDelete }: {
     <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track mutual funds, stocks, loans, real estate, bonds, digital gold, cash/deposits, and other assets. Only asset name and type are required; values and other details are optional and manually entered. Loans are counted as liabilities. Stock entries here are summaries—avoid duplicating amounts already represented in the detailed Stocks portfolio. These details are readable in the private GitHub repository and persist in its history; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search assets" placeholder="Search name, provider, reference, tags..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={typeFilter === "All types" ? 0 : 1}><Field label="Asset type"><Select aria-label="Filter asset type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option>{ASSET_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "record" : "records"}</Badge></div>
+    <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
+      {(["All types", ...ASSET_TYPES] as const).map((type) => {
+        const count = type === "All types" ? assets.length : assets.filter((asset) => asset.type === type).length;
+        return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{type === "All types" ? "All" : type}<span>{count}</span></button>;
+      })}
+    </div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search assets" placeholder="Search name, provider, reference, tags..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "record" : "records"}</Badge></div>
+    {activeType === "Mutual fund" && mutualFundTotals.size > 0 && <div className="asset-total-list">{[...mutualFundTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
+      const gain = total.current - total.invested;
+      const returnPercent = total.invested ? gain / total.invested * 100 : null;
+      return <Card className="asset-total-card mutual-fund-total-card" key={currency}>
+        <div><span>Invested · {currency}</span><strong>{formatAmount(total.invested, currency)}</strong></div>
+        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
+      </Card>;
+    })}</div>}
+    {activeType === "Mutual fund" && <div className="alert">Mutual fund values are statement snapshots, not live NAV. Implied NAV is current value divided by units; gain percentage is total change, not annualized return. Transaction history is not included.</div>}
     <div className="asset-list">{visible.map((asset) => {
       const isLoan = asset.type === "Loan";
       const performance = asset.investedValue !== null && asset.currentValue !== null
         ? asset.currentValue - asset.investedValue
+        : null;
+      const performancePercent = performance !== null && asset.investedValue
+        ? performance / asset.investedValue * 100
+        : null;
+      const impliedNav = asset.type === "Mutual fund" && asset.quantity && asset.currentValue !== null
+        ? asset.currentValue / asset.quantity
         : null;
       return <Card className="asset-card" key={asset.id}>
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
           {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {asset.currentValue !== null && <div><span>{isLoan ? "Outstanding balance" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
-          {asset.quantity !== null && <div><span>Units / quantity</span><strong>{asset.quantity.toLocaleString()}</strong></div>}
+          {asset.quantity !== null && <div><span>{asset.type === "Mutual fund" ? "Units" : "Units / quantity"}</span><strong>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}</strong></div>}
+          {impliedNav !== null && <div><span>Implied NAV · statement value / units</span><strong>{formatAmount(impliedNav, asset.currency)}</strong></div>}
           {asset.interestRate !== null && <div><span>Interest / coupon</span><strong>{asset.interestRate}%</strong></div>}
           {asset.reference && <div><span>Account / reference</span><strong>{asset.reference}</strong></div>}
+          {asset.valuationDate && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
           {asset.startDate && <div><span>{isLoan ? "Start date" : "Purchase / start date"}</span><strong>{dateLabel(asset.startDate)}</strong></div>}
           {asset.maturityDate && <div><span>Maturity / renewal</span><strong>{dateLabel(asset.maturityDate)}</strong></div>}
-          {performance !== null && !isLoan && <div><span>Change since invested</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}</strong></div>}
+          {performance !== null && !isLoan && <div><span>{asset.type === "Mutual fund" ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
           {asset.location && <div><span>Location / description</span><strong>{asset.location}</strong></div>}
         </div>
         {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
@@ -2670,7 +2706,7 @@ function AssetManager({ assets, onSave, onDelete }: {
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
     })}</div>
-    {!visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or type." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
+    {!visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
     {editor !== undefined && <AssetModal key={editor?.id ?? "new-asset"} initial={editor} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} />}
   </>;
 }

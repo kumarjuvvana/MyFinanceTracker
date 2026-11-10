@@ -323,6 +323,8 @@ export function validateData(value: unknown): value is TrackerData {
     (asset.interestRate === null || (typeof asset.interestRate === "number" && Number.isFinite(asset.interestRate) && asset.interestRate >= 0 && asset.interestRate <= 100)) &&
     typeof asset.startDate === "string" && (asset.startDate === "" || !Number.isNaN(Date.parse(asset.startDate))) &&
     typeof asset.maturityDate === "string" && (asset.maturityDate === "" || !Number.isNaN(Date.parse(asset.maturityDate))) &&
+    (asset.valuationDate === undefined || (typeof asset.valuationDate === "string" &&
+      (asset.valuationDate === "" || !Number.isNaN(Date.parse(asset.valuationDate))))) &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>
