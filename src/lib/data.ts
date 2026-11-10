@@ -367,6 +367,12 @@ export function validateData(value: unknown): value is TrackerData {
     (asset.depositTerm === undefined || typeof asset.depositTerm === "string") &&
     (asset.depositScheme === undefined || typeof asset.depositScheme === "string") &&
     (asset.maturityInstruction === undefined || typeof asset.maturityInstruction === "string") &&
+    (asset.bondScheme === undefined || typeof asset.bondScheme === "string" && asset.bondScheme.length <= 160) &&
+    (asset.bondInterestPaymentFrequency === undefined || asset.bondInterestPaymentFrequency === "Monthly" ||
+      asset.bondInterestPaymentFrequency === "Quarterly" || asset.bondInterestPaymentFrequency === "Semi-annual" ||
+      asset.bondInterestPaymentFrequency === "Annual" || asset.bondInterestPaymentFrequency === "At maturity" ||
+      asset.bondInterestPaymentFrequency === "Other" || asset.bondInterestPaymentFrequency === "Unknown") &&
+    (asset.bondCouponResetDates === undefined || typeof asset.bondCouponResetDates === "string" && asset.bondCouponResetDates.length <= 200) &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>

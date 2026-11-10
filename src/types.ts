@@ -218,6 +218,9 @@ export interface AssetRecord {
   depositTerm?: string;
   depositScheme?: string;
   maturityInstruction?: string;
+  bondScheme?: string;
+  bondInterestPaymentFrequency?: "Monthly" | "Quarterly" | "Semi-annual" | "Annual" | "At maturity" | "Other" | "Unknown";
+  bondCouponResetDates?: string;
   location: string;
   notes: string;
   tags: string[];
