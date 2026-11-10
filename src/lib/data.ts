@@ -868,7 +868,11 @@ export function validateData(value: unknown): value is TrackerData {
     typeof account.branch === "string" && account.branch.length <= 160 &&
     typeof account.website === "string" && account.website.length <= 2000 && isSafeExternalLink(account.website) &&
     typeof account.customerService === "string" && account.customerService.length <= 500 &&
-    typeof account.notes === "string" && account.notes.length <= 3000));
+    typeof account.notes === "string" && account.notes.length <= 3000 &&
+    (account.currentBalance === undefined || account.currentBalance === null ||
+      (typeof account.currentBalance === "number" && Number.isFinite(account.currentBalance))) &&
+    (account.balanceAsOfDate === undefined || (typeof account.balanceAsOfDate === "string" &&
+      (account.balanceAsOfDate === "" || !Number.isNaN(Date.parse(account.balanceAsOfDate)))))));
   const credentialRecordsOk = value.credentialRecords === undefined || (Array.isArray(value.credentialRecords) && value.credentialRecords.every((record) =>
     isRecord(record) && typeof record.id === "string" && record.id.length > 0 &&
     (record.kind === undefined || record.kind === "bank-account") &&

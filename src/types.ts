@@ -955,6 +955,8 @@ export interface BankAccount {
   website: string;
   customerService: string;
   notes: string;
+  currentBalance?: number | null;
+  balanceAsOfDate?: string;
 }
 
 export interface EncryptedCredentialVault {

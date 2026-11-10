@@ -9545,6 +9545,8 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
   const [website, setWebsite] = useState(initial?.website ?? "");
   const [customerService, setCustomerService] = useState(initial?.customerService ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [currentBalance, setCurrentBalance] = useState(initial?.currentBalance == null ? "" : String(initial.currentBalance));
+  const [balanceAsOfDate, setBalanceAsOfDate] = useState(initial?.balanceAsOfDate ?? "");
   const [showAccountNumber, setShowAccountNumber] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -9564,6 +9566,11 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
         return;
       }
     }
+    const parsedBalance = currentBalance.trim() ? Number(currentBalance) : null;
+    if (currentBalance.trim() && (!Number.isFinite(parsedBalance) || parsedBalance === null)) {
+      setError("Enter a valid current balance, or leave it blank.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -9577,6 +9584,8 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
         website: website.trim(),
         customerService: customerService.trim(),
         notes: notes.trim(),
+        currentBalance: parsedBalance,
+        balanceAsOfDate: balanceAsOfDate.trim(),
       });
       onClose();
     } catch (caught) {
@@ -9596,6 +9605,8 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
         <div className="field-wrap"><label className="field-label" htmlFor="direct-bank-account-number">Account number</label><div className="credential-secret-field"><Input id="direct-bank-account-number" required maxLength={100} autoComplete="off" type={showAccountNumber ? "text" : "password"} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><button className="icon-button" type="button" aria-label={showAccountNumber ? "Hide account number" : "Show account number"} onClick={() => setShowAccountNumber((visible) => !visible)}>{showAccountNumber ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
         <Field label="IFSC / routing code"><Input maxLength={80} autoComplete="off" value={routingCode} onChange={(event) => setRoutingCode(event.target.value)} /></Field>
         <Field label="Branch"><Input maxLength={160} value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
+        <Field label="Current available balance"><Input type="number" step="0.01" placeholder="Optional" value={currentBalance} onChange={(event) => setCurrentBalance(event.target.value)} /></Field>
+        <Field label="Balance as of"><DateInput value={balanceAsOfDate} onValueChange={setBalanceAsOfDate} /></Field>
         <Field className="full" label="Bank website (HTTPS)"><ExternalLinkInput maxLength={2000} placeholder="https://..." value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
         <Field className="full" label="Customer-service contact"><Input maxLength={500} placeholder="Phone number or email" autoComplete="off" value={customerService} onChange={(event) => setCustomerService(event.target.value)} /></Field>
         <Field className="full" label="Quick-reference notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details such as account purpose or where to find statements" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
@@ -9621,6 +9632,9 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
     account.bankName, account.accountHolder, account.accountType, account.accountNumber,
     account.routingCode, account.branch, account.website, account.customerService, account.notes,
   ].some((value) => value.toLocaleLowerCase().includes(query)));
+  const reportedBalances = filteredAccounts.flatMap((account) =>
+    account.currentBalance == null ? [] : [account.currentBalance]);
+  const totalReportedBalance = reportedBalances.reduce((total, balance) => total + balance, 0);
 
   return <>
     <PageHeading eyebrow="Finance" title="Bank accounts" subtitle="Quick-reference details for your bank accounts." action={<Button onClick={() => setEditor(null)}><Plus size={15} />Add bank account</Button>} />
@@ -9628,8 +9642,9 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       <Button variant="primary" aria-pressed="true"><Landmark size={14} />Bank accounts</Button>
       <Button variant="outline" onClick={() => onNavigate("Account credentials")}><KeyRound size={14} />Account credentials</Button>
     </nav>
-    <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details are stored in a separate, readable Supabase table and included in JSON backups. Anyone with database/service-role access can read them. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
+    <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details and dated balance snapshots are stored in a separate, readable Supabase table and included in JSON backups. Balances are manual snapshots; transaction history is not stored here. Anyone with database/service-role access can read these details. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
+    {reportedBalances.length > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Total reported balance · INR</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(totalReportedBalance)}</strong></div><div><span>Accounts with a balance snapshot</span><strong>{reportedBalances.length} of {filteredAccounts.length}</strong></div></Card></div>}
     <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search bank accounts" placeholder="Search bank, account holder, branch, code..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge></div>
     {filteredAccounts.length ? <div className="credential-list">{filteredAccounts.map((account) => <details className="credential-card compact-details" key={account.id}>
       <summary className="credential-card-head compact-summary"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
@@ -9650,6 +9665,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       </div></summary>
       <div className="compact-details-body"><div className="personal-record-details">
         <div className="credential-bank-number"><span>Account number</span><div><strong>{visibleAccountNumbers.has(account.id) ? account.accountNumber : `•••• •••• ${account.accountNumber.slice(-4)}`}</strong><button type="button" className="icon-button" aria-label={visibleAccountNumbers.has(account.id) ? `Hide ${account.bankName} account number` : `Show ${account.bankName} account number`} onClick={() => setVisibleAccountNumbers((visible) => { const next = new Set(visible); if (next.has(account.id)) next.delete(account.id); else next.add(account.id); return next; })}>{visibleAccountNumbers.has(account.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></div>
+        {account.currentBalance != null && <div><span>Available balance</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(account.currentBalance)}{account.balanceAsOfDate ? ` · as of ${dateLabel(account.balanceAsOfDate)}` : ""}</strong></div>}
         {account.routingCode && <div><span>IFSC / routing code</span><strong>{account.routingCode}</strong></div>}
         {account.branch && <div><span>Branch</span><strong>{account.branch}</strong></div>}
         {account.customerService && <div><span>Customer service</span><strong>{account.customerService}</strong></div>}
