@@ -2864,14 +2864,23 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
     if (deposit.maturityAmount != null) { total.maturity += deposit.maturityAmount; total.maturityCount++; }
     fixedDepositTotals.set(deposit.currency, total);
   }
-  const totals = new Map<Currency, { assets: number; liabilities: number }>();
+  const totals = new Map<string, { assets: number; liabilities: number }>();
   for (const asset of assets) {
+    if (asset.type === "Stock") continue;
     const balance = asset.type === "Home loan" ? asset.principalOutstanding ?? asset.currentValue : asset.currentValue;
     if (balance === null) continue;
     const total = totals.get(asset.currency) ?? { assets: 0, liabilities: 0 };
     if (asset.type === "Loan" || asset.type === "Home loan") total.liabilities += balance;
     else total.assets += balance;
     totals.set(asset.currency, total);
+  }
+  for (const stock of stocks) {
+    const quote = latestStockQuotes.get(stock.id);
+    const quantity = stock.quantity ?? 0;
+    if (!quote || quantity <= 0) continue;
+    const total = totals.get(quote.currency) ?? { assets: 0, liabilities: 0 };
+    total.assets += quote.price * quantity;
+    totals.set(quote.currency, total);
   }
 
   function formatAmount(amount: number, currency: string) {
@@ -2887,7 +2896,8 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. The Stocks tab reads the same holdings and price snapshots as the Stocks menu—there is no duplicate stock data or asset table. Manage stock holdings in the Stocks menu. Loan balances count as liabilities. These details persist in the private GitHub repository and its history; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
-      {(["All types", ...ASSET_TYPES.filter((assetType) => assetType !== "Stock"), "Stocks"] as const).map((type) => {
+      {(["All types", ...ASSET_TYPES.filter((assetType) => assetType !== "Stock").flatMap((assetType) =>
+        assetType === "NPS" ? [assetType, "Stocks" as const] : [assetType])] as const).map((type) => {
         const count = type === "All types" ? assets.length
           : type === "Stocks" ? stocks.length
             : assets.filter((asset) => asset.type === type).length;
