@@ -1956,3 +1956,20 @@ body{background:#f3f5ef}
   .app-shell.dark .subscription-card{background:transparent;border-bottom-color:var(--line,#343d35)}
   .app-shell.dark .compact-details{background:transparent;border-bottom-color:var(--line,#343d35)}
 }
+.important-date-toolbar{flex-wrap:wrap}
+.important-date-toolbar>.search-wrap{flex:1 1 260px}
+.important-date-layout-toggle{display:flex;align-items:center;gap:5px}
+.important-date-clear-filters{display:flex;justify-content:flex-end;margin-top:-5px}
+.important-date-list.is-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));align-items:start}
+.important-date-list.is-grid .important-date-card-main{grid-template-columns:minmax(0,1fr) auto;align-items:start}
+.important-date-list.is-grid .important-date-card-title{grid-column:1/-1}
+.important-date-list.is-grid .important-date-card-meta{grid-column:1;grid-row:2}
+.important-date-list.is-grid .important-date-card-main>.table-actions{grid-column:2;grid-row:2}
+.reminder-filter-toolbar{flex-wrap:wrap}
+.reminder-filter-toolbar>.search-wrap{flex:1 1 260px}
+.reminder-page-list.reminder-grid-layout{grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));align-items:start}
+.reminder-page-list.reminder-grid-layout .reminder-card{grid-template-columns:32px minmax(0,1fr) auto;align-items:start}
+.reminder-page-list.reminder-grid-layout .reminder-card>.recent-info{grid-column:2/-1}
+.reminder-page-list.reminder-grid-layout .reminder-card>.reminder-category-badge{grid-column:2;grid-row:2;justify-self:start}
+.reminder-page-list.reminder-grid-layout .reminder-card>.reminder-status-badge{grid-column:3;grid-row:2;justify-self:end}
+.reminder-page-list.reminder-grid-layout .reminder-card>.table-actions{grid-column:2/-1;grid-row:3;justify-self:end}

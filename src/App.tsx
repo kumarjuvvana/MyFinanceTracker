@@ -875,6 +875,16 @@ function ImportantDatesPage() {
   const [feelingSentiment, setFeelingSentiment] = useState<ImportantDateFeeling["sentiment"]>("Good");
   const [search, setSearch] = useState("");
   const [elapsedAt, setElapsedAt] = useState(() => new Date());
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "title">("newest");
+  const [groupBy, setGroupBy] = useState<"date" | "category" | "person" | "feeling" | "none">("date");
+  const [dateFilterCategory, setDateFilterCategory] = useState("all");
+  const [dateFilterFeeling, setDateFilterFeeling] = useState("all");
+  const [reminderFilter, setReminderFilter] = useState<"all" | "reminders" | "no-reminders">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [recordLayout, setRecordLayout] = useState<"list" | "grid">("list");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -998,14 +1008,66 @@ function ImportantDatesPage() {
     await persist(records.filter((current) => current.id !== entry.id), categories, feelings);
   }
 
-  const query = search.trim().toLocaleLowerCase();
-  const visible = records.filter((entry) => {
-    const category = categories.find((item) => item.id === entry.categoryId)?.name ?? "";
-    const feeling = feelings.find((item) => item.id === entry.feelingId)?.name ?? "";
-    return [entry.title, entry.date, category, feeling, entry.person, entry.note].some((value) => value.toLocaleLowerCase().includes(query));
-  }).sort((a, b) => b.date.localeCompare(a.date));
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
   const feelingById = new Map(feelings.map((feeling) => [feeling.id, feeling]));
+  const query = search.trim().toLocaleLowerCase();
+  const activeFilterCount = Number(dateFilterCategory !== "all") + Number(dateFilterFeeling !== "all") +
+    Number(reminderFilter !== "all") + Number(Boolean(dateFrom)) + Number(Boolean(dateTo)) +
+    Number(sortOrder !== "newest") + Number(groupBy !== "date");
+  const visible = records
+    .filter((entry) => dateFilterCategory === "all" || entry.categoryId === dateFilterCategory)
+    .filter((entry) => dateFilterFeeling === "all" || (dateFilterFeeling === "none" ? !entry.feelingId : entry.feelingId === dateFilterFeeling))
+    .filter((entry) => reminderFilter === "all" || (reminderFilter === "reminders" ? entry.reminder : !entry.reminder))
+    .filter((entry) => !dateFrom || entry.date >= dateFrom)
+    .filter((entry) => !dateTo || entry.date <= dateTo)
+    .filter((entry) => {
+      const category = categoryNames.get(entry.categoryId) ?? "";
+      const feeling = feelingById.get(entry.feelingId)?.name ?? "";
+      return [entry.title, entry.date, category, feeling, entry.person, entry.note].some((value) => value.toLocaleLowerCase().includes(query));
+    })
+    .sort((a, b) => sortOrder === "title"
+      ? a.title.localeCompare(b.title, undefined, { sensitivity: "base" }) || b.date.localeCompare(a.date)
+      : (sortOrder === "newest" ? -1 : 1) * (a.date.localeCompare(b.date) || a.title.localeCompare(b.title)));
+  const groupedVisible = (() => {
+    const groups = new Map<string, { title: string; records: ImportantDate[] }>();
+    for (const entry of visible) {
+      const group = groupBy === "date" ? entry.date
+        : groupBy === "category" ? entry.categoryId
+          : groupBy === "person" ? entry.person.trim().toLocaleLowerCase() || "__no_person"
+            : groupBy === "feeling" ? entry.feelingId || "__no_feeling" : "__all";
+      const title = groupBy === "date" ? `Important dates · ${dateLabel(entry.date)}`
+        : groupBy === "category" ? categoryNames.get(entry.categoryId) ?? "Uncategorized"
+          : groupBy === "person" ? entry.person.trim() || "No person specified"
+            : groupBy === "feeling" ? feelingById.get(entry.feelingId)?.name ?? "No life tag" : "All important dates";
+      const existing = groups.get(group);
+      if (existing) existing.records.push(entry);
+      else groups.set(group, { title, records: [entry] });
+    }
+    return [...groups.entries()].sort(([keyA, groupA], [keyB, groupB]) =>
+      groupBy === "date"
+        ? (sortOrder === "oldest" ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA))
+        : groupA.title.localeCompare(groupB.title, undefined, { sensitivity: "base" }));
+  })();
+  function setAllGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+  function clearDateFilters() {
+    setSearch("");
+    setSortOrder("newest");
+    setGroupBy("date");
+    setDateFilterCategory("all");
+    setDateFilterFeeling("all");
+    setReminderFilter("all");
+    setDateFrom("");
+    setDateTo("");
+  }
+  function renderImportantDateCards(entries: ImportantDate[]) {
+    return <div className={`important-date-list${recordLayout === "grid" ? " is-grid" : ""}`}>{entries.map((entry) => {
+      const feeling = feelingById.get(entry.feelingId);
+      return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note">{entry.note}</span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
+    })}</div>;
+  }
 
   return <>
     <PageHeading eyebrow="Keep the dates that matter" title="Important dates" subtitle="Remember life milestones, purchases, and personal events. Dates and reminders are exact-date only." action={activeTab === "dates" ? <Button disabled={saving || !categories.length} onClick={() => setEditor(null)}><Plus size={15} />Add important date</Button> : undefined} />
@@ -1018,11 +1080,30 @@ function ImportantDatesPage() {
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {loading ? <Card><p className="section-description">Loading important dates from Supabase…</p></Card> : <>
       {activeTab === "dates" && <>
-        <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search important dates" placeholder="Search title, category, feeling..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge></div>
-        {visible.length ? <DateGroupedRecords items={visible} getDate={(entry) => entry.date} title={(date) => `Important dates · ${dateLabel(date)}`}>{(dateEntries) => <div className="important-date-list">{dateEntries.map((entry) => {
-          const feeling = feelingById.get(entry.feelingId);
-          return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note">{entry.note}</span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
-        })}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<CalendarDays size={18} />} title={records.length ? "No matching important dates" : "No important dates yet"} description={records.length ? "Try another search." : "Add a milestone, important purchase, or personal date to start your timeline."} /></Card>}
+        <div className="toolbar filter-toolbar important-date-toolbar">
+          <div className="search-wrap"><Search size={15} /><Input aria-label="Search important dates" placeholder="Search title, category, person, note..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+          <FilterDrawer activeCount={activeFilterCount} label="Filters, sorting & grouping">
+            <Field label="Sort by"><Select aria-label="Sort important dates" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></Select></Field>
+            <Field label="Group by"><Select aria-label="Group important dates" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setAllGroupsExpanded(false); }}><option value="date">Date</option><option value="category">Category</option><option value="person">Person</option><option value="feeling">Good / bad tag</option><option value="none">No grouping</option></Select></Field>
+            <Field label="Category"><Select aria-label="Filter important dates by category" value={dateFilterCategory} onChange={(event) => setDateFilterCategory(event.target.value)}><option value="all">All categories</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>
+            <Field label="Good / bad tag"><Select aria-label="Filter important dates by life tag" value={dateFilterFeeling} onChange={(event) => setDateFilterFeeling(event.target.value)}><option value="all">All tags</option><option value="none">No tag</option>{feelings.map((feeling) => <option key={feeling.id} value={feeling.id}>{feeling.name}</option>)}</Select></Field>
+            <Field label="Reminder"><Select aria-label="Filter important dates by reminder" value={reminderFilter} onChange={(event) => setReminderFilter(event.target.value as typeof reminderFilter)}><option value="all">All dates</option><option value="reminders">With reminders</option><option value="no-reminders">Without reminders</option></Select></Field>
+            <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
+            <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
+          </FilterDrawer>
+          <div className="important-date-layout-toggle" role="group" aria-label="Record layout">
+            <Button type="button" size="sm" variant={recordLayout === "list" ? "primary" : "outline"} aria-pressed={recordLayout === "list"} onClick={() => setRecordLayout("list")}>List</Button>
+            <Button type="button" size="sm" variant={recordLayout === "grid" ? "primary" : "outline"} aria-pressed={recordLayout === "grid"} onClick={() => setRecordLayout("grid")}>Grid</Button>
+          </div>
+          <Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge>
+        </div>
+        {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearDateFilters}>Clear search, filters & sorting</Button></div>}
+        {visible.length ? <>
+          {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(false)}>Hide all</Button></div>}
+          {groupBy === "none" ? renderImportantDateCards(visible) : <div className="record-date-groups">{groupedVisible.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>
+            {renderImportantDateCards(group.records)}
+          </DevotionalRecordGroup>)}</div>}
+        </> : <Card><EmptyState icon={<CalendarDays size={18} />} title={records.length ? "No matching important dates" : "No important dates yet"} description={records.length ? "Try a different search or clear the current filters." : "Add a milestone, important purchase, or personal date to start your timeline."} /></Card>}
       </>}
       {activeTab === "categories" && <Card className="important-date-master"><div><h2 className="section-title">Date categories</h2><p className="section-description">Organize events such as education, career, family, and purchases.</p></div><form className="important-date-master-add" onSubmit={(event) => void addCategory(event)}><Input aria-label="New date category" maxLength={80} placeholder="New category name" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} /><Button type="submit" disabled={saving || !categoryDraft.trim()}><Plus size={14} />Add category</Button></form><div className="master-entry-list">{categories.map((category) => <div className="master-entry" key={category.id}><div className="recent-info"><div className="recent-name">{category.name}</div><div className="recent-meta">{records.filter((entry) => entry.categoryId === category.id).length} important dates</div></div><button className="icon-button" disabled={saving} aria-label={`Rename ${category.name}`} onClick={() => void renameCategory(category)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${category.name}`} onClick={() => void deleteCategory(category)}><Archive size={14} /></button></div>)}</div></Card>}
       {activeTab === "feelings" && <Card className="important-date-master"><div><h2 className="section-title">Good / bad life tags</h2><p className="section-description">Edit the labels and tone used to describe how an event felt.</p></div><form className="important-date-master-add important-date-feeling-add" onSubmit={(event) => void addFeeling(event)}><Input aria-label="New life tag" maxLength={60} placeholder="New life tag" value={feelingDraft} onChange={(event) => setFeelingDraft(event.target.value)} /><Select aria-label="New life tag sentiment" value={feelingSentiment} onChange={(event) => setFeelingSentiment(event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><Button type="submit" disabled={saving || !feelingDraft.trim()}><Plus size={14} />Add tag</Button></form><div className="master-entry-list">{feelings.map((feeling) => <div className="important-date-feeling-row" key={feeling.id}><div className="recent-info"><div className="recent-name">{feeling.name}</div><div className="recent-meta">{records.filter((entry) => entry.feelingId === feeling.id).length} dates use this tag</div></div><Select aria-label={`Sentiment for ${feeling.name}`} disabled={saving} value={feeling.sentiment} onChange={(event) => void changeFeeling(feeling, event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><button className="icon-button" disabled={saving} aria-label={`Rename ${feeling.name}`} onClick={() => void editFeeling(feeling)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${feeling.name}`} onClick={() => void deleteFeeling(feeling)}><Archive size={14} /></button></div>)}</div></Card>}
@@ -1297,6 +1378,13 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [statusFilter, setStatusFilter] = useState("All reminders");
+  const [sortOrder, setSortOrder] = useState<"date-ascending" | "date-descending" | "title" | "category">("date-ascending");
+  const [groupBy, setGroupBy] = useState<"date" | "category" | "status" | "none">("date");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [recordLayout, setRecordLayout] = useState<"list" | "grid">("list");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [error, setError] = useState("");
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -1310,9 +1398,54 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   const visible = reminders
     .filter((reminder) => categoryFilter === "All categories" || (reminder.category || "General") === categoryFilter)
     .filter((reminder) => statusFilter === "All reminders" || (statusFilter === "Completed" ? reminder.completed : !reminder.completed))
+    .filter((reminder) => !dateFrom || reminder.date >= dateFrom)
+    .filter((reminder) => !dateTo || reminder.date <= dateTo)
     .filter((reminder) => [reminder.title, reminder.category || "General", reminder.details, reminder.date, reminder.completed ? "completed done" : "pending upcoming"]
       .some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => Number(a.completed) - Number(b.completed) || a.date.localeCompare(b.date));
+    .sort((a, b) => {
+      if (sortOrder === "title") return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+      if (sortOrder === "category") return (a.category || "General").localeCompare(b.category || "General", undefined, { sensitivity: "base" }) || a.date.localeCompare(b.date);
+      const completionOrder = Number(a.completed) - Number(b.completed);
+      if (completionOrder !== 0) return completionOrder;
+      return sortOrder === "date-ascending" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+    });
+  const activeFilterCount = Number(statusFilter !== "All reminders") + Number(categoryFilter !== "All categories") +
+    Number(Boolean(dateFrom)) + Number(Boolean(dateTo)) + Number(sortOrder !== "date-ascending") + Number(groupBy !== "date");
+  const groupedReminders = (() => {
+    const groups = new Map<string, { title: string; records: Reminder[] }>();
+    for (const reminder of visible) {
+      const categoryName = reminder.category?.trim() || "General";
+      const group = groupBy === "date" ? reminder.date
+        : groupBy === "category" ? categoryName.toLocaleLowerCase()
+          : groupBy === "status" ? reminder.completed ? "completed" : "pending" : "__all";
+      const title = groupBy === "date" ? `Reminders · ${dateLabel(reminder.date)}`
+        : groupBy === "category" ? categoryName
+          : groupBy === "status" ? reminder.completed ? "Completed" : "Pending" : "All reminders";
+      const existing = groups.get(group);
+      if (existing) existing.records.push(reminder);
+      else groups.set(group, { title, records: [reminder] });
+    }
+    return [...groups.entries()].sort(([keyA, groupA], [keyB, groupB]) =>
+      groupBy === "date" ? (sortOrder === "date-ascending" ? keyA.localeCompare(keyB) : keyB.localeCompare(keyA))
+        : groupBy === "status" ? keyA.localeCompare(keyB)
+          : groupA.title.localeCompare(groupB.title, undefined, { sensitivity: "base" }));
+  })();
+  function setAllGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+  function clearListOptions() {
+    setSearch("");
+    setCategoryFilter("All categories");
+    setStatusFilter("All reminders");
+    setDateFrom("");
+    setDateTo("");
+    setSortOrder("date-ascending");
+    setGroupBy("date");
+  }
+  function renderReminderCards(entries: Reminder[]) {
+    return <div className={`reminder-page-list${recordLayout === "grid" ? " reminder-grid-layout" : ""}`}>{entries.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />)}</div>;
+  }
   return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Keep personal notes and dated reminders organized in one place." action={activeTab === "list" ? <Button onClick={() => setActiveTab("add")}><Plus size={15} />Add reminder</Button> : undefined} />
     <nav className="student-profile-tabs reminder-tabs" aria-label="Notes and reminders sections">
       <Button variant={activeTab === "list" ? "primary" : "outline"} aria-pressed={activeTab === "list"} onClick={() => setActiveTab("list")}><Bell size={14} />Notes & reminders<Badge>{reminders.length}</Badge></Button>
@@ -1327,8 +1460,27 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
       <div className="reminder-form-actions full"><Button type="submit"><Plus size={14} />Add reminder</Button><Button type="button" variant="outline" onClick={() => setActiveTab("list")}>Cancel</Button></div>
     </form></Card>}
     {activeTab === "list" && <>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(statusFilter !== "All reminders" ? 1 : 0) + (categoryFilter !== "All categories" ? 1 : 0)}><Field label="Status"><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select></Field><div className="filter-drawer-categories" role="group" aria-label="Filter reminders by category"><span className="field-label">Category</span>{["All categories", ...categories].map((entry) => <button key={entry} type="button" className={`category-choice ${categoryFilter === entry ? "selected" : ""}`} aria-pressed={categoryFilter === entry} onClick={() => setCategoryFilter(entry)}>{entry}{entry === "All categories" && <span>{reminders.length}</span>}</button>)}</div></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge></div>
-    {visible.length ? <DateGroupedRecords items={visible} getDate={(reminder) => reminder.date} title={(date) => `Reminders · ${dateLabel(date)}`}>{(dateReminders) => <div className="reminder-page-list">{dateReminders.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />)}</div>}</DateGroupedRecords> : <div className="reminder-page-list"><Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or category filter." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card></div>}
+    <div className="toolbar filter-toolbar reminder-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer activeCount={activeFilterCount} label="Filters, sorting & grouping">
+        <Field label="Status"><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select></Field>
+        <Field label="Category"><Select aria-label="Filter reminders by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Sort by"><Select aria-label="Sort reminders" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="date-ascending">Due date (earliest)</option><option value="date-descending">Due date (latest)</option><option value="title">Title A–Z</option><option value="category">Category A–Z</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group reminders" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setAllGroupsExpanded(false); }}><option value="date">Date</option><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+        <Field label="From date"><DateInput aria-label="Filter reminders from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
+        <Field label="To date"><DateInput aria-label="Filter reminders to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
+      </FilterDrawer>
+      <div className="important-date-layout-toggle" role="group" aria-label="Reminder layout">
+        <Button type="button" size="sm" variant={recordLayout === "list" ? "primary" : "outline"} aria-pressed={recordLayout === "list"} onClick={() => setRecordLayout("list")}>List</Button>
+        <Button type="button" size="sm" variant={recordLayout === "grid" ? "primary" : "outline"} aria-pressed={recordLayout === "grid"} onClick={() => setRecordLayout("grid")}>Grid</Button>
+      </div>
+      <Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge>
+    </div>
+    {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearListOptions}>Clear search, filters & sorting</Button></div>}
+    {visible.length ? <>
+      {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(false)}>Hide all</Button></div>}
+      {groupBy === "none" ? renderReminderCards(visible) : <div className="record-date-groups">{groupedReminders.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderReminderCards(group.records)}</DevotionalRecordGroup>)}</div>}
+    </> : <div className="reminder-page-list"><Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or clear the current filters." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card></div>}
     </>}
     {editor !== undefined && <ReminderModal key={editor?.id ?? "new-reminder"} initial={editor} categories={categories} onClose={() => setEditor(undefined)} onSave={(reminder, id) => { onSave(reminder, id); setEditor(undefined); }} />}
   </>;
