@@ -139,9 +139,9 @@ begin
     return;
   end if;
 
-  delete from public.important_dates;
-  delete from public.important_date_categories;
-  delete from public.important_date_feelings;
+  delete from public.important_dates where id is not null;
+  delete from public.important_date_categories where id is not null;
+  delete from public.important_date_feelings where id is not null;
 
   item_position := 0;
   for category in select pg_catalog.jsonb_array_elements(p_categories)
