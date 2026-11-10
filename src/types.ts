@@ -164,6 +164,7 @@ export const ASSET_TYPES = [
   "Stock",
   "Loan",
   "Home loan",
+  "Fixed deposit",
   "Real estate",
   "Bond",
   "Digital gold",
@@ -213,6 +214,10 @@ export interface AssetRecord {
   lastStatementDate?: string;
   firstEmiDate?: string;
   lenderLoanType?: string;
+  maturityAmount?: number | null;
+  depositTerm?: string;
+  depositScheme?: string;
+  maturityInstruction?: string;
   location: string;
   notes: string;
   tags: string[];
