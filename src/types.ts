@@ -21,6 +21,7 @@ export type Page =
   | "Price history"
   | "Reports"
   | "Notes & reminders"
+  | "Important dates"
   | "Master data"
   | "Stocks"
   | "Asset manager"
@@ -50,7 +51,7 @@ export type Page =
   | "R&D / Test Connectors";
 export const FAVORITABLE_PAGES: Page[] = [
   "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
-  "Price history", "Reports", "Notes & reminders", "Master data", "Stocks", "Asset manager", "Bank accounts",
+  "Price history", "Reports", "Notes & reminders", "Important dates", "Master data", "Stocks", "Asset manager", "Bank accounts",
   "Learning", "Mind & habits", "Activities", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
@@ -110,6 +111,27 @@ export interface Reminder {
   details: string;
   completed: boolean;
   category?: string;
+}
+
+export interface ImportantDateCategory {
+  id: string;
+  name: string;
+}
+
+export interface ImportantDateFeeling {
+  id: string;
+  name: string;
+  sentiment: "Good" | "Bad" | "Mixed";
+}
+
+export interface ImportantDate {
+  id: string;
+  title: string;
+  date: string;
+  categoryId: string;
+  feelingId: string;
+  link: string;
+  reminder: boolean;
 }
 
 export type StockExchange = "NSE" | "BSE";

@@ -11,12 +11,13 @@ import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
+import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -79,6 +80,7 @@ const navigation: NavigationItem[] = [
   { name: "Price history", icon: ArrowLeftRight, group: "Shopping" },
   { name: "Reports", icon: BarChart3, group: "Shopping" },
   { name: "Notes & reminders", icon: Bell, group: "Shopping" },
+  { name: "Important dates", icon: CalendarDays, group: "Home & family" },
   { name: "Master data", icon: Database, group: "Shopping" },
   { name: "Stocks", icon: TrendingUp, group: "Finance" },
   { name: "Asset manager", icon: Wallet, group: "Finance" },
@@ -745,6 +747,7 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
         <Card><div className="card-head"><div><h2 className="section-title">Where it goes</h2><p className="section-description">This month's spending by category</p></div><button className="text-link" onClick={() => onPage("Reports")}>Full report <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div><CategoryBreakdown purchases={monthlyPurchases} /></Card></div>
     </>}
     {widgets.includes("reminders") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Notes & reminders</h2><p className="section-description">Due now or coming up in the next 7 days</p></div><button className="text-link" onClick={() => onPage("Notes & reminders")}>See all <ChevronRight size={12} /></button></div>{reminders.length ? <div className="reminder-list">{reminders.slice(0, 4).map((reminder) => <div className="reminder-row" key={reminder.id}><Bell size={15} /><div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{reminder.category || "General"} · <LinkifiedText>{reminder.details || "No extra details"}</LinkifiedText></div></div><Badge tone={reminder.date < today() ? "amber" : "green"}>{reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : dateLabel(reminder.date)}</Badge></div>)}</div> : <p className="dashboard-module-empty">No upcoming reminders.</p>}</Card>}
+    <ImportantDatesDashboardCard onPage={onPage} />
     {widgets.includes("personalDocuments") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Document & policy dates</h2><p className="section-description">Expired or approaching the reminder date you set</p></div><button className="text-link" onClick={() => onPage("Personal documents")}>Manage records <ChevronRight size={12} /></button></div>{documentDue.length ? <div className="reminder-list">{documentDue.slice(0, 5).map((record) => {
       const remaining = daysUntil(record.dueDate);
       return <div className="reminder-row" key={record.id}><FileText size={15} /><div className="recent-info"><div className="recent-name">{record.title}</div><div className="recent-meta">{record.type} · Due {dateLabel(record.dueDate)}</div></div><Badge tone="amber">{remaining < 0 ? "Expired" : remaining === 0 ? "Today" : `${remaining} days`}</Badge></div>;
@@ -755,6 +758,254 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
         const module = moduleCards[id];
         return <DashboardModuleCard key={id} title={module.title} page={module.page} entries={module.entries} emptyMessage={module.emptyMessage} onPage={onPage} />;
       })}</div>
+  </>;
+}
+
+function ImportantDatesDashboardCard({ onPage }: { onPage: (page: Page) => void }) {
+  const [records, setRecords] = useState<ImportantDate[]>([]);
+  const [categories, setCategories] = useState<ImportantDateCategory[]>([]);
+  const [feelings, setFeelings] = useState<ImportantDateFeeling[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    loadImportantDates().then((result) => {
+      if (!active) return;
+      setRecords(result.dates);
+      setCategories(result.categories);
+      setFeelings(result.feelings);
+    }).catch((caught: unknown) => {
+      if (active) setError(caught instanceof Error ? caught.message : "Could not load important dates.");
+    });
+    return () => { active = false; };
+  }, []);
+
+  const throughDate = dateAfterDays(7);
+  const upcoming = records.filter((entry) => entry.reminder && entry.date >= today() && entry.date <= throughDate)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+  const feelingById = new Map(feelings.map((feeling) => [feeling.id, feeling]));
+
+  return <Card className="dashboard-reminders important-dates-dashboard">
+    <div className="card-head"><div><h2 className="section-title">Important dates</h2><p className="section-description">Exact-date reminders · today and the next 7 days</p></div><button className="text-link" onClick={() => onPage("Important dates")}>See all <ChevronRight size={12} /></button></div>
+    {error ? <p className="dashboard-module-empty" role="alert">{error}</p> : upcoming.length ? <div className="reminder-list">{upcoming.slice(0, 5).map((entry) => {
+      const feeling = feelingById.get(entry.feelingId);
+      return <div className="reminder-row" key={entry.id}><CalendarDays size={15} /><div className="recent-info"><div className="recent-name">{entry.title}</div><div className="recent-meta">{[categoryNames.get(entry.categoryId), feeling?.name].filter(Boolean).join(" · ")}</div></div><Badge tone={entry.date === today() ? "amber" : "green"}>{entry.date === today() ? "Today" : dateLabel(entry.date)}</Badge></div>;
+    })}</div> : <p className="dashboard-module-empty">No important-date reminders in the next 7 days.</p>}
+  </Card>;
+}
+
+function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: {
+  initial: ImportantDate | null;
+  categories: ImportantDateCategory[];
+  feelings: ImportantDateFeeling[];
+  onClose: () => void;
+  onSave: (entry: ImportantDate) => void;
+}) {
+  const [entry, setEntry] = useState<ImportantDate>(initial ?? {
+    id: createId(), title: "", date: today(), categoryId: categories[0]?.id ?? "",
+    feelingId: "", link: "", reminder: true,
+  });
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!entry.title.trim() || !entry.date || !entry.categoryId) {
+      setError("Enter a title and date, and choose a category.");
+      return;
+    }
+    let safeLink = false;
+    try {
+      const url = new URL(entry.link.trim());
+      safeLink = url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      safeLink = !entry.link.trim();
+    }
+    if (!safeLink) {
+      setError("Enter a valid HTTP or HTTPS link.");
+      return;
+    }
+    onSave({ ...entry, title: entry.title.trim(), link: entry.link.trim() });
+  }
+
+  return <Modal title={initial ? "Edit important date" : "Add important date"} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label="Title"><Input required autoFocus maxLength={160} placeholder="e.g. Graduation, first job, or bought a home" value={entry.title} onChange={(event) => setEntry((current) => ({ ...current, title: event.target.value }))} /></Field>
+      <Field label="Date"><DateInput required value={entry.date} onValueChange={(date) => setEntry((current) => ({ ...current, date }))} /></Field>
+      <Field label="Category"><Select required value={entry.categoryId} onChange={(event) => setEntry((current) => ({ ...current, categoryId: event.target.value }))}>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></Field>
+      <Field label="How did it feel?"><Select value={entry.feelingId} onChange={(event) => setEntry((current) => ({ ...current, feelingId: event.target.value }))}><option value="">Not set</option>{feelings.map((feeling) => <option key={feeling.id} value={feeling.id}>{feeling.name}</option>)}</Select></Field>
+      <Field label="Link (optional)"><Input type="url" maxLength={2048} placeholder="https://..." value={entry.link} onChange={(event) => setEntry((current) => ({ ...current, link: event.target.value }))} /></Field>
+      <label className="important-date-reminder-toggle"><input type="checkbox" checked={entry.reminder} onChange={(event) => setEntry((current) => ({ ...current, reminder: event.target.checked }))} /><span>Show a dashboard reminder for this exact date</span></label>
+    </div>
+    {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add date"}</Button></div></form>
+  </Modal>;
+}
+
+function ImportantDatesPage() {
+  const [records, setRecords] = useState<ImportantDate[]>([]);
+  const [categories, setCategories] = useState<ImportantDateCategory[]>([]);
+  const [feelings, setFeelings] = useState<ImportantDateFeeling[]>([]);
+  const [revision, setRevision] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [activeTab, setActiveTab] = useState<"dates" | "categories" | "feelings">("dates");
+  const [editor, setEditor] = useState<ImportantDate | null | undefined>(undefined);
+  const [categoryDraft, setCategoryDraft] = useState("");
+  const [feelingDraft, setFeelingDraft] = useState("");
+  const [feelingSentiment, setFeelingSentiment] = useState<ImportantDateFeeling["sentiment"]>("Good");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    loadImportantDates().then((result) => {
+      if (!active) return;
+      setRecords(result.dates);
+      setCategories(result.categories);
+      setFeelings(result.feelings);
+      setRevision(result.revision);
+    }).catch((caught: unknown) => {
+      if (active) setError(caught instanceof Error ? caught.message : "Could not load important dates.");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  async function persist(nextRecords: ImportantDate[], nextCategories: ImportantDateCategory[], nextFeelings: ImportantDateFeeling[]) {
+    if (saving) return false;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const nextRevision = await saveImportantDates(nextRecords, nextCategories, nextFeelings, revision);
+      setRecords(nextRecords);
+      setCategories(nextCategories);
+      setFeelings(nextFeelings);
+      setRevision(nextRevision);
+      setNotice("Important dates saved to Supabase.");
+      return true;
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save important dates.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function addCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = categoryDraft.trim();
+    if (!name || categories.some((entry) => entry.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError("Enter a unique category name.");
+      return;
+    }
+    if (await persist(records, [...categories, { id: createId(), name }], feelings)) setCategoryDraft("");
+  }
+
+  async function addFeeling(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = feelingDraft.trim();
+    if (!name || feelings.some((entry) => entry.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError("Enter a unique life-tag name.");
+      return;
+    }
+    if (await persist(records, categories, [...feelings, { id: createId(), name, sentiment: feelingSentiment }])) setFeelingDraft("");
+  }
+
+  async function renameCategory(category: ImportantDateCategory) {
+    const name = window.prompt("Rename this date category", category.name)?.trim();
+    if (!name || name === category.name) return;
+    if (categories.some((entry) => entry.id !== category.id && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError("A category with that name already exists.");
+      return;
+    }
+    await persist(records, categories.map((entry) => entry.id === category.id ? { ...entry, name } : entry), feelings);
+  }
+
+  async function deleteCategory(category: ImportantDateCategory) {
+    if (records.some((entry) => entry.categoryId === category.id)) {
+      setError("Move or edit dates using this category before removing it.");
+      return;
+    }
+    if (categories.length < 2) {
+      setError("Keep at least one date category.");
+      return;
+    }
+    if (window.confirm(`Remove the "${category.name}" category?`)) {
+      await persist(records, categories.filter((entry) => entry.id !== category.id), feelings);
+    }
+  }
+
+  async function editFeeling(feeling: ImportantDateFeeling) {
+    const name = window.prompt("Rename this life tag", feeling.name)?.trim();
+    if (!name || name === feeling.name) return;
+    if (feelings.some((entry) => entry.id !== feeling.id && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError("A life tag with that name already exists.");
+      return;
+    }
+    await persist(records, categories, feelings.map((entry) => entry.id === feeling.id ? { ...entry, name } : entry));
+  }
+
+  async function changeFeeling(feeling: ImportantDateFeeling, sentiment: ImportantDateFeeling["sentiment"]) {
+    await persist(records, categories, feelings.map((entry) => entry.id === feeling.id ? { ...entry, sentiment } : entry));
+  }
+
+  async function deleteFeeling(feeling: ImportantDateFeeling) {
+    if (records.some((entry) => entry.feelingId === feeling.id)) {
+      setError("Edit dates using this life tag before removing it.");
+      return;
+    }
+    if (window.confirm(`Remove the "${feeling.name}" life tag?`)) {
+      await persist(records, categories, feelings.filter((entry) => entry.id !== feeling.id));
+    }
+  }
+
+  async function saveRecord(entry: ImportantDate) {
+    const next = records.some((current) => current.id === entry.id)
+      ? records.map((current) => current.id === entry.id ? entry : current)
+      : [...records, entry];
+    if (await persist(next, categories, feelings)) setEditor(undefined);
+  }
+
+  async function deleteRecord(entry: ImportantDate) {
+    if (!window.confirm(`Remove "${entry.title}" from your important dates?`)) return;
+    await persist(records.filter((current) => current.id !== entry.id), categories, feelings);
+  }
+
+  const query = search.trim().toLocaleLowerCase();
+  const visible = records.filter((entry) => {
+    const category = categories.find((item) => item.id === entry.categoryId)?.name ?? "";
+    const feeling = feelings.find((item) => item.id === entry.feelingId)?.name ?? "";
+    return [entry.title, entry.date, category, feeling].some((value) => value.toLocaleLowerCase().includes(query));
+  }).sort((a, b) => b.date.localeCompare(a.date));
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+  const feelingById = new Map(feelings.map((feeling) => [feeling.id, feeling]));
+
+  return <>
+    <PageHeading eyebrow="Keep the dates that matter" title="Important dates" subtitle="Remember life milestones, purchases, and personal events. Dates and reminders are exact-date only." action={activeTab === "dates" ? <Button disabled={saving || !categories.length} onClick={() => setEditor(null)}><Plus size={15} />Add important date</Button> : undefined} />
+    <nav className="student-profile-tabs important-date-tabs" aria-label="Important dates sections">
+      <Button variant={activeTab === "dates" ? "primary" : "outline"} aria-pressed={activeTab === "dates"} onClick={() => setActiveTab("dates")}><CalendarDays size={14} />Dates <Badge>{records.length}</Badge></Button>
+      <Button variant={activeTab === "categories" ? "primary" : "outline"} aria-pressed={activeTab === "categories"} onClick={() => setActiveTab("categories")}><ListChecks size={14} />Categories</Button>
+      <Button variant={activeTab === "feelings" ? "primary" : "outline"} aria-pressed={activeTab === "feelings"} onClick={() => setActiveTab("feelings")}><Heart size={14} />Good / bad tags</Button>
+    </nav>
+    {error && <div className="alert alert-error" role="alert">{error}</div>}
+    {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    {loading ? <Card><p className="section-description">Loading important dates from Supabase…</p></Card> : <>
+      {activeTab === "dates" && <>
+        <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search important dates" placeholder="Search title, category, feeling..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge></div>
+        {visible.length ? <DateGroupedRecords items={visible} getDate={(entry) => entry.date} title={(date) => `Important dates · ${dateLabel(date)}`}>{(dateEntries) => <div className="important-date-list">{dateEntries.map((entry) => {
+          const feeling = feelingById.get(entry.feelingId);
+          return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name].filter(Boolean).join(" · ")}</span></div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
+        })}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<CalendarDays size={18} />} title={records.length ? "No matching important dates" : "No important dates yet"} description={records.length ? "Try another search." : "Add a milestone, important purchase, or personal date to start your timeline."} /></Card>}
+      </>}
+      {activeTab === "categories" && <Card className="important-date-master"><div><h2 className="section-title">Date categories</h2><p className="section-description">Organize events such as education, career, family, and purchases.</p></div><form className="important-date-master-add" onSubmit={(event) => void addCategory(event)}><Input aria-label="New date category" maxLength={80} placeholder="New category name" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} /><Button type="submit" disabled={saving || !categoryDraft.trim()}><Plus size={14} />Add category</Button></form><div className="master-entry-list">{categories.map((category) => <div className="master-entry" key={category.id}><div className="recent-info"><div className="recent-name">{category.name}</div><div className="recent-meta">{records.filter((entry) => entry.categoryId === category.id).length} important dates</div></div><button className="icon-button" disabled={saving} aria-label={`Rename ${category.name}`} onClick={() => void renameCategory(category)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${category.name}`} onClick={() => void deleteCategory(category)}><Archive size={14} /></button></div>)}</div></Card>}
+      {activeTab === "feelings" && <Card className="important-date-master"><div><h2 className="section-title">Good / bad life tags</h2><p className="section-description">Edit the labels and tone used to describe how an event felt.</p></div><form className="important-date-master-add important-date-feeling-add" onSubmit={(event) => void addFeeling(event)}><Input aria-label="New life tag" maxLength={60} placeholder="New life tag" value={feelingDraft} onChange={(event) => setFeelingDraft(event.target.value)} /><Select aria-label="New life tag sentiment" value={feelingSentiment} onChange={(event) => setFeelingSentiment(event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><Button type="submit" disabled={saving || !feelingDraft.trim()}><Plus size={14} />Add tag</Button></form><div className="master-entry-list">{feelings.map((feeling) => <div className="important-date-feeling-row" key={feeling.id}><div className="recent-info"><div className="recent-name">{feeling.name}</div><div className="recent-meta">{records.filter((entry) => entry.feelingId === feeling.id).length} dates use this tag</div></div><Select aria-label={`Sentiment for ${feeling.name}`} disabled={saving} value={feeling.sentiment} onChange={(event) => void changeFeeling(feeling, event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><button className="icon-button" disabled={saving} aria-label={`Rename ${feeling.name}`} onClick={() => void editFeeling(feeling)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${feeling.name}`} onClick={() => void deleteFeeling(feeling)}><Archive size={14} /></button></div>)}</div></Card>}
+      {saving && <p className="section-description" role="status">Saving to Supabase…</p>}
+    </>}
+    {editor !== undefined && <ImportantDateModal key={editor?.id ?? "new-important-date"} initial={editor} categories={categories} feelings={feelings} onClose={() => setEditor(undefined)} onSave={(entry) => void saveRecord(entry)} />}
   </>;
 }
 
@@ -11181,6 +11432,7 @@ export default function App() {
     "Price history": <PriceHistory data={data} />,
     Reports: <Reports data={data} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
+    "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {
       const store = (previous.stores ?? []).find((entry) => entry.id === id);
       if (!store) return previous;
