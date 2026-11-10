@@ -819,6 +819,10 @@ body{background:#f3f5ef}
 .devotional-section-head h2 svg{color:#648568}
 .devotional-section-head p{margin:4px 0 0;font-size:10px;color:#92998f}
 .devotional-list{display:grid;gap:10px}
+.devotional-date-groups{display:grid;gap:18px}
+.devotional-date-group{display:grid;gap:9px;min-width:0}
+.devotional-date-group-title{margin:0;padding:0 0 7px;border-bottom:1px solid #e8ebe6;font:700 11px Manrope,sans-serif;color:#648568}
+.app-shell.dark .devotional-date-group-title{border-color:#343d35;color:#a6c1a8}
 .devotional-card{min-width:0;padding:14px}
 .devotional-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .devotional-card-head>div:first-child{min-width:0}

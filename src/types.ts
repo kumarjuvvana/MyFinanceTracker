@@ -608,6 +608,7 @@ export interface DailyPrayerLog {
 
 export interface DevotionalResource {
   id: string;
+  dateAdded?: string;
   title: string;
   link: string;
   description: string;

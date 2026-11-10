@@ -582,6 +582,7 @@ export function validateData(value: unknown): value is TrackerData {
     (Array.isArray(value.devotionalResources) && value.devotionalResources.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
       typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 160 &&
+      (entry.dateAdded === undefined || typeof entry.dateAdded === "string" && !Number.isNaN(Date.parse(entry.dateAdded))) &&
       typeof entry.link === "string" && entry.link.length <= 2048 && isSafeExternalLink(entry.link) && entry.link.length > 0 &&
       typeof entry.description === "string" && entry.description.length <= 5000 &&
       typeof entry.source === "string" && entry.source.length <= 120));
