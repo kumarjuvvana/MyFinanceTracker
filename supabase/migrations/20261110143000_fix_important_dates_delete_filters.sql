@@ -1,5 +1,7 @@
 begin;
 
+drop function if exists public.replace_important_dates(jsonb, jsonb, jsonb, text);
+
 create or replace function public.replace_important_dates(
   p_dates jsonb,
   p_categories jsonb,
@@ -92,6 +94,9 @@ begin
   return next;
 end;
 $$;
+
+revoke all on function public.replace_important_dates(jsonb, jsonb, jsonb, text) from public, anon, authenticated;
+grant execute on function public.replace_important_dates(jsonb, jsonb, jsonb, text) to service_role;
 
 notify pgrst, 'reload schema';
 commit;
