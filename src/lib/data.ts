@@ -877,8 +877,9 @@ export function validateData(value: unknown): value is TrackerData {
     typeof account.notes === "string" && account.notes.length <= 3000 &&
     (account.currentBalance === undefined || account.currentBalance === null ||
       (typeof account.currentBalance === "number" && Number.isFinite(account.currentBalance))) &&
-    (account.balanceAsOfDate === undefined || (typeof account.balanceAsOfDate === "string" &&
-      (account.balanceAsOfDate === "" || !Number.isNaN(Date.parse(account.balanceAsOfDate)))))));
+    (account.balanceAsOfDate === undefined || account.balanceAsOfDate === null ||
+      (typeof account.balanceAsOfDate === "string" &&
+        (account.balanceAsOfDate === "" || !Number.isNaN(Date.parse(account.balanceAsOfDate)))))));
   const credentialRecordsOk = value.credentialRecords === undefined || (Array.isArray(value.credentialRecords) && value.credentialRecords.every((record) =>
     isRecord(record) && typeof record.id === "string" && record.id.length > 0 &&
     (record.kind === undefined || record.kind === "bank-account") &&

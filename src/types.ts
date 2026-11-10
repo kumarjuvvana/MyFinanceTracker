@@ -959,7 +959,7 @@ export interface BankAccount {
   customerService: string;
   notes: string;
   currentBalance?: number | null;
-  balanceAsOfDate?: string;
+  balanceAsOfDate?: string | null;
 }
 
 export interface EncryptedCredentialVault {
