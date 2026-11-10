@@ -1953,6 +1953,17 @@ function parseStockImportNumber(text: string, integerOnly: boolean): string {
   return normalized;
 }
 
+function latestStockQuotesById(quotes: StockQuoteSnapshot[]) {
+  const latest = new Map<string, StockQuoteSnapshot>();
+  for (const quote of quotes) {
+    const previous = latest.get(quote.stockId);
+    if (!previous || Date.parse(quote.timestamp) > Date.parse(previous.timestamp)) {
+      latest.set(quote.stockId, quote);
+    }
+  }
+  return latest;
+}
+
 function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onRenameBroker, onDeleteBroker, onSaveQuote }: {
   stocks: TrackedStock[];
   brokers: string[];
@@ -2001,11 +2012,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [collapsedStockGroups, setCollapsedStockGroups] = useState<Set<string>>(() => new Set());
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const latestQuotes = new Map<string, StockQuoteSnapshot>();
-  for (const quote of quotes) {
-    const previous = latestQuotes.get(quote.stockId);
-    if (!previous || Date.parse(quote.timestamp) > Date.parse(previous.timestamp)) latestQuotes.set(quote.stockId, quote);
-  }
+  const latestQuotes = latestStockQuotesById(quotes);
   const sortedHistory = (stockId: string) => quotes.filter((quote) => quote.stockId === stockId).sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
   const portfolioPositions = stocks.flatMap((stock) => {
     const latest = latestQuotes.get(stock.id);
@@ -2345,7 +2352,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     stockHoldingFilter !== "all" || stockQuoteFilter !== "all";
 
   return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and save refreshed price snapshots." action={<div className="stock-heading-actions"><input ref={importInputRef} className="sr-only" type="file" accept="image/*" aria-label="Choose stock screenshot" onChange={(event) => { const file = event.target.files?.[0]; if (file) void recognizeStockScreenshot(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importBusy}>{importBusy ? <LoaderCircle size={14} className="spin" /> : <ImagePlus size={14} />}{importBusy ? `Reading ${importProgress}%` : "Import screenshot"}</Button><Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button></div>} />
-    <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. All snapshots are saved only in this browser.</span></div>
+    <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. Holdings and quote snapshots are saved in the shared tracker data.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {refreshErrors.length > 0 && <div className="alert alert-error stock-errors" role="alert"><div><strong>Some prices could not be refreshed:</strong><ul>{refreshErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
@@ -2739,20 +2746,51 @@ function AssetModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function AssetManager({ assets, onSave, onDelete }: {
+function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenStocks }: {
   assets: AssetRecord[];
+  stocks: TrackedStock[];
+  stockQuotes: StockQuoteSnapshot[];
   onSave: (asset: Omit<AssetRecord, "id">, id?: string) => void;
   onDelete: (asset: AssetRecord) => void;
+  onOpenStocks: () => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
-  const [activeType, setActiveType] = useState<"All types" | AssetType>("All types");
+  const [activeType, setActiveType] = useState<"All types" | "Stocks" | AssetType>("All types");
   const query = search.trim().toLocaleLowerCase();
   const visible = assets.filter((asset) =>
-    (activeType === "All types" || asset.type === activeType) &&
+    (activeType === "All types" || activeType !== "Stocks" && asset.type === activeType) &&
     [asset.name, asset.type, asset.institution, asset.reference, asset.location, asset.notes, ...asset.tags]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
+  const visibleStocks = stocks.filter((stock) =>
+    [stock.symbol, stock.name, stock.exchange, stock.broker].some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const latestStockQuotes = latestStockQuotesById(stockQuotes);
+  const stockTotals = new Map<string, {
+    current: number;
+    invested: number;
+    profitLoss: number;
+    pricedPositions: number;
+    investedPositions: number;
+  }>();
+  for (const stock of visibleStocks) {
+    const quote = latestStockQuotes.get(stock.id);
+    if (!quote || (stock.quantity ?? 0) <= 0) continue;
+    const total = stockTotals.get(quote.currency) ?? {
+      current: 0, invested: 0, profitLoss: 0, pricedPositions: 0, investedPositions: 0,
+    };
+    const currentValue = quote.price * (stock.quantity ?? 0);
+    total.current += currentValue;
+    total.pricedPositions++;
+    if (stock.averageBuyPrice != null && stock.averageBuyPrice > 0) {
+      const investedValue = stock.averageBuyPrice * (stock.quantity ?? 0);
+      total.invested += investedValue;
+      total.profitLoss += currentValue - investedValue;
+      total.investedPositions++;
+    }
+    stockTotals.set(quote.currency, total);
+  }
   const visibleMutualFunds = visible.filter((asset) => asset.type === "Mutual fund");
   const visibleHomeLoans = visible.filter((asset) => asset.type === "Home loan");
   const visibleNps = visible.filter((asset) => asset.type === "NPS");
@@ -2836,7 +2874,7 @@ function AssetManager({ assets, onSave, onDelete }: {
     totals.set(asset.currency, total);
   }
 
-  function formatAmount(amount: number, currency: Currency) {
+  function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   }
 
@@ -2845,17 +2883,49 @@ function AssetManager({ assets, onSave, onDelete }: {
   }
 
   return <>
-    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
-    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Fixed deposits track principal, rate, dates, and the maturity amount stated on the advice; home loans have a dedicated balance snapshot. Loan balances count as liabilities. Stock entries here are summaries—avoid duplicating amounts already represented in the detailed Stocks portfolio. These details persist in the private GitHub repository and its history; do not enter full account numbers or other secrets.</span></div>
+    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : <Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
+    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. The Stocks tab reads the same holdings and price snapshots as the Stocks menu—there is no duplicate stock data or asset table. Manage stock holdings in the Stocks menu. Loan balances count as liabilities. These details persist in the private GitHub repository and its history; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
-      {(["All types", ...ASSET_TYPES] as const).map((type) => {
-        const count = type === "All types" ? assets.length : assets.filter((asset) => asset.type === type).length;
+      {(["All types", ...ASSET_TYPES, "Stocks"] as const).map((type) => {
+        const count = type === "All types" ? assets.length
+          : type === "Stocks" ? stocks.length
+            : assets.filter((asset) => asset.type === type).length;
         const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes" : type;
         return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
       })}
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search assets" placeholder="Search name, provider, reference, tags..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "record" : "records"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
+    {activeType === "Stocks" && stockTotals.size > 0 && <div className="asset-total-list">{[...stockTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
+      const returnPercent = total.invested ? total.profitLoss / total.invested * 100 : null;
+      return <Card className="asset-total-card" key={currency}>
+        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Invested · {currency}</span><strong>{total.investedPositions ? formatAmount(total.invested, currency) : "Average buy price not recorded"}</strong></div>
+        <div><span>Unrealized P/L · priced holdings with average buy price</span><strong className={total.profitLoss >= 0 ? "positive" : "negative"}>{total.investedPositions ? `${total.profitLoss >= 0 ? "+" : ""}${formatAmount(total.profitLoss, currency)}${returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}` : "Not available"}</strong></div>
+        <div><span>Positions with saved quotes</span><strong>{total.pricedPositions}</strong></div>
+      </Card>;
+    })}</div>}
+    {activeType === "Stocks" && <div className="alert">Stock holdings and quote history are read directly from the Stocks menu’s existing data. Price and market value reflect the latest saved quote; edit holdings or refresh quotes in Stocks.</div>}
+    {activeType === "Stocks" && visibleStocks.length > 0 && <div className="asset-list">{visibleStocks.map((stock) => {
+      const quote = latestStockQuotes.get(stock.id);
+      const quantity = stock.quantity ?? 0;
+      const currentValue = quote && quantity > 0 ? quote.price * quantity : null;
+      const investedValue = stock.averageBuyPrice != null && quantity > 0 ? stock.averageBuyPrice * quantity : null;
+      const profitLoss = currentValue !== null && investedValue !== null ? currentValue - investedValue : null;
+      return <Card className="asset-card" key={stock.id}>
+        <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><TrendingUp size={17} /></div><div><h2>{stock.symbol}</h2><p>{stock.name}{stock.exchange ? ` · ${stock.exchange}` : ""}{stock.broker ? ` · ${stock.broker}` : ""}</p></div></div></div>
+        <div className="asset-details">
+          <div><span>Quantity</span><strong>{quantity.toLocaleString()}</strong></div>
+          <div><span>Average buy price</span><strong>{stock.averageBuyPrice != null ? formatAmount(stock.averageBuyPrice, quote?.currency ?? "INR") : "Not recorded"}</strong></div>
+          <div><span>Latest saved price</span><strong>{quote ? formatAmount(quote.price, quote.currency) : "No saved quote"}</strong></div>
+          <div><span>Current value</span><strong>{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</strong></div>
+          {investedValue !== null && quote && <div><span>Invested value</span><strong>{formatAmount(investedValue, quote.currency)}</strong></div>}
+          {profitLoss !== null && quote && <div><span>Unrealized P/L</span><strong className={profitLoss >= 0 ? "positive" : "negative"}>{profitLoss >= 0 ? "+" : ""}{formatAmount(profitLoss, quote.currency)}</strong></div>}
+          {quote && <div><span>Quote saved</span><strong>{new Date(quote.timestamp).toLocaleString()}</strong></div>}
+        </div>
+      </Card>;
+    })}</div>}
+    {activeType === "Stocks" && !visibleStocks.length && <Card><EmptyState icon={<TrendingUp size={18} />} title={stocks.length ? "No matching stocks" : "No stocks tracked yet"} description={stocks.length ? "Try a different search." : "Add holdings in the Stocks menu; they will appear here automatically."} /></Card>}
     {activeType === "Mutual fund" && mutualFundTotals.size > 0 && <div className="asset-total-list">{[...mutualFundTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current - total.invested;
       const returnPercent = total.invested ? gain / total.invested * 100 : null;
@@ -2982,7 +3052,7 @@ function AssetManager({ assets, onSave, onDelete }: {
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
     })}</div>
-    {!visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
+    {activeType !== "Stocks" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
     {editor !== undefined && <AssetModal key={editor?.id ?? "new-asset"} initial={editor} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} />}
   </>;
 }
@@ -11930,7 +12000,7 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} onSave={saveAsset} onDelete={deleteAsset} />,
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} />,
     "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}
       onSave={(account) => persistUpdate((previous) => ({
         ...previous,
