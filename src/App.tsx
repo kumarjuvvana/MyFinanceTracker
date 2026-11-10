@@ -295,12 +295,30 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   const [newSessionName, setNewSessionName] = useState("");
   const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [taskFilter, setTaskFilter] = useState("All tasks");
   const [editingLinkItemId, setEditingLinkItemId] = useState<string | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<string, ActivityChecklistLink[]>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
   const completedCount = sessions.reduce((count, session) =>
     count + session.items.filter((item) => checkedItems.has(item.id)).length, 0);
   const taskCount = sessions.reduce((count, session) => count + session.items.length, 0);
+  const query = search.trim().toLocaleLowerCase();
+  const itemLinksForSearch = (item: ActivityChecklistItem) => item.links ?? (item.appLink ? [{
+    url: item.appLink.url ?? item.appLink.page ?? "",
+    label: item.appLink.label,
+  }] : []);
+  const visibleSessions = sessions.map((session) => {
+    const sessionMatches = !query || session.name.toLocaleLowerCase().includes(query);
+    const items = session.items.filter((item) =>
+      (!query || sessionMatches || item.name.toLocaleLowerCase().includes(query) ||
+        itemLinksForSearch(item).some((link) => `${link.label} ${link.url}`.toLocaleLowerCase().includes(query))) &&
+      (taskFilter === "All tasks" ||
+        (taskFilter === "Completed" ? checkedItems.has(item.id) : !checkedItems.has(item.id))));
+    return { session, items, sessionMatches };
+  }).filter(({ items, sessionMatches }) =>
+    (!query || sessionMatches || items.length > 0) &&
+    (taskFilter === "All tasks" || items.length > 0 || (query && sessionMatches)));
 
   function updateSession(sessionId: string, update: (session: ActivityChecklistSession) => ActivityChecklistSession) {
     onSave(sessions.map((session) => session.id === sessionId ? update(session) : session));
@@ -398,11 +416,18 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
         <button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button>
       </div>
     </Card>
+    <div className="toolbar filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search activity sessions and tasks" placeholder="Search sessions, activities, or links..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer label="Activity filters" activeCount={taskFilter === "All tasks" ? 0 : 1}>
+        <Field label="Task status"><Select aria-label="Filter activities by completion" value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}><option>All tasks</option><option>Incomplete</option><option>Completed</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{visibleSessions.reduce((total, entry) => total + entry.items.length, 0)} matching {visibleSessions.reduce((total, entry) => total + entry.items.length, 0) === 1 ? "task" : "tasks"}</Badge>
+    </div>
     <form className="activity-add-session" onSubmit={addSession}>
       <Input aria-label="New session name" placeholder="Add a session, e.g. Before bed" maxLength={60} value={newSessionName} onChange={(event) => setNewSessionName(event.target.value)} />
       <Button type="submit" disabled={!newSessionName.trim()}><Plus size={14} />Add session</Button>
     </form>
-    {sessions.length ? <div className="activity-session-grid">{sessions.map((session) => {
+    {sessions.length ? visibleSessions.length ? <div className="activity-session-grid">{visibleSessions.map(({ session, items: visibleItems }) => {
       const sessionDone = session.items.filter((item) => checkedItems.has(item.id)).length;
       return <Card className="activity-session-card" key={session.id}>
         <div className="activity-session-head">
@@ -431,7 +456,8 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           <Button type="button" variant="outline" size="sm" disabled={!session.items.length || sessionDone === session.items.length} onClick={() => onSetSessionChecked(session.id, true)}><Check size={13} />Check all</Button>
           <Button type="button" variant="outline" size="sm" disabled={!sessionDone} onClick={() => onSetSessionChecked(session.id, false)}><X size={13} />Uncheck all</Button>
         </div>
-        {session.items.length ? <div className="activity-task-list">{session.items.map((item, itemIndex) => {
+        {visibleItems.length ? <div className="activity-task-list">{visibleItems.map((item) => {
+          const itemIndex = session.items.findIndex((entry) => entry.id === item.id);
           const itemLinks = item.links ?? (item.appLink ? [{
             id: `legacy-${item.id}`,
             url: item.appLink.url ?? (item.appLink.page
@@ -533,13 +559,13 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
               </div>
             </form>}
           </div>;
-        })}</div> : <p className="activity-empty">Add the first activity for this session.</p>}
+        })}</div> : <p className="activity-empty">{session.items.length ? "No activities match the current search or filter." : "Add the first activity for this session."}</p>}
         <form className="activity-add-task" onSubmit={(event) => addItem(event, session.id)}>
           <Input aria-label={`New activity for ${session.name}`} placeholder="Add an activity…" maxLength={120} value={newItemNames[session.id] ?? ""} onChange={(event) => setNewItemNames((current) => ({ ...current, [session.id]: event.target.value }))} />
           <Button type="submit" variant="outline" size="sm" disabled={!newItemNames[session.id]?.trim()}><Plus size={13} />Add</Button>
         </form>
       </Card>;
-    })}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
+    })}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No matching activities" description="Try another search or completion filter." /></Card> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
   </>;
 }
 
@@ -761,9 +787,13 @@ function ShoppingList({ data, onToggle, onAdd, onEdit, onCopy, onDelete }: { dat
   const formatCurrency = useCurrencyFormatter();
   const [filter, setFilter] = useState("All items");
   const [search, setSearch] = useState("");
-  const items = data.items.filter((item) => (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) && item.name.toLowerCase().includes(search.toLowerCase()));
+  const [sortBy, setSortBy] = useState("name");
+  const items = data.items.filter((item) => (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) && item.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => sortBy === "category" ? a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
+      : sortBy === "price-highest" ? b.estimatedPrice * b.quantity - a.estimatedPrice * a.quantity || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name));
   return <><PageHeading eyebrow="Plan a little ahead" title="Shopping list" subtitle={`${data.items.filter((item) => !item.purchased).length} things waiting patiently for their turn.`} action={<Button onClick={onAdd}><Plus size={15} /> Add an item</Button>} />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={filter === "All items" ? 0 : 1}><Field label="Status"><Select aria-label="Filter list" value={filter} onChange={(e) => setFilter(e.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field></FilterDrawer><Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={(filter === "All items" ? 0 : 1) + (sortBy !== "name" ? 1 : 0)}><Field label="Status"><Select aria-label="Filter list" value={filter} onChange={(e) => setFilter(e.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field><Field label="Sort by"><Select aria-label="Sort shopping list" value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="name">Name (A–Z)</option><option value="category">Category</option><option value="price-highest">Estimated total (highest)</option></Select></Field></FilterDrawer><Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge></div>
     <Card className="table-card"><table className="data-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table>
       {items.length === 0 && <EmptyState icon={<ClipboardList size={18} />} title={search ? "No items found" : "A fresh start"} description={search ? "Try another search or clear the filter." : "Add a few things you need and they will be right here."} />}</Card>
   </>;
@@ -870,14 +900,18 @@ function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData
   const [store, setStore] = useState("All stores");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [sortBy, setSortBy] = useState("date-newest");
   const [editing, setEditing] = useState<Purchase | null>(null);
   const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort();
-  const purchases = [...data.purchases].filter((purchase) => (!search || purchase.itemName.toLowerCase().includes(search.toLowerCase())) && (store === "All stores" || purchase.store === store) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) => b.date.localeCompare(a.date));
+  const purchases = [...data.purchases].filter((purchase) => (!search || `${purchase.itemName} ${purchase.category} ${purchase.store}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && (store === "All stores" || purchase.store === store) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) =>
+    sortBy === "date-oldest" ? a.date.localeCompare(b.date) :
+      sortBy === "item" ? a.itemName.localeCompare(b.itemName) || b.date.localeCompare(a.date) :
+        sortBy === "price-highest" ? b.price - a.price || b.date.localeCompare(a.date) : b.date.localeCompare(a.date));
   const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
   return <><PageHeading eyebrow="A record of the good stuff" title="Purchase history" subtitle="Everything you've brought home, in one place." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={[store !== "All stores", Boolean(from), Boolean(to)].filter(Boolean).length}><Field label="Store"><Select aria-label="Filter by store" value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" value={to} onValueChange={setTo} /></Field></FilterDrawer></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items, stores, categories..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={[store !== "All stores", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Store"><Select aria-label="Filter by store" value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} max={to || undefined} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort purchases" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Paid (highest)</option></Select></Field></FilterDrawer></div>
     <div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div>
-    {purchases.length ? <DateGroupedRecords items={purchases} getDate={(purchase) => purchase.date} title={(date) => `Purchases · ${dateLabel(date)}`}>{(datePurchases) => <Card className="table-card"><table className="data-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{datePurchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>}</DateGroupedRecords> : <Card className="table-card"><EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." /></Card>}
+    {purchases.length ? <DateGroupedRecords items={purchases} getDate={(purchase) => purchase.date} title={(date) => `Purchases · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(datePurchases) => <Card className="table-card"><table className="data-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{datePurchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>}</DateGroupedRecords> : <Card className="table-card"><EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." /></Card>}
     {editing && <PurchaseEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(purchase) => { onSave({ ...purchase, id: editing.id, ...(editing.tripId ? { tripId: editing.tripId } : {}) }); setEditing(null); }} />}
   </>;
 }
@@ -1038,8 +1072,25 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<"products" | "stores" | "categories" | "editor">("products");
+  const [masterSearch, setMasterSearch] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("All categories");
+  const [masterSort, setMasterSort] = useState("name");
   const [editorKind, setEditorKind] = useState<"product" | "store" | "category" | null>(null);
   const [error, setError] = useState("");
+  const query = masterSearch.trim().toLocaleLowerCase();
+  const visibleProducts = products.filter((product) =>
+    (productCategoryFilter === "All categories" || product.category === productCategoryFilter) &&
+    `${product.name} ${product.category} ${product.unit}`.toLocaleLowerCase().includes(query))
+    .sort((a, b) => masterSort === "price-highest" ? b.estimatedPrice - a.estimatedPrice || a.name.localeCompare(b.name) :
+      masterSort === "price-lowest" ? a.estimatedPrice - b.estimatedPrice || a.name.localeCompare(b.name) :
+        a.name.localeCompare(b.name));
+  const visibleStores = stores.filter((store) => `${store.name} ${store.location}`.toLocaleLowerCase().includes(query))
+    .sort((a, b) => masterSort === "location" ? a.location.localeCompare(b.location) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
+  const visibleReminderCategories = reminderCategories.filter((entry) => entry.toLocaleLowerCase().includes(query))
+    .sort((a, b) => masterSort === "most-used"
+      ? reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === b.toLocaleLowerCase()).length -
+        reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === a.toLocaleLowerCase()).length || a.localeCompare(b)
+      : a.localeCompare(b));
   function openEditor(kind: "product" | "store" | "category") {
     setEditorKind(kind);
     setEditingStore(null);
@@ -1097,17 +1148,23 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
       <Button variant={activeTab === "categories" ? "primary" : "outline"} aria-pressed={activeTab === "categories"} onClick={() => setActiveTab("categories")}><Bell size={14} />Reminder categories<Badge>{reminderCategories.length}</Badge></Button>
       <Button variant={activeTab === "editor" ? "primary" : "outline"} aria-pressed={activeTab === "editor"} onClick={() => { setEditorKind(null); setActiveTab("editor"); }}><Plus size={14} />Add / edit</Button>
     </nav>
+    {activeTab !== "editor" && <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={`Search master ${activeTab}`} placeholder={activeTab === "products" ? "Search products..." : activeTab === "stores" ? "Search stores and locations..." : "Search reminder categories..."} value={masterSearch} onChange={(event) => setMasterSearch(event.target.value)} /></div><FilterDrawer label="Search & sort" activeCount={(activeTab === "products" && productCategoryFilter !== "All categories" ? 1 : 0) + (masterSort !== "name" ? 1 : 0)}>
+      {activeTab === "products" && <Field label="Product category"><Select aria-label="Filter products by category" value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>}
+      {activeTab === "products" && <Field label="Sort by"><Select aria-label="Sort products" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="price-highest">Price (highest)</option><option value="price-lowest">Price (lowest)</option></Select></Field>}
+      {activeTab === "stores" && <Field label="Sort by"><Select aria-label="Sort stores" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="location">Location (A–Z)</option></Select></Field>}
+      {activeTab === "categories" && <Field label="Sort by"><Select aria-label="Sort reminder categories" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="most-used">Most used</option></Select></Field>}
+    </FilterDrawer><Badge>{activeTab === "products" ? `${visibleProducts.length} products` : activeTab === "stores" ? `${visibleStores.length} stores` : `${visibleReminderCategories.length} categories`}</Badge></div>}
     {activeTab === "products" && <Card>
       <div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><Button onClick={() => openEditor("product")}><Plus size={14} />Add product</Button></div>
-      <div className="master-entry-list">{products.length ? products.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setEditingStore(null); setEditorKind("product"); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved products yet.</p>}</div>
+      <div className="master-entry-list">{visibleProducts.length ? visibleProducts.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setEditingStore(null); setEditorKind("product"); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">{products.length ? "No products match the search or category filter." : "No saved products yet."}</p>}</div>
     </Card>}
     {activeTab === "stores" && <Card>
       <div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Button onClick={() => openEditor("store")}><Plus size={14} />Add store</Button></div>
-      <div className="master-entry-list">{stores.length ? stores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setEditingProduct(null); setEditorKind("store"); setStoreName(store.name); setLocation(store.location); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">No saved stores yet.</p>}</div>
+      <div className="master-entry-list">{visibleStores.length ? visibleStores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setEditingProduct(null); setEditorKind("store"); setStoreName(store.name); setLocation(store.location); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">{stores.length ? "No stores match the search." : "No saved stores yet."}</p>}</div>
     </Card>}
     {activeTab === "categories" && <Card>
       <div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Button onClick={() => openEditor("category")}><Plus size={14} />Add category</Button></div>
-      <div className="master-entry-list">{reminderCategories.length ? reminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">No custom categories yet. Built-in categories are always available.</p>}</div>
+      <div className="master-entry-list">{visibleReminderCategories.length ? visibleReminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">{reminderCategories.length ? "No reminder categories match the search." : "No custom categories yet. Built-in categories are always available."}</p>}</div>
     </Card>}
     {activeTab === "editor" && <Card className="master-editor-card">
       <div className="card-head"><div><h2 className="section-title">{editorKind === "product" ? editingProduct ? "Edit product" : "Add product" : editorKind === "store" ? editingStore ? "Edit store" : "Add store" : editorKind === "category" ? "Add reminder category" : "Choose what to add"}</h2><p className="section-description">This form is separate from the record list.</p></div></div>
@@ -3108,7 +3165,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
                 {result.notes && <small><LinkifiedText>{result.notes}</LinkifiedText></small>}
               </div>)}
             </div>}
-          </> : <div className="education-entry-list">{[...exams].sort((a, b) => b.date.localeCompare(a.date)).map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, examSubjectName(exam), exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}
+          </> : <DateGroupedRecords items={exams} getDate={(exam) => exam.date} title={(date) => `Exams · ${dateLabel(date)}`}>{(dateExams) => <div className="education-entry-list">{dateExams.map((exam) => <div className="education-entry" key={exam.id}><div><strong>{exam.name}</strong><span>{[exam.assessmentType, examSubjectName(exam), exam.date ? dateLabel(exam.date) : "", exam.resultStatus && exam.resultStatus !== "Scored" ? exam.resultStatus : ""].filter(Boolean).join(" · ")}</span><small><LinkifiedText>{[exam.marksObtained !== null && exam.maximumMarks !== null ? `${exam.marksObtained} / ${exam.maximumMarks}${exam.maximumMarks ? ` (${(exam.marksObtained / exam.maximumMarks * 100).toFixed(1)}%)` : ""}` : "", exam.grade ? `Grade / GPA: ${exam.grade}` : "", exam.teacherRemark ? `Teacher remark: ${exam.teacherRemark}` : "", exam.notes].filter(Boolean).join(" · ")}</LinkifiedText></small></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${exam.name}`} onClick={() => setEditor({ kind: "exam", initial: exam })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${exam.name}`} onClick={() => onUpdate({ ...record, exams: [{ ...exam, id: createId() }, ...exams] })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${exam.name}`} onClick={() => removeExam(exam)}><Archive size={13} /></button></div></div>)}</div>}</DateGroupedRecords>}
         </div>
       </> : <p className="education-empty">Track school assessments or college exams, grades, GPA, and marks.</p>}
       </div>
@@ -3203,10 +3260,10 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
         </div>
       </div>
       {holidaysExpanded && <div className="education-compact-record-list">
-        {schoolHolidays.length ? [...schoolHolidays].sort((a, b) => a.startDate.localeCompare(b.startDate)).map((holiday) => <details className="education-compact-record" key={holiday.id}>
+        {schoolHolidays.length ? <DateGroupedRecords items={schoolHolidays} getDate={(holiday) => holiday.startDate} title={(date) => `Holidays · ${dateLabel(date)}`} groupOrder="oldest">{(dateHolidays) => dateHolidays.map((holiday) => <details className="education-compact-record" key={holiday.id}>
           <summary><span><strong>{holiday.name}</strong><small>{holiday.type} · {dateLabel(holiday.startDate)}{holiday.endDate !== holiday.startDate ? ` – ${dateLabel(holiday.endDate)}` : ""}</small></span><ChevronRight size={14} /></summary>
           <div className="education-compact-record-details">{holiday.notes && <p>{holiday.notes}</p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "holiday", initial: holiday })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${holiday.name}`} onClick={() => removeHoliday(holiday)}><Archive size={13} /></button></div></div>
-        </details>) : <p className="education-empty">Add single-day holidays or seasonal breaks for this academic year.</p>}
+        </details>)}</DateGroupedRecords> : <p className="education-empty">Add single-day holidays or seasonal breaks for this academic year.</p>}
       </div>}
     </section>
     <section className="education-section">
@@ -3217,10 +3274,10 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
         <Button size="sm" variant="outline" onClick={() => setEditor({ kind: "award", initial: null })}><Plus size={12} />Add award / certificate</Button>
       </div>
       {awardsExpanded && <div className="education-compact-record-list">
-        {awards.length ? [...awards].sort((a, b) => b.date.localeCompare(a.date)).map((award) => <details className="education-compact-record" key={award.id}>
+        {awards.length ? <DateGroupedRecords items={awards} getDate={(award) => award.date} title={(date) => `Awards · ${dateLabel(date)}`}>{(dateAwards) => dateAwards.map((award) => <details className="education-compact-record" key={award.id}>
           <summary><span><strong>{award.name}</strong><small>{award.type}{award.issuer ? ` · ${award.issuer}` : ""} · {dateLabel(award.date)}</small></span><ChevronRight size={14} /></summary>
           <div className="education-compact-record-details">{award.details && <p>{award.details}</p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "award", initial: award })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${award.name}`} onClick={() => removeAward(award)}><Archive size={13} /></button></div></div>
-        </details>) : <p className="education-empty">Record awards and certificates received during this academic year.</p>}
+        </details>)}</DateGroupedRecords> : <p className="education-empty">Record awards and certificates received during this academic year.</p>}
       </div>}
     </section>
     <section className="education-section">
@@ -3231,20 +3288,20 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
         <Button size="sm" variant="outline" onClick={() => setEditor({ kind: "leave", initial: null })}><Plus size={12} />Record leave</Button>
       </div>
       {leavesExpanded && <div className="education-compact-record-list">
-        {studentLeaves.length ? [...studentLeaves].sort((a, b) => b.date.localeCompare(a.date)).map((leave) => <details className="education-compact-record" key={leave.id}>
+        {studentLeaves.length ? <DateGroupedRecords items={studentLeaves} getDate={(leave) => leave.date} title={(date) => `Leave · ${dateLabel(date)}`}>{(dateLeaves) => dateLeaves.map((leave) => <details className="education-compact-record" key={leave.id}>
           <summary><span><strong>{dateLabel(leave.date)}</strong><small>{leave.reason}</small></span><ChevronRight size={14} /></summary>
           <div className="education-compact-record-details"><p>{leave.reason}</p><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "leave", initial: leave })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive leave entry for ${dateLabel(leave.date)}`} onClick={() => removeStudentLeave(leave)}><Archive size={13} /></button></div></div>
-        </details>) : <p className="education-empty">Manually record leave dates and reasons for this student and academic year. These entries do not change attendance.</p>}
+        </details>)}</DateGroupedRecords> : <p className="education-empty">Manually record leave dates and reasons for this student and academic year. These entries do not change attendance.</p>}
       </div>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={feeChargesExpanded} onClick={() => setFeeChargesExpanded((value) => !value)}><ChevronRight size={14} className={feeChargesExpanded ? "is-expanded" : ""} /><span><h3><Wallet size={14} />Fee charges</h3><p>{feeCharges.length} charges · {formatAmount(feeCharges.reduce((sum, charge) => sum + charge.amount, 0))} billed · {feeChargesExpanded ? "Hide details" : "Show details"}</p></span></button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "charge", initial: null })}><Plus size={12} />Add charge</Button></div>
       {feeChargesExpanded && <><p className="section-description">Charges are amounts billed by the school and determine the fee balance. Record money actually paid, or outside school purchases, in the ledger below.</p>
       {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
-      {feeCharges.length ? <div className="education-entry-list">{feeCharges.map((charge) => {
+      {feeCharges.length ? <DateGroupedRecords items={feeCharges} getDate={(charge) => charge.dueDate} title={(date) => `Fee charges · ${dateLabel(date)}`}>{(dateCharges) => <div className="education-entry-list">{dateCharges.map((charge) => {
         const allocated = allocatedToCharge(charge.id);
         return <div className="education-entry" key={charge.id}><div><strong>{charge.feeType} · {charge.description} · {formatAmount(charge.amount)}</strong><span>{[charge.period, charge.dueDate ? `Due ${dateLabel(charge.dueDate)}` : "", `Paid ${formatAmount(allocated)}`, `Balance ${formatAmount(Math.max(0, charge.amount - allocated))}`].filter(Boolean).join(" · ")}</span>{charge.notes && <small>{charge.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${charge.description}`} onClick={() => setEditor({ kind: "charge", initial: charge })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${charge.description}`} onClick={() => removeFeeCharge(charge)}><Archive size={13} /></button></div></div>;
-      })}</div> : <p className="education-empty">Add itemized tuition, transport, admission, or other charges. Older annual totals remain supported.</p>}</>}
+      })}</div>}</DateGroupedRecords> : <p className="education-empty">Add itemized tuition, transport, admission, or other charges. Older annual totals remain supported.</p>}</>}
     </section>
     <section className="education-section">
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={spendingExpanded} onClick={() => setSpendingExpanded((value) => !value)}><ChevronRight size={14} className={spendingExpanded ? "is-expanded" : ""} /><span><h3><Wallet size={14} />Payments &amp; school purchases</h3><p>{payments.length} fee payments · {educationExpenses.length} purchases · {formatAmount(loggedPaid + purchaseTotal)} recorded spending · {spendingExpanded ? "Hide details" : "Show details"}</p></span></button><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "expense", initial: null })}><Plus size={12} />Add purchase</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "payment", initial: null })}><Plus size={12} />Record fee payment</Button></div></div>
@@ -4052,6 +4109,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
   const [activeSection, setActiveSection] = useState<"overview" | "education" | "interests" | "notes" | "marks-attendance" | "reports" | "plans">("overview");
   const [planProfileId, setPlanProfileId] = useState("");
   const [sortBy, setSortBy] = useState("student-year");
+  const [directorySort, setDirectorySort] = useState("name");
   const grades = [...new Set(records.map((record) => record.gradeCourse.trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   const query = search.trim().toLocaleLowerCase();
@@ -4248,7 +4306,11 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
     if (!query) return true;
     const searchable = [student.name, ...(student.profile?.interests ?? [])].join(" ").toLocaleLowerCase();
     return searchable.includes(query);
-  });
+  }).sort((a, b) => directorySort === "most-records"
+    ? b.records.length - a.records.length || a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    : directorySort === "fewest-records"
+      ? a.records.length - b.records.length || a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      : a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   const profileRecords = selectedEntry?.records ?? [];
   const firstProfileRecord = profileRecords[0];
   const shownProfile = selectedEntry?.profile;
@@ -4257,7 +4319,7 @@ function EducationRecordsPage({ records, profiles, educationPlans, archivedRecor
     <PageHeading eyebrow="Student directory" title="Schools & Colleges" subtitle={selectedEntry ? `${selectedEntry.name}'s profile and education timeline.` : "Choose a student to view their profile, education, and interests."} action={selectedEntry ? <><Button variant="outline" onClick={() => { setSelectedStudent(null); setActiveSection("overview"); }}><ArrowLeftRight size={14} />All students</Button><Button onClick={openProfileEditor}><Pencil size={14} />Edit profile</Button></> : <Button onClick={() => setProfileEditor({ profile: null })}><Plus size={15} /> Add student</Button>} />
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Student profiles, family contact details, blood group, and school records are sensitive. They are stored in the private Supabase project and accessible to people with the shared account password. Do not store government ID numbers or information you do not need.</span></div>
     {!selectedEntry ? <>
-      <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search students" placeholder="Search student names and interests..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{directoryEntries.length} {directoryEntries.length === 1 ? "student" : "students"}</Badge></div>
+      <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search students" placeholder="Search student names and interests..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Student directory filters" activeCount={directorySort === "name" ? 0 : 1}><Field label="Sort by"><Select aria-label="Sort student directory" value={directorySort} onChange={(event) => setDirectorySort(event.target.value)}><option value="name">Name</option><option value="most-records">Most education records</option><option value="fewest-records">Fewest education records</option></Select></Field></FilterDrawer><Badge>{directoryEntries.length} {directoryEntries.length === 1 ? "student" : "students"}</Badge></div>
       {directoryEntries.length ? <div className="student-directory-grid">{directoryEntries.map((student) => <Card key={student.key} className="student-directory-card">
         <button type="button" className="student-directory-open" onClick={() => { setSelectedStudent(student.key); setActiveSection("overview"); setSearch(""); }}>
           {student.profile?.photoStoragePath ? <img src={`/api/documents?path=${encodeURIComponent(student.profile.photoStoragePath)}`} alt="" /> : <span className="student-directory-avatar"><UsersRound size={23} /></span>}
@@ -4406,12 +4468,15 @@ function LearningPage({ records, onSave, onDelete }: {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("All levels");
   const [statusFilter, setStatusFilter] = useState("All statuses");
+  const [sortBy, setSortBy] = useState("status");
   const query = search.trim().toLocaleLowerCase();
   const visible = records
     .filter((record) => (levelFilter === "All levels" || record.level === levelFilter) &&
       (statusFilter === "All statuses" || record.status === statusFilter) &&
       [record.title, record.topic, record.provider, record.notes].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.status.localeCompare(b.status) || a.title.localeCompare(b.title));
+    .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title) :
+      sortBy === "started-newest" ? (b.startedDate ?? "").localeCompare(a.startedDate ?? "") || a.title.localeCompare(b.title) :
+        (a.status.localeCompare(b.status) || a.title.localeCompare(b.title)));
 
   function deleteRecord(record: LearningRecord) {
     if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
@@ -4420,7 +4485,7 @@ function LearningPage({ records, onSave, onDelete }: {
   return <>
     <PageHeading eyebrow="Keep growing" title="Learning" subtitle="Capture what you are learning, track your progress from beginner to advanced, and keep useful resources close." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add learning</Button>} />
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Save skills, courses, progress, notes, and learning links. AI resource links are optional; add a trusted AI tutor or tool that supports your learning.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search learning records" placeholder="Search title, topic, source, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(levelFilter !== "All levels" ? 1 : 0) + (statusFilter !== "All statuses" ? 1 : 0)}><Field label="Level"><Select aria-label="Filter learning level" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{(["Beginner", "Basic", "Intermediate", "Advanced", "Expert"] as const).map((level) => <option key={level}>{level}</option>)}</Select></Field><Field label="Status"><Select aria-label="Filter learning status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Not started</option><option>In progress</option><option>Completed</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search learning records" placeholder="Search title, topic, source, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Learning filters" activeCount={(levelFilter !== "All levels" ? 1 : 0) + (statusFilter !== "All statuses" ? 1 : 0) + (sortBy !== "status" ? 1 : 0)}><Field label="Level"><Select aria-label="Filter learning level" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{(["Beginner", "Basic", "Intermediate", "Advanced", "Expert"] as const).map((level) => <option key={level}>{level}</option>)}</Select></Field><Field label="Status"><Select aria-label="Filter learning status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Not started</option><option>In progress</option><option>Completed</option></Select></Field><Field label="Sort by"><Select aria-label="Sort learning records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="status">Status</option><option value="title">Title</option><option value="started-newest">Start date (newest)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge></div>
     <div className="learning-list">{visible.map((record) => <Card className="learning-card" key={record.id}>
       <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
       <div className="learning-card-meta"><Badge>{record.level}</Badge>{record.startedDate && <span>Started {dateLabel(record.startedDate)}</span>}{record.completedDate && <span>Completed {dateLabel(record.completedDate)}</span>}</div>
@@ -4484,6 +4549,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [typeFilter, setTypeFilter] = useState("All types");
+  const [sortBy, setSortBy] = useState("title");
   const categories = [...new Set(records.map((record) => record.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const query = search.trim().toLocaleLowerCase();
   const visible = records
@@ -4491,7 +4557,9 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
     .filter((record) => typeFilter === "All types" || record.type === typeFilter)
     .filter((record) => [record.title, record.description, record.prompt, record.tool, record.category, record.type]
       .some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => sortBy === "category" ? a.category.localeCompare(b.category) || a.title.localeCompare(b.title) :
+      sortBy === "tool" ? a.tool.localeCompare(b.tool) || a.title.localeCompare(b.title) :
+        a.title.localeCompare(b.title));
 
   function deleteRecord(record: PromptRecord) {
     if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
@@ -4500,7 +4568,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   return <>
     <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Keep frequently used prompts organized, searchable, and ready to copy into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
     <div className="prompt-list">{visible.map((record) => <Card className="prompt-card" key={record.id}>
       <div className="prompt-card-head"><div className="prompt-card-title"><div className="prompt-icon"><Sparkles size={17} /></div><div><h2>{record.title}</h2><p>{[record.category, record.tool].filter(Boolean).join(" · ") || "Reusable prompt"}</p></div></div><div className="prompt-card-actions"><Button size="sm" variant="outline" onClick={() => onCopy(record)}><Copy size={13} />Copy prompt</Button><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.title}`} onClick={() => onSave({ ...record, title: `${record.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
       {(record.type || record.tool || record.category) && <div className="prompt-meta">{record.type && <Badge>{record.type}</Badge>}{record.category && <Badge tone="neutral">{record.category}</Badge>}{record.tool && <span>For {record.tool}</span>}</div>}
@@ -4631,7 +4699,11 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   const [trackingDate, setTrackingDate] = useState(today());
   const [search, setSearch] = useState("");
   const [emotionFilter, setEmotionFilter] = useState("All emotions");
+  const [habitSearch, setHabitSearch] = useState("");
+  const [habitSort, setHabitSort] = useState("title");
+  const [habitStatusFilter, setHabitStatusFilter] = useState("All check-ins");
   const query = search.trim().toLocaleLowerCase();
+  const habitQuery = habitSearch.trim().toLocaleLowerCase();
   const visibleLogs = [...logs]
     .filter((log) => emotionFilter === "All emotions" || log.emotion === emotionFilter)
     .filter((log) => [log.date, log.emotion, log.trigger, log.response, log.positiveAction, log.reflection]
@@ -4650,7 +4722,17 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   ]);
   const recentHabitPractices = recentHabitPracticeKeys.size;
   const habitNames = new Map(habits.map((habit) => [habit.id, habit.title]));
-  const orderedHabits = [...habits].sort((a, b) => a.title.localeCompare(b.title));
+  const visibleHabits = [...habits]
+    .filter((habit) => [habit.title, habit.description].some((value) => value.toLocaleLowerCase().includes(habitQuery)))
+    .filter((habit) => {
+      const checked = (habit.completedDates ?? []).includes(trackingDate) ||
+        logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
+      return habitStatusFilter === "All check-ins" ||
+        (habitStatusFilter === "Checked in" ? checked : !checked);
+    })
+    .sort((a, b) => habitSort === "started-newest"
+      ? (b.startDate ?? "").localeCompare(a.startDate ?? "") || a.title.localeCompare(b.title)
+      : a.title.localeCompare(b.title));
 
   function habitProgress(habit: MindfulHabit) {
     const startDate = habit.startDate ?? "";
@@ -4712,9 +4794,10 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><FileText size={14} />Reflections <Badge>{logs.length}</Badge></Button>
     </nav>
     {activeTab === "habits" && <>
+      <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search habits" placeholder="Search habit name or description..." value={habitSearch} onChange={(event) => setHabitSearch(event.target.value)} /></div><FilterDrawer label="Habit filters" activeCount={(habitSort !== "title" ? 1 : 0) + (habitStatusFilter !== "All check-ins" ? 1 : 0)}><Field label="Check-in status"><Select aria-label="Filter habits by check-in status" value={habitStatusFilter} onChange={(event) => setHabitStatusFilter(event.target.value)}><option>All check-ins</option><option>Checked in</option><option>Not checked in</option></Select></Field><Field label="Sort by"><Select aria-label="Sort habits" value={habitSort} onChange={(event) => setHabitSort(event.target.value)}><option value="title">Name</option><option value="started-newest">Start date (newest)</option></Select></Field></FilterDrawer><Badge>{visibleHabits.length} {visibleHabits.length === 1 ? "habit" : "habits"}</Badge></div>
       <Card className="mindful-habits-card">
         <div className="toolbar habit-date-toolbar"><Field label="Track habits for"><DateInput required value={trackingDate} onValueChange={setTrackingDate} /></Field><span>Check a habit when you complete it on that date.</span></div>
-        {orderedHabits.length ? <div className="education-entry-list">{orderedHabits.map((habit) => {
+        {visibleHabits.length ? <div className="education-entry-list">{visibleHabits.map((habit) => {
           const progress = habitProgress(habit);
           const completedDates = habit.completedDates ?? [];
           const reflectedOnDate = logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
@@ -4743,7 +4826,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
               </div>
             </div>
           </div>;
-        })}</div> : <EmptyState icon={<Heart size={18} />} title="No habits to track yet" description="Add a repeatable habit to begin checking in each day." />}
+        })}</div> : <EmptyState icon={<Heart size={18} />} title={habits.length ? "No matching habits" : "No habits to track yet"} description={habits.length ? "Try another search." : "Add a repeatable habit to begin checking in each day."} />}
       </Card>
     </>}
     {activeTab === "reflections" && <>
@@ -5687,10 +5770,14 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   const [editor, setEditor] = useState<ElectricityReading | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All bills");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("reading-newest");
   const query = search.trim().toLocaleLowerCase();
   const visible = readings.filter((entry) =>
     (!query || [entry.meterName, entry.location, entry.notes].some((value) => value.toLocaleLowerCase().includes(query))) &&
-    (statusFilter === "All bills" || (statusFilter === "Paid" ? entry.paid : !entry.paid)));
+    (statusFilter === "All bills" || (statusFilter === "Paid" ? entry.paid : !entry.paid)) &&
+    (!dateFrom || entry.readingDate >= dateFrom) && (!dateTo || entry.readingDate <= dateTo));
   const meterKey = (entry: ElectricityReading) =>
     `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
   const grouped = new Map<string, ElectricityReading[]>();
@@ -5707,14 +5794,16 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       <Card><span>Readings</span><strong>{readings.length}</strong></Card>
       <Card><span>Unpaid bills</span><strong>{formatCurrency(readings.filter((entry) => !entry.paid).reduce((sum, entry) => sum + (entry.billAmount ?? 0), 0))}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={statusFilter === "All bills" ? 0 : 1}><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
-    {grouped.size ? <div className="electricity-list">{[...grouped.entries()].sort((a, b) => a[1][0].meterName.localeCompare(b[1][0].meterName)).map(([key, entries]) => {
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
+    {grouped.size ? <div className="electricity-list">{[...grouped.entries()].sort((a, b) => sortBy === "meter-name"
+      ? a[1][0].meterName.localeCompare(b[1][0].meterName)
+      : (sortBy === "reading-oldest" ? 1 : -1) * a[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, "").localeCompare(b[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, ""))).map(([key, entries]) => {
       const sorted = [...entries].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
       const allForMeter = readings.filter((entry) => meterKey(entry) === key).sort((a, b) => a.readingDate.localeCompare(b.readingDate));
       const latest = allForMeter[allForMeter.length - 1];
       return <Card className="electricity-card" key={key}>
         <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><Zap size={17} /></div><div><h2 className="section-title">{latest.meterName}</h2><p className="section-description">{latest.location || "Location not specified"}</p></div></div><div className="electricity-meter-latest"><span>Latest reading</span><strong>{latest.meterReading.toLocaleString()} kWh</strong></div></div>
-        <DateGroupedRecords items={[...sorted].reverse()} getDate={(entry) => entry.readingDate} title={(date) => `Meter readings · ${dateLabel(date)}`}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
+        <DateGroupedRecords items={sortBy === "reading-oldest" ? sorted : [...sorted].reverse()} getDate={(entry) => entry.readingDate} title={(date) => `Meter readings · ${dateLabel(date)}`} groupOrder={sortBy === "reading-oldest" ? "oldest" : "newest"}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
           const index = allForMeter.findIndex((candidate) => candidate.id === entry.id);
           const previous = index > 0 ? allForMeter[index - 1] : null;
           const used = previous ? entry.meterReading - previous.meterReading : null;
@@ -5841,6 +5930,9 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [statusFilter, setStatusFilter] = useState("All records");
+  const [transactionFrom, setTransactionFrom] = useState("");
+  const [transactionTo, setTransactionTo] = useState("");
+  const [transactionSort, setTransactionSort] = useState("newest");
   const query = search.trim().toLocaleLowerCase();
   const currentDate = today();
   const upcomingDate = dateAfterDays(30);
@@ -5848,18 +5940,22 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   const pending = transactions.filter(({ transaction }) => !transaction.paid);
   const overdue = pending.filter(({ transaction }) => transaction.dueDate && transaction.dueDate < currentDate);
   const dueSoon = pending.filter(({ transaction }) => transaction.dueDate && transaction.dueDate >= currentDate && transaction.dueDate <= upcomingDate);
+  const inTransactionDateRange = (entry: SubscriptionTransaction) =>
+    (!transactionFrom || entry.transactionDate >= transactionFrom) && (!transactionTo || entry.transactionDate <= transactionTo);
   const visible = accounts.filter((account) => {
     const matchesText = !query || [account.name, account.category, account.provider, account.accountReference, account.notes,
       ...account.transactions.flatMap((entry) => [entry.type, entry.reference, entry.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query));
     const matchesCategory = categoryFilter === "All categories" || account.category === categoryFilter;
     const matchesStatus = statusFilter === "All records" || account.transactions.some((entry) => {
+      if (!inTransactionDateRange(entry)) return false;
       if (statusFilter === "Paid") return entry.paid;
       if (statusFilter === "Pending") return !entry.paid;
       if (statusFilter === "Overdue") return !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
       return !entry.paid && Boolean(entry.dueDate) && entry.dueDate >= currentDate && entry.dueDate <= upcomingDate;
     });
-    return matchesText && matchesCategory && matchesStatus;
+    const matchesDateRange = (!transactionFrom && !transactionTo) || account.transactions.some(inTransactionDateRange);
+    return matchesText && matchesCategory && matchesStatus && matchesDateRange;
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   function archiveAccount(account: SubscriptionAccount) {
@@ -5877,14 +5973,18 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       <Card><span>Overdue</span><strong>{overdue.length}</strong></Card>
       <Card><span>Due in 30 days</span><strong>{dueSoon.length}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search subscriptions and bills" placeholder="Search service, provider, or reference..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (statusFilter !== "All records" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter by service category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Payment status"><Select aria-label="Filter by payment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search subscriptions and bills" placeholder="Search service, provider, or reference..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Subscription filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (statusFilter !== "All records" ? 1 : 0) + (transactionFrom ? 1 : 0) + (transactionTo ? 1 : 0) + (transactionSort !== "newest" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter by service category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Payment status"><Select aria-label="Filter by payment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select></Field><Field label="Transaction from"><DateInput aria-label="Transaction from date" value={transactionFrom} onValueChange={setTransactionFrom} max={transactionTo || undefined} /></Field><Field label="Transaction to"><DateInput aria-label="Transaction to date" value={transactionTo} onValueChange={setTransactionTo} min={transactionFrom || undefined} /></Field><Field label="Sort transactions by"><Select aria-label="Sort subscription transactions" value={transactionSort} onChange={(event) => setTransactionSort(event.target.value)}><option value="newest">Date (newest)</option><option value="oldest">Date (oldest)</option><option value="amount-highest">Amount (highest)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge></div>
     {visible.length ? <div className="subscription-list">{visible.map((account) => {
-      const sorted = [...account.transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate));
+      const sorted = account.transactions.filter((entry) =>
+        (!transactionFrom || entry.transactionDate >= transactionFrom) && (!transactionTo || entry.transactionDate <= transactionTo))
+        .sort((a, b) => transactionSort === "oldest" ? a.transactionDate.localeCompare(b.transactionDate) :
+          transactionSort === "amount-highest" ? (b.amount ?? -1) - (a.amount ?? -1) || b.transactionDate.localeCompare(a.transactionDate) :
+            b.transactionDate.localeCompare(a.transactionDate));
       const nextDue = account.transactions.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
       return <details className="subscription-card compact-details" key={account.id}>
         <summary className="subscription-card-summary compact-summary"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="subscription-card-due">{nextDue ? <><span>{nextDue.dueDate < currentDate ? "Overdue" : "Next due"}</span><strong>{dateLabel(nextDue.dueDate)}</strong></> : <span>{sorted.length ? `${sorted.length} transactions` : "No transactions"}</span>}</div><div className="table-actions"><Button variant="outline" onClick={(event) => { event.preventDefault(); setTransactionEditor({ account, transaction: null }); }}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={(event) => { event.preventDefault(); setAccountEditor(account); }}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={(event) => { event.preventDefault(); onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={(event) => { event.preventDefault(); archiveAccount(account); }}><Archive size={13} /></button></div></summary>
         <div className="compact-details-body">{account.notes && <p className="subscription-card-notes">{account.notes}</p>}
-        {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel(sorted[0].transactionDate)}</span></summary><DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
+        {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel([...sorted].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0].transactionDate)}</span></summary><DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`} groupOrder={transactionSort === "oldest" ? "oldest" : "newest"}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
           const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
           const isOverdue = !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
           return <div className="electricity-record" key={entry.id}>
@@ -8325,11 +8425,14 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
   const [editor, setEditor] = useState<{ initial: PersonalRecord | null } | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All records");
+  const [sortBy, setSortBy] = useState("due-soon");
   const visibleRecords = records
     .filter((record) => typeFilter === "All records" || record.type === typeFilter)
     .filter((record) => `${record.title} ${record.holder} ${record.recordNumber} ${record.issuer} ${record.notes}`
       .toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
+      if (sortBy === "title") return a.title.localeCompare(b.title);
+      if (sortBy === "due-latest") return (b.dueDate ?? "").localeCompare(a.dueDate ?? "") || a.title.localeCompare(b.title);
       if (!a.dueDate) return b.dueDate ? 1 : a.title.localeCompare(b.title);
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
@@ -8350,8 +8453,8 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
   return <><PageHeading eyebrow="Important information" title="Personal documents" subtitle="Keep frequently needed IDs, policies, dates and secure document links together." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add record</Button>} />
     <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These record details are stored in Supabase as readable text. Anyone with the Daybook password or Supabase service-role access can read them. Use the separate Documents screen to upload files to private storage; uploaded files are not end-to-end encrypted.</span></div>
     {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} expired` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={typeFilter === "All records" ? 0 : 1}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field></FilterDrawer><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
-    <div className="personal-record-list">{visibleRecords.map((record) => {
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Expiry date (soonest)</option><option value="due-latest">Expiry date (latest)</option><option value="title">Title (A–Z)</option></Select></Field></FilterDrawer><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    {visibleRecords.length ? <DateGroupedRecords items={visibleRecords} getDate={(record) => record.dueDate || undefined} title={(date) => `Expiry / renewal · ${dateLabel(date)}`} groupOrder={sortBy === "due-soon" ? "oldest" : "newest"}>{(dueRecords) => <div className="personal-record-list">{dueRecords.map((record) => {
       const due = dueLabel(record);
       return <Card className="personal-record-card" key={record.id}>
         <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => onDelete(record)}><Archive size={14} /></button></div></div>
@@ -8364,8 +8467,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
         {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
         {record.documentLink && <a className="personal-document-link" href={record.documentLink} target="_blank" rel="noopener noreferrer"><FileText size={14} /> Open shared document link</a>}
       </Card>;
-    })}</div>
-    {!visibleRecords.length && <Card><EmptyState icon={<FileText size={18} />} title={records.length ? "No matching records" : "No personal records yet"} description={records.length ? "Try another search or record type." : "Add a record for an ID, insurance policy, license or other frequently needed information."} /></Card>}
+    })}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<FileText size={18} />} title={records.length ? "No matching records" : "No personal records yet"} description={records.length ? "Try another search or record type." : "Add a record for an ID, insurance policy, license or other frequently needed information."} /></Card>}
     {editor && <PersonalRecordModal key={editor.initial?.id ?? "new-personal-record"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.initial?.id); setEditor(null); }} />}
   </>;
 }
@@ -8459,16 +8561,21 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
   const [viewer, setViewer] = useState<DocumentAttachment | null>(null);
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
   const percentUsed = totalStoredBytes / (1024 * 1024 * 1024) * 100;
   const visible = documents.filter((document) =>
-    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
+    (!dateFrom || document.uploadedAt.slice(0, 10) >= dateFrom) && (!dateTo || document.uploadedAt.slice(0, 10) <= dateTo))
+    .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title) :
+      (sortBy === "oldest" ? 1 : -1) * a.uploadedAt.localeCompare(b.uploadedAt));
 
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
     <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan bucket; each upload can be up to 10 MB. The estimate tracks document records only; student photos and ID-card images also use this bucket but are not included.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
-    {visible.length ? <DateGroupedRecords items={visible} getDate={(document) => document.uploadedAt.slice(0, 10)} title={(date) => `Documents added · ${dateLabel(date)}`}>{(dateDocuments) => <div className="document-list">{dateDocuments.map((document) => {
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Document filters" activeCount={(dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}><Field label="Added from"><DateInput aria-label="Documents added from" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Added to"><DateInput aria-label="Documents added to" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Title (A–Z)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
+    {visible.length ? <DateGroupedRecords items={visible} getDate={(document) => document.uploadedAt.slice(0, 10)} title={(date) => `Documents added · ${dateLabel(date)}`} groupOrder={sortBy === "oldest" ? "oldest" : "newest"}>{(dateDocuments) => <div className="document-list">{dateDocuments.map((document) => {
       const hasFile = Boolean(document.storagePath);
       const canPreview = hasFile && (document.contentType === "application/pdf" || document.contentType.startsWith("image/"));
       const downloadUrl = hasFile
