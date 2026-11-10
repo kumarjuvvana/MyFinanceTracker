@@ -4550,6 +4550,8 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [typeFilter, setTypeFilter] = useState("All types");
   const [sortBy, setSortBy] = useState("title");
+  const [expandAllGroups, setExpandAllGroups] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const categories = [...new Set(records.map((record) => record.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const query = search.trim().toLocaleLowerCase();
   const visible = records
@@ -4560,21 +4562,45 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
     .sort((a, b) => sortBy === "category" ? a.category.localeCompare(b.category) || a.title.localeCompare(b.title) :
       sortBy === "tool" ? a.tool.localeCompare(b.tool) || a.title.localeCompare(b.title) :
         a.title.localeCompare(b.title));
+  const groupsByKey = new Map<string, { title: string; records: PromptRecord[] }>();
+  for (const record of visible) {
+    const category = record.category.trim();
+    const type = record.type.trim();
+    const key = category ? `category:${category.toLocaleLowerCase()}` :
+      type ? `type:${type.toLocaleLowerCase()}` : "uncategorized";
+    const title = category ? category : type ? `Type · ${type}` : "Uncategorized";
+    const group = groupsByKey.get(key) ?? { title, records: [] };
+    group.records.push(record);
+    groupsByKey.set(key, group);
+  }
+  const promptGroups = [...groupsByKey.entries()]
+    .map(([key, group]) => ({ key, ...group }))
+    .sort((a, b) => a.title.localeCompare(b.title));
 
   function deleteRecord(record: PromptRecord) {
     if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
   }
 
-  return <>
-    <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Keep frequently used prompts organized, searchable, and ready to copy into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
-    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
-    <div className="prompt-list">{visible.map((record) => <Card className="prompt-card" key={record.id}>
+  function setPromptGroupsExpanded(expanded: boolean) {
+    setExpandAllGroups(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+
+  function renderPrompt(record: PromptRecord) {
+    return <Card className="prompt-card" key={record.id}>
       <div className="prompt-card-head"><div className="prompt-card-title"><div className="prompt-icon"><Sparkles size={17} /></div><div><h2>{record.title}</h2><p>{[record.category, record.tool].filter(Boolean).join(" · ") || "Reusable prompt"}</p></div></div><div className="prompt-card-actions"><Button size="sm" variant="outline" onClick={() => onCopy(record)}><Copy size={13} />Copy prompt</Button><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.title}`} onClick={() => onSave({ ...record, title: `${record.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
       {(record.type || record.tool || record.category) && <div className="prompt-meta">{record.type && <Badge>{record.type}</Badge>}{record.category && <Badge tone="neutral">{record.category}</Badge>}{record.tool && <span>For {record.tool}</span>}</div>}
       {record.description && <p className="prompt-description">{record.description}</p>}
       <pre className="prompt-body">{record.prompt}</pre>
-    </Card>)}</div>
+    </Card>;
+  }
+
+  return <>
+    <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Browse prompts by category or prompt type, then search, filter, and copy them into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
+    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    {promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
+    <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="prompt-list">{group.records.map(renderPrompt)}</div></DevotionalRecordGroup>)}</div>
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
     {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
