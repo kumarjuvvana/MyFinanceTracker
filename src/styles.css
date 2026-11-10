@@ -1786,6 +1786,10 @@ body{background:#f3f5ef}
 .cooking-plan-main span{color:#92998f;font-size:10px}
 .cooking-plan-row>.field{width:auto;min-width:104px}
 .cooking-plan-row>.table-actions{gap:2px}
+.cooking-plan-controls{display:grid;grid-template-columns:minmax(125px,.65fr) minmax(0,2fr);align-items:end;gap:12px}
+.cooking-plan-status{width:100%;min-width:0}
+.cooking-plan-action-group{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:end;gap:8px;min-width:0}
+.cooking-plan-action-group>.button{align-self:end}
 .cooking-plan-details{display:grid;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid #eef0ec}
 .cooking-plan-edit-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .cooking-plan-ingredients{display:grid;gap:8px}
@@ -1799,8 +1803,8 @@ body{background:#f3f5ef}
 .cooking-plan-details>.field-wrap{min-width:0}
 .cooking-plan-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .cooking-plan-footer>strong{color:#3e6747;font:700 12px Manrope,sans-serif}
-.cooking-plan-copy{display:flex;align-items:end;gap:6px}
-.cooking-plan-copy>.field-wrap{width:150px}
+.cooking-plan-copy{display:grid;grid-template-columns:minmax(125px,1fr) auto;align-items:end;gap:6px;min-width:0}
+.cooking-plan-copy>.field-wrap{width:100%;min-width:0}
 .cooking-bulk-copy{display:grid;gap:14px}
 .cooking-bulk-copy-range{display:grid;gap:9px;padding:12px;border:1px solid #e8ebe6;border-radius:10px}
 .cooking-bulk-copy-range-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -1827,14 +1831,15 @@ body{background:#f3f5ef}
   .cooking-plan-row>.field{grid-column:1;grid-row:2;width:100%}
   .cooking-plan-row>.table-actions{grid-column:2;grid-row:1}
   .cooking-plan-edit-fields{grid-template-columns:minmax(0,1fr)}
+  .cooking-plan-controls{grid-template-columns:minmax(0,1fr);gap:10px}
+  .cooking-plan-action-group{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .cooking-plan-copy{grid-column:1/-1;grid-row:1;grid-template-columns:minmax(0,1fr) auto}
   .cooking-plan-ingredient{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
   .cooking-plan-measure-note{grid-column:1 / -1}
   .cooking-plan-ingredient-cost{grid-column:1}
   .cooking-plan-ingredient>.icon-button{grid-column:2;grid-row:auto;justify-self:end}
   .cooking-plan-ingredient-head{align-items:flex-start;flex-direction:column;gap:3px}
   .cooking-plan-footer{align-items:flex-start;flex-direction:column}
-  .cooking-plan-copy{align-items:stretch;flex-wrap:wrap}
-  .cooking-plan-copy>.field-wrap{width:min(100%,180px)}
   .cooking-bulk-copy-range-head{align-items:flex-start;flex-direction:column}
   .cooking-inventory-measure-list>div{grid-template-columns:minmax(0,1fr) auto}
   .cooking-inventory-measure-list>div>strong,.cooking-inventory-measure-list>div>span{grid-column:1}
@@ -1865,6 +1870,8 @@ body{background:#f3f5ef}
 .cooking-card{padding:11px 13px}
 .cooking-card>.compact-summary{align-items:center}
 .cooking-card>.compact-summary>div:first-child{min-width:0}
+.cooking-card[open]>.cooking-log-summary .cooking-log-summary-cost{display:none}
+.cooking-log-summary-cost{flex:none}
 .cooking-card .table-actions{flex:none}
 .vehicle-card{padding:11px 13px}
 .vehicle-card>.compact-summary{align-items:center}
