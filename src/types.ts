@@ -160,6 +160,7 @@ export interface StockQuoteSnapshot {
 
 export const ASSET_TYPES = [
   "Mutual fund",
+  "NPS",
   "Stock",
   "Loan",
   "Real estate",
@@ -171,6 +172,14 @@ export const ASSET_TYPES = [
 ] as const;
 
 export type AssetType = (typeof ASSET_TYPES)[number];
+
+export interface NpsSchemeHolding {
+  schemeName: string;
+  allocationPercent: number | null;
+  units: number | null;
+  nav: number | null;
+  currentValue: number | null;
+}
 
 export interface AssetRecord {
   id: string;
@@ -188,6 +197,11 @@ export interface AssetRecord {
   maturityDate: string;
   valuationDate?: string;
   installmentsPaid?: number | null;
+  npsTier?: "Tier I" | "Tier II";
+  withdrawnValue?: number | null;
+  chargesValue?: number | null;
+  lastWithdrawalDate?: string;
+  npsSchemes?: NpsSchemeHolding[];
   location: string;
   notes: string;
   tags: string[];

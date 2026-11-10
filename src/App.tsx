@@ -22,6 +22,7 @@ import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type Student
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
 import type { CookingInventoryUsage } from "./types";
+import type { NpsSchemeHolding } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -2513,6 +2514,11 @@ const emptyAsset = (): Omit<AssetRecord, "id"> => ({
   maturityDate: "",
   valuationDate: "",
   installmentsPaid: null,
+  npsTier: "Tier I",
+  withdrawnValue: null,
+  chargesValue: null,
+  lastWithdrawalDate: "",
+  npsSchemes: [],
   location: "",
   notes: "",
   tags: [],
@@ -2532,7 +2538,22 @@ function AssetModal({ initial, onClose, onSave }: {
   const [quantity, setQuantity] = useState(initial?.quantity == null ? "" : String(initial.quantity));
   const [interestRate, setInterestRate] = useState(initial?.interestRate == null ? "" : String(initial.interestRate));
   const [installmentsPaid, setInstallmentsPaid] = useState(initial?.installmentsPaid == null ? "" : String(initial.installmentsPaid));
+  const [withdrawnValue, setWithdrawnValue] = useState(initial?.withdrawnValue == null ? "" : String(initial.withdrawnValue));
+  const [chargesValue, setChargesValue] = useState(initial?.chargesValue == null ? "" : String(initial.chargesValue));
+  const [npsTier, setNpsTier] = useState<"Tier I" | "Tier II">(initial?.npsTier ?? "Tier I");
+  const [lastWithdrawalDate, setLastWithdrawalDate] = useState(initial?.lastWithdrawalDate ?? "");
+  const [npsSchemes, setNpsSchemes] = useState<NpsSchemeHolding[]>(initial?.npsSchemes?.map((scheme) => ({ ...scheme })) ?? []);
   const [error, setError] = useState("");
+
+  function updateNpsScheme(index: number, patch: Partial<NpsSchemeHolding>) {
+    setNpsSchemes((current) => current.map((scheme, row) => row === index ? { ...scheme, ...patch } : scheme));
+  }
+
+  function parseSchemeNumber(value: string) {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2553,23 +2574,36 @@ function AssetModal({ initial, onClose, onSave }: {
     const parsedQuantity = parseOptionalNumber(quantity);
     const parsedInterest = parseOptionalNumber(interestRate);
     const parsedInstallments = parseOptionalNumber(installmentsPaid);
-    if ([investedValue, currentValue, quantity, interestRate, installmentsPaid].some((value) => value.trim() !== "") &&
-      [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest, parsedInstallments].some((value, index) =>
-        [investedValue, currentValue, quantity, interestRate, installmentsPaid][index].trim() !== "" && value === null)) {
+    const parsedWithdrawn = parseOptionalNumber(withdrawnValue);
+    const parsedCharges = parseOptionalNumber(chargesValue);
+    const numericInputs = [investedValue, currentValue, quantity, interestRate, installmentsPaid, withdrawnValue, chargesValue];
+    const parsedInputs = [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest, parsedInstallments, parsedWithdrawn, parsedCharges];
+    if (numericInputs.some((value, index) => value.trim() !== "" && parsedInputs[index] === null)) {
       setError("Enter valid numeric values, or leave optional fields blank.");
       return;
     }
     if (parsedInvested !== null && parsedInvested < 0 || parsedCurrent !== null && parsedCurrent < 0 ||
       parsedQuantity !== null && parsedQuantity < 0 || parsedInterest !== null && (parsedInterest < 0 || parsedInterest > 100) ||
-      parsedInstallments !== null && (!Number.isInteger(parsedInstallments) || parsedInstallments < 0)) {
-      setError("Amounts and quantities must be non-negative; the interest rate must be between 0 and 100.");
+      parsedInstallments !== null && (!Number.isInteger(parsedInstallments) || parsedInstallments < 0) ||
+      parsedWithdrawn !== null && parsedWithdrawn < 0 || parsedCharges !== null && parsedCharges < 0 ||
+      asset.type === "NPS" && npsSchemes.some((scheme) => !scheme.schemeName.trim() ||
+        scheme.allocationPercent !== null && (scheme.allocationPercent < 0 || scheme.allocationPercent > 100) ||
+        scheme.units !== null && scheme.units < 0 || scheme.nav !== null && scheme.nav < 0 ||
+        scheme.currentValue !== null && scheme.currentValue < 0)) {
+      setError("Check amounts, quantities, and scheme details. Values must be non-negative; rates and allocations must be between 0 and 100.");
       return;
     }
+    const isNpsAsset = asset.type === "NPS";
     onSave({
       ...asset,
       name: asset.name.trim(),
       valuationDate: asset.valuationDate ?? "",
       installmentsPaid: parsedInstallments,
+      npsTier: isNpsAsset ? npsTier : undefined,
+      withdrawnValue: isNpsAsset ? parsedWithdrawn : null,
+      chargesValue: isNpsAsset ? parsedCharges : null,
+      lastWithdrawalDate: isNpsAsset ? lastWithdrawalDate : "",
+      npsSchemes: isNpsAsset ? npsSchemes : [],
       investedValue: parsedInvested,
       currentValue: parsedCurrent,
       quantity: parsedQuantity,
@@ -2596,25 +2630,41 @@ function AssetModal({ initial, onClose, onSave }: {
   const isLoan = asset.type === "Loan";
   const isGold = asset.type === "Digital gold";
   const isGoldScheme = asset.type === "Gold savings scheme";
+  const isNps = asset.type === "NPS";
   return <Modal title={initial ? "Edit asset" : "Add asset"} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Asset name (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Retirement fund, home loan, family home" value={asset.name} onChange={(event) => setAsset((current) => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="Asset type (required)"><Select required value={asset.type} onChange={(event) => setAsset((current) => ({ ...current, type: event.target.value as AssetType }))}>{ASSET_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field>
       <Field label="Currency"><Select value={asset.currency} onChange={(event) => setAsset((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
-      <Field label="Institution / provider"><Input maxLength={120} placeholder="Optional" value={asset.institution} onChange={(event) => setAsset((current) => ({ ...current, institution: event.target.value }))} /></Field>
-      <Field label="Account / reference"><Input maxLength={120} placeholder="Optional (avoid sensitive numbers)" value={asset.reference} onChange={(event) => setAsset((current) => ({ ...current, reference: event.target.value }))} /></Field>
-      {numericInput(isLoan ? "Original loan amount" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount", investedValue, setInvestedValue)}
-      {numericInput(isLoan ? "Outstanding balance" : "Current value", currentValue, setCurrentValue)}
-      {numericInput(isGold || isGoldScheme ? "Gold weight (grams)" : "Units / quantity", quantity, setQuantity, { step: "any" })}
+      <Field label={isNps ? "Pension fund manager / provider" : "Institution / provider"}><Input maxLength={120} placeholder="Optional" value={asset.institution} onChange={(event) => setAsset((current) => ({ ...current, institution: event.target.value }))} /></Field>
+      <Field label="Account / reference"><Input maxLength={120} placeholder={isNps ? "Optional; do not enter PRAN" : "Optional (avoid sensitive numbers)"} value={asset.reference} onChange={(event) => setAsset((current) => ({ ...current, reference: event.target.value }))} /></Field>
+      {numericInput(isLoan ? "Original loan amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount", investedValue, setInvestedValue)}
+      {numericInput(isLoan ? "Outstanding balance" : isNps ? "Current market value" : "Current value", currentValue, setCurrentValue)}
+      {!isNps && numericInput(isGold || isGoldScheme ? "Gold weight (grams)" : "Units / quantity", quantity, setQuantity, { step: "any" })}
       {isGoldScheme && numericInput("Installments paid", installmentsPaid, setInstallmentsPaid, { step: "1" })}
-      {numericInput("Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
-      <Field label={isLoan ? "Start / disbursal date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
-      <Field label="Maturity / renewal date"><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>
-      {(asset.type === "Mutual fund" || isGold) && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
+      {!isNps && numericInput("Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
+      {isNps && <Field label="NPS tier"><Select value={npsTier} onChange={(event) => setNpsTier(event.target.value as "Tier I" | "Tier II")}><option>Tier I</option><option>Tier II</option></Select></Field>}
+      {isNps && numericInput("Total withdrawals processed", withdrawnValue, setWithdrawnValue)}
+      {isNps && numericInput("Charges deducted", chargesValue, setChargesValue)}
+      <Field label={isLoan ? "Start / disbursal date" : isNps ? "Account start date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
+      {!isNps && <Field label="Maturity / renewal date"><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>}
+      {(asset.type === "Mutual fund" || isGold || isNps) && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
+      {isNps && <Field label="Most recent withdrawal date"><DateInput value={lastWithdrawalDate} onValueChange={setLastWithdrawalDate} /></Field>}
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
       <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional details, terms, or reminders" value={asset.notes} onChange={(event) => setAsset((current) => ({ ...current, notes: event.target.value }))} /></Field>
+      {isNps && <div className="full nps-scheme-editor">
+        <div className="nps-scheme-editor-head"><div><strong>Current scheme holdings</strong><span>Optional. Add scheme allocation, units, NAV and current value from your statement.</span></div><Button type="button" variant="outline" onClick={() => setNpsSchemes((current) => [...current, { schemeName: "", allocationPercent: null, units: null, nav: null, currentValue: null }])}><Plus size={14} /> Add scheme</Button></div>
+        {npsSchemes.map((scheme, index) => <div className="nps-scheme-editor-row" key={`nps-scheme-${index}`}>
+          <Field label="Scheme name"><Input maxLength={150} value={scheme.schemeName} onChange={(event) => updateNpsScheme(index, { schemeName: event.target.value })} /></Field>
+          <Field label="Allocation (%)"><Input type="number" min="0" max="100" step="0.01" value={scheme.allocationPercent ?? ""} onChange={(event) => updateNpsScheme(index, { allocationPercent: parseSchemeNumber(event.target.value) })} /></Field>
+          <Field label="Units"><Input type="number" min="0" step="any" value={scheme.units ?? ""} onChange={(event) => updateNpsScheme(index, { units: parseSchemeNumber(event.target.value) })} /></Field>
+          <Field label="Latest NAV"><Input type="number" min="0" step="any" value={scheme.nav ?? ""} onChange={(event) => updateNpsScheme(index, { nav: parseSchemeNumber(event.target.value) })} /></Field>
+          <Field label="Current value"><Input type="number" min="0" step="0.01" value={scheme.currentValue ?? ""} onChange={(event) => updateNpsScheme(index, { currentValue: parseSchemeNumber(event.target.value) })} /></Field>
+          <button className="icon-button" type="button" aria-label={`Remove NPS scheme ${index + 1}`} onClick={() => setNpsSchemes((current) => current.filter((_, row) => row !== index))}><X size={14} /></button>
+        </div>)}
+      </div>}
     </div>
     <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank; the asset manager does not fetch or verify valuations.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -2637,6 +2687,7 @@ function AssetManager({ assets, onSave, onDelete }: {
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
   const visibleMutualFunds = visible.filter((asset) => asset.type === "Mutual fund");
+  const visibleNps = visible.filter((asset) => asset.type === "NPS");
   const visibleDigitalGold = visible.filter((asset) => asset.type === "Digital gold");
   const mutualFundTotals = new Map<Currency, { invested: number; current: number }>();
   for (const fund of visibleMutualFunds) {
@@ -2653,6 +2704,15 @@ function AssetManager({ assets, onSave, onDelete }: {
     if (holding.currentValue !== null) total.current += holding.currentValue;
     if (holding.quantity !== null) total.grams += holding.quantity;
     digitalGoldTotals.set(holding.currency, total);
+  }
+  const npsTotals = new Map<Currency, { contributions: number; current: number; withdrawals: number; charges: number }>();
+  for (const account of visibleNps) {
+    const total = npsTotals.get(account.currency) ?? { contributions: 0, current: 0, withdrawals: 0, charges: 0 };
+    if (account.investedValue !== null) total.contributions += account.investedValue;
+    if (account.currentValue !== null) total.current += account.currentValue;
+    if (account.withdrawnValue != null) total.withdrawals += account.withdrawnValue;
+    if (account.chargesValue != null) total.charges += account.chargesValue;
+    npsTotals.set(account.currency, total);
   }
   const totals = new Map<Currency, { assets: number; liabilities: number }>();
   for (const asset of assets) {
@@ -2693,6 +2753,17 @@ function AssetManager({ assets, onSave, onDelete }: {
       </Card>;
     })}</div>}
     {activeType === "Mutual fund" && <div className="alert">Mutual fund values are statement snapshots, not live NAV. Implied NAV is current value divided by units; gain percentage is total change, not annualized return. Transaction history is not included.</div>}
+    {activeType === "NPS" && npsTotals.size > 0 && <div className="asset-total-list nps-summary-list">{[...npsTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
+      const gain = total.current + total.withdrawals - total.contributions;
+      const returnPercent = total.contributions ? gain / total.contributions * 100 : null;
+      return <Card className="asset-total-card" key={currency}>
+        <div><span>Total contributions · {currency}</span><strong>{formatAmount(total.contributions, currency)}</strong></div>
+        <div><span>Current market value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Withdrawals · {currency}</span><strong>{formatAmount(total.withdrawals, currency)}</strong></div>
+        <div><span>Gain / loss after withdrawals · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
+      </Card>;
+    })}</div>}
+    {activeType === "NPS" && <div className="alert">NPS balances are statement snapshots, not live valuations. Gain / loss is calculated as current value + withdrawals − total contributions; transaction history is not imported in this snapshot.</div>}
     {activeType === "Digital gold" && digitalGoldTotals.size > 0 && <div className="asset-total-list digital-gold-summary">{[...digitalGoldTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current - total.invested;
       const returnPercent = total.invested ? gain / total.invested * 100 : null;
@@ -2707,10 +2778,11 @@ function AssetManager({ assets, onSave, onDelete }: {
     {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Amounts and installments are copied from the supplied screenshot; verify whether the amount is cumulative before relying on returns.</div>}
     <div className="asset-list">{visible.map((asset) => {
       const isLoan = asset.type === "Loan";
+      const isNps = asset.type === "NPS";
       const isGold = asset.type === "Digital gold";
       const isGoldScheme = asset.type === "Gold savings scheme";
       const performance = asset.investedValue !== null && asset.currentValue !== null
-        ? asset.currentValue - asset.investedValue
+        ? asset.currentValue + (isNps ? asset.withdrawnValue ?? 0 : 0) - asset.investedValue
         : null;
       const performancePercent = performance !== null && asset.investedValue
         ? performance / asset.investedValue * 100
@@ -2724,8 +2796,11 @@ function AssetManager({ assets, onSave, onDelete }: {
       return <Card className="asset-card" key={asset.id}>
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
-          {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
-          {asset.currentValue !== null && <div><span>{isLoan ? "Outstanding balance" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
+          {asset.investedValue !== null && <div><span>{isLoan ? "Original amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
+          {asset.currentValue !== null && <div><span>{isLoan ? "Outstanding balance" : isNps ? "Current market value" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
+          {isNps && asset.withdrawnValue != null && <div><span>Total withdrawals</span><strong>{formatAmount(asset.withdrawnValue, asset.currency)}</strong></div>}
+          {isNps && asset.chargesValue != null && <div><span>Statement charges</span><strong>{formatAmount(asset.chargesValue, asset.currency)}</strong></div>}
+          {isNps && asset.npsTier && <div><span>NPS tier</span><strong>{asset.npsTier}</strong></div>}
           {asset.quantity !== null && <div><span>{isGold || isGoldScheme ? "Gold weight" : asset.type === "Mutual fund" ? "Units" : "Units / quantity"}</span><strong>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: isGold || isGoldScheme ? 4 : 3 })}{isGold || isGoldScheme ? " g" : ""}</strong></div>}
           {impliedNav !== null && <div><span>Implied NAV · statement value / units</span><strong>{formatAmount(impliedNav, asset.currency)}</strong></div>}
           {impliedGoldPrice !== null && <div><span>Implied value per gram</span><strong>{formatAmount(impliedGoldPrice, asset.currency)}/g</strong></div>}
@@ -2733,11 +2808,20 @@ function AssetManager({ assets, onSave, onDelete }: {
           {asset.interestRate !== null && <div><span>Interest / coupon</span><strong>{asset.interestRate}%</strong></div>}
           {asset.reference && <div><span>Account / reference</span><strong>{asset.reference}</strong></div>}
           {asset.valuationDate && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
+          {isNps && asset.lastWithdrawalDate && <div><span>Most recent withdrawal</span><strong>{dateLabel(asset.lastWithdrawalDate)}</strong></div>}
           {asset.startDate && <div><span>{isLoan ? "Start date" : "Purchase / start date"}</span><strong>{dateLabel(asset.startDate)}</strong></div>}
           {asset.maturityDate && <div><span>Maturity / renewal</span><strong>{dateLabel(asset.maturityDate)}</strong></div>}
-          {performance !== null && !isLoan && <div><span>{asset.type === "Mutual fund" || isGold ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
+          {performance !== null && !isLoan && <div><span>{isNps ? "Gain / loss after withdrawals" : asset.type === "Mutual fund" || isGold ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
           {asset.location && <div><span>Location / description</span><strong>{asset.location}</strong></div>}
         </div>
+        {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <div className="nps-scheme-list">
+          <strong>Current scheme holdings</strong>
+          {asset.npsSchemes?.map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
+            <span>{scheme.schemeName}{scheme.allocationPercent !== null ? ` · ${scheme.allocationPercent}% allocation` : ""}</span>
+            <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}</span>
+            <strong>{scheme.currentValue !== null ? formatAmount(scheme.currentValue, asset.currency) : "—"}</strong>
+          </div>)}
+        </div>}
         {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
         {asset.tags.length > 0 && <div className="credential-tags">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}

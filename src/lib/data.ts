@@ -327,6 +327,21 @@ export function validateData(value: unknown): value is TrackerData {
       (asset.valuationDate === "" || !Number.isNaN(Date.parse(asset.valuationDate))))) &&
     (asset.installmentsPaid === undefined || asset.installmentsPaid === null ||
       (typeof asset.installmentsPaid === "number" && Number.isInteger(asset.installmentsPaid) && asset.installmentsPaid >= 0)) &&
+    (asset.withdrawnValue === undefined || asset.withdrawnValue === null ||
+      (typeof asset.withdrawnValue === "number" && Number.isFinite(asset.withdrawnValue) && asset.withdrawnValue >= 0)) &&
+    (asset.chargesValue === undefined || asset.chargesValue === null ||
+      (typeof asset.chargesValue === "number" && Number.isFinite(asset.chargesValue) && asset.chargesValue >= 0)) &&
+    (asset.npsTier === undefined || asset.npsTier === "Tier I" || asset.npsTier === "Tier II") &&
+    (asset.lastWithdrawalDate === undefined || (typeof asset.lastWithdrawalDate === "string" &&
+      (asset.lastWithdrawalDate === "" || !Number.isNaN(Date.parse(asset.lastWithdrawalDate))))) &&
+    (asset.npsSchemes === undefined || (Array.isArray(asset.npsSchemes) && asset.npsSchemes.every((scheme) =>
+      isRecord(scheme) && typeof scheme.schemeName === "string" && scheme.schemeName.trim().length > 0 &&
+      (scheme.allocationPercent === null || (typeof scheme.allocationPercent === "number" &&
+        Number.isFinite(scheme.allocationPercent) && scheme.allocationPercent >= 0 && scheme.allocationPercent <= 100)) &&
+      (scheme.units === null || (typeof scheme.units === "number" && Number.isFinite(scheme.units) && scheme.units >= 0)) &&
+      (scheme.nav === null || (typeof scheme.nav === "number" && Number.isFinite(scheme.nav) && scheme.nav >= 0)) &&
+      (scheme.currentValue === null || (typeof scheme.currentValue === "number" &&
+        Number.isFinite(scheme.currentValue) && scheme.currentValue >= 0))))) &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>
