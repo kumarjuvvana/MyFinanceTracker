@@ -837,6 +837,9 @@ body{background:#f3f5ef}
 .devotional-date-group-content{min-width:0}
 .devotional-group-actions{display:flex;gap:6px;flex:none}
 .devotional-group-actions .button{height:34px;padding:0 9px;font-size:10px}
+.record-group-actions{display:flex;justify-content:flex-end;gap:6px;margin:0 0 9px}
+.record-group-actions .button{height:32px;padding:0 9px;font-size:10px}
+.record-date-groups{display:grid;gap:12px}
 .app-shell.dark .devotional-date-group-toggle{border-color:#343d35;background:#252e26}
 .app-shell.dark .devotional-date-group-toggle:hover{background:#29352b}
 .app-shell.dark .devotional-date-group-title{color:#a6c1a8}
