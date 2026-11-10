@@ -2887,7 +2887,7 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. The Stocks tab reads the same holdings and price snapshots as the Stocks menu—there is no duplicate stock data or asset table. Manage stock holdings in the Stocks menu. Loan balances count as liabilities. These details persist in the private GitHub repository and its history; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
-      {(["All types", ...ASSET_TYPES, "Stocks"] as const).map((type) => {
+      {(["All types", ...ASSET_TYPES.filter((assetType) => assetType !== "Stock"), "Stocks"] as const).map((type) => {
         const count = type === "All types" ? assets.length
           : type === "Stocks" ? stocks.length
             : assets.filter((asset) => asset.type === type).length;
