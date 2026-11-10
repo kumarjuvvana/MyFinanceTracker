@@ -32,6 +32,12 @@ button{cursor:pointer}
 .toolbar{display:flex;align-items:center;gap:9px;margin-bottom:16px;flex-wrap:wrap}.search-wrap{position:relative;flex:1;min-width:180px}.search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#9ba198}.search-wrap .field{padding-left:34px}
 .filter-toolbar{flex-wrap:nowrap}.filter-toolbar>.search-wrap{min-width:0}.filter-toolbar>.badge{flex:none}.filter-drawer-trigger{flex:none;white-space:nowrap}.filter-drawer-count{display:grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:20px;background:var(--user-accent-soft,#edf4ee);color:var(--user-accent,#356a4a);font-size:10px;font-weight:700}
 .filter-drawer-layer{position:fixed;inset:0;z-index:40}.filter-drawer-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;background:#17201978;backdrop-filter:blur(2px)}.filter-drawer{position:absolute;top:0;right:0;display:flex;flex-direction:column;gap:14px;width:min(390px,100%);height:100%;padding:22px;background:var(--panel,#fff);color:var(--text,#303830);box-shadow:-14px 0 42px #15201925;overflow:auto;animation:filter-drawer-in .18s ease-out}.filter-drawer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--panel-line,#e6ebe4)}.filter-drawer-head h2{margin:0;font:700 17px Manrope,sans-serif}.filter-drawer-content{display:grid;gap:14px;align-content:start}.filter-drawer-content>.field-wrap{min-width:0}.filter-drawer-content .filter-date{width:100%}.filter-drawer-categories{display:grid;gap:8px}.filter-drawer-categories .category-choice{width:100%;text-align:left}.app-shell.dark .filter-drawer{--panel:#222a23;--text:#e3e8e2;--panel-line:#343d35}.app-shell.dark.theme-slate .filter-drawer{--panel:#252f3d;--panel-line:#3a4655}.app-shell.dark.theme-midnight .filter-drawer{--panel:#222232;--panel-line:#3a394d}@keyframes filter-drawer-in{from{transform:translateX(24px);opacity:.7}to{transform:translateX(0);opacity:1}}
+.devotional-toolbar{align-items:center}
+.devotional-calendar-records{margin-top:4px}
+.devotional-calendar-record .devotional-card-head{align-items:center}
+.devotional-calendar-record .devotional-card-head>div:first-child{flex:1}
+.devotional-calendar-record p{margin:6px 0 0}
+.app-shell.dark .devotional-calendar-record p{color:#a7b0a7}
 .inline-editor{margin:0 0 16px;border-color:var(--user-accent,#85a78a);scroll-margin:24px}
 .inline-editor .modal-head{margin-bottom:16px}
 .inline-editor .modal-head h2{font:700 16px Manrope,sans-serif;color:var(--text,#303830)}

@@ -137,6 +137,12 @@ function groupByDate<T>(items: readonly T[], getDate: (item: T) => string | unde
     .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
     .map(([date, records]) => ({ date, records }));
 }
+type DevotionalSortOrder = "newest" | "oldest" | "title";
+function sortDevotionalRecords<T>(items: readonly T[], getDate: (item: T) => string | undefined, getTitle: (item: T) => string, sortOrder: DevotionalSortOrder) {
+  return [...items].sort((a, b) => sortOrder === "title"
+    ? getTitle(a).localeCompare(getTitle(b))
+    : (sortOrder === "newest" ? -1 : 1) * (getDate(a) ?? "").localeCompare(getDate(b) ?? ""));
+}
 const timeLabel = (time: string) => {
   const [hours, minutes] = time.split(":").map(Number);
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return time;
@@ -6174,6 +6180,12 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   const [progressMonth, setProgressMonth] = useState(() => monthKey(today()));
   const [selectedProgressDate, setSelectedProgressDate] = useState("");
   const [showReadingStreak, setShowReadingStreak] = useState(false);
+  const [sortOrder, setSortOrder] = useState<DevotionalSortOrder>("newest");
+  const [groupBy, setGroupBy] = useState<"date" | "none">("date");
+  const [calendarGroupBy, setCalendarGroupBy] = useState<"date" | "type">("date");
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState("All record types");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [readingEditorDate, setReadingEditorDate] = useState(today());
   const [dailyPrayerEditorDate, setDailyPrayerEditorDate] = useState(today());
   const [entryEditorDate, setEntryEditorDate] = useState(today());
@@ -6186,26 +6198,37 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   const [requestFilter, setRequestFilter] = useState("Ongoing");
   const [search, setSearch] = useState("");
   const query = search.trim().toLocaleLowerCase();
+  const matchesDateFilter = (date: string | undefined) =>
+    (!dateFrom && !dateTo) || Boolean(date && (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo));
   const visibleEntries = [...entries].filter((entry) =>
-    !query || [entry.scriptureReference, entry.takeaway, entry.reflection, entry.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    matchesDateFilter(entry.date) && (!query || [entry.scriptureReference, entry.takeaway, entry.reflection, entry.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query))));
+  const sortedEntries = sortDevotionalRecords(visibleEntries, (entry) => entry.date, (entry) => entry.scriptureReference, sortOrder);
   const visibleReadings = [...readings].filter((reading) =>
-    !query || [
+    matchesDateFilter(reading.date) && (!query || [
       reading.fromTestament, reading.fromBook, reading.fromChapterName, String(reading.fromChapterNumber), String(reading.fromVerseNumber),
       reading.toTestament, reading.toBook, reading.toChapterName, String(reading.toChapterNumber), String(reading.toVerseNumber), reading.people ?? "", reading.notes,
-    ].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    ].some((value) => value.toLocaleLowerCase().includes(query))));
+  const sortedReadings = sortDevotionalRecords(visibleReadings, (reading) => reading.date, (reading) => reading.fromBook, sortOrder);
   const visibleRequests = [...requests].filter((request) =>
     (requestFilter === "All requests" || request.status === requestFilter) &&
-    (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))))
-    .sort((a, b) => b.dateAdded.localeCompare(a.dateAdded));
+    matchesDateFilter(request.dateAdded) && (!query || [request.title, request.details].some((value) => value.toLocaleLowerCase().includes(query))));
+  const sortedRequests = sortDevotionalRecords(visibleRequests, (request) => request.dateAdded, (request) => request.title, sortOrder);
   const visibleDailyPrayerLogs = [...dailyPrayerLogs].filter((log) =>
-    !query || [log.date, log.period, log.time ?? "", log.prayerType, log.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => b.date.localeCompare(a.date) ||
-      ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period));
+    matchesDateFilter(log.date) && (!query || [log.date, log.period, log.time ?? "", log.prayerType, log.prayerNotes].some((value) => value.toLocaleLowerCase().includes(query))));
   const visibleResources = [...resources].filter((resource) =>
-    !query || [resource.title, resource.link, resource.description, resource.source].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.title.localeCompare(b.title));
+    matchesDateFilter(resource.dateAdded) && (!query || [resource.title, resource.link, resource.description, resource.source].some((value) => value.toLocaleLowerCase().includes(query))));
+  const sortedResources = sortDevotionalRecords(visibleResources, (resource) => resource.dateAdded, (resource) => resource.title, sortOrder);
+  const sortedPrayerLogs = sortDevotionalRecords(visibleDailyPrayerLogs, (log) => log.date, (log) => `${log.period} ${log.prayerType}`, sortOrder);
+  if (sortOrder !== "title") {
+    sortedPrayerLogs.sort((a, b) =>
+      (sortOrder === "newest" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)) ||
+      ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period));
+  }
+  const dateGroups = <T,>(items: readonly T[], getDate: (item: T) => string | undefined) => {
+    if (groupBy !== "date") return [{ date: "", records: [...items] }];
+    const groups = groupByDate(items, getDate);
+    return sortOrder === "oldest" ? groups.reverse() : groups;
+  };
   const ongoingCount = requests.filter((request) => request.status === "Ongoing").length;
   const answeredCount = requests.filter((request) => request.status === "Answered").length;
   const progressReadingDays = new Map<string, number>();
@@ -6245,6 +6268,37 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
   const selectedDateReflections = selectedProgressDate ? entries.filter((entry) => entry.date === selectedProgressDate) : [];
   const selectedDateRequests = selectedProgressDate ? requests.filter((request) => request.dateAdded === selectedProgressDate) : [];
   const selectedDateActivityCount = selectedDateReadings.length + selectedDatePrayerLogs.length + selectedDateReflections.length + selectedDateRequests.length;
+  const calendarRecordItems = [
+    ...readings.filter((reading) => reading.date.startsWith(`${progressMonth}-`)).map((record) => ({
+      id: record.id, date: record.date, type: "Bible readings", title: `${record.fromBook} ${record.fromChapterNumber}:${record.fromVerseNumber}`,
+      summary: `${record.fromBook} ${record.fromChapterNumber}:${record.fromVerseNumber} – ${record.toBook} ${record.toChapterNumber}:${record.toVerseNumber}${record.notes ? ` · ${record.notes}` : ""}`,
+      edit: () => setReadingEditor(record),
+    })),
+    ...dailyPrayerLogs.filter((log) => log.date.startsWith(`${progressMonth}-`)).map((record) => ({
+      id: record.id, date: record.date, type: "Daily prayers", title: `${record.period} ${record.prayerType}`,
+      summary: `${record.period} · ${record.prayerType} · ${record.prayerNotes}`,
+      edit: () => setDailyPrayerEditor(record),
+    })),
+    ...entries.filter((entry) => entry.date.startsWith(`${progressMonth}-`)).map((record) => ({
+      id: record.id, date: record.date, type: "Bible reflections", title: record.scriptureReference,
+      summary: [record.takeaway, record.reflection, record.prayerNotes].filter(Boolean).join(" · "),
+      edit: () => setEntryEditor(record),
+    })),
+    ...requests.filter((request) => request.dateAdded.startsWith(`${progressMonth}-`)).map((record) => ({
+      id: record.id, date: record.dateAdded, type: "Prayer requests", title: record.title,
+      summary: `${record.status}${record.details ? ` · ${record.details}` : ""}`,
+      edit: () => setRequestEditor(record),
+    })),
+  ].filter((record) =>
+    (calendarTypeFilter === "All record types" || record.type === calendarTypeFilter) &&
+    matchesDateFilter(record.date) &&
+    (!query || `${record.type} ${record.title} ${record.summary}`.toLocaleLowerCase().includes(query)));
+  const sortedCalendarRecordItems = sortDevotionalRecords(calendarRecordItems, (record) => record.date, (record) => record.title, sortOrder);
+  const calendarRecordGroups = calendarGroupBy === "date"
+    ? groupByDate(sortedCalendarRecordItems, (record) => record.date).map(({ date, records }) => ({ title: dateLabel(date), records }))
+    : ["Bible readings", "Daily prayers", "Bible reflections", "Prayer requests"]
+      .filter((type) => calendarRecordItems.some((record) => record.type === type))
+      .map((type) => ({ title: type, records: sortedCalendarRecordItems.filter((record) => record.type === type) }));
   const sortedReadingDates = [...progressReadingDays.keys()].sort();
   const completedReadingDates = sortedReadingDates.filter((date) => date <= today());
   const latestReadingDate = completedReadingDates[completedReadingDates.length - 1];
@@ -6318,22 +6372,36 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
       <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => setActiveTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
       <Button variant={activeTab === "calendar" ? "primary" : "outline"} aria-pressed={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}><CalendarDays size={14} />Calendar</Button>
     </nav>
-    {activeTab !== "calendar" && <div className={`toolbar${activeTab === "prayers" ? " filter-toolbar" : ""}`}><div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>{activeTab === "prayers" && <FilterDrawer activeCount={requestFilter === "Ongoing" ? 0 : 1}><Field label="Request status"><Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select></Field></FilterDrawer>}</div>}
+    <div className="toolbar filter-toolbar devotional-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer label="Search & display filters" activeCount={(dateFrom ? 1 : 0) + (dateTo ? 1 : 0) +
+        (activeTab === "calendar" ? (calendarTypeFilter !== "All record types" ? 1 : 0) + (calendarGroupBy !== "date" ? 1 : 0) : (groupBy !== "date" ? 1 : 0)) +
+        (activeTab === "prayers" && requestFilter !== "Ongoing" ? 1 : 0) + (sortOrder !== "newest" ? 1 : 0)}>
+        {activeTab === "calendar"
+          ? <Field label="Group calendar records by"><Select aria-label="Group calendar records by" value={calendarGroupBy} onChange={(event) => setCalendarGroupBy(event.target.value as "date" | "type")}><option value="date">Date</option><option value="type">Record type (tab)</option></Select></Field>
+          : <Field label="Group records by"><Select aria-label="Group devotional records by" value={groupBy} onChange={(event) => setGroupBy(event.target.value as "date" | "none")}><option value="date">Date</option><option value="none">No grouping</option></Select></Field>}
+        <Field label="Sort by"><Select aria-label="Sort devotional records" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as DevotionalSortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></Select></Field>
+        <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
+        <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
+        {activeTab === "calendar" && <Field label="Record type"><Select aria-label="Filter calendar record type" value={calendarTypeFilter} onChange={(event) => setCalendarTypeFilter(event.target.value)}><option>All record types</option><option>Bible readings</option><option>Daily prayers</option><option>Bible reflections</option><option>Prayer requests</option></Select></Field>}
+        {activeTab === "prayers" && <Field label="Request status"><Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select></Field>}
+      </FilterDrawer>
+    </div>
     {activeTab === "readings" && <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div></div>
-      {visibleReadings.length ? <div className="devotional-date-groups">{groupByDate(visibleReadings, (reading) => reading.date).map(({ date, records }) => <div className="devotional-date-group" key={date}><h3 className="devotional-date-group-title">{dateLabel(date)}</h3><div className="devotional-reading-list">{records.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
-        <div className="devotional-card-head"><div><h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading({ ...copy, notes: copyLabel(copy.notes || "Bible reading", 5000) }); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
+      {visibleReadings.length ? <div className="devotional-date-groups">{dateGroups(sortedReadings, (reading) => reading.date).map(({ date, records }, index) => <div className="devotional-date-group" key={date || `all-${index}`}>{date && <h3 className="devotional-date-group-title">Readings · {dateLabel(date)}</h3>}<div className="devotional-reading-list">{records.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
+        <div className="devotional-card-head"><div>{groupBy === "none" && <span className="devotional-date">{dateLabel(reading.date)}</span>}<h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading({ ...copy, notes: copyLabel(copy.notes || "Bible reading", 5000) }); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
         {reading.people && <p><strong>People in the verses:</strong> <LinkifiedText>{reading.people}</LinkifiedText></p>}
         {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
       </Card>)}</div></div>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={readings.length ? "No matching Bible readings" : "No daily Bible readings yet"} description={readings.length ? "Try another search." : "Record a date and the Scripture range you read."} /></Card>}
     </section>}
     {activeTab === "reflections" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div></div>
-        {visibleEntries.length ? <div className="devotional-date-groups">{groupByDate(visibleEntries, (entry) => entry.date).map(({ date, records }) => <div className="devotional-date-group" key={date}><h3 className="devotional-date-group-title">{dateLabel(date)}</h3><div className="devotional-list">{records.map((entry) => <Card className="devotional-card" key={entry.id}>
-          <div className="devotional-card-head"><div><h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry({ ...copy, scriptureReference: copyLabel(copy.scriptureReference, 120) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
+        {visibleEntries.length ? <div className="devotional-date-groups">{dateGroups(sortedEntries, (entry) => entry.date).map(({ date, records }, index) => <div className="devotional-date-group" key={date || `all-${index}`}>{date && <h3 className="devotional-date-group-title">Reflections · {dateLabel(date)}</h3>}<div className="devotional-list">{records.map((entry) => <Card className="devotional-card" key={entry.id}>
+          <div className="devotional-card-head"><div>{groupBy === "none" && <span className="devotional-date">{dateLabel(entry.date)}</span>}<h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry({ ...copy, scriptureReference: copyLabel(copy.scriptureReference, 120) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
           {entry.takeaway && <p><strong>Message:</strong> <LinkifiedText>{entry.takeaway}</LinkifiedText></p>}{entry.reflection && <p><strong>Reflection:</strong> <LinkifiedText>{entry.reflection}</LinkifiedText></p>}{entry.prayerNotes && <p><strong>Prayer:</strong> <LinkifiedText>{entry.prayerNotes}</LinkifiedText></p>}
         </Card>)}</div></div>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={entries.length ? "No matching reflections" : "No Bible reflections yet"} description={entries.length ? "Try another search." : "Save a Scripture reference and your thoughts about it."} /></Card>}
     </section>}
     {activeTab === "prayers" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><Heart size={15} /> Prayer requests</h2><p>{ongoingCount} ongoing · {answeredCount} answered</p></div></div>
-        {visibleRequests.length ? <div className="devotional-date-groups">{groupByDate(visibleRequests, (request) => request.dateAdded).map(({ date, records }) => <div className="devotional-date-group" key={date}><h3 className="devotional-date-group-title">{dateLabel(date)}</h3><div className="devotional-list">{records.map((request) => <Card className="devotional-card" key={request.id}>
+        {visibleRequests.length ? <div className="devotional-date-groups">{dateGroups(sortedRequests, (request) => request.dateAdded).map(({ date, records }, index) => <div className="devotional-date-group" key={date || `all-${index}`}>{date && <h3 className="devotional-date-group-title">Requests added · {dateLabel(date)}</h3>}<div className="devotional-list">{records.map((request) => <Card className="devotional-card" key={request.id}>
           <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy prayer request: ${request.title}`} onClick={() => { const { id, ...copy } = request; void id; onSaveRequest({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Archive size={13} /></button></div></div>
           {request.details && <p><LinkifiedText>{request.details}</LinkifiedText></p>}
           <Button size="sm" variant="outline" onClick={() => onSaveRequest({
@@ -6344,16 +6412,16 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
         </Card>)}</div></div>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={requests.length ? "No matching prayer requests" : "No prayer requests yet"} description={requests.length ? "Try another search or status filter." : "Add a request to keep it in your prayer list."} /></Card>}
     </section>}
     {activeTab === "resources" && <section className="devotional-resource-section" ><div className="devotional-section-head"><div><h2><PlayCircle size={15} /> Music, media & other resources</h2><p>{visibleResources.length} {visibleResources.length === 1 ? "resource" : "resources"} · audio, video, songs, sermons, Scripture study, and more</p></div></div>
-      {visibleResources.length ? <div className="devotional-date-groups">{groupByDate(visibleResources, (resource) => resource.dateAdded).map(({ date, records }) => <div className="devotional-date-group" key={date || "undated"}><h3 className="devotional-date-group-title">{date ? dateLabel(date) : "Date not recorded"}</h3><div className="devotional-resource-list">{records.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
-        <div className="devotional-card-head"><div><h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, dateAdded: resource.dateAdded ?? today(), title: copyLabel(resource.title, 160) })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
+      {visibleResources.length ? <div className="devotional-date-groups">{dateGroups(sortedResources, (resource) => resource.dateAdded).map(({ date, records }, index) => <div className="devotional-date-group" key={date || `all-${index}`}>{groupBy === "date" && <h3 className="devotional-date-group-title">{date ? `Resources · ${dateLabel(date)}` : "Date not recorded"}</h3>}<div className="devotional-resource-list">{records.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
+        <div className="devotional-card-head"><div>{groupBy === "none" && <span className="devotional-date">{resource.dateAdded ? dateLabel(resource.dateAdded) : "Date not recorded"}</span>}<h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, dateAdded: resource.dateAdded ?? today(), title: copyLabel(resource.title, 160) })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
         {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
         <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
       </Card>)}</div></div>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
     </section>}
     {activeTab === "daily-prayers" && <section className="devotional-section devotional-tab-panel">
       <div className="devotional-section-head"><div><h2><Heart size={15} /> Daily prayer tracker</h2><p>{visibleDailyPrayerLogs.length} {visibleDailyPrayerLogs.length === 1 ? "prayer" : "prayers"} recorded · {new Set(dailyPrayerLogs.map((log) => log.date)).size} days tracked</p></div></div>
-      {visibleDailyPrayerLogs.length ? <div className="devotional-date-groups">{groupByDate(visibleDailyPrayerLogs, (log) => log.date).map(({ date, records }) => <div className="devotional-date-group" key={date}><h3 className="devotional-date-group-title">{dateLabel(date)}</h3><div className="devotional-list">{records.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
-        <div className="devotional-card-head"><div><span className="devotional-date">{log.period}{log.time ? ` · ${timeLabel(log.time)}` : ""}</span><h3>{log.prayerType}{log.prayerNotes.endsWith(" (copy)") ? " (copy)" : ""}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog({ ...copy, prayerNotes: copyLabel(copy.prayerNotes || copy.prayerType, 5000) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
+      {visibleDailyPrayerLogs.length ? <div className="devotional-date-groups">{dateGroups(sortedPrayerLogs, (log) => log.date).map(({ date, records }, index) => <div className="devotional-date-group" key={date || `all-${index}`}>{date && <h3 className="devotional-date-group-title">Prayers · {dateLabel(date)}</h3>}<div className="devotional-list">{records.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
+        <div className="devotional-card-head"><div><span className="devotional-date">{groupBy === "none" ? `${dateLabel(log.date)} · ` : ""}{log.period}{log.time ? ` · ${timeLabel(log.time)}` : ""}</span><h3>{log.prayerType}{log.prayerNotes.endsWith(" (copy)") ? " (copy)" : ""}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog({ ...copy, prayerNotes: copyLabel(copy.prayerNotes || copy.prayerType, 5000) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
         <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
       </Card>)}</div></div>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={dailyPrayerLogs.length ? "No matching daily prayers" : "No daily prayers recorded"} description={dailyPrayerLogs.length ? "Try another search." : "Record a prayer by date, time of day, type, and notes."} /></Card>}
     </section>}
@@ -6393,6 +6461,15 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, request
         <div className="devotional-calendar-legend"><span><i>B</i>Bible readings</span><span><i>P</i>Daily prayers</span><span><i>R</i>Reflections</span><span><i>Q</i>Prayer requests</span></div>
         {showReadingStreak && <div className="devotional-streak-summary"><div><span>Current streak</span><strong>{currentReadingStreak} {currentReadingStreak === 1 ? "day" : "days"}</strong></div><div><span>Best streak</span><strong>{bestReadingStreak} {bestReadingStreak === 1 ? "day" : "days"}</strong></div></div>}
       </Card>
+      <section className="devotional-section devotional-calendar-records">
+        <div className="devotional-section-head"><div><h2><BookOpen size={15} />Records this month</h2><p>{calendarRecordItems.length} matching records · grouped by {calendarGroupBy === "date" ? "date" : "record type"}</p></div></div>
+        {calendarRecordItems.length ? <div className="devotional-date-groups">{calendarRecordGroups.map((group) => <div className="devotional-date-group" key={group.title}>
+          <h3 className="devotional-date-group-title">{group.title}</h3>
+          <div className="devotional-list">{group.records.map((record) => <Card className="devotional-card devotional-calendar-record" key={`${record.type}-${record.id}`}>
+            <div className="devotional-card-head"><div><span className="devotional-date">{record.type} · {dateLabel(record.date)}</span><h3>{record.title}</h3>{record.summary && <p>{record.summary}</p>}</div><button type="button" className="icon-button" aria-label={`Edit ${record.title}`} onClick={record.edit}><Pencil size={13} /></button></div>
+          </Card>)}</div>
+        </div>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title="No matching records this month" description="Change the search or filters, or choose another month." /></Card>}
+      </section>
       <section className="devotional-progress-day">
         <div className="devotional-section-head"><div><h2><BookOpen size={15} />{selectedProgressDate ? dateLabel(selectedProgressDate) : "Select a date"}</h2><p>{selectedProgressDate ? `${selectedDateActivityCount} ${selectedDateActivityCount === 1 ? "record" : "records"} · ${selectedDateReadings.length} readings · ${selectedDatePrayerLogs.length} prayers · ${selectedDateReflections.length} reflections · ${selectedDateRequests.length} requests` : "Select a date to view Bible readings, daily prayers, reflections, and prayer requests."}</p></div>{selectedProgressDate && <div className="table-actions"><Button size="sm" variant="outline" onClick={() => { setReadingEditorDate(selectedProgressDate); setReadingEditor(null); }}><Plus size={13} />Reading</Button><Button size="sm" variant="outline" onClick={() => { setDailyPrayerEditorDate(selectedProgressDate); setDailyPrayerEditor(null); }}><Plus size={13} />Prayer</Button><Button size="sm" variant="outline" onClick={() => { setEntryEditorDate(selectedProgressDate); setEntryEditor(null); }}><Plus size={13} />Reflection</Button><Button size="sm" variant="outline" onClick={() => { setRequestEditorDate(selectedProgressDate); setRequestEditor(null); }}><Plus size={13} />Request</Button></div>}</div>
         {selectedProgressDate && selectedDateActivityCount > 0 && <div className="devotional-list">
