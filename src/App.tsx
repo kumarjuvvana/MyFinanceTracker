@@ -2762,26 +2762,32 @@ function AssetModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenStocks }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDelete, onOpenStocks, onOpenBankAccounts }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
+  bankAccounts: BankAccount[];
   onSave: (asset: Omit<AssetRecord, "id">, id?: string) => void;
   onDelete: (asset: AssetRecord) => void;
   onOpenStocks: () => void;
+  onOpenBankAccounts: () => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
-  const [activeType, setActiveType] = useState<"All types" | "Stocks" | AssetType>("All types");
+  const [activeType, setActiveType] = useState<"All types" | "Stocks" | "Bank accounts" | AssetType>("All types");
   const query = search.trim().toLocaleLowerCase();
   const visible = assets.filter((asset) =>
-    (activeType === "All types" || activeType !== "Stocks" && asset.type === activeType) &&
+    (activeType === "All types" || activeType !== "Stocks" && activeType !== "Bank accounts" && asset.type === activeType) &&
     [asset.name, asset.type, asset.institution, asset.reference, asset.location, asset.notes, ...asset.tags]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
   const visibleStocks = stocks.filter((stock) =>
     [stock.symbol, stock.name, stock.exchange, stock.broker].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const visibleBankAccounts = bankAccounts.filter((account) =>
+    [account.bankName, account.accountType, account.accountHolder, account.branch, account.notes, account.accountNumber]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.bankName.localeCompare(b.bankName) || a.accountType.localeCompare(b.accountType));
   const latestStockQuotes = latestStockQuotesById(stockQuotes);
   const stockTotals = new Map<string, {
     current: number;
@@ -2898,6 +2904,28 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
     total.assets += quote.price * quantity;
     totals.set(quote.currency, total);
   }
+  for (const account of bankAccounts) {
+    if (account.currentBalance == null) continue;
+    const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
+    total.assets += account.currentBalance;
+    totals.set("INR", total);
+  }
+  const visibleBankTotals = visibleBankAccounts.reduce(
+    (total, account) => {
+      if (account.currentBalance == null) return total;
+      total.balance += account.currentBalance;
+      total.reportedAccounts++;
+      return total;
+    },
+    { balance: 0, reportedAccounts: 0 },
+  );
+  const assetTabs: Array<"All types" | "Stocks" | "Bank accounts" | AssetType> = [
+    "All types",
+    ...ASSET_TYPES.filter((assetType) => assetType !== "Stock").flatMap((assetType) =>
+      assetType === "NPS" ? [assetType, "Stocks" as const]
+        : assetType === "Cash / deposit" ? [assetType, "Bank accounts" as const]
+          : [assetType]),
+  ];
 
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
@@ -2908,20 +2936,22 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
   }
 
   return <>
-    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : <Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
-    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. The Stocks tab reads the same holdings and price snapshots as the Stocks menu—there is no duplicate stock data or asset table. Manage stock holdings in the Stocks menu. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
+    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : <Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
+    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
-      {(["All types", ...ASSET_TYPES.filter((assetType) => assetType !== "Stock").flatMap((assetType) =>
-        assetType === "NPS" ? [assetType, "Stocks" as const] : [assetType])] as const).map((type) => {
+      {assetTabs.map((type) => {
         const count = type === "All types" ? assets.length
           : type === "Stocks" ? stocks.length
+            : type === "Bank accounts" ? bankAccounts.length
             : assets.filter((asset) => asset.type === type).length;
         const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes" : type;
         return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
       })}
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
+    {activeType === "Bank accounts" && <div className="alert">Balances are the saved snapshots from Bank accounts, not live bank balances. Only accounts with a recorded balance are included in totals.</div>}
+    {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
     {activeType === "Stocks" && stockTotals.size > 0 && <div className="asset-total-list">{[...stockTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const returnPercent = total.invested ? total.profitLoss / total.invested * 100 : null;
       return <Card className="asset-total-card" key={currency}>
@@ -2952,6 +2982,21 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
       </Card>;
     })}</div>}
     {activeType === "Stocks" && !visibleStocks.length && <Card><EmptyState icon={<TrendingUp size={18} />} title={stocks.length ? "No matching stocks" : "No stocks tracked yet"} description={stocks.length ? "Try a different search." : "Add holdings in the Stocks menu; they will appear here automatically."} /></Card>}
+    {activeType === "Bank accounts" && visibleBankAccounts.length > 0 && <div className="asset-list">{visibleBankAccounts.map((account) => {
+      const accountDigits = account.accountNumber.replace(/\D/g, "");
+      const accountLabel = accountDigits.length >= 4 ? `Account ending ${accountDigits.slice(-4)}` : "Account number not shown";
+      return <Card className="asset-card" key={account.id}>
+        <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType}{account.branch ? ` · ${account.branch}` : ""}</p></div></div></div>
+        <div className="asset-details">
+          <div><span>Account</span><strong>{accountLabel}</strong></div>
+          {account.currentBalance != null
+            ? <div><span>Available balance</span><strong>{formatAmount(account.currentBalance, "INR")}</strong></div>
+            : <div><span>Available balance</span><strong>Not recorded</strong></div>}
+          {account.balanceAsOfDate && <div><span>Balance as of</span><strong>{dateLabel(account.balanceAsOfDate)}</strong></div>}
+        </div>
+      </Card>;
+    })}</div>}
+    {activeType === "Bank accounts" && !visibleBankAccounts.length && <Card><EmptyState icon={<Landmark size={18} />} title={bankAccounts.length ? "No matching bank accounts" : "No bank accounts recorded"} description={bankAccounts.length ? "Try a different search." : "Add accounts in the Bank accounts menu; they will appear here automatically."} /></Card>}
     {activeType === "Mutual fund" && mutualFundTotals.size > 0 && <div className="asset-total-list">{[...mutualFundTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current - total.invested;
       const returnPercent = total.invested ? gain / total.invested * 100 : null;
@@ -3083,7 +3128,7 @@ function AssetManager({ assets, stocks, stockQuotes, onSave, onDelete, onOpenSto
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
     })}</div>
-    {activeType !== "Stocks" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
+    {activeType !== "Stocks" && activeType !== "Bank accounts" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
     {editor !== undefined && <AssetModal key={editor?.id ?? "new-asset"} initial={editor} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} />}
   </>;
 }
@@ -12047,7 +12092,7 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} />,
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} />,
     "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}
       onSave={(account) => persistUpdate((previous) => ({
         ...previous,
