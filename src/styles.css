@@ -38,6 +38,7 @@ button{cursor:pointer}
 .devotional-calendar-record .devotional-card-head>div:first-child{flex:1}
 .devotional-calendar-record p{margin:6px 0 0}
 .app-shell.dark .devotional-calendar-record p{color:#a7b0a7}
+@media(max-width:760px){.devotional-toolbar{flex-wrap:wrap}.devotional-toolbar>.search-wrap{flex-basis:100%}.devotional-group-actions{margin-left:auto}}
 .inline-editor{margin:0 0 16px;border-color:var(--user-accent,#85a78a);scroll-margin:24px}
 .inline-editor .modal-head{margin-bottom:16px}
 .inline-editor .modal-head h2{font:700 16px Manrope,sans-serif;color:var(--text,#303830)}
@@ -827,8 +828,19 @@ body{background:#f3f5ef}
 .devotional-list{display:grid;gap:10px}
 .devotional-date-groups{display:grid;gap:18px}
 .devotional-date-group{display:grid;gap:9px;min-width:0}
-.devotional-date-group-title{margin:0;padding:0 0 7px;border-bottom:1px solid #e8ebe6;font:700 11px Manrope,sans-serif;color:#648568}
-.app-shell.dark .devotional-date-group-title{border-color:#343d35;color:#a6c1a8}
+.devotional-date-group-toggle{display:flex;align-items:center;gap:9px;width:100%;padding:9px 10px;border:1px solid #e8ebe6;border-radius:8px;background:#f8faf7;color:#648568;text-align:left;cursor:pointer}
+.devotional-date-group-toggle:hover{background:#f1f5ef}
+.devotional-date-group-title{flex:1;margin:0;font:700 11px Manrope,sans-serif;color:#648568}
+.devotional-date-group-meta{font-size:10px;color:#92998f;white-space:nowrap}
+.devotional-date-group-toggle>svg{flex:none;transition:transform .16s ease}
+.devotional-date-group-toggle.expanded>svg{transform:rotate(90deg)}
+.devotional-date-group-content{min-width:0}
+.devotional-group-actions{display:flex;gap:6px;flex:none}
+.devotional-group-actions .button{height:34px;padding:0 9px;font-size:10px}
+.app-shell.dark .devotional-date-group-toggle{border-color:#343d35;background:#252e26}
+.app-shell.dark .devotional-date-group-toggle:hover{background:#29352b}
+.app-shell.dark .devotional-date-group-title{color:#a6c1a8}
+.app-shell.dark .devotional-date-group-meta{color:#a7b0a7}
 .devotional-card{min-width:0;padding:14px}
 .devotional-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .devotional-card-head>div:first-child{min-width:0}
