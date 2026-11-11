@@ -2906,6 +2906,17 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     }
     return asset.currentValue;
   };
+  const assetProfit = (asset: AssetRecord) => {
+    if (asset.type === "Loan" || asset.type === "Home loan" || asset.type === "Fixed deposit" ||
+      asset.type === "Bond" || asset.type === "Insurance" ||
+      (asset.type === "NPS" && hasPartialNpsSelection(asset)) ||
+      asset.investedValue === null || currentAssetValue(asset) === null) return null;
+    if (asset.type === "NPS" && (asset.npsSchemes ?? []).some((scheme) => scheme.currentValue === null)) return null;
+    return (currentAssetValue(asset) ?? 0) +
+      (asset.type === "NPS" ? asset.withdrawnValue ?? 0 : 0) - asset.investedValue;
+  };
+  const profitClass = (profit: number | null) =>
+    profit === null || profit === 0 ? "" : profit > 0 ? "positive" : "negative";
   const matchesValueFilter = (amount: number | null | undefined) =>
     valueFilter === "all" || (valueFilter === "recorded" ? amount != null : amount == null);
   const compareByValue = (left: number | null | undefined, right: number | null | undefined) => {
@@ -2921,7 +2932,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => sortBy === "name" ? a.name.localeCompare(b.name) : compareByValue(currentAssetValue(a), currentAssetValue(b)));
   const visibleStocks = stocks.filter((stock) => {
-    if (!selectedTypes.has("Stocks")) return false;
+    if (!selectedTypes.has("Stocks") || isItemHidden("Stocks", stock.id)) return false;
     const quote = latestStockQuotes.get(stock.id);
     const currentValue = quote && (stock.quantity ?? 0) > 0 ? quote.price * (stock.quantity ?? 0) : null;
     return (filterCurrency === "All currencies" || quote?.currency === filterCurrency) &&
@@ -3168,7 +3179,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     totals.set(asset.currency, total);
   }
   for (const stock of stocks) {
-    if (!selectedTypes.has("Stocks")) continue;
+    if (!selectedTypes.has("Stocks") || isItemHidden("Stocks", stock.id)) continue;
     const quote = latestStockQuotes.get(stock.id);
     const quantity = stock.quantity ?? 0;
     if (!quote || quantity <= 0) continue;
@@ -3204,16 +3215,38 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     "All types",
     ...ASSET_MANAGER_VISIBLE_TYPES.filter((type) => selectedTypes.has(type)),
   ];
-  type PreferenceItem = { id: string; label: string; value: number | null; currency: string; children?: PreferenceItem[] };
+  type PreferenceItem = {
+    id: string;
+    label: string;
+    value: number | null;
+    currency: string;
+    profit: number | null;
+    children?: PreferenceItem[];
+  };
   const preferenceItems = ASSET_MANAGER_VISIBLE_TYPES.map((type) => {
     const items: PreferenceItem[] = type === "Stocks"
-      ? []
+      ? stocks.map((stock) => {
+        const quote = latestStockQuotes.get(stock.id);
+        const quantity = stock.quantity ?? 0;
+        const value = quote && quantity > 0 ? quote.price * quantity : null;
+        const invested = stock.averageBuyPrice != null && quantity > 0
+          ? stock.averageBuyPrice * quantity
+          : null;
+        return {
+          id: stock.id,
+          label: `${stock.symbol} · ${stock.name}`,
+          value,
+          currency: quote?.currency ?? "INR",
+          profit: value !== null && invested !== null ? value - invested : null,
+        };
+      })
       : type === "Bank accounts"
         ? bankAccounts.map((account) => ({
           id: account.id,
           label: `${account.bankName} · ${account.accountType}`,
           value: account.currentBalance ?? null,
           currency: "INR",
+          profit: null,
         }))
         : type === "Vehicle"
           ? vehicles.map((vehicle) => ({
@@ -3221,18 +3254,25 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
             label: [vehicle.name, vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" · "),
             value: vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? null,
             currency: "INR",
+            profit: (vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue) != null &&
+              vehiclePurchaseValue(vehicle) != null
+              ? (vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? 0) -
+                (vehiclePurchaseValue(vehicle) ?? 0)
+              : null,
           }))
           : assets.filter((asset) => asset.type === type).map((asset) => ({
             id: asset.id,
             label: asset.name,
             value: currentAssetValue(asset),
             currency: asset.currency,
+            profit: assetProfit(asset),
             ...(asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0
               ? { children: (asset.npsSchemes ?? []).map((scheme) => ({
                 id: `${asset.id}::${scheme.schemeName}`,
                 label: scheme.schemeName,
                 value: scheme.currentValue,
                 currency: asset.currency,
+                profit: null,
               })) }
               : {}),
           }));
@@ -3294,10 +3334,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       {assetTabs.map((type) => {
         const count = type === "All types" ? assets.filter((asset) => asset.type !== "Stock" &&
             selectedTypes.has(asset.type) && isAssetItemVisible(asset)).length +
-            (selectedTypes.has("Stocks") ? stocks.length : 0) +
+            (selectedTypes.has("Stocks") ? stocks.filter((stock) => !isItemHidden("Stocks", stock.id)).length : 0) +
             (selectedTypes.has("Bank accounts") ? bankAccounts.filter((account) => !isItemHidden("Bank accounts", account.id)).length : 0) +
             (selectedTypes.has("Vehicle") ? vehicles.filter((vehicle) => !isItemHidden("Vehicle", vehicle.id)).length : 0)
-          : type === "Stocks" ? stocks.length
+          : type === "Stocks" ? stocks.filter((stock) => !isItemHidden("Stocks", stock.id)).length
             : type === "Bank accounts" ? bankAccounts.filter((account) => !isItemHidden("Bank accounts", account.id)).length
             : type === "Vehicle" ? vehicles.filter((vehicle) => !isItemHidden("Vehicle", vehicle.id)).length
             : assets.filter((asset) => asset.type === type && isAssetItemVisible(asset)).length;
@@ -3357,7 +3397,24 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
                   </summary>
                 <div className="asset-preference-children">
                   {type === "Stocks"
-                    ? <span className="section-description">Stock positions are included or excluded together; individual stock selection is not enabled.</span>
+                    ? <>
+                  <div className="asset-preference-actions">
+                    <button type="button" disabled={!keys.length} onClick={() => setItemsHidden(type, keys, false)}>Check all stocks</button>
+                    <button type="button" disabled={!keys.length} onClick={() => setItemsHidden(type, keys, true)}>Uncheck all stocks</button>
+                  </div>
+                  {!items.length && <span className="section-description">No stock positions recorded yet.</span>}
+                  {items.map((item) => <div className="asset-preference-item" key={item.id}>
+                    <label>
+                      <input type="checkbox" checked={!isItemHidden(type, item.id)}
+                        onChange={(event) => togglePreferenceItem(type, item.id, event.currentTarget.checked)} />
+                      <span>{item.label}</span>
+                      <strong className={profitClass(item.profit)}>
+                        {item.value === null ? "No quote" : formatAmount(item.value, item.currency)}
+                        {item.profit !== null && item.profit !== 0 && <small>{item.profit > 0 ? "+" : ""}{formatAmount(item.profit, item.currency)} P/L</small>}
+                      </strong>
+                    </label>
+                  </div>)}
+                    </>
                     : <>
                   <div className="asset-preference-actions">
                     <button type="button" disabled={!keys.length} onClick={() => setItemsHidden(type, keys, false)}>Check all items</button>
@@ -3375,7 +3432,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
                           ref={(input) => { if (input) input.indeterminate = mixed; }}
                           onChange={(event) => setItemsHidden(type, itemIds, !event.currentTarget.checked)} />
                         <span>{item.label}</span>
-                        <strong>{item.value === null ? "Not recorded" : formatAmount(item.value, item.currency)}</strong>
+                        <strong className={profitClass(item.profit)}>
+                          {item.value === null ? "Not recorded" : formatAmount(item.value, item.currency)}
+                          {item.profit !== null && item.profit !== 0 && <small>{item.profit > 0 ? "+" : ""}{formatAmount(item.profit, item.currency)} P/L</small>}
+                        </strong>
                       </label>
                       {item.children?.map((child) => <label className="asset-preference-subitem" key={child.id}>
                         <input type="checkbox" checked={!isItemHidden(type, child.id)}
@@ -3402,7 +3462,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
     {activeType === "Vehicle" && <div className="alert">Vehicles use the same records as the Vehicles menu. Edit vehicle details and purchase/current values from either screen; Add vehicle value saves a dated valuation snapshot. The current estimate contributes to your INR asset total.</div>}
     {activeType === "Vehicle" && visibleVehicles.length > 0 && <div className="asset-total-list"><Card className="asset-total-card">
-      <div><span>Current estimated value · INR</span><strong>{visibleVehicleTotals.currentValueCount ? formatAmount(visibleVehicleTotals.currentValue, "INR") : "Not recorded"}{visibleVehicleTotals.currentValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.currentValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
+      <div><span>Current estimated value · INR</span><strong className={profitClass(
+        visibleVehicles.length > 0 && visibleVehicleTotals.comparableVehicles === visibleVehicles.length
+          ? visibleVehicleTotals.estimatedChange
+          : null,
+      )}>{visibleVehicleTotals.currentValueCount ? formatAmount(visibleVehicleTotals.currentValue, "INR") : "Not recorded"}{visibleVehicleTotals.currentValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.currentValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
       <div><span>Purchase value · INR</span><strong>{visibleVehicleTotals.purchaseValueCount ? formatAmount(visibleVehicleTotals.purchaseValue, "INR") : "Not recorded"}{visibleVehicleTotals.purchaseValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.purchaseValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
       <div><span>Estimated change · vehicles with both values</span><strong className={visibleVehicleTotals.estimatedChange >= 0 ? "positive" : "negative"}>{visibleVehicleTotals.comparableVehicles ? `${visibleVehicleTotals.estimatedChange >= 0 ? "+" : ""}${formatAmount(visibleVehicleTotals.estimatedChange, "INR")}` : "Not available"}{visibleVehicleTotals.comparableVehicles < visibleVehicles.length ? ` · ${visibleVehicleTotals.comparableVehicles} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
     </Card></div>}
@@ -3413,11 +3477,12 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       const latest = valuations[0];
       const currentValue = vehicle.currentValue ?? latest?.currentValue ?? null;
       const purchaseValue = vehiclePurchaseValue(vehicle);
+      const vehicleProfit = currentValue !== null && purchaseValue !== null ? currentValue - purchaseValue : null;
       return <Card className="asset-card" key={vehicle.id}>
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Car size={17} /></div><div><h2>{vehicle.name}</h2><p>{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}</p></div></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${vehicle.name} details`} title="Edit vehicle details and values" onClick={() => setVehicleEditor(vehicle)}><Pencil size={14} /></button></div></div>
         <div className="asset-details">
           {purchaseValue != null && <div><span>Purchase value</span><strong>{formatAmount(purchaseValue, "INR")}</strong></div>}
-          <div><span>Current estimated value</span><strong>{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</strong></div>
+          <div><span>Current estimated value</span><strong className={profitClass(vehicleProfit)}>{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</strong></div>
           {(vehicle.valuationDate || latest?.date) && <div><span>Latest valuation</span><strong>{dateLabel(vehicle.valuationDate ?? latest?.date ?? "")}</strong></div>}
           {vehicle.fuelType && <div><span>Fuel type</span><strong>{vehicle.fuelType}</strong></div>}
         </div>
@@ -3435,7 +3500,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     {activeType === "Stocks" && stockTotals.size > 0 && <div className="asset-total-list">{[...stockTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const returnPercent = total.invested ? total.profitLoss / total.invested * 100 : null;
       return <Card className="asset-total-card" key={currency}>
-        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Current value · {currency}</span><strong className={profitClass(
+          total.pricedPositions > 0 && total.pricedPositions === total.investedPositions ? total.profitLoss : null,
+        )}>{formatAmount(total.current, currency)}</strong></div>
         <div><span>Invested · {currency}</span><strong>{total.investedPositions ? formatAmount(total.invested, currency) : "Average buy price not recorded"}</strong></div>
         <div><span>Unrealized P/L · priced holdings with average buy price</span><strong className={total.profitLoss >= 0 ? "positive" : "negative"}>{total.investedPositions ? `${total.profitLoss >= 0 ? "+" : ""}${formatAmount(total.profitLoss, currency)}${returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}` : "Not available"}</strong></div>
         <div><span>Positions with saved quotes</span><strong>{total.pricedPositions}</strong></div>
@@ -3455,8 +3522,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div className="asset-details">
           <div><span>Quantity</span><strong>{quantity.toLocaleString()}</strong></div>
           <div><span>Average buy price</span><strong>{stock.averageBuyPrice != null ? formatAmount(stock.averageBuyPrice, quote?.currency ?? "INR") : "Not recorded"}</strong></div>
-          <div><span>Latest saved price</span><strong>{quote ? formatAmount(quote.price, quote.currency) : "No saved quote"}</strong></div>
-          <div><span>Current value</span><strong>{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</strong></div>
+          <div><span>Latest saved price</span><strong className={profitClass(profitLoss)}>{quote ? formatAmount(quote.price, quote.currency) : "No saved quote"}</strong></div>
+          <div><span>Current value</span><strong className={profitClass(profitLoss)}>{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</strong></div>
           {investedValue !== null && quote && <div><span>Invested value</span><strong>{formatAmount(investedValue, quote.currency)}</strong></div>}
           {profitLoss !== null && quote && <div><span>Unrealized P/L</span><strong className={profitLoss >= 0 ? "positive" : "negative"}>{profitLoss >= 0 ? "+" : ""}{formatAmount(profitLoss, quote.currency)}</strong></div>}
           {quote && <div><span>Quote saved</span><strong>{new Date(quote.timestamp).toLocaleString()}</strong></div>}
@@ -3488,7 +3555,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       const returnPercent = total.invested ? gain / total.invested * 100 : null;
       return <Card className="asset-total-card mutual-fund-total-card" key={currency}>
         <div><span>Invested · {currency}</span><strong>{formatAmount(total.invested, currency)}</strong></div>
-        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Current value · {currency}</span><strong className={profitClass(gain)}>{formatAmount(total.current, currency)}</strong></div>
         <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
       </Card>;
     })}</div>}
@@ -3499,7 +3566,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       const returnPercent = total.contributions ? gain / total.contributions * 100 : null;
       return <Card className="asset-total-card" key={currency}>
         <div><span>Total contributions · {currency}</span><strong>{formatAmount(total.contributions, currency)}</strong></div>
-        <div><span>{isPartialNpsSelection ? "Selected schemes' current value" : "Current market value"} · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>{isPartialNpsSelection ? "Selected schemes' current value" : "Current market value"} · {currency}</span><strong className={isPartialNpsSelection ? "" : profitClass(gain)}>{formatAmount(total.current, currency)}</strong></div>
         <div><span>Withdrawals · {currency}</span><strong>{formatAmount(total.withdrawals, currency)}</strong></div>
         {!isPartialNpsSelection && <div><span>Gain / loss after withdrawals · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>}
       </Card>;
@@ -3535,14 +3602,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       return <Card className="asset-total-card" key={currency}>
         <div><span>Gold held</span><strong>{total.grams.toLocaleString(undefined, { maximumFractionDigits: 4 })} g</strong></div>
         <div><span>Invested · {currency}</span><strong>{formatAmount(total.invested, currency)}</strong></div>
-        <div><span>Current value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>Current value · {currency}</span><strong className={profitClass(gain)}>{formatAmount(total.current, currency)}</strong></div>
         <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
       </Card>;
     })}</div>}
     {activeType === "Digital gold" && <div className="alert">Digital gold values are manually recorded snapshots, not live provider prices. Per-gram value is derived from current value ÷ grams; returns are not annualized. Update the valuation date when refreshing a provider balance.</div>}
     {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Amounts and installments are copied from the supplied screenshot; verify whether the amount is cumulative before relying on returns.</div>}
     {activeType === "Real estate" && realEstateTotals.size > 0 && <div className="asset-total-list">{[...realEstateTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
-      <div><span>Current market value · {currency}</span><strong>{total.currentCount ? formatAmount(total.current, currency) : "Not recorded"}{total.currentCount < total.properties ? ` · ${total.currentCount} of ${total.properties} properties` : ""}</strong></div>
+      <div><span>Current market value · {currency}</span><strong className={total.comparableProperties === total.properties ? profitClass(total.estimatedChange) : ""}>{total.currentCount ? formatAmount(total.current, currency) : "Not recorded"}{total.currentCount < total.properties ? ` · ${total.currentCount} of ${total.properties} properties` : ""}</strong></div>
       <div><span>Purchase value · {currency}</span><strong>{total.purchaseCount ? formatAmount(total.purchase, currency) : "Not recorded"}{total.purchaseCount < total.properties ? ` · ${total.purchaseCount} of ${total.properties} properties` : ""}</strong></div>
       <div><span>Estimated change · properties with both values</span><strong className={total.estimatedChange >= 0 ? "positive" : "negative"}>{total.comparableProperties ? `${total.estimatedChange >= 0 ? "+" : ""}${formatAmount(total.estimatedChange, currency)}` : "Not available"}{total.comparableProperties < total.properties ? ` · ${total.comparableProperties} of ${total.properties} properties` : ""}</strong></div>
     </Card>)}</div>}
@@ -3579,7 +3646,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total account contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : isInsurance ? "Premiums paid to date" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {isHomeLoan
             ? <div><span>Principal outstanding</span><strong>{asset.principalOutstanding != null ? formatAmount(asset.principalOutstanding, asset.currency) : "Not shown in provided statement"}</strong></div>
-            : currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? partialNpsSelection ? "Selected schemes' current value" : "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong>{formatAmount(currentValue, asset.currency)}</strong></div>}
+            : currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? partialNpsSelection ? "Selected schemes' current value" : "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong className={profitClass(assetProfit(asset))}>{formatAmount(currentValue, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.maturityAmount != null && <div><span>Maturity amount on advice</span><strong>{formatAmount(asset.maturityAmount, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.depositTerm && <div><span>Deposit term</span><strong>{asset.depositTerm}</strong></div>}
           {isFixedDeposit && asset.depositScheme && <div><span>Deposit scheme</span><strong>{asset.depositScheme}</strong></div>}

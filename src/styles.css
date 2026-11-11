@@ -798,6 +798,11 @@ body{background:#f3f5ef}
 .asset-preference-item{display:grid;gap:7px}
 .asset-preference-item>label span,.asset-preference-subitem span{flex:1;min-width:0;overflow-wrap:anywhere}
 .asset-preference-item>label strong,.asset-preference-subitem strong{font-size:10px;color:var(--text-muted,#778077);text-align:right}
+.asset-preference-item>label strong.positive{color:#40834e}
+.asset-preference-item>label strong.negative{color:#b3483d}
+.asset-preference-item>label strong small{display:block;margin-top:3px;font-size:9px;font-weight:600}
+.app-shell.dark .asset-preference-item>label strong.positive{color:#a8d1ad}
+.app-shell.dark .asset-preference-item>label strong.negative{color:#f0aaa0}
 .asset-preference-subitem{padding-left:22px}
 .asset-list-group{display:grid;gap:10px;margin-bottom:12px}
 .asset-list-group-title{margin:0;color:var(--text-muted,#778077);font:700 12px Inter,"Aptos","Segoe UI",sans-serif}
@@ -841,8 +846,12 @@ body{background:#f3f5ef}
 .asset-details>div{display:grid;gap:4px;min-width:0;padding:10px;border:1px solid #eef0ec;border-radius:9px}
 .asset-details span{font-size:9px;color:#92998f}
 .asset-details strong{font-size:11px;color:#414a42;overflow-wrap:anywhere;word-break:break-word}
+.asset-details strong.positive,.asset-total-card strong.positive{color:#40834e}
+.asset-details strong.negative,.asset-total-card strong.negative{color:#b3483d}
 .app-shell.dark .asset-icon{background:#2b3d30;color:#a6c1a8}
 .app-shell.dark .asset-card-title h2,.app-shell.dark .asset-details strong,.app-shell.dark .asset-total-card strong{color:#e3e8e2}
+.app-shell.dark .asset-details strong.positive,.app-shell.dark .asset-total-card strong.positive{color:#a8d1ad}
+.app-shell.dark .asset-details strong.negative,.app-shell.dark .asset-total-card strong.negative{color:#f0aaa0}
 .app-shell.dark .asset-card-title p,.app-shell.dark .asset-details span,.app-shell.dark .asset-total-card span{color:#a7b0a7}
 .app-shell.dark .asset-details>div{border-color:#343d35}
 .electricity-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
