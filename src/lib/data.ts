@@ -298,6 +298,13 @@ export function validateData(value: unknown): value is TrackerData {
         Number.isFinite(stock.averageBuyPrice) && stock.averageBuyPrice > 0)) &&
       (stock.quantity === undefined || (typeof stock.quantity === "number" &&
         Number.isInteger(stock.quantity) && stock.quantity >= 0)) &&
+      (stock.latestQuote === undefined || (isRecord(stock.latestQuote) &&
+        typeof stock.latestQuote.price === "number" && Number.isFinite(stock.latestQuote.price) && stock.latestQuote.price >= 0 &&
+        typeof stock.latestQuote.currency === "string" && /^[A-Z]{3}$/.test(stock.latestQuote.currency) &&
+        typeof stock.latestQuote.timestamp === "string" && !Number.isNaN(Date.parse(stock.latestQuote.timestamp)) &&
+        typeof stock.latestQuote.marketState === "string" &&
+        (stock.latestQuote.previousClose === null || (typeof stock.latestQuote.previousClose === "number" &&
+          Number.isFinite(stock.latestQuote.previousClose) && stock.latestQuote.previousClose >= 0)))) &&
       averageMissing === quantityMissing;
   }));
   const stockQuotesOk = value.stockQuotes === undefined || (Array.isArray(value.stockQuotes) && value.stockQuotes.every((quote) =>

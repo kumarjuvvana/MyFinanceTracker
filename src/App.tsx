@@ -1954,12 +1954,20 @@ function parseStockImportNumber(text: string, integerOnly: boolean): string {
   return normalized;
 }
 
-function latestStockQuotesById(quotes: StockQuoteSnapshot[]) {
+function latestStockQuotesById(quotes: StockQuoteSnapshot[], stocks: TrackedStock[] = []) {
   const latest = new Map<string, StockQuoteSnapshot>();
   for (const quote of quotes) {
     const previous = latest.get(quote.stockId);
     if (!previous || Date.parse(quote.timestamp) > Date.parse(previous.timestamp)) {
       latest.set(quote.stockId, quote);
+    }
+  }
+  for (const stock of stocks) {
+    if (!stock.latestQuote) continue;
+    const quote: StockQuoteSnapshot = { ...stock.latestQuote, id: `latest-${stock.id}`, stockId: stock.id };
+    const previous = latest.get(stock.id);
+    if (!previous || Date.parse(quote.timestamp) >= Date.parse(previous.timestamp)) {
+      latest.set(stock.id, quote);
     }
   }
   return latest;
@@ -1974,7 +1982,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   onAddBroker: (name: string) => void;
   onRenameBroker: (oldName: string, newName: string) => void;
   onDeleteBroker: (name: string) => void;
-  onSaveQuote: (quote: Omit<StockQuoteSnapshot, "id">) => void;
+  onSaveQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
 }) {
   const [brokerName, setBrokerName] = useState("");
   const [editingBroker, setEditingBroker] = useState<{ original: string; value: string } | null>(null);
@@ -1987,6 +1995,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stockTab, setStockTab] = useState<"stocks" | "manage">("stocks");
   const [busy, setBusy] = useState(false);
+  const [trackPriceHistory, setTrackPriceHistory] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshErrors, setRefreshErrors] = useState<string[]>([]);
@@ -2013,7 +2022,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [collapsedStockGroups, setCollapsedStockGroups] = useState<Set<string>>(() => new Set());
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const latestQuotes = latestStockQuotesById(quotes);
+  const latestQuotes = latestStockQuotesById(quotes, stocks);
   const sortedHistory = (stockId: string) => quotes.filter((quote) => quote.stockId === stockId).sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
   const portfolioPositions = stocks.flatMap((stock) => {
     const latest = latestQuotes.get(stock.id);
@@ -2263,7 +2272,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     const failures: string[] = [];
     for (const stock of selectedStocks) {
       try {
-        onSaveQuote({ stockId: stock.id, ...await fetchStockQuote(stock) });
+        onSaveQuote({ stockId: stock.id, ...await fetchStockQuote(stock) }, trackPriceHistory);
         updated++;
       } catch (caught) {
         failures.push(`${stock.symbol} (${stock.exchange}): ${caught instanceof Error ? caught.message : "Could not load quote."}`);
@@ -2272,7 +2281,11 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     }
     setBusy(false);
     setRefreshErrors(failures);
-    setNotice(updated ? `Saved ${updated} new price ${updated === 1 ? "snapshot" : "snapshots"}.` : "");
+    setNotice(updated
+      ? trackPriceHistory
+        ? `Updated ${updated} ${updated === 1 ? "price" : "prices"} and saved ${updated === 1 ? "a history snapshot" : "history snapshots"}.`
+        : `Updated latest prices for ${updated} ${updated === 1 ? "stock" : "stocks"}; history was not saved.`
+      : "");
     if (!updated && failures.length === 0) setError("No quotes were returned.");
   }
   async function refreshStock(stock: TrackedStock) {
@@ -2294,10 +2307,12 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       timestamp: new Date().toISOString(),
       marketState: "MANUAL",
       previousClose: null,
-    });
+    }, trackPriceHistory);
     setManualQuoteDraft(null);
     setManualQuoteError("");
-    setNotice(`Saved your manual price for ${stock.symbol}.`);
+    setNotice(trackPriceHistory
+      ? `Saved your manual price and history snapshot for ${stock.symbol}.`
+      : `Updated the latest price for ${stock.symbol}; history was not saved.`);
     setRefreshErrors((failures) => failures.filter((failure) => !failure.startsWith(`${stock.symbol} (${stock.exchange}):`)));
   }
   function formatQuote(price: number, currency: string) {
@@ -2352,8 +2367,8 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const activeStockFilters = stockSearch.trim() || stockBrokerFilter !== "all" || stockExchangeFilter !== "all" ||
     stockHoldingFilter !== "all" || stockQuoteFilter !== "all";
 
-  return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and save refreshed price snapshots." action={<div className="stock-heading-actions"><input ref={importInputRef} className="sr-only" type="file" accept="image/*" aria-label="Choose stock screenshot" onChange={(event) => { const file = event.target.files?.[0]; if (file) void recognizeStockScreenshot(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importBusy}>{importBusy ? <LoaderCircle size={14} className="spin" /> : <ImagePlus size={14} />}{importBusy ? `Reading ${importProgress}%` : "Import screenshot"}</Button><Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button></div>} />
-    <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. Holdings and quote snapshots are saved in the shared tracker data.</span></div>
+  return <><PageHeading eyebrow="Market watch" title="Stocks" subtitle="Track NSE and BSE codes, organize them by broker, and update the latest price with optional history." action={<div className="stock-heading-actions"><label className="stock-history-toggle"><input type="checkbox" checked={trackPriceHistory} disabled={busy} onChange={(event) => setTrackPriceHistory(event.target.checked)} />Track price history</label><input ref={importInputRef} className="sr-only" type="file" accept="image/*" aria-label="Choose stock screenshot" onChange={(event) => { const file = event.target.files?.[0]; if (file) void recognizeStockScreenshot(file); event.currentTarget.value = ""; }} /><Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importBusy}>{importBusy ? <LoaderCircle size={14} className="spin" /> : <ImagePlus size={14} />}{importBusy ? `Reading ${importProgress}%` : "Import screenshot"}</Button><Button onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />{busy ? "Refreshing..." : "Refresh prices"}</Button></div>} />
+    <div className="alert stock-source-note"><TrendingUp size={15} /><span>Quotes are requested from Yahoo Finance through the app’s server endpoint. This free public source is unofficial and may delay, limit, or temporarily fail to provide prices. Initial prices copied from the supplied portfolio screenshot are marked “SCREENSHOT SEED”; refresh to request current quotes. Latest prices are saved in shared data; refresh and manual price updates are added to history only while Track price history is enabled.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {refreshErrors.length > 0 && <div className="alert alert-error stock-errors" role="alert"><div><strong>Some prices could not be refreshed:</strong><ul>{refreshErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
@@ -2441,7 +2456,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           <div className="stock-row-expanded">
             <div className="stock-expanded-grid">
               <div className="stock-current">
-                <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No price snapshot yet"}</small>
+                <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No saved price yet"}</small>
                 <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
               </div>
               <div className="stock-metric"><span>Volume</span><strong>{stock.quantity ?? "—"}</strong></div>
@@ -2459,7 +2474,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             </div>
           <details className="stock-history">
             <summary>Price history ({history.length} snapshots)</summary>
-            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">Refresh this stock to save its first price snapshot.</p>}
+            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">No price history saved yet. Enable Track price history before refreshing to record snapshots.</p>}
           </details>
           </div>
         </details>;
@@ -2867,7 +2882,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
   const vehiclePurchaseValue = (vehicle: Vehicle) => vehicle.purchaseValue ??
     [...(vehicle.valuationHistory ?? [])].sort((a, b) => a.date.localeCompare(b.date))
       .find((valuation) => valuation.purchaseValue != null)?.purchaseValue ?? null;
-  const latestStockQuotes = latestStockQuotesById(stockQuotes);
+  const latestStockQuotes = latestStockQuotesById(stockQuotes, stocks);
   const stockTotals = new Map<string, {
     current: number;
     invested: number;
@@ -11508,7 +11523,11 @@ export default function App() {
       const identityChanged = current && (current.symbol !== stock.symbol || current.exchange !== stock.exchange);
       return {
         ...previous,
-        stocks: (previous.stocks ?? []).map((entry) => entry.id === id ? { ...stock, id } : entry),
+        stocks: (previous.stocks ?? []).map((entry) => entry.id === id ? {
+          ...stock,
+          id,
+          ...(identityChanged ? {} : { latestQuote: current?.latestQuote }),
+        } : entry),
         stockQuotes: identityChanged
           ? (previous.stockQuotes ?? []).filter((quote) => quote.stockId !== id)
           : previous.stockQuotes ?? [],
@@ -11526,10 +11545,24 @@ export default function App() {
       stockQuotes: (previous.stockQuotes ?? []).filter((quote) => quote.stockId !== id),
     };});
   }
-  function saveStockQuote(quote: Omit<StockQuoteSnapshot, "id">) {
+  function saveStockQuote(quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) {
     update((previous) => ({
       ...previous,
-      stockQuotes: [{ ...quote, id: createId() }, ...(previous.stockQuotes ?? [])],
+      stocks: (previous.stocks ?? []).map((stock) => stock.id === quote.stockId
+        ? {
+          ...stock,
+          latestQuote: {
+            price: quote.price,
+            currency: quote.currency,
+            timestamp: quote.timestamp,
+            marketState: quote.marketState,
+            previousClose: quote.previousClose,
+          },
+        }
+        : stock),
+      stockQuotes: trackHistory
+        ? [{ ...quote, id: createId() }, ...(previous.stockQuotes ?? [])]
+        : previous.stockQuotes ?? [],
     }));
   }
   function saveAsset(asset: Omit<AssetRecord, "id">, id?: string) {

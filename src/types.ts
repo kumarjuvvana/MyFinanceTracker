@@ -146,16 +146,20 @@ export interface TrackedStock {
   broker: string;
   averageBuyPrice?: number | null;
   quantity?: number;
+  latestQuote?: StockQuotePrice;
 }
 
-export interface StockQuoteSnapshot {
-  id: string;
-  stockId: string;
+export interface StockQuotePrice {
   price: number;
   currency: string;
   timestamp: string;
   marketState: string;
   previousClose: number | null;
+}
+
+export interface StockQuoteSnapshot extends StockQuotePrice {
+  id: string;
+  stockId: string;
 }
 
 export const ASSET_TYPES = [

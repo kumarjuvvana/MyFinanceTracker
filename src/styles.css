@@ -222,6 +222,8 @@ button{cursor:pointer}
 .stock-form{gap:12px}
 .stock-form-actions{display:flex;justify-content:flex-end;gap:8px}
 .stock-heading-actions,.stock-import-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stock-history-toggle{display:inline-flex;align-items:center;gap:6px;color:var(--text-secondary,#687469);font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer}
+.stock-history-toggle input{width:15px;height:15px;margin:0;accent-color:var(--user-accent,#56815d)}
 .stock-import-intro{line-height:1.6;margin-bottom:12px}
 .stock-import-tools{justify-content:flex-end;margin:10px 0}
 .stock-import-bulk-broker{display:grid;gap:8px;margin:12px 0;padding:12px;border:1px solid #e8ebe6;border-radius:9px}
