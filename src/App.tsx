@@ -23,6 +23,7 @@ import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
 import type { CookingInventoryUsage } from "./types";
 import type { NpsSchemeHolding } from "./types";
+import type { VehicleValuation } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -2506,9 +2507,9 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   </>;
 }
 
-const emptyAsset = (): Omit<AssetRecord, "id"> => ({
+const emptyAsset = (type: AssetType = "Other"): Omit<AssetRecord, "id"> => ({
   name: "",
-  type: "Other",
+  type,
   institution: "",
   reference: "",
   link: "",
@@ -2547,14 +2548,18 @@ const emptyAsset = (): Omit<AssetRecord, "id"> => ({
   tags: [],
 });
 
-function AssetModal({ initial, onClose, onSave }: {
+function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVehicleValuation, onOpenVehicles }: {
   initial: AssetRecord | null;
+  defaultType: AssetType;
+  vehicles: Vehicle[];
   onClose: () => void;
   onSave: (asset: Omit<AssetRecord, "id">) => void;
+  onSaveVehicleValuation: (vehicleId: string, valuation: VehicleValuation) => void;
+  onOpenVehicles: () => void;
 }) {
   const [asset, setAsset] = useState<Omit<AssetRecord, "id">>(initial
     ? { ...initial, tags: [...initial.tags] }
-    : emptyAsset());
+    : emptyAsset(defaultType));
   const [tagsText, setTagsText] = useState(initial?.tags.join(", ") ?? "");
   const [investedValue, setInvestedValue] = useState(initial?.investedValue == null ? "" : String(initial.investedValue));
   const [currentValue, setCurrentValue] = useState(initial?.currentValue == null ? "" : String(initial.currentValue));
@@ -2583,6 +2588,13 @@ function AssetModal({ initial, onClose, onSave }: {
   const bondInterestFrequencies = ["Unknown", "Monthly", "Quarterly", "Semi-annual", "Annual", "At maturity", "Other"] as const;
   const [bondInterestPaymentFrequency, setBondInterestPaymentFrequency] = useState<(typeof bondInterestFrequencies)[number]>(initial?.bondInterestPaymentFrequency ?? "Unknown");
   const [bondCouponResetDates, setBondCouponResetDates] = useState(initial?.bondCouponResetDates ?? "");
+  const [insuranceType, setInsuranceType] = useState<NonNullable<AssetRecord["insuranceType"]>>(initial?.insuranceType ?? "Term life");
+  const [insuranceSumAssured, setInsuranceSumAssured] = useState(initial?.insuranceSumAssured == null ? "" : String(initial.insuranceSumAssured));
+  const [insurancePremium, setInsurancePremium] = useState(initial?.insurancePremium == null ? "" : String(initial.insurancePremium));
+  const insurancePremiumFrequencies = ["Unknown", "Monthly", "Quarterly", "Half-yearly", "Annual", "Single premium", "Other"] as const;
+  const [insurancePremiumFrequency, setInsurancePremiumFrequency] = useState<NonNullable<AssetRecord["insurancePremiumFrequency"]>>(initial?.insurancePremiumFrequency ?? "Unknown");
+  const [vehicleId, setVehicleId] = useState("");
+  const [vehicleValuationDate, setVehicleValuationDate] = useState(today());
   const [error, setError] = useState("");
 
   function updateNpsScheme(index: number, patch: Partial<NpsSchemeHolding>) {
@@ -2597,6 +2609,32 @@ function AssetModal({ initial, onClose, onSave }: {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (asset.type === "Vehicle") {
+      const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+      if (!selectedVehicle) {
+        setError("Select an existing vehicle from the Vehicles menu first.");
+        return;
+      }
+      const parsedPurchaseValue = parseOptionalNumber(investedValue);
+      const parsedVehicleValue = parseOptionalNumber(currentValue);
+      if (parsedVehicleValue === null || parsedVehicleValue < 0 ||
+        investedValue.trim() !== "" && (parsedPurchaseValue === null || parsedPurchaseValue < 0)) {
+        setError("Enter a non-negative current value and an optional non-negative purchase value.");
+        return;
+      }
+      if (!vehicleValuationDate || Number.isNaN(Date.parse(vehicleValuationDate))) {
+        setError("Enter a valid valuation date.");
+        return;
+      }
+      onSaveVehicleValuation(selectedVehicle.id, {
+        id: createId(),
+        date: vehicleValuationDate,
+        purchaseValue: parsedPurchaseValue,
+        currentValue: parsedVehicleValue,
+        notes: asset.notes.trim(),
+      });
+      return;
+    }
     if (!asset.name.trim()) {
       setError("Enter an asset name.");
       return;
@@ -2622,8 +2660,10 @@ function AssetModal({ initial, onClose, onSave }: {
     const parsedRemainingTenure = parseOptionalNumber(remainingTenureMonths);
     const parsedEmi = parseOptionalNumber(emiAmount);
     const parsedMaturityAmount = parseOptionalNumber(maturityAmount);
-    const numericInputs = [investedValue, currentValue, quantity, interestRate, installmentsPaid, withdrawnValue, chargesValue, sanctionedAmount, interestPaidToDate, loanTenureMonths, remainingTenureMonths, emiAmount, maturityAmount];
-    const parsedInputs = [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest, parsedInstallments, parsedWithdrawn, parsedCharges, parsedSanctioned, parsedInterestPaid, parsedLoanTenure, parsedRemainingTenure, parsedEmi, parsedMaturityAmount];
+    const parsedInsuredAmount = parseOptionalNumber(insuranceSumAssured);
+    const parsedInsurancePremium = parseOptionalNumber(insurancePremium);
+    const numericInputs = [investedValue, currentValue, quantity, interestRate, installmentsPaid, withdrawnValue, chargesValue, sanctionedAmount, interestPaidToDate, loanTenureMonths, remainingTenureMonths, emiAmount, maturityAmount, insuranceSumAssured, insurancePremium];
+    const parsedInputs = [parsedInvested, parsedCurrent, parsedQuantity, parsedInterest, parsedInstallments, parsedWithdrawn, parsedCharges, parsedSanctioned, parsedInterestPaid, parsedLoanTenure, parsedRemainingTenure, parsedEmi, parsedMaturityAmount, parsedInsuredAmount, parsedInsurancePremium];
     if (numericInputs.some((value, index) => value.trim() !== "" && parsedInputs[index] === null)) {
       setError("Enter valid numeric values, or leave optional fields blank.");
       return;
@@ -2637,6 +2677,7 @@ function AssetModal({ initial, onClose, onSave }: {
       parsedRemainingTenure !== null && (!Number.isInteger(parsedRemainingTenure) || parsedRemainingTenure < 0) ||
       parsedEmi !== null && parsedEmi < 0 ||
       parsedMaturityAmount !== null && parsedMaturityAmount < 0 ||
+      parsedInsuredAmount !== null && parsedInsuredAmount < 0 || parsedInsurancePremium !== null && parsedInsurancePremium < 0 ||
       asset.type === "NPS" && npsSchemes.some((scheme) => !scheme.schemeName.trim() ||
         scheme.allocationPercent !== null && (scheme.allocationPercent < 0 || scheme.allocationPercent > 100) ||
         scheme.units !== null && scheme.units < 0 || scheme.nav !== null && scheme.nav < 0 ||
@@ -2648,6 +2689,7 @@ function AssetModal({ initial, onClose, onSave }: {
     const isHomeLoanAsset = asset.type === "Home loan";
     const isFixedDepositAsset = asset.type === "Fixed deposit";
     const isBondAsset = asset.type === "Bond";
+    const isInsuranceAsset = asset.type === "Insurance";
     onSave({
       ...asset,
       name: asset.name.trim(),
@@ -2675,6 +2717,10 @@ function AssetModal({ initial, onClose, onSave }: {
       bondScheme: isBondAsset ? bondScheme.trim() : undefined,
       bondInterestPaymentFrequency: isBondAsset ? bondInterestPaymentFrequency : undefined,
       bondCouponResetDates: isBondAsset ? bondCouponResetDates.trim() : undefined,
+      insuranceType: isInsuranceAsset ? insuranceType : undefined,
+      insuranceSumAssured: isInsuranceAsset ? parsedInsuredAmount : undefined,
+      insurancePremium: isInsuranceAsset ? parsedInsurancePremium : undefined,
+      insurancePremiumFrequency: isInsuranceAsset ? insurancePremiumFrequency : undefined,
       investedValue: parsedInvested,
       currentValue: parsedCurrent,
       quantity: parsedQuantity,
@@ -2705,23 +2751,37 @@ function AssetModal({ initial, onClose, onSave }: {
   const isGoldScheme = asset.type === "Gold savings scheme";
   const isNps = asset.type === "NPS";
   const isBond = asset.type === "Bond";
-  return <Modal title={initial ? "Edit asset" : "Add asset"} onClose={onClose} wide>
+  const isInsurance = asset.type === "Insurance";
+  const isVehicleAsset = asset.type === "Vehicle";
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const modalTitle = initial ? "Edit asset" : isVehicleAsset ? "Add vehicle value" : isInsurance ? "Add insurance policy" : "Add asset";
+  const submitLabel = initial ? "Save changes" : isVehicleAsset ? "Save vehicle value" : isInsurance ? "Add policy" : "Add asset";
+  return <Modal title={modalTitle} onClose={onClose} wide>
     <form onSubmit={submit}><div className="form-grid">
-      <Field className="full" label="Asset name (required)"><Input autoFocus required maxLength={120} placeholder="e.g. Retirement fund, home loan, family home" value={asset.name} onChange={(event) => setAsset((current) => ({ ...current, name: event.target.value }))} /></Field>
+      <Field className="full" label={isVehicleAsset ? "Vehicle" : isInsurance ? "Policy name (required)" : "Asset name (required)"}><Input autoFocus={!isVehicleAsset} required={!isVehicleAsset} disabled={isVehicleAsset && Boolean(selectedVehicle)} maxLength={120} placeholder={isVehicleAsset ? "Select an existing vehicle below" : isInsurance ? "e.g. LIC endowment policy" : "e.g. Retirement fund, home loan, family home"} value={asset.name} onChange={(event) => setAsset((current) => ({ ...current, name: event.target.value }))} /></Field>
       <Field label="Asset type (required)"><Select required value={asset.type} onChange={(event) => setAsset((current) => ({ ...current, type: event.target.value as AssetType }))}>{ASSET_TYPES.map((type) => <option key={type}>{type}</option>)}</Select></Field>
       <Field label="Currency"><Select value={asset.currency} onChange={(event) => setAsset((current) => ({ ...current, currency: event.target.value as Currency }))}>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
-      <Field label={isNps ? "Pension fund manager / provider" : isHomeLoan ? "Lender" : "Institution / provider"}><Input maxLength={120} placeholder="Optional" value={asset.institution} onChange={(event) => setAsset((current) => ({ ...current, institution: event.target.value }))} /></Field>
-      <Field label="Account / reference"><Input maxLength={120} placeholder={isNps ? "Optional; do not enter PRAN" : "Optional (avoid sensitive numbers)"} value={asset.reference} onChange={(event) => setAsset((current) => ({ ...current, reference: event.target.value }))} /></Field>
-      {numericInput(isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original loan amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : "Invested / purchase amount", investedValue, setInvestedValue)}
+      {isVehicleAsset && <Field className="full" label="Existing vehicle"><Select value={vehicleId} onChange={(event) => { const nextId = event.target.value; const vehicle = vehicles.find((entry) => entry.id === nextId); setVehicleId(nextId); setAsset((current) => ({ ...current, name: vehicle?.name ?? "" })); }}><option value="">Select a vehicle</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.name}{vehicle.year ? ` · ${vehicle.year}` : ""}{vehicle.make || vehicle.model ? ` · ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : ""}</option>)}</Select></Field>}
+      <Field label={isNps ? "Pension fund manager / provider" : isHomeLoan ? "Lender" : isInsurance ? "Insurer" : "Institution / provider"}><Input maxLength={120} placeholder={isInsurance ? "e.g. Axis Max Life, LIC, ICICI Prudential" : "Optional"} value={asset.institution} onChange={(event) => setAsset((current) => ({ ...current, institution: event.target.value }))} /></Field>
+      {!isVehicleAsset && <Field label={isInsurance ? "Policy reference (avoid full policy number)" : "Account / reference"}><Input maxLength={120} placeholder={isNps ? "Optional; do not enter PRAN" : "Optional (avoid sensitive numbers)"} value={asset.reference} onChange={(event) => setAsset((current) => ({ ...current, reference: event.target.value }))} /></Field>}
+      {isInsurance && <Field label="Policy type"><Select value={insuranceType} onChange={(event) => setInsuranceType(event.target.value as NonNullable<AssetRecord["insuranceType"]>)}><option>Term life</option><option>Endowment</option><option>ULIP</option><option>Whole life</option><option>Other</option></Select></Field>}
+      {isInsurance && numericInput("Sum assured (cover; not asset value)", insuranceSumAssured, setInsuranceSumAssured)}
+      {isInsurance && numericInput("Premium amount", insurancePremium, setInsurancePremium)}
+      {isInsurance && <Field label="Premium frequency"><Select value={insurancePremiumFrequency} onChange={(event) => setInsurancePremiumFrequency(event.target.value as NonNullable<AssetRecord["insurancePremiumFrequency"]>)}>{insurancePremiumFrequencies.map((frequency) => <option key={frequency}>{frequency}</option>)}</Select></Field>}
+      {isVehicleAsset && numericInput("Purchase value (optional)", investedValue, setInvestedValue)}
+      {isVehicleAsset && numericInput("Current estimated value", currentValue, setCurrentValue)}
+      {isInsurance && numericInput("Premiums paid to date (optional)", investedValue, setInvestedValue)}
+      {isInsurance && numericInput("Current fund / surrender value (optional)", currentValue, setCurrentValue)}
+      {!isVehicleAsset && !isInsurance && numericInput(isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original loan amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : "Invested / purchase amount", investedValue, setInvestedValue)}
       {isFixedDeposit && numericInput("Recorded principal balance", currentValue, setCurrentValue)}
       {isFixedDeposit && numericInput("Maturity amount (as shown on advice)", maturityAmount, setMaturityAmount)}
       {isBond && numericInput("Principal balance (from certificate)", currentValue, setCurrentValue)}
       {isHomeLoan && numericInput("Sanctioned amount", sanctionedAmount, setSanctionedAmount)}
-      {!isBond && numericInput(isHomeLoan ? "Principal outstanding" : isLoan ? "Outstanding balance" : isNps ? "Current market value" : "Current value", currentValue, setCurrentValue)}
+      {!isBond && !isVehicleAsset && !isInsurance && numericInput(isHomeLoan ? "Principal outstanding" : isLoan ? "Outstanding balance" : isNps ? "Current market value" : "Current value", currentValue, setCurrentValue)}
       {isHomeLoan && numericInput("Interest paid to date", interestPaidToDate, setInterestPaidToDate)}
       {!isNps && numericInput(isGold || isGoldScheme ? "Gold weight (grams)" : "Units / quantity", quantity, setQuantity, { step: "any" })}
       {isGoldScheme && numericInput("Installments paid", installmentsPaid, setInstallmentsPaid, { step: "1" })}
-      {!isNps && numericInput(isHomeLoan ? "Current interest rate (%)" : isFixedDeposit ? "Interest rate (% p.a.)" : isBond ? "Current coupon rate (%)" : "Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
+      {!isNps && !isInsurance && !isVehicleAsset && numericInput(isHomeLoan ? "Current interest rate (%)" : isFixedDeposit ? "Interest rate (% p.a.)" : isBond ? "Current coupon rate (%)" : "Interest / coupon rate (%)", interestRate, setInterestRate, { max: 100, step: "0.01" })}
       {isHomeLoan && <Field label="Rate type"><Select value={interestRateType} onChange={(event) => setInterestRateType(event.target.value as "Fixed" | "Floating" | "Mixed" | "Unknown")}><option>Unknown</option><option>Floating</option><option>Fixed</option><option>Mixed</option></Select></Field>}
       {isHomeLoan && numericInput("Original tenure (months)", loanTenureMonths, setLoanTenureMonths, { step: "1" })}
       {isHomeLoan && numericInput("Remaining tenure (months)", remainingTenureMonths, setRemainingTenureMonths, { step: "1" })}
@@ -2732,11 +2792,12 @@ function AssetModal({ initial, onClose, onSave }: {
       {isBond && <Field label="Bond scheme / instrument"><Input maxLength={160} placeholder="Optional" value={bondScheme} onChange={(event) => setBondScheme(event.target.value)} /></Field>}
       {isBond && <Field label="Interest payment frequency"><Select value={bondInterestPaymentFrequency} onChange={(event) => setBondInterestPaymentFrequency(event.target.value as (typeof bondInterestFrequencies)[number])}>{bondInterestFrequencies.map((frequency) => <option key={frequency}>{frequency}</option>)}</Select></Field>}
       {isBond && <Field label="Coupon reset dates / terms"><Input maxLength={200} placeholder="Optional, e.g. 01 January and 01 July" value={bondCouponResetDates} onChange={(event) => setBondCouponResetDates(event.target.value)} /></Field>}
+      {isVehicleAsset && <Field label="Valuation date"><DateInput value={vehicleValuationDate} onValueChange={setVehicleValuationDate} /></Field>}
       {isNps && <Field label="NPS tier"><Select value={npsTier} onChange={(event) => setNpsTier(event.target.value as "Tier I" | "Tier II")}><option>Tier I</option><option>Tier II</option></Select></Field>}
       {isNps && numericInput("Total withdrawals processed", withdrawnValue, setWithdrawnValue)}
       {isNps && numericInput("Charges deducted", chargesValue, setChargesValue)}
-      <Field label={isFixedDeposit ? "Deposit start date" : isHomeLoan ? "Loan sanction / open date" : isLoan ? "Start / disbursal date" : isNps ? "Account start date" : isBond ? "Investment date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>
-      {!isNps && <Field label={isBond ? "Repayment / maturity date" : "Maturity / renewal date"}><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>}
+      {!isVehicleAsset && <Field label={isInsurance ? "Policy start date" : isFixedDeposit ? "Deposit start date" : isHomeLoan ? "Loan sanction / open date" : isLoan ? "Start / disbursal date" : isNps ? "Account start date" : isBond ? "Investment date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>}
+      {!isNps && !isVehicleAsset && <Field label={isInsurance ? "Policy maturity date (if applicable)" : isBond ? "Repayment / maturity date" : "Maturity / renewal date"}><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>}
       {(asset.type === "Mutual fund" || isGold || isNps) && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
       {isHomeLoan && <><Field label="First EMI date"><DateInput value={firstEmiDate} onValueChange={setFirstEmiDate} /></Field><Field label="Latest statement date"><DateInput value={lastStatementDate} onValueChange={setLastStatementDate} /></Field><Field className="full" label="Loan product / terms"><Input maxLength={200} placeholder="Optional, e.g. variable rate, monthly rest" value={lenderLoanType} onChange={(event) => setLenderLoanType(event.target.value)} /></Field></>}
       {isNps && <Field label="Most recent withdrawal date"><DateInput value={lastWithdrawalDate} onValueChange={setLastWithdrawalDate} /></Field>}
@@ -2744,6 +2805,7 @@ function AssetModal({ initial, onClose, onSave }: {
       <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional details, terms, or reminders" value={asset.notes} onChange={(event) => setAsset((current) => ({ ...current, notes: event.target.value }))} /></Field>
+      {isVehicleAsset && <div className="full"><p className="section-description">Vehicle details stay in the Vehicles menu. This adds a dated value record to that vehicle without creating a duplicate asset.</p><Button type="button" variant="outline" onClick={() => { onClose(); onOpenVehicles(); }}><Car size={14} /> Add or manage vehicles</Button></div>}
       {isNps && <div className="full nps-scheme-editor">
         <div className="nps-scheme-editor-head"><div><strong>Current scheme holdings</strong><span>Optional. Add scheme allocation, units, NAV and current value from your statement.</span></div><Button type="button" variant="outline" onClick={() => setNpsSchemes((current) => [...current, { schemeName: "", allocationPercent: null, units: null, nav: null, currentValue: null }])}><Plus size={14} /> Add scheme</Button></div>
         {npsSchemes.map((scheme, index) => <div className="nps-scheme-editor-row" key={`nps-scheme-${index}`}>
@@ -2758,21 +2820,25 @@ function AssetModal({ initial, onClose, onSave }: {
     </div>
     <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank; the asset manager does not fetch or verify valuations.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
-    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add asset"}</Button></div></form>
+    <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{submitLabel}</Button></div></form>
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDelete, onOpenStocks, onOpenBankAccounts }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicleValuation, onOpenVehicles }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
   bankAccounts: BankAccount[];
+  vehicles: Vehicle[];
   onSave: (asset: Omit<AssetRecord, "id">, id?: string) => void;
   onDelete: (asset: AssetRecord) => void;
   onOpenStocks: () => void;
   onOpenBankAccounts: () => void;
+  onSaveVehicleValuation: (vehicleId: string, valuation: VehicleValuation) => void;
+  onOpenVehicles: () => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
+  const [newAssetType, setNewAssetType] = useState<AssetType>("Other");
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<"All types" | "Stocks" | "Bank accounts" | AssetType>("All types");
   const query = search.trim().toLocaleLowerCase();
@@ -2788,6 +2854,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
     [account.bankName, account.accountType, account.accountHolder, account.branch, account.notes, account.accountNumber]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.bankName.localeCompare(b.bankName) || a.accountType.localeCompare(b.accountType));
+  const visibleVehicles = vehicles.filter((vehicle) =>
+    [vehicle.name, vehicle.make, vehicle.model, vehicle.year, vehicle.registration, vehicle.fuelType, vehicle.notes]
+      .some((value) => String(value ?? "").toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const latestVehicleValuation = (vehicle: Vehicle) => (vehicle.valuationHistory ?? []).reduce<VehicleValuation | undefined>(
+    (latest, valuation) => !latest || valuation.date >= latest.date ? valuation : latest,
+    undefined,
+  );
   const latestStockQuotes = latestStockQuotesById(stockQuotes);
   const stockTotals = new Map<string, {
     current: number;
@@ -2910,6 +2984,13 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
     total.assets += account.currentBalance;
     totals.set("INR", total);
   }
+  for (const vehicle of vehicles) {
+    const balance = latestVehicleValuation(vehicle)?.currentValue ?? vehicle.currentValue;
+    if (balance == null) continue;
+    const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
+    total.assets += balance;
+    totals.set("INR", total);
+  }
   const visibleBankTotals = visibleBankAccounts.reduce(
     (total, account) => {
       if (account.currentBalance == null) return total;
@@ -2936,22 +3017,43 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
   }
 
   return <>
-    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : <Button onClick={() => setEditor(null)}><Plus size={15} /> Add asset</Button>} />
+    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>} />
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
-        const count = type === "All types" ? assets.length
+        const count = type === "All types" ? assets.length + stocks.length + bankAccounts.length + vehicles.length
           : type === "Stocks" ? stocks.length
             : type === "Bank accounts" ? bankAccounts.length
+            : type === "Vehicle" ? vehicles.length
             : assets.filter((asset) => asset.type === type).length;
-        const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes" : type;
+        const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes"
+          : type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances" : type;
         return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
       })}
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : activeType === "Vehicle" ? "Search vehicles" : activeType === "Insurance" ? "Search insurance policies" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : activeType === "Vehicle" ? "Search vehicle, make, model, registration..." : activeType === "Insurance" ? "Search policy, insurer, reference, tags..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
     {activeType === "Bank accounts" && <div className="alert">Balances are the saved snapshots from Bank accounts, not live bank balances. Only accounts with a recorded balance are included in totals.</div>}
     {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
+    {activeType === "Vehicle" && <div className="alert">Vehicles are read from the existing Vehicles menu. Add each vehicle there once, then use Add vehicle value to record a dated purchase/current value snapshot; the latest value contributes to your INR asset total.</div>}
+    {activeType === "Vehicle" && <div className="asset-list">{visibleVehicles.map((vehicle) => {
+      const valuations = [...(vehicle.valuationHistory ?? [])].reverse().sort((a, b) => b.date.localeCompare(a.date));
+      const latest = valuations[0];
+      const currentValue = latest?.currentValue ?? vehicle.currentValue ?? null;
+      const purchaseValue = vehicle.purchaseValue ?? valuations.find((entry) => entry.purchaseValue != null)?.purchaseValue ?? null;
+      return <Card className="asset-card" key={vehicle.id}>
+        <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Car size={17} /></div><div><h2>{vehicle.name}</h2><p>{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}</p></div></div></div>
+        <div className="asset-details">
+          {purchaseValue != null && <div><span>Purchase value</span><strong>{formatAmount(purchaseValue, "INR")}</strong></div>}
+          <div><span>Current estimated value</span><strong>{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</strong></div>
+          {(latest?.date || vehicle.valuationDate) && <div><span>Latest valuation</span><strong>{dateLabel(latest?.date ?? vehicle.valuationDate ?? "")}</strong></div>}
+          {vehicle.fuelType && <div><span>Fuel type</span><strong>{vehicle.fuelType}</strong></div>}
+        </div>
+        {valuations.length > 0 && <div className="nps-scheme-list"><strong>Value history</strong>{valuations.map((valuation) => <div className="nps-scheme-row" key={valuation.id}><span>{dateLabel(valuation.date)}</span><span>{valuation.purchaseValue != null ? `Purchase ${formatAmount(valuation.purchaseValue, "INR")}` : ""}</span><strong>{formatAmount(valuation.currentValue, "INR")}</strong></div>)}</div>}
+      </Card>;
+    })}</div>}
+    {activeType === "Vehicle" && !visibleVehicles.length && <Card><EmptyState icon={<Car size={18} />} title={vehicles.length ? "No matching vehicles" : "No vehicles recorded yet"} description={vehicles.length ? "Try a different search." : "Add a vehicle in the Vehicles menu. It will appear here automatically."} />{!vehicles.length && <Button type="button" variant="outline" onClick={onOpenVehicles}><Car size={14} /> Open Vehicles</Button>}</Card>}
+    {activeType === "Insurance" && <div className="alert">Sum assured is the policy’s coverage, not an asset value. Only a recorded fund or surrender value contributes to asset totals; pure term cover is not counted as an investment.</div>}
     {activeType === "Stocks" && stockTotals.size > 0 && <div className="asset-total-list">{[...stockTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const returnPercent = total.invested ? total.profitLoss / total.invested * 100 : null;
       return <Card className="asset-total-card" key={currency}>
@@ -3059,10 +3161,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
       const isHomeLoan = asset.type === "Home loan";
       const isFixedDeposit = asset.type === "Fixed deposit";
       const isBond = asset.type === "Bond";
+      const isInsurance = asset.type === "Insurance";
       const isNps = asset.type === "NPS";
       const isGold = asset.type === "Digital gold";
       const isGoldScheme = asset.type === "Gold savings scheme";
-      const performance = !isHomeLoan && !isFixedDeposit && !isBond && asset.investedValue !== null && asset.currentValue !== null
+      const performance = !isHomeLoan && !isFixedDeposit && !isBond && !isInsurance && asset.investedValue !== null && asset.currentValue !== null
         ? asset.currentValue + (isNps ? asset.withdrawnValue ?? 0 : 0) - asset.investedValue
         : null;
       const performancePercent = performance !== null && asset.investedValue
@@ -3078,10 +3181,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
           {isHomeLoan && asset.sanctionedAmount != null && <div><span>Sanctioned amount</span><strong>{formatAmount(asset.sanctionedAmount, asset.currency)}</strong></div>}
-          {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
+          {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : isInsurance ? "Premiums paid to date" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {isHomeLoan
             ? <div><span>Principal outstanding</span><strong>{asset.principalOutstanding != null ? formatAmount(asset.principalOutstanding, asset.currency) : "Not shown in provided statement"}</strong></div>
-            : asset.currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? "Current market value" : isBond ? "Principal balance (certificate)" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
+            : asset.currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.maturityAmount != null && <div><span>Maturity amount on advice</span><strong>{formatAmount(asset.maturityAmount, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.depositTerm && <div><span>Deposit term</span><strong>{asset.depositTerm}</strong></div>}
           {isFixedDeposit && asset.depositScheme && <div><span>Deposit scheme</span><strong>{asset.depositScheme}</strong></div>}
@@ -3089,6 +3192,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
           {isBond && asset.bondScheme && <div><span>Bond scheme</span><strong>{asset.bondScheme}</strong></div>}
           {isBond && asset.bondInterestPaymentFrequency && asset.bondInterestPaymentFrequency !== "Unknown" && <div><span>Interest payment frequency</span><strong>{asset.bondInterestPaymentFrequency}</strong></div>}
           {isBond && asset.bondCouponResetDates && <div><span>Coupon reset schedule</span><strong>{asset.bondCouponResetDates}</strong></div>}
+          {isInsurance && asset.insuranceType && <div><span>Policy type</span><strong>{asset.insuranceType}</strong></div>}
+          {isInsurance && asset.insuranceSumAssured != null && <div><span>Sum assured · coverage only</span><strong>{formatAmount(asset.insuranceSumAssured, asset.currency)}</strong></div>}
+          {isInsurance && asset.insurancePremium != null && <div><span>Premium</span><strong>{formatAmount(asset.insurancePremium, asset.currency)}{asset.insurancePremiumFrequency && asset.insurancePremiumFrequency !== "Unknown" ? ` · ${asset.insurancePremiumFrequency}` : ""}</strong></div>}
           {isHomeLoan && asset.interestPaidToDate != null && <div><span>Interest paid to date</span><strong>{formatAmount(asset.interestPaidToDate, asset.currency)}</strong></div>}
           {isHomeLoan && asset.interestPaidToDate == null && <div><span>Interest paid to date</span><strong>Not shown in provided statement</strong></div>}
           {isHomeLoan && asset.remainingTenureMonths != null && <div><span>Remaining tenure</span><strong>{asset.remainingTenureMonths} months</strong></div>}
@@ -3128,8 +3234,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, onSave, onDel
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
     })}</div>
-    {activeType !== "Stocks" && activeType !== "Bank accounts" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={assets.length ? "No matching assets" : "No assets recorded yet"} description={assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
-    {editor !== undefined && <AssetModal key={editor?.id ?? "new-asset"} initial={editor} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} />}
+    {activeType !== "Stocks" && activeType !== "Bank accounts" && activeType !== "Vehicle" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={activeType === "Insurance" ? "No insurance policies recorded yet" : assets.length ? "No matching assets" : "No assets recorded yet"} description={activeType === "Insurance" ? "Add one record for each policy. Sum assured is kept separate from any current fund or surrender value." : assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
+    {editor !== undefined && <AssetModal key={editor?.id ?? `new-asset-${newAssetType}`} initial={editor} defaultType={newAssetType} vehicles={vehicles} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} onSaveVehicleValuation={(vehicleId, valuation) => { onSaveVehicleValuation(vehicleId, valuation); setEditor(undefined); }} onOpenVehicles={onOpenVehicles} />}
   </>;
 }
 
@@ -11505,18 +11611,60 @@ export default function App() {
     }));
   }
   function saveVehicle(vehicle: Omit<Vehicle, "id">, id?: string) {
+    update((previous) => {
+      const current = id ? (previous.vehicles ?? []).find((entry) => entry.id === id) : undefined;
+      const savedVehicle: Vehicle = {
+        ...current,
+        ...vehicle,
+        id: id ?? createId(),
+        purchaseValue: vehicle.purchaseValue ?? current?.purchaseValue,
+        currentValue: vehicle.currentValue ?? current?.currentValue,
+        valuationDate: vehicle.valuationDate ?? current?.valuationDate,
+        valuationHistory: vehicle.valuationHistory ?? current?.valuationHistory,
+      };
+      return {
+        ...previous,
+        vehicles: id
+          ? (previous.vehicles ?? []).map((entry) => entry.id === id ? savedVehicle : entry)
+          : [savedVehicle, ...(previous.vehicles ?? [])],
+      };
+    });
+  }
+  function saveVehicleValuation(vehicleId: string, valuation: VehicleValuation) {
     update((previous) => ({
       ...previous,
-      vehicles: id
-        ? (previous.vehicles ?? []).map((entry) => entry.id === id ? { ...vehicle, id } : entry)
-        : [{ ...vehicle, id: createId() }, ...(previous.vehicles ?? [])],
+      vehicles: (previous.vehicles ?? []).map((vehicle) => {
+        if (vehicle.id !== vehicleId) return vehicle;
+        const valuationHistory = [...(vehicle.valuationHistory ?? []), valuation];
+        const latestValuation = valuationHistory.reduce(
+          (latest, entry) => entry.date >= latest.date ? entry : latest,
+        );
+        const originalPurchaseValue = [...valuationHistory]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .find((entry) => entry.purchaseValue !== null)?.purchaseValue ?? null;
+        return {
+          ...vehicle,
+          purchaseValue: vehicle.purchaseValue ?? originalPurchaseValue,
+          currentValue: latestValuation.currentValue,
+          valuationDate: latestValuation.date,
+          valuationHistory,
+        };
+      }),
     }));
   }
   function copyVehicle(vehicle: Vehicle) {
     update((previous) => {
       return {
         ...previous,
-        vehicles: [{ ...vehicle, id: createId(), name: copyLabel(vehicle.name, 100) }, ...(previous.vehicles ?? [])],
+        vehicles: [{
+          ...vehicle,
+          id: createId(),
+          name: copyLabel(vehicle.name, 100),
+          purchaseValue: null,
+          currentValue: null,
+          valuationDate: "",
+          valuationHistory: [],
+        }, ...(previous.vehicles ?? [])],
       };
     });
   }
@@ -12092,7 +12240,7 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} />,
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} />,
     "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}
       onSave={(account) => persistUpdate((previous) => ({
         ...previous,

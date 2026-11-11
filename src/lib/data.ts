@@ -373,6 +373,16 @@ export function validateData(value: unknown): value is TrackerData {
       asset.bondInterestPaymentFrequency === "Annual" || asset.bondInterestPaymentFrequency === "At maturity" ||
       asset.bondInterestPaymentFrequency === "Other" || asset.bondInterestPaymentFrequency === "Unknown") &&
     (asset.bondCouponResetDates === undefined || typeof asset.bondCouponResetDates === "string" && asset.bondCouponResetDates.length <= 200) &&
+    (asset.insuranceType === undefined || asset.insuranceType === "Term life" || asset.insuranceType === "Endowment" ||
+      asset.insuranceType === "ULIP" || asset.insuranceType === "Whole life" || asset.insuranceType === "Other") &&
+    (asset.insuranceSumAssured === undefined || asset.insuranceSumAssured === null ||
+      (typeof asset.insuranceSumAssured === "number" && Number.isFinite(asset.insuranceSumAssured) && asset.insuranceSumAssured >= 0)) &&
+    (asset.insurancePremium === undefined || asset.insurancePremium === null ||
+      (typeof asset.insurancePremium === "number" && Number.isFinite(asset.insurancePremium) && asset.insurancePremium >= 0)) &&
+    (asset.insurancePremiumFrequency === undefined || asset.insurancePremiumFrequency === "Monthly" ||
+      asset.insurancePremiumFrequency === "Quarterly" || asset.insurancePremiumFrequency === "Half-yearly" ||
+      asset.insurancePremiumFrequency === "Annual" || asset.insurancePremiumFrequency === "Single premium" ||
+      asset.insurancePremiumFrequency === "Other" || asset.insurancePremiumFrequency === "Unknown") &&
     typeof asset.location === "string" && typeof asset.notes === "string" &&
     Array.isArray(asset.tags) && asset.tags.every((tag) => typeof tag === "string")));
   const educationRecordsOk = value.educationRecords === undefined || (Array.isArray(value.educationRecords) && value.educationRecords.every((entry) =>
@@ -531,7 +541,21 @@ export function validateData(value: unknown): value is TrackerData {
     isRecord(vehicle) && typeof vehicle.id === "string" && typeof vehicle.name === "string" &&
     typeof vehicle.make === "string" && typeof vehicle.model === "string" &&
     (vehicle.year === null || (typeof vehicle.year === "number" && Number.isInteger(vehicle.year) && vehicle.year >= 1886)) &&
-    typeof vehicle.registration === "string" && typeof vehicle.fuelType === "string" && typeof vehicle.notes === "string"));
+    typeof vehicle.registration === "string" && typeof vehicle.fuelType === "string" && typeof vehicle.notes === "string" &&
+    (vehicle.purchaseValue === undefined || vehicle.purchaseValue === null ||
+      (typeof vehicle.purchaseValue === "number" && Number.isFinite(vehicle.purchaseValue) && vehicle.purchaseValue >= 0)) &&
+    (vehicle.currentValue === undefined || vehicle.currentValue === null ||
+      (typeof vehicle.currentValue === "number" && Number.isFinite(vehicle.currentValue) && vehicle.currentValue >= 0)) &&
+    (vehicle.valuationDate === undefined || typeof vehicle.valuationDate === "string" &&
+      (vehicle.valuationDate === "" || !Number.isNaN(Date.parse(vehicle.valuationDate)))) &&
+    (vehicle.valuationHistory === undefined || Array.isArray(vehicle.valuationHistory) &&
+      vehicle.valuationHistory.every((valuation) => isRecord(valuation) &&
+        typeof valuation.id === "string" && valuation.id.length > 0 &&
+        typeof valuation.date === "string" && !Number.isNaN(Date.parse(valuation.date)) &&
+        (valuation.purchaseValue === null || (typeof valuation.purchaseValue === "number" &&
+          Number.isFinite(valuation.purchaseValue) && valuation.purchaseValue >= 0)) &&
+        typeof valuation.currentValue === "number" && Number.isFinite(valuation.currentValue) && valuation.currentValue >= 0 &&
+        typeof valuation.notes === "string"))));
   const vehicleJourneysOk = value.vehicleJourneys === undefined || (Array.isArray(value.vehicleJourneys) && value.vehicleJourneys.every((journey) =>
     isRecord(journey) && typeof journey.id === "string" && typeof journey.vehicleId === "string" &&
     typeof journey.date === "string" && !Number.isNaN(Date.parse(journey.date)) &&
@@ -996,6 +1020,8 @@ export function validateData(value: unknown): value is TrackerData {
   }
   if (Array.isArray(value.stockQuotes) && new Set((value.stockQuotes as StockQuoteSnapshot[]).map((quote) => quote.id)).size !== value.stockQuotes.length) return false;
   if (Array.isArray(value.vehicles) && new Set((value.vehicles as Vehicle[]).map((vehicle) => vehicle.id)).size !== value.vehicles.length) return false;
+  if (Array.isArray(value.vehicles) && (value.vehicles as Vehicle[]).some((vehicle) =>
+    vehicle.valuationHistory && new Set(vehicle.valuationHistory.map((entry) => entry.id)).size !== vehicle.valuationHistory.length)) return false;
   if (Array.isArray(value.vehicleJourneys) && new Set((value.vehicleJourneys as VehicleJourney[]).map((journey) => journey.id)).size !== value.vehicleJourneys.length) return false;
   if (Array.isArray(value.vehicleMaintenance) && new Set((value.vehicleMaintenance as VehicleMaintenance[]).map((entry) => entry.id)).size !== value.vehicleMaintenance.length) return false;
   if (Array.isArray(value.electricityReadings) &&

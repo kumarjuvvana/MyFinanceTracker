@@ -170,6 +170,8 @@ export const ASSET_TYPES = [
   "Digital gold",
   "Gold savings scheme",
   "Cash / deposit",
+  "Vehicle",
+  "Insurance",
   "Other",
 ] as const;
 
@@ -221,6 +223,10 @@ export interface AssetRecord {
   bondScheme?: string;
   bondInterestPaymentFrequency?: "Monthly" | "Quarterly" | "Semi-annual" | "Annual" | "At maturity" | "Other" | "Unknown";
   bondCouponResetDates?: string;
+  insuranceType?: "Term life" | "Endowment" | "ULIP" | "Whole life" | "Other";
+  insuranceSumAssured?: number | null;
+  insurancePremium?: number | null;
+  insurancePremiumFrequency?: "Monthly" | "Quarterly" | "Half-yearly" | "Annual" | "Single premium" | "Other" | "Unknown";
   location: string;
   notes: string;
   tags: string[];
@@ -549,6 +555,18 @@ export interface Vehicle {
   year: number | null;
   registration: string;
   fuelType: string;
+  notes: string;
+  purchaseValue?: number | null;
+  currentValue?: number | null;
+  valuationDate?: string;
+  valuationHistory?: VehicleValuation[];
+}
+
+export interface VehicleValuation {
+  id: string;
+  date: string;
+  purchaseValue: number | null;
+  currentValue: number;
   notes: string;
 }
 
