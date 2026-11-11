@@ -318,6 +318,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   );
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [sessionFilter, setSessionFilter] = useState("all");
   const [taskFilter, setTaskFilter] = useState("All tasks");
   const [editingLinkItemId, setEditingLinkItemId] = useState<string | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<string, ActivityChecklistLink[]>>({});
@@ -330,7 +331,8 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     url: item.appLink.url ?? item.appLink.page ?? "",
     label: item.appLink.label,
   }] : []);
-  const visibleSessions = sessions.map((session) => {
+  const visibleSessions = sessions.filter((session) =>
+    sessionFilter === "all" || session.id === sessionFilter).map((session) => {
     const sessionMatches = !query || session.name.toLocaleLowerCase().includes(query);
     const items = session.items.filter((item) =>
       (!query || sessionMatches || item.name.toLocaleLowerCase().includes(query) ||
@@ -444,8 +446,15 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     </Card>
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search activity sessions and tasks" placeholder="Search sessions, activities, or links..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-      <FilterDrawer label="Activity filters" activeCount={taskFilter === "All tasks" ? 0 : 1}>
+      <div className="activity-filter-controls">
+        <Field label="Category"><Select aria-label="Filter activities by category" value={sessionFilter} onChange={(event) => setSessionFilter(event.target.value)}>
+          <option value="all">All categories</option>
+          {sessions.map((session) => <option key={session.id} value={session.id}>{session.name}</option>)}
+        </Select></Field>
         <Field label="Task status"><Select aria-label="Filter activities by completion" value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}><option>All tasks</option><option>Incomplete</option><option>Completed</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters">
+        <p className="section-description">Additional activity filters can be added here.</p>
       </FilterDrawer>
       <Badge>{visibleSessions.reduce((total, entry) => total + entry.items.length, 0)} matching {visibleSessions.reduce((total, entry) => total + entry.items.length, 0) === 1 ? "task" : "tasks"}</Badge>
     </div>
