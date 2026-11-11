@@ -17,7 +17,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
 import type { CookingPlan } from "./types";
@@ -2869,13 +2869,13 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
         </div>)}
       </div>}
     </div>
-    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank. Mutual-fund NAVs can be refreshed manually; other asset valuations are not fetched or independently verified.</p>
+    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank. Mutual-fund and NPS NAVs can be refreshed manually; other asset valuations are not fetched or independently verified.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{submitLabel}</Button></div></form>
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
@@ -2901,6 +2901,15 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     currentValue?: number;
     historySnapshot?: MutualFundNavSnapshot;
   }>) => void;
+  onRefreshNpsNavs: (updates: Array<{
+    assetId: string;
+    schemeIndex: number;
+    schemeId: string;
+    nav: number;
+    date: string;
+    currentValue?: number;
+    historySnapshot?: NpsNavSnapshot;
+  }>) => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
@@ -2920,6 +2929,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [mutualFundNavMessage, setMutualFundNavMessage] = useState("");
   const [mutualFundNavErrors, setMutualFundNavErrors] = useState<string[]>([]);
   const [trackMutualFundNavHistory, setTrackMutualFundNavHistory] = useState(false);
+  const [npsNavBusy, setNpsNavBusy] = useState(false);
+  const [npsNavMessage, setNpsNavMessage] = useState("");
+  const [npsNavErrors, setNpsNavErrors] = useState<string[]>([]);
+  const [trackNpsNavHistory, setTrackNpsNavHistory] = useState(false);
   const savedTypesKey = savedVisibleTypes.join("|");
   const savedHiddenItemsKey = JSON.stringify(savedHiddenItems);
   useEffect(() => {
@@ -3475,6 +3488,133 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     }
   }
 
+  async function refreshNpsNavs() {
+    const npsAssets = assets.filter((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0);
+    if (!npsAssets.length) {
+      setNpsNavMessage("");
+      setNpsNavErrors(["No NPS scheme holdings are available to refresh."]);
+      return;
+    }
+
+    setNpsNavBusy(true);
+    setNpsNavMessage("");
+    setNpsNavErrors([]);
+    try {
+      const response = await fetch("/api/nps-nav", { method: "POST" });
+      const payload: unknown = await response.json();
+      const providerError = typeof payload === "object" && payload !== null && "error" in payload &&
+        typeof payload.error === "string" ? payload.error : "The NPS NAV response was invalid.";
+      if (!response.ok || typeof payload !== "object" || payload === null ||
+        !("navs" in payload) || !Array.isArray(payload.navs)) throw new Error(providerError);
+
+      const navs = payload.navs.flatMap((result) => {
+        if (typeof result !== "object" || result === null ||
+          !("schemeId" in result) || typeof result.schemeId !== "string" || !/^SM\d{6}$/.test(result.schemeId) ||
+          !("schemeName" in result) || typeof result.schemeName !== "string" ||
+          !("pfmName" in result) || typeof result.pfmName !== "string" ||
+          !("nav" in result) || typeof result.nav !== "number" || !Number.isFinite(result.nav) || result.nav <= 0 ||
+          !("date" in result) || typeof result.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(result.date)) return [];
+        return [{
+          schemeId: result.schemeId,
+          schemeName: result.schemeName,
+          pfmName: result.pfmName,
+          nav: result.nav,
+          date: result.date,
+        }];
+      });
+      if (!navs.length) throw new Error("NPS Trust returned no usable scheme NAVs.");
+
+      const normalizeName = (value: string) => value.toLocaleUpperCase().replace(/[^A-Z0-9]/g, "");
+      const normalizeSchemeName = (value: string) => normalizeName(value).replace(/^NPSTRUSTAC/, "");
+      const normalizePfmName = (value: string) => normalizeName(value).replace(/(?:LIMITED|LTD|PRIVATE|PVT)$/, "");
+      const errors: string[] = [];
+      const updates: Array<{
+        assetId: string;
+        schemeIndex: number;
+        schemeId: string;
+        nav: number;
+        date: string;
+        currentValue?: number;
+        historySnapshot?: NpsNavSnapshot;
+      }> = [];
+      let updatedValues = 0;
+      let navOnly = 0;
+      const fetchedAt = new Date().toISOString();
+
+      for (const asset of npsAssets) {
+        for (const [schemeIndex, scheme] of (asset.npsSchemes ?? []).entries()) {
+          const pfm = normalizePfmName(asset.institution);
+          const providerNavs = navs.filter((entry) => normalizePfmName(entry.pfmName) === pfm);
+          const exactName = normalizeSchemeName(scheme.schemeName);
+          let matches = providerNavs.filter((entry) => normalizeSchemeName(entry.schemeName) === exactName);
+          if (!matches.length && exactName.endsWith("POP")) {
+            const withoutPop = exactName.slice(0, -3);
+            matches = providerNavs.filter((entry) => normalizeSchemeName(entry.schemeName) === withoutPop);
+          }
+          if (scheme.schemeId) matches = matches.filter((entry) => entry.schemeId === scheme.schemeId);
+
+          if (matches.length !== 1) {
+            const reason = matches.length > 1 ? "matches multiple official schemes" : "has no exact official scheme match";
+            errors.push(`${asset.name} · ${scheme.schemeName}: ${reason}; no NAV was changed.`);
+            continue;
+          }
+
+          const result = matches[0];
+          const update: {
+            assetId: string;
+            schemeIndex: number;
+            schemeId: string;
+            nav: number;
+            date: string;
+            currentValue?: number;
+            historySnapshot?: NpsNavSnapshot;
+          } = {
+            assetId: asset.id,
+            schemeIndex,
+            schemeId: result.schemeId,
+            nav: result.nav,
+            date: result.date,
+          };
+          if (scheme.units !== null && Number.isFinite(scheme.units)) {
+            update.currentValue = Math.round(scheme.units * result.nav * 100) / 100;
+            updatedValues++;
+          } else {
+            navOnly++;
+          }
+          if (trackNpsNavHistory) {
+            update.historySnapshot = {
+              id: createId(),
+              schemeId: result.schemeId,
+              nav: result.nav,
+              date: result.date,
+              fetchedAt,
+            };
+          }
+          updates.push(update);
+        }
+      }
+
+      if (updates.length) {
+        onRefreshNpsNavs(updates);
+        const dates = [...new Set(updates.map((update) => update.date))].sort();
+        const dateMessage = dates.length === 1 ? ` NAV date: ${dateLabel(dates[0])}.` : ` NAV dates: ${dates.map(dateLabel).join(", ")}.`;
+        setNpsNavMessage(
+          `Refreshed ${updates.length} of ${(npsAssets.reduce((count, asset) => count + (asset.npsSchemes?.length ?? 0), 0))} NPS schemes from NPS Trust.` +
+          dateMessage +
+          (updatedValues ? ` Current values updated for ${updatedValues} schemes.` : "") +
+          (navOnly ? ` ${navOnly} schemes have no units, so only their NAV was updated.` : "") +
+          (trackNpsNavHistory ? " A NAV history snapshot was saved for each refreshed scheme." : " NAV history was not saved."),
+        );
+      }
+      setNpsNavErrors(errors);
+      if (!updates.length && !errors.length) setNpsNavErrors(["NPS Trust returned no matching NAVs."]);
+    } catch (caught) {
+      setNpsNavErrors([caught instanceof Error ? caught.message : "Could not refresh NPS NAVs."]);
+    } finally {
+      setNpsNavBusy(false);
+    }
+  }
+
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   }
@@ -3489,11 +3629,17 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       {assets.some((asset) => asset.type === "Mutual fund") && <Button type="button" variant="outline" onClick={() => void refreshMutualFundNavs()} disabled={mutualFundNavBusy}>
         <RefreshCw size={14} className={mutualFundNavBusy ? "spin" : ""} />{mutualFundNavBusy ? "Refreshing NAVs..." : "Refresh mutual fund NAVs"}
       </Button>}
+      {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <label className="stock-history-toggle"><input type="checkbox" checked={trackNpsNavHistory} disabled={npsNavBusy} onChange={(event) => setTrackNpsNavHistory(event.target.checked)} />Track NPS NAV history</label>}
+      {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <Button type="button" variant="outline" onClick={() => void refreshNpsNavs()} disabled={npsNavBusy}>
+        <RefreshCw size={14} className={npsNavBusy ? "spin" : ""} />{npsNavBusy ? "Refreshing NPS NAVs..." : "Refresh NPS NAVs"}
+      </Button>}
       {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
     </div>} />
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {mutualFundNavMessage && <div className="alert alert-success" role="status">{mutualFundNavMessage}</div>}
     {mutualFundNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some mutual-fund NAVs could not be refreshed:</strong><ul>{mutualFundNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
+    {npsNavMessage && <div className="alert alert-success" role="status">{npsNavMessage}</div>}
+    {npsNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some NPS NAVs could not be refreshed:</strong><ul>{npsNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
@@ -3725,6 +3871,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       </Card>;
     })}</div>}
     {activeType === "Mutual fund" && <div className="alert">Refresh mutual fund NAVs to update each linked scheme from AMFI’s published NAV file. NAVs are normally daily, not intraday; unmatched schemes need a valid ISIN in Account / reference. Gain percentage is total change, not annualized return. Transaction history is not included.</div>}
+    {activeType === "NPS" && <div className="alert">Refresh NPS NAVs manually from NPS Trust’s published daily NAV file. Only exact fund, scheme, tier, and plan matches are updated; ambiguous or unmatched schemes are skipped. The file’s NAV date is shown for each refreshed scheme. NAV history is saved only when Track NPS NAV history is enabled.</div>}
     {activeType === "NPS" && isPartialNpsSelection && <div className="alert">Current market value reflects only the selected NPS schemes. Contributions and withdrawals remain account-level statement totals because the source data does not allocate them by scheme.</div>}
     {activeType === "NPS" && npsTotals.size > 0 && <div className="asset-total-list nps-summary-list">{[...npsTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current + total.withdrawals - total.contributions;
@@ -3865,10 +4012,21 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           <strong>Current scheme holdings</strong>
           {getVisibleNpsSchemes(asset).map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
             <span>{scheme.schemeName}{scheme.allocationPercent !== null ? ` · ${scheme.allocationPercent}% allocation` : ""}</span>
-            <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}</span>
+            <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}{scheme.navDate ? ` · ${dateLabel(scheme.navDate)} · NPS Trust` : ""}{scheme.schemeId ? ` · ${scheme.schemeId}` : ""}</span>
             <strong>{scheme.currentValue !== null ? formatAmount(scheme.currentValue, asset.currency) : "—"}</strong>
           </div>)}
         </div>}
+        {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <details className="stock-history mutual-fund-nav-history">
+          <summary>NPS NAV history ({(asset.npsSchemes ?? []).reduce((count, scheme) => count + (scheme.navHistory?.length ?? 0), 0)} snapshots)</summary>
+          {(asset.npsSchemes ?? []).flatMap((scheme) => (scheme.navHistory ?? []).map((snapshot) => ({ scheme, snapshot })))
+            .sort((a, b) => b.snapshot.fetchedAt.localeCompare(a.snapshot.fetchedAt))
+            .map(({ scheme, snapshot }) => <div className="stock-history-row" key={snapshot.id}>
+              <span>{scheme.schemeName} · NAV date {dateLabel(snapshot.date)}</span>
+              <strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: asset.currency, maximumFractionDigits: 6 }).format(snapshot.nav)}</strong>
+              <small>Scheme {snapshot.schemeId} · fetched {new Date(snapshot.fetchedAt).toLocaleString()}</small>
+            </div>)}
+          {!((asset.npsSchemes ?? []).some((scheme) => (scheme.navHistory?.length ?? 0) > 0)) && <p className="section-description">No NPS NAV snapshots saved. Enable Track NPS NAV history before manually refreshing to record future fetches.</p>}
+        </details>}
         {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
         {asset.tags.length > 0 && <div className="credential-tags">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
@@ -12939,6 +13097,43 @@ export default function App() {
             }),
             ...(navUpdate.historySnapshot ? {
               navHistory: [...(asset.navHistory ?? []), navUpdate.historySnapshot],
+            } : {}),
+          };
+        }),
+      }));
+    }} onRefreshNpsNavs={(navUpdates) => {
+      update((previous) => ({
+        ...previous,
+        assets: (previous.assets ?? []).map((asset) => {
+          if (asset.type !== "NPS" || !asset.npsSchemes?.length) return asset;
+          const assetUpdates = navUpdates.filter((entry) => entry.assetId === asset.id);
+          if (!assetUpdates.length) return asset;
+          const updatesByIndex = new Map(assetUpdates.map((entry) => [entry.schemeIndex, entry]));
+          const npsSchemes = asset.npsSchemes.map((scheme, index) => {
+            const navUpdate = updatesByIndex.get(index);
+            if (!navUpdate) return scheme;
+            return {
+              ...scheme,
+              schemeId: navUpdate.schemeId,
+              nav: navUpdate.nav,
+              navDate: navUpdate.date,
+              ...(navUpdate.currentValue === undefined ? {} : { currentValue: navUpdate.currentValue }),
+              ...(navUpdate.historySnapshot ? {
+                navHistory: [...(scheme.navHistory ?? []), navUpdate.historySnapshot],
+              } : {}),
+            };
+          });
+          const dates = assetUpdates.map((entry) => entry.date).sort();
+          const valuationDate = dates[dates.length - 1];
+          const completeValuation = assetUpdates.length === asset.npsSchemes.length &&
+            npsSchemes.every((scheme) => scheme.units !== null && scheme.currentValue !== null);
+          return {
+            ...asset,
+            npsSchemes,
+            currency: "INR",
+            ...(valuationDate ? { valuationDate } : {}),
+            ...(completeValuation ? {
+              currentValue: npsSchemes.reduce((total, scheme) => total + (scheme.currentValue ?? 0), 0),
             } : {}),
           };
         }),

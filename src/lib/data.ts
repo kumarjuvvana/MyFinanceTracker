@@ -366,7 +366,17 @@ export function validateData(value: unknown): value is TrackerData {
       (scheme.units === null || (typeof scheme.units === "number" && Number.isFinite(scheme.units) && scheme.units >= 0)) &&
       (scheme.nav === null || (typeof scheme.nav === "number" && Number.isFinite(scheme.nav) && scheme.nav >= 0)) &&
       (scheme.currentValue === null || (typeof scheme.currentValue === "number" &&
-        Number.isFinite(scheme.currentValue) && scheme.currentValue >= 0))))) &&
+        Number.isFinite(scheme.currentValue) && scheme.currentValue >= 0)) &&
+      (scheme.schemeId === undefined || (typeof scheme.schemeId === "string" && /^SM\d{6}$/.test(scheme.schemeId))) &&
+      (scheme.navDate === undefined || (typeof scheme.navDate === "string" &&
+        (scheme.navDate === "" || !Number.isNaN(Date.parse(scheme.navDate))))) &&
+      (scheme.navHistory === undefined || (Array.isArray(scheme.navHistory) && scheme.navHistory.every((snapshot) =>
+        isRecord(snapshot) && typeof snapshot.id === "string" && snapshot.id.length > 0 &&
+        typeof snapshot.schemeId === "string" && /^SM\d{6}$/.test(snapshot.schemeId) &&
+        typeof snapshot.nav === "number" && Number.isFinite(snapshot.nav) && snapshot.nav > 0 &&
+        typeof snapshot.date === "string" && !Number.isNaN(Date.parse(snapshot.date)) &&
+        typeof snapshot.fetchedAt === "string" && !Number.isNaN(Date.parse(snapshot.fetchedAt))) &&
+        new Set(scheme.navHistory.map((snapshot) => snapshot.id)).size === scheme.navHistory.length))))) &&
     (asset.sanctionedAmount === undefined || asset.sanctionedAmount === null ||
       (typeof asset.sanctionedAmount === "number" && Number.isFinite(asset.sanctionedAmount) && asset.sanctionedAmount >= 0)) &&
     (asset.principalOutstanding === undefined || asset.principalOutstanding === null ||

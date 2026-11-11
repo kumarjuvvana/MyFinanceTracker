@@ -169,6 +169,14 @@ export interface MutualFundNavSnapshot {
   fetchedAt: string;
 }
 
+export interface NpsNavSnapshot {
+  id: string;
+  schemeId: string;
+  nav: number;
+  date: string;
+  fetchedAt: string;
+}
+
 export const ASSET_TYPES = [
   "Mutual fund",
   "NPS",
@@ -213,6 +221,9 @@ export interface NpsSchemeHolding {
   units: number | null;
   nav: number | null;
   currentValue: number | null;
+  schemeId?: string;
+  navDate?: string;
+  navHistory?: NpsNavSnapshot[];
 }
 
 export interface AssetRecord {

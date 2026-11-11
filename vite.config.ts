@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import stockPriceHandler from "./api/stock-price";
 import mutualFundNavHandler from "./api/mutual-fund-nav";
+import npsNavHandler from "./api/nps-nav";
 import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
 import databaseHandler from "./api/database";
@@ -68,6 +69,7 @@ export default defineConfig(({ command, mode }) => {
         const routes: [string, ApiHandler][] = [
           ["/api/stock-price", stockPriceHandler],
           ["/api/mutual-fund-nav", mutualFundNavHandler],
+          ["/api/nps-nav", npsNavHandler],
           ["/api/data-auth", dataAuthHandler],
           ["/api/data", dataHandler],
           ["/api/documents", documentsHandler],
