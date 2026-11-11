@@ -2864,6 +2864,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     (latest, valuation) => !latest || valuation.date >= latest.date ? valuation : latest,
     undefined,
   );
+  const vehiclePurchaseValue = (vehicle: Vehicle) => vehicle.purchaseValue ??
+    [...(vehicle.valuationHistory ?? [])].sort((a, b) => a.date.localeCompare(b.date))
+      .find((valuation) => valuation.purchaseValue != null)?.purchaseValue ?? null;
   const latestStockQuotes = latestStockQuotesById(stockQuotes);
   const stockTotals = new Map<string, {
     current: number;
@@ -2894,6 +2897,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
   const visibleNps = visible.filter((asset) => asset.type === "NPS");
   const visibleDigitalGold = visible.filter((asset) => asset.type === "Digital gold");
   const visibleFixedDeposits = visible.filter((asset) => asset.type === "Fixed deposit");
+  const visibleRealEstate = visible.filter((asset) => asset.type === "Real estate");
+  const visibleInsurance = visible.filter((asset) => asset.type === "Insurance");
   const mutualFundTotals = new Map<Currency, { invested: number; current: number }>();
   for (const fund of visibleMutualFunds) {
     if (fund.investedValue === null || fund.currentValue === null) continue;
@@ -2962,6 +2967,81 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     if (deposit.maturityAmount != null) { total.maturity += deposit.maturityAmount; total.maturityCount++; }
     fixedDepositTotals.set(deposit.currency, total);
   }
+  const realEstateTotals = new Map<Currency, {
+    properties: number;
+    current: number;
+    currentCount: number;
+    purchase: number;
+    purchaseCount: number;
+    estimatedChange: number;
+    comparableProperties: number;
+  }>();
+  for (const property of visibleRealEstate) {
+    const total = realEstateTotals.get(property.currency) ?? {
+      properties: 0, current: 0, currentCount: 0, purchase: 0, purchaseCount: 0,
+      estimatedChange: 0, comparableProperties: 0,
+    };
+    total.properties++;
+    if (property.currentValue != null) {
+      total.current += property.currentValue;
+      total.currentCount++;
+    }
+    if (property.investedValue != null) {
+      total.purchase += property.investedValue;
+      total.purchaseCount++;
+    }
+    if (property.currentValue != null && property.investedValue != null) {
+      total.estimatedChange += property.currentValue - property.investedValue;
+      total.comparableProperties++;
+    }
+    realEstateTotals.set(property.currency, total);
+  }
+  const insuranceTotals = new Map<Currency, {
+    policies: number;
+    currentValue: number;
+    currentValueCount: number;
+    premiumsPaid: number;
+    premiumsPaidCount: number;
+    sumAssured: number;
+    sumAssuredCount: number;
+  }>();
+  for (const policy of visibleInsurance) {
+    const total = insuranceTotals.get(policy.currency) ?? {
+      policies: 0, currentValue: 0, currentValueCount: 0, premiumsPaid: 0,
+      premiumsPaidCount: 0, sumAssured: 0, sumAssuredCount: 0,
+    };
+    total.policies++;
+    if (policy.currentValue != null) {
+      total.currentValue += policy.currentValue;
+      total.currentValueCount++;
+    }
+    if (policy.investedValue != null) {
+      total.premiumsPaid += policy.investedValue;
+      total.premiumsPaidCount++;
+    }
+    if (policy.insuranceSumAssured != null) {
+      total.sumAssured += policy.insuranceSumAssured;
+      total.sumAssuredCount++;
+    }
+    insuranceTotals.set(policy.currency, total);
+  }
+  const visibleVehicleTotals = visibleVehicles.reduce((total, vehicle) => {
+    const currentValue = vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? null;
+    const purchaseValue = vehiclePurchaseValue(vehicle);
+    if (currentValue != null) {
+      total.currentValue += currentValue;
+      total.currentValueCount++;
+    }
+    if (purchaseValue != null) {
+      total.purchaseValue += purchaseValue;
+      total.purchaseValueCount++;
+    }
+    if (currentValue != null && purchaseValue != null) {
+      total.estimatedChange += currentValue - purchaseValue;
+      total.comparableVehicles++;
+    }
+    return total;
+  }, { currentValue: 0, currentValueCount: 0, purchaseValue: 0, purchaseValueCount: 0, estimatedChange: 0, comparableVehicles: 0 });
   const totals = new Map<string, { assets: number; liabilities: number }>();
   for (const asset of assets) {
     if (asset.type === "Stock") continue;
@@ -3038,11 +3118,16 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     {activeType === "Bank accounts" && <div className="alert">Balances are the saved snapshots from Bank accounts, not live bank balances. Only accounts with a recorded balance are included in totals.</div>}
     {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
     {activeType === "Vehicle" && <div className="alert">Vehicles use the same records as the Vehicles menu. Edit vehicle details and purchase/current values from either screen; Add vehicle value saves a dated valuation snapshot. The current estimate contributes to your INR asset total.</div>}
+    {activeType === "Vehicle" && visibleVehicles.length > 0 && <div className="asset-total-list"><Card className="asset-total-card">
+      <div><span>Current estimated value · INR</span><strong>{visibleVehicleTotals.currentValueCount ? formatAmount(visibleVehicleTotals.currentValue, "INR") : "Not recorded"}{visibleVehicleTotals.currentValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.currentValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
+      <div><span>Purchase value · INR</span><strong>{visibleVehicleTotals.purchaseValueCount ? formatAmount(visibleVehicleTotals.purchaseValue, "INR") : "Not recorded"}{visibleVehicleTotals.purchaseValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.purchaseValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
+      <div><span>Estimated change · vehicles with both values</span><strong className={visibleVehicleTotals.estimatedChange >= 0 ? "positive" : "negative"}>{visibleVehicleTotals.comparableVehicles ? `${visibleVehicleTotals.estimatedChange >= 0 ? "+" : ""}${formatAmount(visibleVehicleTotals.estimatedChange, "INR")}` : "Not available"}{visibleVehicleTotals.comparableVehicles < visibleVehicles.length ? ` · ${visibleVehicleTotals.comparableVehicles} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
+    </Card></div>}
     {activeType === "Vehicle" && <div className="asset-list">{visibleVehicles.map((vehicle) => {
       const valuations = [...(vehicle.valuationHistory ?? [])].reverse().sort((a, b) => b.date.localeCompare(a.date));
       const latest = valuations[0];
       const currentValue = vehicle.currentValue ?? latest?.currentValue ?? null;
-      const purchaseValue = vehicle.purchaseValue ?? valuations.find((entry) => entry.purchaseValue != null)?.purchaseValue ?? null;
+      const purchaseValue = vehiclePurchaseValue(vehicle);
       return <Card className="asset-card" key={vehicle.id}>
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Car size={17} /></div><div><h2>{vehicle.name}</h2><p>{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}</p></div></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${vehicle.name} details`} title="Edit vehicle details and values" onClick={() => setVehicleEditor(vehicle)}><Pencil size={14} /></button></div></div>
         <div className="asset-details">
@@ -3056,6 +3141,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     })}</div>}
     {activeType === "Vehicle" && !visibleVehicles.length && <Card><EmptyState icon={<Car size={18} />} title={vehicles.length ? "No matching vehicles" : "No vehicles recorded yet"} description={vehicles.length ? "Try a different search." : "Add a vehicle in the Vehicles menu. It will appear here automatically."} />{!vehicles.length && <Button type="button" variant="outline" onClick={onOpenVehicles}><Car size={14} /> Open Vehicles</Button>}</Card>}
     {activeType === "Insurance" && <div className="alert">Sum assured is the policy’s coverage, not an asset value. Only a recorded fund or surrender value contributes to asset totals; pure term cover is not counted as an investment.</div>}
+    {activeType === "Insurance" && insuranceTotals.size > 0 && <div className="asset-total-list">{[...insuranceTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
+      <div><span>Current fund / surrender value · {currency}</span><strong>{total.currentValueCount ? formatAmount(total.currentValue, currency) : "Not recorded"}{total.currentValueCount < total.policies ? ` · ${total.currentValueCount} of ${total.policies} policies` : ""}</strong></div>
+      <div><span>Premiums paid to date · {currency}</span><strong>{total.premiumsPaidCount ? formatAmount(total.premiumsPaid, currency) : "Not recorded"}{total.premiumsPaidCount < total.policies ? ` · ${total.premiumsPaidCount} of ${total.policies} policies` : ""}</strong></div>
+      <div><span>Sum assured · coverage only · {currency}</span><strong>{total.sumAssuredCount ? formatAmount(total.sumAssured, currency) : "Not recorded"}{total.sumAssuredCount < total.policies ? ` · ${total.sumAssuredCount} of ${total.policies} policies` : ""}</strong></div>
+    </Card>)}</div>}
     {activeType === "Stocks" && stockTotals.size > 0 && <div className="asset-total-list">{[...stockTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const returnPercent = total.invested ? total.profitLoss / total.invested * 100 : null;
       return <Card className="asset-total-card" key={currency}>
@@ -3158,6 +3248,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     })}</div>}
     {activeType === "Digital gold" && <div className="alert">Digital gold values are manually recorded snapshots, not live provider prices. Per-gram value is derived from current value ÷ grams; returns are not annualized. Update the valuation date when refreshing a provider balance.</div>}
     {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Amounts and installments are copied from the supplied screenshot; verify whether the amount is cumulative before relying on returns.</div>}
+    {activeType === "Real estate" && realEstateTotals.size > 0 && <div className="asset-total-list">{[...realEstateTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
+      <div><span>Current market value · {currency}</span><strong>{total.currentCount ? formatAmount(total.current, currency) : "Not recorded"}{total.currentCount < total.properties ? ` · ${total.currentCount} of ${total.properties} properties` : ""}</strong></div>
+      <div><span>Purchase value · {currency}</span><strong>{total.purchaseCount ? formatAmount(total.purchase, currency) : "Not recorded"}{total.purchaseCount < total.properties ? ` · ${total.purchaseCount} of ${total.properties} properties` : ""}</strong></div>
+      <div><span>Estimated change · properties with both values</span><strong className={total.estimatedChange >= 0 ? "positive" : "negative"}>{total.comparableProperties ? `${total.estimatedChange >= 0 ? "+" : ""}${formatAmount(total.estimatedChange, currency)}` : "Not available"}{total.comparableProperties < total.properties ? ` · ${total.comparableProperties} of ${total.properties} properties` : ""}</strong></div>
+    </Card>)}</div>}
     <div className="asset-list">{visible.map((asset) => {
       const isLoan = asset.type === "Loan";
       const isHomeLoan = asset.type === "Home loan";
