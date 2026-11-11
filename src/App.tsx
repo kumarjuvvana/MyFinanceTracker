@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell, History,
-  ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
+  ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
@@ -313,6 +313,9 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({});
   const [newSessionName, setNewSessionName] = useState("");
   const [newItemNames, setNewItemNames] = useState<Record<string, string>>({});
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(
+    () => new Set(sessions.map((session) => session.id)),
+  );
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("All tasks");
@@ -360,7 +363,9 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     event.preventDefault();
     const name = newSessionName.trim();
     if (!name) return;
-    onSave([...sessions, { id: createId(), name, items: [] }]);
+    const session = { id: createId(), name, items: [] };
+    onSave([...sessions, session]);
+    setExpandedSessionIds((current) => new Set([...current, session.id]));
     setNewSessionName("");
   }
 
@@ -432,6 +437,8 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
         <Badge>{completedCount} / {taskCount} done</Badge>
         <Button type="button" variant="outline" size="sm" disabled={!taskCount || completedCount === taskCount} onClick={() => onSetAllChecked(true)}><Check size={13} />Check all</Button>
         <Button type="button" variant="outline" size="sm" disabled={!completedCount} onClick={() => onSetAllChecked(false)}><X size={13} />Uncheck all</Button>
+        <Button type="button" variant="outline" size="sm" disabled={sessions.every((session) => expandedSessionIds.has(session.id))} onClick={() => setExpandedSessionIds(new Set(sessions.map((session) => session.id)))}><ChevronDown size={13} />Expand all</Button>
+        <Button type="button" variant="outline" size="sm" disabled={sessions.every((session) => !expandedSessionIds.has(session.id))} onClick={() => setExpandedSessionIds(new Set())}><ChevronRight size={13} />Collapse all</Button>
         <button type="button" className="icon-button" disabled={!completedCount} aria-label="Reset all activity sessions" title="Reset all completion marks" onClick={onResetAll}><RefreshCw size={15} /></button>
       </div>
     </Card>
@@ -448,8 +455,16 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     </form>
     {sessions.length ? visibleSessions.length ? <div className="activity-session-grid">{visibleSessions.map(({ session, items: visibleItems }) => {
       const sessionDone = session.items.filter((item) => checkedItems.has(item.id)).length;
+      const expanded = expandedSessionIds.has(session.id);
       return <Card className="activity-session-card" key={session.id}>
         <div className="activity-session-head">
+          <button type="button" className="icon-button activity-session-expand" aria-label={`${expanded ? "Collapse" : "Expand"} ${session.name} activities`} aria-expanded={expanded}
+            title={`${expanded ? "Collapse" : "Expand"} activities`} onClick={() => setExpandedSessionIds((current) => {
+              const next = new Set(current);
+              if (expanded) next.delete(session.id);
+              else next.add(session.id);
+              return next;
+            })}><ChevronDown size={16} /></button>
           <div className="activity-session-title">
             <Input
               aria-label={`${session.name} session name`}
@@ -468,9 +483,17 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           </div>
           <div className="activity-session-actions">
             <button type="button" className="icon-button" disabled={!sessionDone} aria-label={`Reset ${session.name} completion marks`} title={`Reset ${session.name} completion marks`} onClick={() => onResetSession(session.id)}><RefreshCw size={15} /></button>
-            <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => onSave(sessions.filter((entry) => entry.id !== session.id))}><Trash2 size={15} /></button>
+            <button type="button" className="icon-button" aria-label={`Remove ${session.name} session`} title={`Remove ${session.name} session`} onClick={() => {
+              onSave(sessions.filter((entry) => entry.id !== session.id));
+              setExpandedSessionIds((current) => {
+                const next = new Set(current);
+                next.delete(session.id);
+                return next;
+              });
+            }}><Trash2 size={15} /></button>
           </div>
         </div>
+        {expanded && <>
         <div className="activity-session-bulk-actions" aria-label={`${session.name} checklist actions`}>
           <Button type="button" variant="outline" size="sm" disabled={!session.items.length || sessionDone === session.items.length} onClick={() => onSetSessionChecked(session.id, true)}><Check size={13} />Check all</Button>
           <Button type="button" variant="outline" size="sm" disabled={!sessionDone} onClick={() => onSetSessionChecked(session.id, false)}><X size={13} />Uncheck all</Button>
@@ -583,6 +606,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           <Input aria-label={`New activity for ${session.name}`} placeholder="Add an activity…" maxLength={120} value={newItemNames[session.id] ?? ""} onChange={(event) => setNewItemNames((current) => ({ ...current, [session.id]: event.target.value }))} />
           <Button type="submit" variant="outline" size="sm" disabled={!newItemNames[session.id]?.trim()}><Plus size={13} />Add</Button>
         </form>
+        </>}
       </Card>;
     })}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No matching activities" description="Try another search or completion filter." /></Card> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
   </>;
