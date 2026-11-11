@@ -180,6 +180,25 @@ export const ASSET_TYPES = [
 ] as const;
 
 export type AssetType = (typeof ASSET_TYPES)[number];
+export type AssetManagerVisibleType = Exclude<AssetType, "Stock"> | "Stocks" | "Bank accounts";
+
+export const ASSET_MANAGER_VISIBLE_TYPES: AssetManagerVisibleType[] = [
+  "Mutual fund",
+  "NPS",
+  "Stocks",
+  "Loan",
+  "Home loan",
+  "Fixed deposit",
+  "Real estate",
+  "Bond",
+  "Digital gold",
+  "Gold savings scheme",
+  "Cash / deposit",
+  "Bank accounts",
+  "Vehicle",
+  "Insurance",
+  "Other",
+];
 
 export interface NpsSchemeHolding {
   schemeName: string;
@@ -1101,6 +1120,7 @@ export interface TrackerPreferences {
   menuSortOrder: MenuSortOrder;
   activitySessions?: ActivityChecklistSession[];
   activityCompletedItemIds?: string[];
+  assetManagerVisibleTypes?: AssetManagerVisibleType[];
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {

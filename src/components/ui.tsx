@@ -157,7 +157,7 @@ export function Modal({ title, onClose, children, wide = false, inline = false }
   );
 }
 
-export function FilterDrawer({ children, activeCount = 0, label = "Filters" }: { children: ReactNode; activeCount?: number; label?: string }) {
+export function FilterDrawer({ children, activeCount = 0, label = "Filters", closeOnChange = true }: { children: ReactNode; activeCount?: number; label?: string; closeOnChange?: boolean }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -176,6 +176,7 @@ export function FilterDrawer({ children, activeCount = 0, label = "Filters" }: {
     {open && <div className="filter-drawer-layer">
       <button type="button" className="filter-drawer-backdrop" aria-label="Close filters" onClick={() => setOpen(false)} />
       <aside className="filter-drawer" role="dialog" aria-modal="true" aria-label={label} onChangeCapture={(event) => {
+        if (!closeOnChange) return;
         const target = event.target;
         if (!(target instanceof HTMLElement && target.closest(".date-input-mobile"))) setOpen(false);
       }} onClickCapture={(event) => {

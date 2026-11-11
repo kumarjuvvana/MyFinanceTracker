@@ -778,6 +778,13 @@ body{background:#f3f5ef}
 .app-shell.dark .vehicle-stats span,.app-shell.dark .vehicle-notes,.app-shell.dark .vehicle-section-head>div p,.app-shell.dark .vehicle-record-main>span,.app-shell.dark .vehicle-record-main>small,.app-shell.dark .vehicle-empty{color:#a7b0a7}
 .app-shell.dark .vehicle-record{border-color:#343d35}
 .asset-total-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:0 0 16px}
+.asset-type-preferences{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--panel-line,#e6ebe3)}
+.asset-type-preferences .section-title,.asset-type-preferences .section-description{margin:0}
+.asset-type-preference-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.asset-type-preference-options label{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--text,#303830)}
+.asset-type-preference-options input{accent-color:var(--user-accent,#56815d)}
+.asset-list-group{display:grid;gap:10px;margin-bottom:12px}
+.asset-list-group-title{margin:0;color:var(--text-muted,#778077);font:700 12px Inter,"Aptos","Segoe UI",sans-serif}
 .asset-type-tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding:0 0 4px;scrollbar-width:thin}
 .asset-type-tabs button{display:inline-flex;align-items:center;gap:7px;flex:none;border:1px solid var(--panel-line,#e6ebe3);border-radius:999px;background:var(--panel,#fff);color:var(--text-muted,#778077);padding:7px 10px;font:600 10px Inter,"Aptos","Segoe UI",sans-serif;cursor:pointer}
 .asset-type-tabs button[aria-selected="true"]{border-color:var(--user-accent,#56815d);background:color-mix(in srgb,var(--user-accent,#56815d) 10%,var(--panel,#fff));color:var(--user-accent,#56815d)}

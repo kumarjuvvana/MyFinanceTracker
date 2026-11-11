@@ -17,7 +17,7 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
@@ -2839,12 +2839,13 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
   bankAccounts: BankAccount[];
   vehicles: Vehicle[];
+  savedVisibleTypes: AssetManagerVisibleType[];
   onSave: (asset: Omit<AssetRecord, "id">, id?: string) => void;
   onDelete: (asset: AssetRecord) => void;
   onOpenStocks: () => void;
@@ -2852,37 +2853,107 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
   onSaveVehicle: (vehicle: Omit<Vehicle, "id">, id?: string) => void;
   onSaveVehicleValuation: (vehicleId: string, valuation: VehicleValuation) => void;
   onOpenVehicles: () => void;
+  onSaveVisibleTypes: (types: AssetManagerVisibleType[]) => Promise<void>;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
   const [newAssetType, setNewAssetType] = useState<AssetType>("Other");
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<"All types" | "Stocks" | "Bank accounts" | AssetType>("All types");
+  const [draftVisibleTypes, setDraftVisibleTypes] = useState<AssetManagerVisibleType[]>(savedVisibleTypes);
+  const [sortBy, setSortBy] = useState<"name" | "value-highest" | "value-lowest">("name");
+  const [groupBy, setGroupBy] = useState<"none" | "type" | "institution" | "currency">("none");
+  const [filterCurrency, setFilterCurrency] = useState<"All currencies" | Currency>("All currencies");
+  const [valueFilter, setValueFilter] = useState<"all" | "recorded" | "missing">("all");
+  const [savingTypes, setSavingTypes] = useState(false);
+  const [typePreferenceMessage, setTypePreferenceMessage] = useState("");
+  const [typePreferenceError, setTypePreferenceError] = useState("");
+  const savedTypesKey = savedVisibleTypes.join("|");
+  useEffect(() => {
+    setDraftVisibleTypes(savedVisibleTypes);
+  }, [savedTypesKey]);
+  const selectedTypes = new Set(draftVisibleTypes);
   const query = search.trim().toLocaleLowerCase();
-  const visible = assets.filter((asset) =>
-    (activeType === "All types" || activeType !== "Stocks" && activeType !== "Bank accounts" && asset.type === activeType) &&
-    [asset.name, asset.type, asset.institution, asset.reference, asset.location, asset.notes, ...asset.tags]
-      .some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const visibleStocks = stocks.filter((stock) =>
-    [stock.symbol, stock.name, stock.exchange, stock.broker].some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.symbol.localeCompare(b.symbol));
-  const visibleBankAccounts = bankAccounts.filter((account) =>
-    [account.bankName, account.accountType, account.accountHolder, account.branch, account.notes, account.accountNumber]
-      .some((value) => value.toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.bankName.localeCompare(b.bankName) || a.accountType.localeCompare(b.accountType));
-  const visibleVehicles = vehicles.filter((vehicle) =>
-    [vehicle.name, vehicle.make, vehicle.model, vehicle.year, vehicle.registration, vehicle.fuelType, vehicle.notes]
-      .some((value) => String(value ?? "").toLocaleLowerCase().includes(query)))
-    .sort((a, b) => a.name.localeCompare(b.name));
   const latestVehicleValuation = (vehicle: Vehicle) => (vehicle.valuationHistory ?? []).reduce<VehicleValuation | undefined>(
     (latest, valuation) => !latest || valuation.date >= latest.date ? valuation : latest,
     undefined,
   );
+  const latestStockQuotes = latestStockQuotesById(stockQuotes, stocks);
+  const currentAssetValue = (asset: AssetRecord) =>
+    asset.type === "Home loan" ? asset.principalOutstanding ?? asset.currentValue : asset.currentValue;
+  const matchesValueFilter = (amount: number | null | undefined) =>
+    valueFilter === "all" || (valueFilter === "recorded" ? amount != null : amount == null);
+  const compareByValue = (left: number | null | undefined, right: number | null | undefined) => {
+    const difference = (left ?? Number.NEGATIVE_INFINITY) - (right ?? Number.NEGATIVE_INFINITY);
+    return sortBy === "value-lowest" ? difference : -difference;
+  };
+  const visible = assets.filter((asset) =>
+    asset.type !== "Stock" && selectedTypes.has(asset.type) &&
+    (activeType === "All types" || activeType !== "Stocks" && activeType !== "Bank accounts" && asset.type === activeType) &&
+    (filterCurrency === "All currencies" || asset.currency === filterCurrency) &&
+    matchesValueFilter(currentAssetValue(asset)) &&
+    [asset.name, asset.type, asset.institution, asset.reference, asset.location, asset.notes, ...asset.tags]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => sortBy === "name" ? a.name.localeCompare(b.name) : compareByValue(currentAssetValue(a), currentAssetValue(b)));
+  const visibleStocks = stocks.filter((stock) => {
+    if (!selectedTypes.has("Stocks")) return false;
+    const quote = latestStockQuotes.get(stock.id);
+    const currentValue = quote && (stock.quantity ?? 0) > 0 ? quote.price * (stock.quantity ?? 0) : null;
+    return (filterCurrency === "All currencies" || quote?.currency === filterCurrency) &&
+      matchesValueFilter(currentValue) &&
+      [stock.symbol, stock.name, stock.exchange, stock.broker].some((value) => value.toLocaleLowerCase().includes(query));
+  }).sort((a, b) => sortBy === "name"
+    ? a.symbol.localeCompare(b.symbol)
+    : compareByValue((latestStockQuotes.get(a.id)?.price ?? 0) * (a.quantity ?? 0), (latestStockQuotes.get(b.id)?.price ?? 0) * (b.quantity ?? 0)));
+  const visibleBankAccounts = bankAccounts.filter((account) =>
+    selectedTypes.has("Bank accounts") && (filterCurrency === "All currencies" || filterCurrency === "INR") &&
+    matchesValueFilter(account.currentBalance) &&
+    [account.bankName, account.accountType, account.accountHolder, account.branch, account.notes, account.accountNumber]
+      .some((value) => value.toLocaleLowerCase().includes(query)))
+    .sort((a, b) => sortBy === "name"
+      ? a.bankName.localeCompare(b.bankName) || a.accountType.localeCompare(b.accountType)
+      : compareByValue(a.currentBalance, b.currentBalance));
+  const visibleVehicles = vehicles.filter((vehicle) => {
+    const value = vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? null;
+    return selectedTypes.has("Vehicle") && (filterCurrency === "All currencies" || filterCurrency === "INR") &&
+      matchesValueFilter(value) &&
+      [vehicle.name, vehicle.make, vehicle.model, vehicle.year, vehicle.registration, vehicle.fuelType, vehicle.notes]
+        .some((item) => String(item ?? "").toLocaleLowerCase().includes(query));
+  }).sort((a, b) => sortBy === "name"
+    ? a.name.localeCompare(b.name)
+    : compareByValue(
+      a.currentValue ?? latestVehicleValuation(a)?.currentValue,
+      b.currentValue ?? latestVehicleValuation(b)?.currentValue,
+    ));
+  function groupRecords<T>(records: T[], getLabel: (record: T) => string) {
+    const groups = new Map<string, T[]>();
+    for (const record of records) {
+      const label = getLabel(record);
+      groups.set(label, [...(groups.get(label) ?? []), record]);
+    }
+    return [...groups.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([label, entries]) => ({ key: label || "all", label, records: entries }));
+  }
+  const visibleGroups = groupRecords(visible, (asset) => groupBy === "type" ? asset.type
+    : groupBy === "institution" ? asset.institution || "No institution"
+      : groupBy === "currency" ? asset.currency
+        : "");
+  const visibleStockGroups = groupRecords(visibleStocks, (stock) => groupBy === "type" ? "Stocks"
+    : groupBy === "institution" ? stock.broker || "No broker"
+      : groupBy === "currency" ? latestStockQuotes.get(stock.id)?.currency ?? "No quote"
+        : "");
+  const visibleBankGroups = groupRecords(visibleBankAccounts, (account) => groupBy === "type" ? account.accountType
+    : groupBy === "institution" ? account.bankName
+      : groupBy === "currency" ? "INR"
+        : "");
+  const visibleVehicleGroups = groupRecords(visibleVehicles, (vehicle) => groupBy === "type" ? "Vehicles"
+    : groupBy === "institution" ? vehicle.make || "No make"
+      : groupBy === "currency" ? "INR"
+        : "");
   const vehiclePurchaseValue = (vehicle: Vehicle) => vehicle.purchaseValue ??
     [...(vehicle.valuationHistory ?? [])].sort((a, b) => a.date.localeCompare(b.date))
       .find((valuation) => valuation.purchaseValue != null)?.purchaseValue ?? null;
-  const latestStockQuotes = latestStockQuotesById(stockQuotes, stocks);
   const stockTotals = new Map<string, {
     current: number;
     invested: number;
@@ -3059,6 +3130,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
   }, { currentValue: 0, currentValueCount: 0, purchaseValue: 0, purchaseValueCount: 0, estimatedChange: 0, comparableVehicles: 0 });
   const totals = new Map<string, { assets: number; liabilities: number }>();
   for (const asset of assets) {
+    if (asset.type !== "Stock" && !selectedTypes.has(asset.type)) continue;
     if (asset.type === "Stock") continue;
     const balance = asset.type === "Home loan" ? asset.principalOutstanding ?? asset.currentValue : asset.currentValue;
     if (balance === null) continue;
@@ -3068,6 +3140,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     totals.set(asset.currency, total);
   }
   for (const stock of stocks) {
+    if (!selectedTypes.has("Stocks")) continue;
     const quote = latestStockQuotes.get(stock.id);
     const quantity = stock.quantity ?? 0;
     if (!quote || quantity <= 0) continue;
@@ -3076,12 +3149,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     totals.set(quote.currency, total);
   }
   for (const account of bankAccounts) {
+    if (!selectedTypes.has("Bank accounts")) continue;
     if (account.currentBalance == null) continue;
     const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
     total.assets += account.currentBalance;
     totals.set("INR", total);
   }
   for (const vehicle of vehicles) {
+    if (!selectedTypes.has("Vehicle")) continue;
     const balance = vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue;
     if (balance == null) continue;
     const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
@@ -3099,11 +3174,31 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
   );
   const assetTabs: Array<"All types" | "Stocks" | "Bank accounts" | AssetType> = [
     "All types",
-    ...ASSET_TYPES.filter((assetType) => assetType !== "Stock").flatMap((assetType) =>
-      assetType === "NPS" ? [assetType, "Stocks" as const]
-        : assetType === "Cash / deposit" ? [assetType, "Bank accounts" as const]
-          : [assetType]),
+    ...ASSET_MANAGER_VISIBLE_TYPES.filter((type) => selectedTypes.has(type)),
   ];
+  useEffect(() => {
+    if (activeType !== "All types" && !assetTabs.includes(activeType)) setActiveType("All types");
+  }, [activeType, savedTypesKey, draftVisibleTypes]);
+  const hasUnsavedTypeChanges = ASSET_MANAGER_VISIBLE_TYPES.some((type) =>
+    selectedTypes.has(type) !== savedVisibleTypes.includes(type));
+  async function saveVisibleTypes() {
+    if (!draftVisibleTypes.length) {
+      setTypePreferenceError("Select at least one asset type to show.");
+      setTypePreferenceMessage("");
+      return;
+    }
+    setSavingTypes(true);
+    setTypePreferenceError("");
+    setTypePreferenceMessage("");
+    try {
+      await onSaveVisibleTypes(draftVisibleTypes);
+      setTypePreferenceMessage("Asset type preferences saved to Supabase.");
+    } catch (caught) {
+      setTypePreferenceError(caught instanceof Error ? caught.message : "Could not save asset type preferences.");
+    } finally {
+      setSavingTypes(false);
+    }
+  }
 
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
@@ -3119,7 +3214,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
-        const count = type === "All types" ? assets.length + stocks.length + bankAccounts.length + vehicles.length
+        const count = type === "All types" ? assets.filter((asset) => asset.type !== "Stock" && selectedTypes.has(asset.type)).length +
+            (selectedTypes.has("Stocks") ? stocks.length : 0) +
+            (selectedTypes.has("Bank accounts") ? bankAccounts.length : 0) +
+            (selectedTypes.has("Vehicle") ? vehicles.length : 0)
           : type === "Stocks" ? stocks.length
             : type === "Bank accounts" ? bankAccounts.length
             : type === "Vehicle" ? vehicles.length
@@ -3129,7 +3227,36 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
         return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
       })}
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : activeType === "Vehicle" ? "Search vehicles" : activeType === "Insurance" ? "Search insurance policies" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : activeType === "Vehicle" ? "Search vehicle, make, model, registration..." : activeType === "Insurance" ? "Search policy, insurer, reference, tags..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge></div>
+    <div className="toolbar filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : activeType === "Vehicle" ? "Search vehicles" : activeType === "Insurance" ? "Search insurance policies" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : activeType === "Vehicle" ? "Search vehicle, make, model, registration..." : activeType === "Insurance" ? "Search policy, insurer, reference, tags..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer
+        label="Filters, sorting & grouping"
+        closeOnChange={false}
+        activeCount={(filterCurrency !== "All currencies" ? 1 : 0) + (valueFilter !== "all" ? 1 : 0) + (sortBy !== "name" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
+      >
+        <Field label="Currency"><Select aria-label="Filter assets by currency" value={filterCurrency} onChange={(event) => setFilterCurrency(event.target.value as "All currencies" | Currency)}><option>All currencies</option>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
+        <Field label="Current value"><Select aria-label="Filter assets by current value" value={valueFilter} onChange={(event) => setValueFilter(event.target.value as typeof valueFilter)}><option value="all">All records</option><option value="recorded">Value recorded</option><option value="missing">Value not recorded</option></Select></Field>
+        <Field label="Sort by"><Select aria-label="Sort asset records" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}><option value="name">Name (A–Z)</option><option value="value-highest">Current value (highest)</option><option value="value-lowest">Current value (lowest)</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group assets" value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}><option value="none">No grouping</option><option value="type">Asset type</option><option value="institution">Institution</option><option value="currency">Currency</option></Select></Field>
+        <div className="asset-type-preferences">
+          <h3 className="section-title">Asset types shown</h3>
+          <p className="section-description">This separate selection controls which tabs and totals appear. Changes preview immediately and are not saved until you choose Save.</p>
+          <div className="asset-type-preference-options">{ASSET_MANAGER_VISIBLE_TYPES.map((type) => <label key={type}><input type="checkbox" checked={selectedTypes.has(type)} onChange={(event) => {
+            const checked = event.currentTarget.checked;
+            setDraftVisibleTypes((current) => checked
+              ? ASSET_MANAGER_VISIBLE_TYPES.filter((candidate) => candidate === type || current.includes(candidate))
+              : current.filter((candidate) => candidate !== type));
+            setTypePreferenceError("");
+            setTypePreferenceMessage("");
+          }} /><span>{type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances" : type === "Gold savings scheme" ? "Gold savings schemes" : type}</span></label>)}</div>
+          {typePreferenceError && <div className="alert alert-error" role="alert">{typePreferenceError}</div>}
+          {typePreferenceMessage && <div className="alert alert-success" role="status">{typePreferenceMessage}</div>}
+          <Button type="button" disabled={savingTypes || !hasUnsavedTypeChanges || !draftVisibleTypes.length} onClick={() => void saveVisibleTypes()}>{savingTypes ? "Saving..." : "Save asset type selection"}</Button>
+          {!draftVisibleTypes.length && <p className="section-description">Choose at least one asset type before saving.</p>}
+        </div>
+      </FilterDrawer>
+      <Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge>
+    </div>
     {activeType === "Bank accounts" && <div className="alert">Balances are the saved snapshots from Bank accounts, not live bank balances. Only accounts with a recorded balance are included in totals.</div>}
     {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
     {activeType === "Vehicle" && <div className="alert">Vehicles use the same records as the Vehicles menu. Edit vehicle details and purchase/current values from either screen; Add vehicle value saves a dated valuation snapshot. The current estimate contributes to your INR asset total.</div>}
@@ -3138,7 +3265,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
       <div><span>Purchase value · INR</span><strong>{visibleVehicleTotals.purchaseValueCount ? formatAmount(visibleVehicleTotals.purchaseValue, "INR") : "Not recorded"}{visibleVehicleTotals.purchaseValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.purchaseValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
       <div><span>Estimated change · vehicles with both values</span><strong className={visibleVehicleTotals.estimatedChange >= 0 ? "positive" : "negative"}>{visibleVehicleTotals.comparableVehicles ? `${visibleVehicleTotals.estimatedChange >= 0 ? "+" : ""}${formatAmount(visibleVehicleTotals.estimatedChange, "INR")}` : "Not available"}{visibleVehicleTotals.comparableVehicles < visibleVehicles.length ? ` · ${visibleVehicleTotals.comparableVehicles} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
     </Card></div>}
-    {activeType === "Vehicle" && <div className="asset-list">{visibleVehicles.map((vehicle) => {
+    {activeType === "Vehicle" && visibleVehicleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className="asset-list">{group.records.map((vehicle) => {
       const valuations = [...(vehicle.valuationHistory ?? [])].reverse().sort((a, b) => b.date.localeCompare(a.date));
       const latest = valuations[0];
       const currentValue = vehicle.currentValue ?? latest?.currentValue ?? null;
@@ -3153,7 +3282,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
         </div>
         {valuations.length > 0 && <div className="nps-scheme-list"><strong>Value history</strong>{valuations.map((valuation) => <div className="nps-scheme-row" key={valuation.id}><span>{dateLabel(valuation.date)}</span><span>{valuation.purchaseValue != null ? `Purchase ${formatAmount(valuation.purchaseValue, "INR")}` : ""}</span><strong>{formatAmount(valuation.currentValue, "INR")}</strong></div>)}</div>}
       </Card>;
-    })}</div>}
+      })}</div>
+    </section>)}
     {activeType === "Vehicle" && !visibleVehicles.length && <Card><EmptyState icon={<Car size={18} />} title={vehicles.length ? "No matching vehicles" : "No vehicles recorded yet"} description={vehicles.length ? "Try a different search." : "Add a vehicle in the Vehicles menu. It will appear here automatically."} />{!vehicles.length && <Button type="button" variant="outline" onClick={onOpenVehicles}><Car size={14} /> Open Vehicles</Button>}</Card>}
     {activeType === "Insurance" && <div className="alert">Sum assured is the policy’s coverage, not an asset value. Only a recorded fund or surrender value contributes to asset totals; pure term cover is not counted as an investment.</div>}
     {activeType === "Insurance" && insuranceTotals.size > 0 && <div className="asset-total-list">{[...insuranceTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
@@ -3171,7 +3301,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
       </Card>;
     })}</div>}
     {activeType === "Stocks" && <div className="alert">Stock holdings and quote history are read directly from the Stocks menu’s existing data. Price and market value reflect the latest saved quote; edit holdings or refresh quotes in Stocks.</div>}
-    {activeType === "Stocks" && visibleStocks.length > 0 && <div className="asset-list">{visibleStocks.map((stock) => {
+    {activeType === "Stocks" && visibleStocks.length > 0 && visibleStockGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className="asset-list">{group.records.map((stock) => {
       const quote = latestStockQuotes.get(stock.id);
       const quantity = stock.quantity ?? 0;
       const currentValue = quote && quantity > 0 ? quote.price * quantity : null;
@@ -3189,9 +3321,12 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
           {quote && <div><span>Quote saved</span><strong>{new Date(quote.timestamp).toLocaleString()}</strong></div>}
         </div>
       </Card>;
-    })}</div>}
+      })}</div>
+    </section>)}
     {activeType === "Stocks" && !visibleStocks.length && <Card><EmptyState icon={<TrendingUp size={18} />} title={stocks.length ? "No matching stocks" : "No stocks tracked yet"} description={stocks.length ? "Try a different search." : "Add holdings in the Stocks menu; they will appear here automatically."} /></Card>}
-    {activeType === "Bank accounts" && visibleBankAccounts.length > 0 && <div className="asset-list">{visibleBankAccounts.map((account) => {
+    {activeType === "Bank accounts" && visibleBankAccounts.length > 0 && visibleBankGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className="asset-list">{group.records.map((account) => {
       const accountDigits = account.accountNumber.replace(/\D/g, "");
       const accountLabel = accountDigits.length >= 4 ? `Account ending ${accountDigits.slice(-4)}` : "Account number not shown";
       return <Card className="asset-card" key={account.id}>
@@ -3204,7 +3339,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
           {account.balanceAsOfDate && <div><span>Balance as of</span><strong>{dateLabel(account.balanceAsOfDate)}</strong></div>}
         </div>
       </Card>;
-    })}</div>}
+      })}</div>
+    </section>)}
     {activeType === "Bank accounts" && !visibleBankAccounts.length && <Card><EmptyState icon={<Landmark size={18} />} title={bankAccounts.length ? "No matching bank accounts" : "No bank accounts recorded"} description={bankAccounts.length ? "Try a different search." : "Add accounts in the Bank accounts menu; they will appear here automatically."} /></Card>}
     {activeType === "Mutual fund" && mutualFundTotals.size > 0 && <div className="asset-total-list">{[...mutualFundTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current - total.invested;
@@ -3268,7 +3404,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
       <div><span>Purchase value · {currency}</span><strong>{total.purchaseCount ? formatAmount(total.purchase, currency) : "Not recorded"}{total.purchaseCount < total.properties ? ` · ${total.purchaseCount} of ${total.properties} properties` : ""}</strong></div>
       <div><span>Estimated change · properties with both values</span><strong className={total.estimatedChange >= 0 ? "positive" : "negative"}>{total.comparableProperties ? `${total.estimatedChange >= 0 ? "+" : ""}${formatAmount(total.estimatedChange, currency)}` : "Not available"}{total.comparableProperties < total.properties ? ` · ${total.comparableProperties} of ${total.properties} properties` : ""}</strong></div>
     </Card>)}</div>}
-    <div className="asset-list">{visible.map((asset) => {
+    {visibleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className="asset-list">{group.records.map((asset) => {
       const isLoan = asset.type === "Loan";
       const isHomeLoan = asset.type === "Home loan";
       const isFixedDeposit = asset.type === "Fixed deposit";
@@ -3345,7 +3483,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, onS
         {asset.tags.length > 0 && <div className="credential-tags">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
-    })}</div>
+      })}</div>
+    </section>)}
     {activeType !== "Stocks" && activeType !== "Bank accounts" && activeType !== "Vehicle" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={activeType === "Insurance" ? "No insurance policies recorded yet" : assets.length ? "No matching assets" : "No assets recorded yet"} description={activeType === "Insurance" ? "Add one record for each policy. Sum assured is kept separate from any current fund or surrender value." : assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
     {vehicleEditor && <VehicleModal key={vehicleEditor.id} initial={vehicleEditor} onClose={() => setVehicleEditor(null)} onSave={(vehicle) => { onSaveVehicle(vehicle, vehicleEditor.id); setVehicleEditor(null); }} />}
     {editor !== undefined && <AssetModal key={editor?.id ?? `new-asset-${newAssetType}`} initial={editor} defaultType={newAssetType} vehicles={vehicles} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} onSaveVehicleValuation={(vehicleId, valuation) => { onSaveVehicleValuation(vehicleId, valuation); setEditor(undefined); }} onOpenVehicles={onOpenVehicles} />}
@@ -12392,7 +12531,14 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} />,
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onSaveVisibleTypes={(types) => persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        assetManagerVisibleTypes: types,
+      },
+    }))} />,
     "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}
       onSave={(account) => persistUpdate((previous) => ({
         ...previous,
