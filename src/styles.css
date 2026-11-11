@@ -302,6 +302,7 @@ button{cursor:pointer}
 .stock-history{padding:9px 0 0 12px}
 .stock-history>summary{cursor:pointer;color:#55785a;font-size:10px;font-weight:600}
 .stock-history-row{display:grid;grid-template-columns:minmax(160px,1.1fr) minmax(80px,.5fr) minmax(100px,.5fr) auto;gap:12px;align-items:center;border-top:1px solid #f0f1ee;padding:8px 0;font-size:10px;color:#818981}
+.mutual-fund-nav-history .stock-history-row{grid-template-columns:minmax(0,1fr) auto}
 .stock-history-row strong{color:#424a42;font-size:11px}
 .stock-history-row small{color:#92998f}
 .stock-errors ul{margin:6px 0 0;padding-left:18px}
@@ -778,6 +779,7 @@ body{background:#f3f5ef}
 .app-shell.dark .vehicle-stats span,.app-shell.dark .vehicle-notes,.app-shell.dark .vehicle-section-head>div p,.app-shell.dark .vehicle-record-main>span,.app-shell.dark .vehicle-record-main>small,.app-shell.dark .vehicle-empty{color:#a7b0a7}
 .app-shell.dark .vehicle-record{border-color:#343d35}
 .asset-total-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:0 0 16px}
+.asset-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .asset-type-preferences{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--panel-line,#e6ebe3)}
 .asset-type-preferences .section-title,.asset-type-preferences .section-description{margin:0}
 .asset-type-preference-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}

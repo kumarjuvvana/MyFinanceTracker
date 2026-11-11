@@ -4,6 +4,7 @@ import { readdir, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import stockPriceHandler from "./api/stock-price";
+import mutualFundNavHandler from "./api/mutual-fund-nav";
 import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
 import databaseHandler from "./api/database";
@@ -66,6 +67,7 @@ export default defineConfig(({ command, mode }) => {
       configureServer(server) {
         const routes: [string, ApiHandler][] = [
           ["/api/stock-price", stockPriceHandler],
+          ["/api/mutual-fund-nav", mutualFundNavHandler],
           ["/api/data-auth", dataAuthHandler],
           ["/api/data", dataHandler],
           ["/api/documents", documentsHandler],

@@ -162,6 +162,13 @@ export interface StockQuoteSnapshot extends StockQuotePrice {
   stockId: string;
 }
 
+export interface MutualFundNavSnapshot {
+  id: string;
+  nav: number;
+  date: string;
+  fetchedAt: string;
+}
+
 export const ASSET_TYPES = [
   "Mutual fund",
   "NPS",
@@ -223,6 +230,9 @@ export interface AssetRecord {
   startDate: string;
   maturityDate: string;
   valuationDate?: string;
+  latestNav?: number;
+  latestNavDate?: string;
+  navHistory?: MutualFundNavSnapshot[];
   installmentsPaid?: number | null;
   npsTier?: "Tier I" | "Tier II";
   withdrawnValue?: number | null;

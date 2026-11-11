@@ -17,8 +17,9 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VehicleMaintenanceType, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
+import type { VehicleMaintenanceType } from "./types";
 import type { CookingPlan } from "./types";
 import type { DailyBibleReading } from "./types";
 import type { CookingInventoryUsage } from "./types";
@@ -2769,6 +2770,8 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
       insuranceSumAssured: isInsuranceAsset ? parsedInsuredAmount : undefined,
       insurancePremium: isInsuranceAsset ? parsedInsurancePremium : undefined,
       insurancePremiumFrequency: isInsuranceAsset ? insurancePremiumFrequency : undefined,
+      latestNav: asset.type === "Mutual fund" ? asset.latestNav : undefined,
+      latestNavDate: asset.type === "Mutual fund" ? asset.latestNavDate : undefined,
       investedValue: parsedInvested,
       currentValue: parsedCurrent,
       quantity: parsedQuantity,
@@ -2866,13 +2869,13 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
         </div>)}
       </div>}
     </div>
-    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank; the asset manager does not fetch or verify valuations.</p>
+    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank. Mutual-fund NAVs can be refreshed manually; other asset valuations are not fetched or independently verified.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{submitLabel}</Button></div></form>
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
@@ -2891,6 +2894,13 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     types: AssetManagerVisibleType[],
     hiddenItems: NonNullable<TrackerPreferences["assetManagerHiddenItems"]>,
   ) => Promise<void>;
+  onRefreshMutualFundNavs: (updates: Array<{
+    id: string;
+    nav: number;
+    date: string;
+    currentValue?: number;
+    historySnapshot?: MutualFundNavSnapshot;
+  }>) => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
@@ -2906,6 +2916,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [savingTypes, setSavingTypes] = useState(false);
   const [typePreferenceMessage, setTypePreferenceMessage] = useState("");
   const [typePreferenceError, setTypePreferenceError] = useState("");
+  const [mutualFundNavBusy, setMutualFundNavBusy] = useState(false);
+  const [mutualFundNavMessage, setMutualFundNavMessage] = useState("");
+  const [mutualFundNavErrors, setMutualFundNavErrors] = useState<string[]>([]);
+  const [trackMutualFundNavHistory, setTrackMutualFundNavHistory] = useState(false);
   const savedTypesKey = savedVisibleTypes.join("|");
   const savedHiddenItemsKey = JSON.stringify(savedHiddenItems);
   useEffect(() => {
@@ -3351,6 +3365,116 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     }
   }
 
+  async function refreshMutualFundNavs() {
+    const mutualFunds = assets.filter((asset) => asset.type === "Mutual fund");
+    if (!mutualFunds.length) {
+      setMutualFundNavMessage("");
+      setMutualFundNavErrors(["No mutual-fund records are available to refresh."]);
+      return;
+    }
+
+    setMutualFundNavBusy(true);
+    setMutualFundNavMessage("");
+    setMutualFundNavErrors([]);
+    try {
+      const eligibleFunds = mutualFunds.filter((asset) => /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/i.test(asset.reference.trim()));
+      const errors = mutualFunds
+        .filter((asset) => !/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/i.test(asset.reference.trim()))
+        .map((asset) => `${asset.name}: add its 12-character ISIN in Account / reference to refresh its NAV.`);
+      if (!eligibleFunds.length) {
+        setMutualFundNavErrors(errors.length ? errors : ["No valid mutual-fund ISINs were found."]);
+        return;
+      }
+
+      const response = await fetch("/api/mutual-fund-nav", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isins: [...new Set(eligibleFunds.map((asset) => asset.reference.trim().toUpperCase()))] }),
+      });
+      const payload: unknown = await response.json();
+      const providerError = typeof payload === "object" && payload !== null && "error" in payload &&
+        typeof payload.error === "string" ? payload.error : "The mutual-fund NAV response was invalid.";
+      if (!response.ok || typeof payload !== "object" || payload === null ||
+        !("navs" in payload) || !Array.isArray(payload.navs)) throw new Error(providerError);
+
+      const navs = new Map<string, { nav: number; date: string; error?: string }>();
+      for (const result of payload.navs) {
+        if (typeof result !== "object" || result === null || !("isin" in result) || typeof result.isin !== "string") continue;
+        if ("nav" in result && typeof result.nav === "number" && Number.isFinite(result.nav) && result.nav > 0 &&
+          "date" in result && typeof result.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
+          navs.set(result.isin.toUpperCase(), { nav: result.nav, date: result.date });
+        } else {
+          navs.set(result.isin.toUpperCase(), {
+            nav: 0,
+            date: "",
+            error: "AMFI did not provide a usable NAV for this ISIN.",
+          });
+        }
+      }
+
+      let updatedValues = 0;
+      let navOnly = 0;
+      const fetchedAt = new Date().toISOString();
+      const updates: Array<{
+        id: string;
+        nav: number;
+        date: string;
+        currentValue?: number;
+        historySnapshot?: MutualFundNavSnapshot;
+      }> = [];
+      for (const asset of eligibleFunds) {
+        const isin = asset.reference.trim().toUpperCase();
+        const result = navs.get(isin);
+        if (!result || result.error) {
+          errors.push(`${asset.name}: ${result?.error ?? "No NAV was returned for this ISIN."}`);
+          continue;
+        }
+        const update: {
+          id: string;
+          nav: number;
+          date: string;
+          currentValue?: number;
+          historySnapshot?: MutualFundNavSnapshot;
+        } = {
+          id: asset.id,
+          nav: result.nav,
+          date: result.date,
+        };
+        if (trackMutualFundNavHistory) {
+          update.historySnapshot = {
+            id: createId(),
+            nav: result.nav,
+            date: result.date,
+            fetchedAt,
+          };
+        }
+        if (asset.quantity !== null && Number.isFinite(asset.quantity)) {
+          update.currentValue = Math.round(asset.quantity * result.nav * 100) / 100;
+          updatedValues++;
+        } else {
+          navOnly++;
+        }
+        updates.push(update);
+      }
+
+      if (updates.length) {
+        onRefreshMutualFundNavs(updates);
+        setMutualFundNavMessage(
+          `Refreshed NAV for ${updates.length} of ${mutualFunds.length} mutual funds from AMFI.` +
+          (updatedValues ? ` Current values updated for ${updatedValues} holdings.` : "") +
+          (navOnly ? ` ${navOnly} funds have no units, so only their NAV was updated.` : "") +
+          (trackMutualFundNavHistory ? " A NAV history snapshot was saved for each refreshed fund." : " NAV history was not saved."),
+        );
+      }
+      setMutualFundNavErrors(errors);
+      if (!updates.length && !errors.length) setMutualFundNavErrors(["AMFI returned no usable NAVs."]);
+    } catch (caught) {
+      setMutualFundNavErrors([caught instanceof Error ? caught.message : "Could not refresh mutual-fund NAVs."]);
+    } finally {
+      setMutualFundNavBusy(false);
+    }
+  }
+
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   }
@@ -3360,8 +3484,16 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   }
 
   return <>
-    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>} />
+    <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<div className="asset-heading-actions">
+      {assets.some((asset) => asset.type === "Mutual fund") && <label className="stock-history-toggle"><input type="checkbox" checked={trackMutualFundNavHistory} disabled={mutualFundNavBusy} onChange={(event) => setTrackMutualFundNavHistory(event.target.checked)} />Track NAV history</label>}
+      {assets.some((asset) => asset.type === "Mutual fund") && <Button type="button" variant="outline" onClick={() => void refreshMutualFundNavs()} disabled={mutualFundNavBusy}>
+        <RefreshCw size={14} className={mutualFundNavBusy ? "spin" : ""} />{mutualFundNavBusy ? "Refreshing NAVs..." : "Refresh mutual fund NAVs"}
+      </Button>}
+      {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
+    </div>} />
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
+    {mutualFundNavMessage && <div className="alert alert-success" role="status">{mutualFundNavMessage}</div>}
+    {mutualFundNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some mutual-fund NAVs could not be refreshed:</strong><ul>{mutualFundNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
@@ -3592,7 +3724,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
       </Card>;
     })}</div>}
-    {activeType === "Mutual fund" && <div className="alert">Mutual fund values are statement snapshots, not live NAV. Implied NAV is current value divided by units; gain percentage is total change, not annualized return. Transaction history is not included.</div>}
+    {activeType === "Mutual fund" && <div className="alert">Refresh mutual fund NAVs to update each linked scheme from AMFI’s published NAV file. NAVs are normally daily, not intraday; unmatched schemes need a valid ISIN in Account / reference. Gain percentage is total change, not annualized return. Transaction history is not included.</div>}
     {activeType === "NPS" && isPartialNpsSelection && <div className="alert">Current market value reflects only the selected NPS schemes. Contributions and withdrawals remain account-level statement totals because the source data does not allocate them by scheme.</div>}
     {activeType === "NPS" && npsTotals.size > 0 && <div className="asset-total-list nps-summary-list">{[...npsTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current + total.withdrawals - total.contributions;
@@ -3654,6 +3786,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       const isFixedDeposit = asset.type === "Fixed deposit";
       const isBond = asset.type === "Bond";
       const isInsurance = asset.type === "Insurance";
+      const isMutualFund = asset.type === "Mutual fund";
       const isNps = asset.type === "NPS";
       const isGold = asset.type === "Digital gold";
       const isGoldScheme = asset.type === "Gold savings scheme";
@@ -3701,12 +3834,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           {isNps && asset.chargesValue != null && <div><span>Statement charges</span><strong>{formatAmount(asset.chargesValue, asset.currency)}</strong></div>}
           {isNps && asset.npsTier && <div><span>NPS tier</span><strong>{asset.npsTier}</strong></div>}
           {asset.quantity !== null && <div><span>{isGold || isGoldScheme ? "Gold weight" : asset.type === "Mutual fund" ? "Units" : "Units / quantity"}</span><strong>{asset.quantity.toLocaleString(undefined, { maximumFractionDigits: isGold || isGoldScheme ? 4 : 3 })}{isGold || isGoldScheme ? " g" : ""}</strong></div>}
-          {impliedNav !== null && <div><span>Implied NAV · statement value / units</span><strong>{formatAmount(impliedNav, asset.currency)}</strong></div>}
+          {isMutualFund && asset.latestNav != null && <div><span>Latest NAV</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: asset.currency, maximumFractionDigits: 6 }).format(asset.latestNav)}</strong></div>}
+          {impliedNav !== null && asset.latestNav == null && <div><span>Implied NAV · statement value / units</span><strong>{formatAmount(impliedNav, asset.currency)}</strong></div>}
           {impliedGoldPrice !== null && <div><span>Implied value per gram</span><strong>{formatAmount(impliedGoldPrice, asset.currency)}/g</strong></div>}
           {isGoldScheme && asset.installmentsPaid != null && <div><span>Installments paid</span><strong>{asset.installmentsPaid}</strong></div>}
           {!isHomeLoan && asset.interestRate !== null && <div><span>{isFixedDeposit ? "Interest rate (% p.a.)" : isBond ? "Current coupon rate (%)" : "Interest / coupon"}</span><strong>{asset.interestRate}%</strong></div>}
           {asset.reference && <div><span>Account / reference</span><strong>{asset.reference}</strong></div>}
-          {asset.valuationDate && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
+          {asset.latestNavDate && isMutualFund && <div><span>NAV date · AMFI</span><strong>{dateLabel(asset.latestNavDate)}</strong></div>}
+          {asset.valuationDate && !(isMutualFund && asset.latestNavDate) && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
           {isNps && asset.lastWithdrawalDate && <div><span>Most recent withdrawal</span><strong>{dateLabel(asset.lastWithdrawalDate)}</strong></div>}
           {asset.startDate && <div><span>{isFixedDeposit ? "Deposit start date" : isHomeLoan ? "Loan sanction / open date" : isLoan ? "Start date" : isBond ? "Investment date" : "Purchase / start date"}</span><strong>{dateLabel(asset.startDate)}</strong></div>}
           {isHomeLoan && asset.firstEmiDate && <div><span>First EMI date</span><strong>{dateLabel(asset.firstEmiDate)}</strong></div>}
@@ -3716,6 +3851,16 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           {performance !== null && !isLoan && <div><span>{isNps ? "Gain / loss after withdrawals" : asset.type === "Mutual fund" || isGold ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
           {asset.location && <div><span>Location / description</span><strong>{asset.location}</strong></div>}
         </div>
+        {isMutualFund && <details className="stock-history mutual-fund-nav-history">
+          <summary>NAV history ({asset.navHistory?.length ?? 0} snapshots)</summary>
+          {asset.navHistory?.length
+            ? [...asset.navHistory].sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt)).map((snapshot) => <div className="stock-history-row" key={snapshot.id}>
+              <span>NAV date · {dateLabel(snapshot.date)}</span>
+              <strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: asset.currency, maximumFractionDigits: 6 }).format(snapshot.nav)}</strong>
+              <small>Fetched {new Date(snapshot.fetchedAt).toLocaleString()}</small>
+            </div>)
+            : <p className="section-description">No NAV snapshots saved. Enable Track NAV history before manually refreshing to record future fetches.</p>}
+        </details>}
         {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <div className="nps-scheme-list">
           <strong>Current scheme holdings</strong>
           {getVisibleNpsSchemes(asset).map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
@@ -12776,7 +12921,29 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} savedHiddenItems={data.preferences?.assetManagerHiddenItems ?? {}} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onSaveVisibleTypes={(types, hiddenItems) => persistPreferenceUpdate((previous) => ({
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} savedHiddenItems={data.preferences?.assetManagerHiddenItems ?? {}} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onRefreshMutualFundNavs={(navUpdates) => {
+      const updatesById = new Map(navUpdates.map((entry) => [entry.id, entry]));
+      update((previous) => ({
+        ...previous,
+        assets: (previous.assets ?? []).map((asset) => {
+          const navUpdate = updatesById.get(asset.id);
+          if (asset.type !== "Mutual fund" || !navUpdate) return asset;
+          return {
+            ...asset,
+            latestNav: navUpdate.nav,
+            latestNavDate: navUpdate.date,
+            currency: "INR",
+            ...(navUpdate.currentValue === undefined ? {} : {
+              currentValue: navUpdate.currentValue,
+              valuationDate: navUpdate.date,
+            }),
+            ...(navUpdate.historySnapshot ? {
+              navHistory: [...(asset.navHistory ?? []), navUpdate.historySnapshot],
+            } : {}),
+          };
+        }),
+      }));
+    }} onSaveVisibleTypes={(types, hiddenItems) => persistPreferenceUpdate((previous) => ({
       ...previous,
       preferences: {
         ...DEFAULT_TRACKER_PREFERENCES,

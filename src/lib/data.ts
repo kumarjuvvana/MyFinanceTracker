@@ -340,6 +340,16 @@ export function validateData(value: unknown): value is TrackerData {
     typeof asset.maturityDate === "string" && (asset.maturityDate === "" || !Number.isNaN(Date.parse(asset.maturityDate))) &&
     (asset.valuationDate === undefined || (typeof asset.valuationDate === "string" &&
       (asset.valuationDate === "" || !Number.isNaN(Date.parse(asset.valuationDate))))) &&
+    (asset.latestNav === undefined || (typeof asset.latestNav === "number" &&
+      Number.isFinite(asset.latestNav) && asset.latestNav > 0)) &&
+    (asset.latestNavDate === undefined || (typeof asset.latestNavDate === "string" &&
+      (asset.latestNavDate === "" || !Number.isNaN(Date.parse(asset.latestNavDate))))) &&
+    (asset.navHistory === undefined || (Array.isArray(asset.navHistory) && asset.navHistory.every((snapshot) =>
+      isRecord(snapshot) && typeof snapshot.id === "string" && snapshot.id.length > 0 &&
+      typeof snapshot.nav === "number" && Number.isFinite(snapshot.nav) && snapshot.nav > 0 &&
+      typeof snapshot.date === "string" && !Number.isNaN(Date.parse(snapshot.date)) &&
+      typeof snapshot.fetchedAt === "string" && !Number.isNaN(Date.parse(snapshot.fetchedAt))) &&
+      new Set(asset.navHistory.map((snapshot) => snapshot.id)).size === asset.navHistory.length)) &&
     (asset.installmentsPaid === undefined || asset.installmentsPaid === null ||
       (typeof asset.installmentsPaid === "number" && Number.isInteger(asset.installmentsPaid) && asset.installmentsPaid >= 0)) &&
     (asset.withdrawnValue === undefined || asset.withdrawnValue === null ||
