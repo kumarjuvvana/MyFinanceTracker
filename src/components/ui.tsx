@@ -157,7 +157,7 @@ export function Modal({ title, onClose, children, wide = false, inline = false }
   );
 }
 
-export function FilterDrawer({ children, activeCount = 0, label = "Filters", closeOnChange = true }: { children: ReactNode; activeCount?: number; label?: string; closeOnChange?: boolean }) {
+export function FilterDrawer({ children, activeCount = 0, label = "Filters", closeOnChange = true, closeOnButtonClick = true }: { children: ReactNode; activeCount?: number; label?: string; closeOnChange?: boolean; closeOnButtonClick?: boolean }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -180,6 +180,7 @@ export function FilterDrawer({ children, activeCount = 0, label = "Filters", clo
         const target = event.target;
         if (!(target instanceof HTMLElement && target.closest(".date-input-mobile"))) setOpen(false);
       }} onClickCapture={(event) => {
+        if (!closeOnButtonClick) return;
         const target = event.target;
         if (target instanceof HTMLButtonElement) setOpen(false);
       }}>

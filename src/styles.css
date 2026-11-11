@@ -787,9 +787,11 @@ body{background:#f3f5ef}
 .asset-preference-actions button{border:1px solid var(--panel-line,#e6ebe3);border-radius:7px;background:var(--panel,#fff);color:var(--text-muted,#778077);padding:6px 9px;font:600 10px Inter,"Aptos","Segoe UI",sans-serif;cursor:pointer}
 .asset-preference-actions button:disabled{opacity:.5;cursor:default}
 .asset-type-preference-tree{display:grid;gap:7px}
-.asset-preference-type{border:1px solid var(--panel-line,#e6ebe3);border-radius:9px;padding:8px 10px}
-.asset-preference-type>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;list-style-position:inside}
-.asset-preference-type>summary label,.asset-preference-item>label,.asset-preference-subitem{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--text,#303830)}
+.asset-preference-type-row{display:flex;align-items:flex-start;gap:9px}
+.asset-preference-type-toggle{display:flex;align-items:center;min-height:39px}
+.asset-preference-type{flex:1;min-width:0;border:1px solid var(--panel-line,#e6ebe3);border-radius:9px;padding:8px 10px}
+.asset-preference-type>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;list-style-position:inside;font-size:11px;font-weight:600;color:var(--text,#303830)}
+.asset-preference-item>label,.asset-preference-subitem{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--text,#303830)}
 .asset-preference-type input{accent-color:var(--user-accent,#56815d);flex:none}
 .asset-preference-count{color:var(--text-muted,#778077);font-size:10px;white-space:nowrap}
 .asset-preference-children{display:grid;gap:8px;padding:10px 0 2px 20px}

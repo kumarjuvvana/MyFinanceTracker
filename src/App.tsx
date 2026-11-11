@@ -3311,6 +3311,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       <FilterDrawer
         label="Filters, sorting & grouping"
         closeOnChange={false}
+        closeOnButtonClick={false}
         activeCount={(filterCurrency !== "All currencies" ? 1 : 0) + (valueFilter !== "all" ? 1 : 0) + (sortBy !== "name" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
       >
         <Field label="Currency"><Select aria-label="Filter assets by currency" value={filterCurrency} onChange={(event) => setFilterCurrency(event.target.value as "All currencies" | Currency)}><option>All currencies</option>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
@@ -3338,21 +3339,22 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
               const selectedCount = keys.filter((id) => !isItemHidden(type, id)).length;
               const title = type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances"
                 : type === "Gold savings scheme" ? "Gold savings schemes" : type;
-              return <details className="asset-preference-type" key={type}>
-                <summary>
-                  <label onClick={(event) => event.stopPropagation()}>
-                    <input type="checkbox" checked={selectedTypes.has(type)} onChange={(event) => {
-                      const checked = event.currentTarget.checked;
-                      setDraftVisibleTypes((current) => checked
-                        ? ASSET_MANAGER_VISIBLE_TYPES.filter((candidate) => candidate === type || current.includes(candidate))
-                        : current.filter((candidate) => candidate !== type));
-                      setTypePreferenceError("");
-                      setTypePreferenceMessage("");
-                    }} />
+              return <div className="asset-preference-type-row" key={type}>
+                <label className="asset-preference-type-toggle">
+                  <input type="checkbox" aria-label={`Include ${title} in asset manager`} checked={selectedTypes.has(type)} onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setDraftVisibleTypes((current) => checked
+                      ? ASSET_MANAGER_VISIBLE_TYPES.filter((candidate) => candidate === type || current.includes(candidate))
+                      : current.filter((candidate) => candidate !== type));
+                    setTypePreferenceError("");
+                    setTypePreferenceMessage("");
+                  }} />
+                </label>
+                <details className="asset-preference-type" open={type === "NPS"}>
+                  <summary>
                     <span>{title}</span>
-                  </label>
-                  <span className="asset-preference-count">{selectedCount} / {keys.length} items</span>
-                </summary>
+                    <span className="asset-preference-count">{selectedCount} / {keys.length} items</span>
+                  </summary>
                 <div className="asset-preference-children">
                   {type === "Stocks"
                     ? <span className="section-description">Stock positions are included or excluded together; individual stock selection is not enabled.</span>
@@ -3385,7 +3387,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
                   })}
                     </>}
                 </div>
-              </details>;
+                </details>
+              </div>;
             })}
           </div>
           {typePreferenceError && <div className="alert alert-error" role="alert">{typePreferenceError}</div>}
