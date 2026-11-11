@@ -267,7 +267,12 @@ export function validateData(value: unknown): value is TrackerData {
         new Set(preferences.activityCompletedItemIds).size === preferences.activityCompletedItemIds.length)) &&
       (preferences.assetManagerVisibleTypes === undefined || (Array.isArray(preferences.assetManagerVisibleTypes) &&
         preferences.assetManagerVisibleTypes.every((type) => ASSET_MANAGER_VISIBLE_TYPES.includes(type as (typeof ASSET_MANAGER_VISIBLE_TYPES)[number])) &&
-        new Set(preferences.assetManagerVisibleTypes).size === preferences.assetManagerVisibleTypes.length));
+        new Set(preferences.assetManagerVisibleTypes).size === preferences.assetManagerVisibleTypes.length)) &&
+      (preferences.assetManagerHiddenItems === undefined || (isRecord(preferences.assetManagerHiddenItems) &&
+        Object.entries(preferences.assetManagerHiddenItems).every(([type, ids]) =>
+          ASSET_MANAGER_VISIBLE_TYPES.includes(type as (typeof ASSET_MANAGER_VISIBLE_TYPES)[number]) &&
+          Array.isArray(ids) && ids.every((id) => typeof id === "string" && id.trim().length > 0) &&
+          new Set(ids).size === ids.length)));
   })();
   if (!preferencesOk) return false;
   const storesOk = value.stores === undefined || (Array.isArray(value.stores) && value.stores.every((store) =>

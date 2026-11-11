@@ -1121,6 +1121,7 @@ export interface TrackerPreferences {
   activitySessions?: ActivityChecklistSession[];
   activityCompletedItemIds?: string[];
   assetManagerVisibleTypes?: AssetManagerVisibleType[];
+  assetManagerHiddenItems?: Partial<Record<AssetManagerVisibleType, string[]>>;
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {

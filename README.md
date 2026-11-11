@@ -65,7 +65,7 @@ The daily Bible-reading feature also requires `supabase/migrations/2026110811000
 
 The daily prayer tracker requires `supabase/migrations/20261108120000_add_daily_prayer_logs.sql`, applied after the daily Bible-reading migration. Run it in Supabase SQL Editor before deploying code that calls its new save/load RPCs. It creates a separate service-role-only table; prayer logs are included in backups and the Archive.
 
-Favorites and display preferences require `supabase/migrations/20261108130000_add_daybook_preferences.sql`. Apply it in the Supabase SQL Editor before deploying this version; it creates a service-role-only preferences table and dedicated load/save RPCs. Preferences and Favorites remain part of JSON backups.
+Favorites and display preferences require `supabase/migrations/20261108130000_add_daybook_preferences.sql`. Apply it in the Supabase SQL Editor before deploying this version; it creates a service-role-only preferences table and dedicated load/save RPCs. Asset Manager type and item selections, including individual NPS scheme visibility, are saved in that existing preferences JSONB record, so this enhancement needs no additional schema migration. Preferences and Favorites remain part of JSON backups.
 
 Morning exercise tracking requires `supabase/migrations/20261108140000_add_morning_exercise_logs.sql`, applied after the daily prayer migration. Run it in Supabase SQL Editor before deploying code that saves exercise logs. It adds a service-role-only table and includes exercise records in shared data, backups, search, and the Archive.
 

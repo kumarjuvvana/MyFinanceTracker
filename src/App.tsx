@@ -2839,13 +2839,14 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
   bankAccounts: BankAccount[];
   vehicles: Vehicle[];
   savedVisibleTypes: AssetManagerVisibleType[];
+  savedHiddenItems: NonNullable<TrackerPreferences["assetManagerHiddenItems"]>;
   onSave: (asset: Omit<AssetRecord, "id">, id?: string) => void;
   onDelete: (asset: AssetRecord) => void;
   onOpenStocks: () => void;
@@ -2853,7 +2854,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   onSaveVehicle: (vehicle: Omit<Vehicle, "id">, id?: string) => void;
   onSaveVehicleValuation: (vehicleId: string, valuation: VehicleValuation) => void;
   onOpenVehicles: () => void;
-  onSaveVisibleTypes: (types: AssetManagerVisibleType[]) => Promise<void>;
+  onSaveVisibleTypes: (
+    types: AssetManagerVisibleType[],
+    hiddenItems: NonNullable<TrackerPreferences["assetManagerHiddenItems"]>,
+  ) => Promise<void>;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
@@ -2861,6 +2865,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<"All types" | "Stocks" | "Bank accounts" | AssetType>("All types");
   const [draftVisibleTypes, setDraftVisibleTypes] = useState<AssetManagerVisibleType[]>(savedVisibleTypes);
+  const [draftHiddenItems, setDraftHiddenItems] = useState<NonNullable<TrackerPreferences["assetManagerHiddenItems"]>>(savedHiddenItems);
   const [sortBy, setSortBy] = useState<"name" | "value-highest" | "value-lowest">("name");
   const [groupBy, setGroupBy] = useState<"none" | "type" | "institution" | "currency">("none");
   const [filterCurrency, setFilterCurrency] = useState<"All currencies" | Currency>("All currencies");
@@ -2869,9 +2874,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [typePreferenceMessage, setTypePreferenceMessage] = useState("");
   const [typePreferenceError, setTypePreferenceError] = useState("");
   const savedTypesKey = savedVisibleTypes.join("|");
+  const savedHiddenItemsKey = JSON.stringify(savedHiddenItems);
   useEffect(() => {
     setDraftVisibleTypes(savedVisibleTypes);
-  }, [savedTypesKey]);
+    setDraftHiddenItems(savedHiddenItems);
+  }, [savedTypesKey, savedHiddenItemsKey]);
   const selectedTypes = new Set(draftVisibleTypes);
   const query = search.trim().toLocaleLowerCase();
   const latestVehicleValuation = (vehicle: Vehicle) => (vehicle.valuationHistory ?? []).reduce<VehicleValuation | undefined>(
@@ -2879,8 +2886,26 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     undefined,
   );
   const latestStockQuotes = latestStockQuotesById(stockQuotes, stocks);
-  const currentAssetValue = (asset: AssetRecord) =>
-    asset.type === "Home loan" ? asset.principalOutstanding ?? asset.currentValue : asset.currentValue;
+  const isItemHidden = (type: AssetManagerVisibleType, id: string) =>
+    (draftHiddenItems[type] ?? []).includes(id);
+  const getVisibleNpsSchemes = (asset: AssetRecord) =>
+    (asset.npsSchemes ?? []).filter((scheme) => !isItemHidden("NPS", `${asset.id}::${scheme.schemeName}`));
+  const hasPartialNpsSelection = (asset: AssetRecord) =>
+    asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0 &&
+    getVisibleNpsSchemes(asset).length < (asset.npsSchemes?.length ?? 0);
+  const isAssetItemVisible = (asset: AssetRecord) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0
+    ? getVisibleNpsSchemes(asset).length > 0
+    : asset.type === "Stock" || !isItemHidden(asset.type, asset.id);
+  const currentAssetValue = (asset: AssetRecord) => {
+    if (asset.type === "Home loan") return asset.principalOutstanding ?? asset.currentValue;
+    if (asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) {
+      const schemes = getVisibleNpsSchemes(asset);
+      const valuedSchemes = schemes.filter((scheme) => scheme.currentValue !== null);
+      if (valuedSchemes.length) return valuedSchemes.reduce((total, scheme) => total + (scheme.currentValue ?? 0), 0);
+      return schemes.length === (asset.npsSchemes?.length ?? 0) ? asset.currentValue : null;
+    }
+    return asset.currentValue;
+  };
   const matchesValueFilter = (amount: number | null | undefined) =>
     valueFilter === "all" || (valueFilter === "recorded" ? amount != null : amount == null);
   const compareByValue = (left: number | null | undefined, right: number | null | undefined) => {
@@ -2888,7 +2913,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     return sortBy === "value-lowest" ? difference : -difference;
   };
   const visible = assets.filter((asset) =>
-    asset.type !== "Stock" && selectedTypes.has(asset.type) &&
+    asset.type !== "Stock" && selectedTypes.has(asset.type) && isAssetItemVisible(asset) &&
     (activeType === "All types" || activeType !== "Stocks" && activeType !== "Bank accounts" && asset.type === activeType) &&
     (filterCurrency === "All currencies" || asset.currency === filterCurrency) &&
     matchesValueFilter(currentAssetValue(asset)) &&
@@ -2906,7 +2931,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     ? a.symbol.localeCompare(b.symbol)
     : compareByValue((latestStockQuotes.get(a.id)?.price ?? 0) * (a.quantity ?? 0), (latestStockQuotes.get(b.id)?.price ?? 0) * (b.quantity ?? 0)));
   const visibleBankAccounts = bankAccounts.filter((account) =>
-    selectedTypes.has("Bank accounts") && (filterCurrency === "All currencies" || filterCurrency === "INR") &&
+    selectedTypes.has("Bank accounts") && !isItemHidden("Bank accounts", account.id) &&
+    (filterCurrency === "All currencies" || filterCurrency === "INR") &&
     matchesValueFilter(account.currentBalance) &&
     [account.bankName, account.accountType, account.accountHolder, account.branch, account.notes, account.accountNumber]
       .some((value) => value.toLocaleLowerCase().includes(query)))
@@ -2915,7 +2941,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       : compareByValue(a.currentBalance, b.currentBalance));
   const visibleVehicles = vehicles.filter((vehicle) => {
     const value = vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? null;
-    return selectedTypes.has("Vehicle") && (filterCurrency === "All currencies" || filterCurrency === "INR") &&
+    return selectedTypes.has("Vehicle") && !isItemHidden("Vehicle", vehicle.id) &&
+      (filterCurrency === "All currencies" || filterCurrency === "INR") &&
       matchesValueFilter(value) &&
       [vehicle.name, vehicle.make, vehicle.model, vehicle.year, vehicle.registration, vehicle.fuelType, vehicle.notes]
         .some((item) => String(item ?? "").toLocaleLowerCase().includes(query));
@@ -2981,6 +3008,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const visibleMutualFunds = visible.filter((asset) => asset.type === "Mutual fund");
   const visibleHomeLoans = visible.filter((asset) => asset.type === "Home loan");
   const visibleNps = visible.filter((asset) => asset.type === "NPS");
+  const isPartialNpsSelection = visibleNps.some(hasPartialNpsSelection);
   const visibleDigitalGold = visible.filter((asset) => asset.type === "Digital gold");
   const visibleFixedDeposits = visible.filter((asset) => asset.type === "Fixed deposit");
   const visibleRealEstate = visible.filter((asset) => asset.type === "Real estate");
@@ -3005,7 +3033,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   for (const account of visibleNps) {
     const total = npsTotals.get(account.currency) ?? { contributions: 0, current: 0, withdrawals: 0, charges: 0 };
     if (account.investedValue !== null) total.contributions += account.investedValue;
-    if (account.currentValue !== null) total.current += account.currentValue;
+    const currentValue = currentAssetValue(account);
+    if (currentValue !== null) total.current += currentValue;
     if (account.withdrawnValue != null) total.withdrawals += account.withdrawnValue;
     if (account.chargesValue != null) total.charges += account.chargesValue;
     npsTotals.set(account.currency, total);
@@ -3130,9 +3159,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   }, { currentValue: 0, currentValueCount: 0, purchaseValue: 0, purchaseValueCount: 0, estimatedChange: 0, comparableVehicles: 0 });
   const totals = new Map<string, { assets: number; liabilities: number }>();
   for (const asset of assets) {
-    if (asset.type !== "Stock" && !selectedTypes.has(asset.type)) continue;
-    if (asset.type === "Stock") continue;
-    const balance = asset.type === "Home loan" ? asset.principalOutstanding ?? asset.currentValue : asset.currentValue;
+    if (asset.type === "Stock" || !selectedTypes.has(asset.type) || !isAssetItemVisible(asset)) continue;
+    const balance = currentAssetValue(asset);
     if (balance === null) continue;
     const total = totals.get(asset.currency) ?? { assets: 0, liabilities: 0 };
     if (asset.type === "Loan" || asset.type === "Home loan") total.liabilities += balance;
@@ -3149,14 +3177,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     totals.set(quote.currency, total);
   }
   for (const account of bankAccounts) {
-    if (!selectedTypes.has("Bank accounts")) continue;
+    if (!selectedTypes.has("Bank accounts") || isItemHidden("Bank accounts", account.id)) continue;
     if (account.currentBalance == null) continue;
     const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
     total.assets += account.currentBalance;
     totals.set("INR", total);
   }
   for (const vehicle of vehicles) {
-    if (!selectedTypes.has("Vehicle")) continue;
+    if (!selectedTypes.has("Vehicle") || isItemHidden("Vehicle", vehicle.id)) continue;
     const balance = vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue;
     if (balance == null) continue;
     const total = totals.get("INR") ?? { assets: 0, liabilities: 0 };
@@ -3176,23 +3204,73 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     "All types",
     ...ASSET_MANAGER_VISIBLE_TYPES.filter((type) => selectedTypes.has(type)),
   ];
+  type PreferenceItem = { id: string; label: string; value: number | null; currency: string; children?: PreferenceItem[] };
+  const preferenceItems = ASSET_MANAGER_VISIBLE_TYPES.map((type) => {
+    const items: PreferenceItem[] = type === "Stocks"
+      ? []
+      : type === "Bank accounts"
+        ? bankAccounts.map((account) => ({
+          id: account.id,
+          label: `${account.bankName} · ${account.accountType}`,
+          value: account.currentBalance ?? null,
+          currency: "INR",
+        }))
+        : type === "Vehicle"
+          ? vehicles.map((vehicle) => ({
+            id: vehicle.id,
+            label: [vehicle.name, vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" · "),
+            value: vehicle.currentValue ?? latestVehicleValuation(vehicle)?.currentValue ?? null,
+            currency: "INR",
+          }))
+          : assets.filter((asset) => asset.type === type).map((asset) => ({
+            id: asset.id,
+            label: asset.name,
+            value: currentAssetValue(asset),
+            currency: asset.currency,
+            ...(asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0
+              ? { children: (asset.npsSchemes ?? []).map((scheme) => ({
+                id: `${asset.id}::${scheme.schemeName}`,
+                label: scheme.schemeName,
+                value: scheme.currentValue,
+                currency: asset.currency,
+              })) }
+              : {}),
+          }));
+    return { type, items };
+  });
+  function itemKeys(items: PreferenceItem[]): string[] {
+    return items.flatMap((item) => item.children?.length ? item.children.map((child) => child.id) : [item.id]);
+  }
+  function setItemsHidden(type: AssetManagerVisibleType, ids: string[], hidden: boolean) {
+    setDraftHiddenItems((current) => {
+      const updatedIds = new Set(current[type] ?? []);
+      ids.forEach((id) => hidden ? updatedIds.add(id) : updatedIds.delete(id));
+      const next = { ...current };
+      if (updatedIds.size) next[type] = [...updatedIds];
+      else delete next[type];
+      return next;
+    });
+    setTypePreferenceError("");
+    setTypePreferenceMessage("");
+  }
+  function togglePreferenceItem(type: AssetManagerVisibleType, id: string, checked: boolean) {
+    setItemsHidden(type, [id], !checked);
+  }
   useEffect(() => {
     if (activeType !== "All types" && !assetTabs.includes(activeType)) setActiveType("All types");
   }, [activeType, savedTypesKey, draftVisibleTypes]);
   const hasUnsavedTypeChanges = ASSET_MANAGER_VISIBLE_TYPES.some((type) =>
     selectedTypes.has(type) !== savedVisibleTypes.includes(type));
+  const hasUnsavedItemChanges = ASSET_MANAGER_VISIBLE_TYPES.some((type) =>
+    JSON.stringify([...(draftHiddenItems[type] ?? [])].sort()) !==
+    JSON.stringify([...(savedHiddenItems[type] ?? [])].sort()));
   async function saveVisibleTypes() {
-    if (!draftVisibleTypes.length) {
-      setTypePreferenceError("Select at least one asset type to show.");
-      setTypePreferenceMessage("");
-      return;
-    }
     setSavingTypes(true);
     setTypePreferenceError("");
     setTypePreferenceMessage("");
     try {
-      await onSaveVisibleTypes(draftVisibleTypes);
-      setTypePreferenceMessage("Asset type preferences saved to Supabase.");
+      await onSaveVisibleTypes(draftVisibleTypes, draftHiddenItems);
+      setTypePreferenceMessage("Asset and item selections saved to Supabase.");
     } catch (caught) {
       setTypePreferenceError(caught instanceof Error ? caught.message : "Could not save asset type preferences.");
     } finally {
@@ -3214,14 +3292,15 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
-        const count = type === "All types" ? assets.filter((asset) => asset.type !== "Stock" && selectedTypes.has(asset.type)).length +
+        const count = type === "All types" ? assets.filter((asset) => asset.type !== "Stock" &&
+            selectedTypes.has(asset.type) && isAssetItemVisible(asset)).length +
             (selectedTypes.has("Stocks") ? stocks.length : 0) +
-            (selectedTypes.has("Bank accounts") ? bankAccounts.length : 0) +
-            (selectedTypes.has("Vehicle") ? vehicles.length : 0)
+            (selectedTypes.has("Bank accounts") ? bankAccounts.filter((account) => !isItemHidden("Bank accounts", account.id)).length : 0) +
+            (selectedTypes.has("Vehicle") ? vehicles.filter((vehicle) => !isItemHidden("Vehicle", vehicle.id)).length : 0)
           : type === "Stocks" ? stocks.length
-            : type === "Bank accounts" ? bankAccounts.length
-            : type === "Vehicle" ? vehicles.length
-            : assets.filter((asset) => asset.type === type).length;
+            : type === "Bank accounts" ? bankAccounts.filter((account) => !isItemHidden("Bank accounts", account.id)).length
+            : type === "Vehicle" ? vehicles.filter((vehicle) => !isItemHidden("Vehicle", vehicle.id)).length
+            : assets.filter((asset) => asset.type === type && isAssetItemVisible(asset)).length;
         const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes"
           : type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances" : type;
         return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
@@ -3240,19 +3319,78 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <Field label="Group by"><Select aria-label="Group assets" value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}><option value="none">No grouping</option><option value="type">Asset type</option><option value="institution">Institution</option><option value="currency">Currency</option></Select></Field>
         <div className="asset-type-preferences">
           <h3 className="section-title">Asset types shown</h3>
-          <p className="section-description">This separate selection controls which tabs and totals appear. Changes preview immediately and are not saved until you choose Save.</p>
-          <div className="asset-type-preference-options">{ASSET_MANAGER_VISIBLE_TYPES.map((type) => <label key={type}><input type="checkbox" checked={selectedTypes.has(type)} onChange={(event) => {
-            const checked = event.currentTarget.checked;
-            setDraftVisibleTypes((current) => checked
-              ? ASSET_MANAGER_VISIBLE_TYPES.filter((candidate) => candidate === type || current.includes(candidate))
-              : current.filter((candidate) => candidate !== type));
-            setTypePreferenceError("");
-            setTypePreferenceMessage("");
-          }} /><span>{type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances" : type === "Gold savings scheme" ? "Gold savings schemes" : type}</span></label>)}</div>
+          <p className="section-description">Choose asset classes and individual records to include in tabs and totals. New records are included by default. Changes are saved to the shared Supabase preferences when you choose Save.</p>
+          <div className="asset-preference-actions">
+            <Button type="button" variant="outline" onClick={() => {
+              setDraftVisibleTypes([...ASSET_MANAGER_VISIBLE_TYPES]);
+              setTypePreferenceError("");
+              setTypePreferenceMessage("");
+            }}>Check all types</Button>
+            <Button type="button" variant="outline" onClick={() => {
+              setDraftVisibleTypes([]);
+              setTypePreferenceError("");
+              setTypePreferenceMessage("");
+            }}>Uncheck all types</Button>
+          </div>
+          <div className="asset-type-preference-tree">
+            {preferenceItems.map(({ type, items }) => {
+              const keys = itemKeys(items);
+              const selectedCount = keys.filter((id) => !isItemHidden(type, id)).length;
+              const title = type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances"
+                : type === "Gold savings scheme" ? "Gold savings schemes" : type;
+              return <details className="asset-preference-type" key={type}>
+                <summary>
+                  <label onClick={(event) => event.stopPropagation()}>
+                    <input type="checkbox" checked={selectedTypes.has(type)} onChange={(event) => {
+                      const checked = event.currentTarget.checked;
+                      setDraftVisibleTypes((current) => checked
+                        ? ASSET_MANAGER_VISIBLE_TYPES.filter((candidate) => candidate === type || current.includes(candidate))
+                        : current.filter((candidate) => candidate !== type));
+                      setTypePreferenceError("");
+                      setTypePreferenceMessage("");
+                    }} />
+                    <span>{title}</span>
+                  </label>
+                  <span className="asset-preference-count">{selectedCount} / {keys.length} items</span>
+                </summary>
+                <div className="asset-preference-children">
+                  {type === "Stocks"
+                    ? <span className="section-description">Stock positions are included or excluded together; individual stock selection is not enabled.</span>
+                    : <>
+                  <div className="asset-preference-actions">
+                    <button type="button" disabled={!keys.length} onClick={() => setItemsHidden(type, keys, false)}>Check all items</button>
+                    <button type="button" disabled={!keys.length} onClick={() => setItemsHidden(type, keys, true)}>Uncheck all items</button>
+                  </div>
+                  {!items.length && <span className="section-description">No items recorded yet. New items will be checked by default.</span>}
+                  {items.map((item) => {
+                    const itemIds = item.children?.length ? item.children.map((child) => child.id) : [item.id];
+                    const itemSelectedCount = itemIds.filter((id) => !isItemHidden(type, id)).length;
+                    const checked = itemIds.length > 0 && itemSelectedCount === itemIds.length;
+                    const mixed = itemSelectedCount > 0 && !checked;
+                    return <div className="asset-preference-item" key={item.id}>
+                      <label>
+                        <input type="checkbox" checked={checked} aria-checked={mixed ? "mixed" : checked}
+                          ref={(input) => { if (input) input.indeterminate = mixed; }}
+                          onChange={(event) => setItemsHidden(type, itemIds, !event.currentTarget.checked)} />
+                        <span>{item.label}</span>
+                        <strong>{item.value === null ? "Not recorded" : formatAmount(item.value, item.currency)}</strong>
+                      </label>
+                      {item.children?.map((child) => <label className="asset-preference-subitem" key={child.id}>
+                        <input type="checkbox" checked={!isItemHidden(type, child.id)}
+                          onChange={(event) => togglePreferenceItem(type, child.id, event.currentTarget.checked)} />
+                        <span>{child.label}</span>
+                        <strong>{child.value === null ? "Not recorded" : formatAmount(child.value, child.currency)}</strong>
+                      </label>)}
+                    </div>;
+                  })}
+                    </>}
+                </div>
+              </details>;
+            })}
+          </div>
           {typePreferenceError && <div className="alert alert-error" role="alert">{typePreferenceError}</div>}
           {typePreferenceMessage && <div className="alert alert-success" role="status">{typePreferenceMessage}</div>}
-          <Button type="button" disabled={savingTypes || !hasUnsavedTypeChanges || !draftVisibleTypes.length} onClick={() => void saveVisibleTypes()}>{savingTypes ? "Saving..." : "Save asset type selection"}</Button>
-          {!draftVisibleTypes.length && <p className="section-description">Choose at least one asset type before saving.</p>}
+          <Button type="button" disabled={savingTypes || (!hasUnsavedTypeChanges && !hasUnsavedItemChanges)} onClick={() => void saveVisibleTypes()}>{savingTypes ? "Saving..." : "Save asset and item selection"}</Button>
         </div>
       </FilterDrawer>
       <Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge>
@@ -3352,17 +3490,18 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       </Card>;
     })}</div>}
     {activeType === "Mutual fund" && <div className="alert">Mutual fund values are statement snapshots, not live NAV. Implied NAV is current value divided by units; gain percentage is total change, not annualized return. Transaction history is not included.</div>}
+    {activeType === "NPS" && isPartialNpsSelection && <div className="alert">Current market value reflects only the selected NPS schemes. Contributions and withdrawals remain account-level statement totals because the source data does not allocate them by scheme.</div>}
     {activeType === "NPS" && npsTotals.size > 0 && <div className="asset-total-list nps-summary-list">{[...npsTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const gain = total.current + total.withdrawals - total.contributions;
       const returnPercent = total.contributions ? gain / total.contributions * 100 : null;
       return <Card className="asset-total-card" key={currency}>
         <div><span>Total contributions · {currency}</span><strong>{formatAmount(total.contributions, currency)}</strong></div>
-        <div><span>Current market value · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
+        <div><span>{isPartialNpsSelection ? "Selected schemes' current value" : "Current market value"} · {currency}</span><strong>{formatAmount(total.current, currency)}</strong></div>
         <div><span>Withdrawals · {currency}</span><strong>{formatAmount(total.withdrawals, currency)}</strong></div>
-        <div><span>Gain / loss after withdrawals · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
+        {!isPartialNpsSelection && <div><span>Gain / loss after withdrawals · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>}
       </Card>;
     })}</div>}
-    {activeType === "NPS" && <div className="alert">NPS balances are statement snapshots, not live valuations. Gain / loss is calculated as current value + withdrawals − total contributions; transaction history is not imported in this snapshot.</div>}
+    {activeType === "NPS" && <div className="alert">NPS balances are statement snapshots, not live valuations. Gain / loss is calculated as current value + withdrawals − total contributions when all schemes are selected; transaction history is not imported in this snapshot.</div>}
     {activeType === "Home loan" && homeLoanTotals.size > 0 && <div className="asset-total-list home-loan-summary-list">{[...homeLoanTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => {
       const metric = (value: number, found: number, label: string) => found
         ? `${formatAmount(value, currency)}${found < total.accounts ? ` (${found} of ${total.accounts} reported)` : ""}`
@@ -3415,8 +3554,11 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       const isNps = asset.type === "NPS";
       const isGold = asset.type === "Digital gold";
       const isGoldScheme = asset.type === "Gold savings scheme";
-      const performance = !isHomeLoan && !isFixedDeposit && !isBond && !isInsurance && asset.investedValue !== null && asset.currentValue !== null
-        ? asset.currentValue + (isNps ? asset.withdrawnValue ?? 0 : 0) - asset.investedValue
+      const currentValue = currentAssetValue(asset);
+      const partialNpsSelection = hasPartialNpsSelection(asset);
+      const performance = !isHomeLoan && !isFixedDeposit && !isBond && !isInsurance && !partialNpsSelection &&
+        asset.investedValue !== null && currentValue !== null
+        ? currentValue + (isNps ? asset.withdrawnValue ?? 0 : 0) - asset.investedValue
         : null;
       const performancePercent = performance !== null && asset.investedValue
         ? performance / asset.investedValue * 100
@@ -3431,10 +3573,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Wallet size={17} /></div><div><h2>{asset.name}</h2><p>{asset.type}{asset.institution ? ` · ${asset.institution}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button></div></div>
         <div className="asset-details">
           {isHomeLoan && asset.sanctionedAmount != null && <div><span>Sanctioned amount</span><strong>{formatAmount(asset.sanctionedAmount, asset.currency)}</strong></div>}
-          {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : isInsurance ? "Premiums paid to date" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
+          {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total account contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : isInsurance ? "Premiums paid to date" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {isHomeLoan
             ? <div><span>Principal outstanding</span><strong>{asset.principalOutstanding != null ? formatAmount(asset.principalOutstanding, asset.currency) : "Not shown in provided statement"}</strong></div>
-            : asset.currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong>{formatAmount(asset.currentValue, asset.currency)}</strong></div>}
+            : currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? partialNpsSelection ? "Selected schemes' current value" : "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong>{formatAmount(currentValue, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.maturityAmount != null && <div><span>Maturity amount on advice</span><strong>{formatAmount(asset.maturityAmount, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.depositTerm && <div><span>Deposit term</span><strong>{asset.depositTerm}</strong></div>}
           {isFixedDeposit && asset.depositScheme && <div><span>Deposit scheme</span><strong>{asset.depositScheme}</strong></div>}
@@ -3473,7 +3615,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         </div>
         {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <div className="nps-scheme-list">
           <strong>Current scheme holdings</strong>
-          {asset.npsSchemes?.map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
+          {getVisibleNpsSchemes(asset).map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
             <span>{scheme.schemeName}{scheme.allocationPercent !== null ? ` · ${scheme.allocationPercent}% allocation` : ""}</span>
             <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}</span>
             <strong>{scheme.currentValue !== null ? formatAmount(scheme.currentValue, asset.currency) : "—"}</strong>
@@ -12531,12 +12673,13 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onSaveVisibleTypes={(types) => persistPreferenceUpdate((previous) => ({
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} savedHiddenItems={data.preferences?.assetManagerHiddenItems ?? {}} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onSaveVisibleTypes={(types, hiddenItems) => persistPreferenceUpdate((previous) => ({
       ...previous,
       preferences: {
         ...DEFAULT_TRACKER_PREFERENCES,
         ...previous.preferences,
         assetManagerVisibleTypes: types,
+        assetManagerHiddenItems: hiddenItems,
       },
     }))} />,
     "Bank accounts": <BankAccountsPage accounts={data.bankAccounts ?? []} onNavigate={changePage}

@@ -783,6 +783,20 @@ body{background:#f3f5ef}
 .asset-type-preference-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .asset-type-preference-options label{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--text,#303830)}
 .asset-type-preference-options input{accent-color:var(--user-accent,#56815d)}
+.asset-preference-actions{display:flex;flex-wrap:wrap;gap:7px}
+.asset-preference-actions button{border:1px solid var(--panel-line,#e6ebe3);border-radius:7px;background:var(--panel,#fff);color:var(--text-muted,#778077);padding:6px 9px;font:600 10px Inter,"Aptos","Segoe UI",sans-serif;cursor:pointer}
+.asset-preference-actions button:disabled{opacity:.5;cursor:default}
+.asset-type-preference-tree{display:grid;gap:7px}
+.asset-preference-type{border:1px solid var(--panel-line,#e6ebe3);border-radius:9px;padding:8px 10px}
+.asset-preference-type>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;list-style-position:inside}
+.asset-preference-type>summary label,.asset-preference-item>label,.asset-preference-subitem{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--text,#303830)}
+.asset-preference-type input{accent-color:var(--user-accent,#56815d);flex:none}
+.asset-preference-count{color:var(--text-muted,#778077);font-size:10px;white-space:nowrap}
+.asset-preference-children{display:grid;gap:8px;padding:10px 0 2px 20px}
+.asset-preference-item{display:grid;gap:7px}
+.asset-preference-item>label span,.asset-preference-subitem span{flex:1;min-width:0;overflow-wrap:anywhere}
+.asset-preference-item>label strong,.asset-preference-subitem strong{font-size:10px;color:var(--text-muted,#778077);text-align:right}
+.asset-preference-subitem{padding-left:22px}
 .asset-list-group{display:grid;gap:10px;margin-bottom:12px}
 .asset-list-group-title{margin:0;color:var(--text-muted,#778077);font:700 12px Inter,"Aptos","Segoe UI",sans-serif}
 .asset-type-tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding:0 0 4px;scrollbar-width:thin}
