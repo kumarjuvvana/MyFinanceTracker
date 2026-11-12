@@ -1590,6 +1590,9 @@ body{background:#f3f5ef}
 .activity-add-session>.field{flex:1;min-width:0}
 .activity-filter-controls{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
 .activity-filter-controls>.field-wrap{min-width:135px}
+.activity-session-groups,.exercise-record-groups,.training-record-groups{display:grid;gap:14px}
+.exercise-record-groups>section,.training-record-groups>section{display:grid;gap:10px;min-width:0}
+.exercise-group-control,.training-group-control{width:min(100%,160px);margin:0}
 .activity-session-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
 .activity-session-card{min-width:0;padding:17px}
 .activity-session-head{justify-content:space-between;margin-bottom:13px}

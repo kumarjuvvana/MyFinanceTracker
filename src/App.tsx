@@ -321,6 +321,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   const [search, setSearch] = useState("");
   const [sessionFilter, setSessionFilter] = useState("all");
   const [taskFilter, setTaskFilter] = useState("All tasks");
+  const [sessionGroupBy, setSessionGroupBy] = useState("session");
   const [editingLinkItemId, setEditingLinkItemId] = useState<string | null>(null);
   const [linkDrafts, setLinkDrafts] = useState<Record<string, ActivityChecklistLink[]>>({});
   const [linkErrors, setLinkErrors] = useState<Record<string, string>>({});
@@ -344,6 +345,17 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
   }).filter(({ items, sessionMatches }) =>
     (!query || sessionMatches || items.length > 0) &&
     (taskFilter === "All tasks" || items.length > 0 || (query && sessionMatches)));
+  const activitySessionGroups = sessionGroupBy === "session"
+    ? [{ key: "sessions", title: "", sessions: visibleSessions }]
+    : ["In progress", "Not started", "Completed"].map((title) => ({
+      key: title,
+      title,
+      sessions: visibleSessions.filter(({ session }) => {
+        const done = session.items.filter((item) => checkedItems.has(item.id)).length;
+        const progress = done === 0 ? "Not started" : done === session.items.length ? "Completed" : "In progress";
+        return progress === title;
+      }),
+    })).filter((group) => group.sessions.length > 0);
 
   function updateSession(sessionId: string, update: (session: ActivityChecklistSession) => ActivityChecklistSession) {
     onSave(sessions.map((session) => session.id === sessionId ? update(session) : session));
@@ -453,17 +465,17 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
           {sessions.map((session) => <option key={session.id} value={session.id}>{session.name}</option>)}
         </Select></Field>
         <Field label="Task status"><Select aria-label="Filter activities by completion" value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}><option>All tasks</option><option>Incomplete</option><option>Completed</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group activity sessions" value={sessionGroupBy} onChange={(event) => setSessionGroupBy(event.target.value)}><option value="session">Session</option><option value="progress">Progress status</option></Select></Field>
       </div>
-      <FilterDrawer label="Apply filters">
-        <p className="section-description">Additional activity filters can be added here.</p>
-      </FilterDrawer>
       <Badge>{visibleSessions.reduce((total, entry) => total + entry.items.length, 0)} matching {visibleSessions.reduce((total, entry) => total + entry.items.length, 0) === 1 ? "task" : "tasks"}</Badge>
     </div>
     <form className="activity-add-session" onSubmit={addSession}>
       <Input aria-label="New session name" placeholder="Add a session, e.g. Before bed" maxLength={60} value={newSessionName} onChange={(event) => setNewSessionName(event.target.value)} />
       <Button type="submit" disabled={!newSessionName.trim()}><Plus size={14} />Add session</Button>
     </form>
-    {sessions.length ? visibleSessions.length ? <div className="activity-session-grid">{visibleSessions.map(({ session, items: visibleItems }) => {
+    {sessions.length ? visibleSessions.length ? <div className="activity-session-groups">{activitySessionGroups.map((group) => <section className="activity-session-group" key={group.key}>
+      {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.sessions.length}</span></h2>}
+      <div className="activity-session-grid">{group.sessions.map(({ session, items: visibleItems }) => {
       const sessionDone = session.items.filter((item) => checkedItems.has(item.id)).length;
       const expanded = expandedSessionIds.has(session.id);
       return <Card className="activity-session-card" key={session.id}>
@@ -618,7 +630,8 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
         </form>
         </>}
       </Card>;
-    })}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No matching activities" description="Try another search or completion filter." /></Card> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
+      })}</div>
+    </section>)}</div> : <Card><EmptyState icon={<ListChecks size={18} />} title="No matching activities" description="Try another search or completion filter." /></Card> : <Card><EmptyState icon={<ListChecks size={18} />} title="No sessions yet" description="Add a session above to start building your reusable activity checklist." /></Card>}
   </>;
 }
 
@@ -6959,6 +6972,11 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   }]);
   const [search, setSearch] = useState("");
   const [activityFilter, setActivityFilter] = useState("");
+  const [daypartFilter, setDaypartFilter] = useState("");
+  const [intensityFilter, setIntensityFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [groupBy, setGroupBy] = useState("date");
   const [newActivity, setNewActivity] = useState("");
   const [editingActivity, setEditingActivity] = useState<string | null>(null);
   const [activityDraft, setActivityDraft] = useState("");
@@ -6968,10 +6986,21 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   const formActivities = [...new Set([...activities, ...draftRows.map((row) => row.activity)])];
   const visibleLogs = [...logs].filter((log) =>
     (!activityFilter || log.activity === activityFilter) &&
-    [log.date, log.activity, log.intensity, log.notes].some((value) => value.toLocaleLowerCase().includes(query)));
+    (!daypartFilter || (log.daypart ?? "Morning") === daypartFilter) &&
+    (!intensityFilter || log.intensity === intensityFilter) &&
+    (!dateFrom || log.date >= dateFrom) &&
+    (!dateTo || log.date <= dateTo) &&
+    [log.date, log.activity, log.intensity, log.notes, log.daypart ?? "Morning"].some((value) => value.toLocaleLowerCase().includes(query)));
   const visibleDayGroups = [...new Set(visibleLogs.map((log) => log.date))]
     .sort((a, b) => b.localeCompare(a))
     .map((date) => ({ date, logs: visibleLogs.filter((log) => log.date === date) }));
+  const exerciseRecordGroups = groupBy === "activity"
+    ? [...new Set(visibleLogs.map((log) => log.activity))].sort((a, b) => a.localeCompare(b))
+      .map((title) => ({ title, logs: visibleLogs.filter((log) => log.activity === title) }))
+    : groupBy === "daypart"
+      ? EXERCISE_DAYPARTS.filter((part) => visibleLogs.some((log) => (log.daypart ?? "Morning") === part))
+        .map((title) => ({ title, logs: visibleLogs.filter((log) => (log.daypart ?? "Morning") === title) }))
+      : [];
   const weekStart = new Date(`${today()}T00:00:00`);
   weekStart.setDate(weekStart.getDate() - 6);
   const weekStartKey = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
@@ -7120,6 +7149,26 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     onArchive(log);
   }
 
+  function renderExerciseDayCards(entries: MorningExerciseLog[]) {
+    const dateGroups = [...new Set(entries.map((log) => log.date))]
+      .sort((a, b) => b.localeCompare(a))
+      .map((date) => ({ date, logs: entries.filter((log) => log.date === date) }));
+    return <div className="exercise-day-list">{dateGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
+      <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => copyDay(date)}><Copy size={13} />Copy day</Button><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div></div>
+      <div className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>{dayLogs.map((log) => <tr key={log.id}>
+          <td data-label="Session">{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</td>
+          <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
+          <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
+          <td data-label="Intensity">{log.intensity}</td>
+          <td data-label="Notes">{log.notes}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></div>
+    </Card>)}</div>;
+  }
+
   const exerciseEntryForm = <Card className="mindful-habits-card">
     <div className="card-head"><div><h2 className="section-title">{editingDate ? `Edit exercises · ${dateLabel(editingDate)}` : copyingDate ? `Copy exercises from ${dateLabel(copyingDate)}` : "Log exercises for one day"}</h2><p className="section-description">Choose the date once, add each activity as a row below, then save them together. Each row defaults to Morning; time is optional.</p></div><Dumbbell size={17} /></div>
     <form onSubmit={submit}>
@@ -7174,26 +7223,23 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     {(editingDate || copyingDate) && exerciseEntryForm}
     <div className="toolbar filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search exercise logs" placeholder="Search date, activity, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-      <FilterDrawer activeCount={activityFilter ? 1 : 0}>
+      <FilterDrawer activeCount={[activityFilter, daypartFilter, intensityFilter, dateFrom, dateTo].filter(Boolean).length}>
         <Field label="Activity"><Select aria-label="Filter by exercise activity" value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}><option value="">All activities</option>{[...new Set(logs.map((log) => log.activity))].sort((a, b) => a.localeCompare(b)).map((activity) => <option key={activity}>{activity}</option>)}</Select></Field>
-        {activityFilter && <Button type="button" variant="outline" size="sm" onClick={() => setActivityFilter("")}>Clear filter</Button>}
+        <Field label="Daypart"><Select aria-label="Filter by exercise daypart" value={daypartFilter} onChange={(event) => setDaypartFilter(event.target.value)}><option value="">All dayparts</option>{EXERCISE_DAYPARTS.map((part) => <option key={part}>{part}</option>)}</Select></Field>
+        <Field label="Intensity"><Select aria-label="Filter by exercise intensity" value={intensityFilter} onChange={(event) => setIntensityFilter(event.target.value)}><option value="">All intensities</option>{EXERCISE_INTENSITIES.map((intensity) => <option key={intensity}>{intensity}</option>)}</Select></Field>
+        <Field label="From date"><DateInput aria-label="Filter exercise records from date" value={dateFrom} onValueChange={setDateFrom} /></Field>
+        <Field label="To date"><DateInput aria-label="Filter exercise records to date" value={dateTo} onValueChange={setDateTo} /></Field>
+        {[activityFilter, daypartFilter, intensityFilter, dateFrom, dateTo].some(Boolean) && <Button type="button" variant="outline" size="sm" onClick={() => { setActivityFilter(""); setDaypartFilter(""); setIntensityFilter(""); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
       </FilterDrawer>
+      <Field className="exercise-group-control" label="Group by"><Select aria-label="Group exercise records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="activity">Activity</option><option value="daypart">Daypart</option><option value="none">No grouping</option></Select></Field>
       <Badge>{visibleDayGroups.length} {visibleDayGroups.length === 1 ? "day" : "days"} · {visibleLogs.length} {visibleLogs.length === 1 ? "activity" : "activities"}</Badge>
     </div>
-    {visibleDayGroups.length ? <DateGroupedRecords items={visibleDayGroups} getDate={(group) => group.date} title={(date) => `Exercise · ${dateLabel(date)}`}>{(dateGroups) => <div className="exercise-day-list">{dateGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
-      <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => copyDay(date)}><Copy size={13} />Copy day</Button><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div></div>
-      <div className="table-card"><table className="data-table mobile-card-table">
-        <thead><tr><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
-        <tbody>{dayLogs.map((log) => <tr key={log.id}>
-          <td data-label="Session">{log.daypart ?? "Morning"}{log.time ? ` · ${log.time}` : ""}</td>
-          <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
-          <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
-          <td data-label="Intensity">{log.intensity}</td>
-          <td data-label="Notes">{log.notes}</td>
-          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
-        </tr>)}</tbody>
-      </table></div>
-    </Card>)}</div>}</DateGroupedRecords> : null}
+    {visibleDayGroups.length && groupBy === "date" ? <DateGroupedRecords items={visibleDayGroups} getDate={(group) => group.date} title={(date) => `Exercise · ${dateLabel(date)}`}>{(dateGroups) => renderExerciseDayCards(dateGroups.flatMap((group) => group.logs))}</DateGroupedRecords>
+      : visibleLogs.length && groupBy === "none" ? renderExerciseDayCards(visibleLogs)
+        : visibleLogs.length ? <div className="exercise-record-groups">{exerciseRecordGroups.map((group) => <section key={group.title}>
+          <h2 className="shopping-record-group-title">{group.title}<span>{group.logs.length}</span></h2>
+          {renderExerciseDayCards(group.logs)}
+        </section>)}</div> : null}
     {!visibleLogs.length && <Card><EmptyState icon={<Dumbbell size={18} />} title={logs.length ? "No matching exercise sessions" : "No exercise sessions yet"} description={logs.length ? "Try another search or activity filter." : "Use the form above to record your first morning exercise session."} /></Card>}
     </>}
   </>;
@@ -7520,26 +7566,60 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
   const [editor, setEditor] = useState<TrainingSession | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState("All formats");
+  const [courseFilter, setCourseFilter] = useState("All courses");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [groupBy, setGroupBy] = useState("date");
   const query = search.trim().toLocaleLowerCase();
   const visible = sessions
     .filter((session) => modeFilter === "All formats" || session.mode === modeFilter)
+    .filter((session) => courseFilter === "All courses" || session.courseName === courseFilter)
+    .filter((session) => (!dateFrom || session.date >= dateFrom) && (!dateTo || session.date <= dateTo))
     .filter((session) => [
       session.courseName, session.institution, session.mode, session.date, session.topic,
       session.instructor, session.learned, session.notes,
     ].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime));
+  const trainingGroups = groupBy === "month"
+    ? [...new Set(visible.map((session) => session.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a))
+      .map((month) => ({
+        key: month,
+        title: new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${month}-01T00:00:00`)),
+        sessions: visible.filter((session) => session.date.startsWith(month)),
+      }))
+    : groupBy === "course"
+      ? [...new Set(visible.map((session) => session.courseName))].sort((a, b) => a.localeCompare(b))
+        .map((course) => ({ key: course, title: course, sessions: visible.filter((session) => session.courseName === course) }))
+      : [];
 
-  return <>
-    <PageHeading eyebrow="Build your skills" title="Training & classes" subtitle="Keep a dated journal of institute classes, online or virtual training, and self-study sessions." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Log a session</Button>} />
-    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>This log is separate from daily Learning. Add one entry for each class or study date to track the subject, format, materials, and what you learned.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search training sessions" placeholder="Search course, date, topic, learning..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={modeFilter === "All formats" ? 0 : 1}><Field label="Training format"><Select aria-label="Filter training format" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option>All formats</option>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
-    {visible.length ? <DateGroupedRecords items={visible} getDate={(session) => session.date} title={(date) => `Training sessions · ${dateLabel(date)}`}>{(dateSessions) => <div className="training-session-list">{dateSessions.map((session) => <Card className="training-session-card" key={session.id}>
+  function renderTrainingCards(entries: TrainingSession[]) {
+    return <div className="training-session-list">{entries.map((session) => <Card className="training-session-card" key={session.id}>
       <div className="training-session-head"><div className="training-session-title"><div className="training-session-icon"><BookOpen size={16} /></div><div><h2>{session.courseName}</h2><p>{[session.institution, session.topic].filter(Boolean).join(" · ") || "Class session"}</p></div></div><div className="table-actions"><Badge>{session.mode}</Badge><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave({ ...copy, courseName: copyLabel(copy.courseName, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></div>
       <div className="training-session-meta"><span>{dateLabel(session.date)}{session.startTime ? ` · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}` : ""}</span>{session.instructor && <span>Instructor: {session.instructor}</span>}</div>
       <div className="training-session-learning"><strong>What I learned</strong><p><LinkifiedText>{session.learned}</LinkifiedText></p></div>
       {session.notes && <p className="training-session-notes"><LinkifiedText>{session.notes}</LinkifiedText></p>}
       {session.resourceLink && <a className="personal-document-link" href={session.resourceLink} target="_blank" rel="noopener noreferrer">Open class materials</a>}
-    </Card>)}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<BookOpen size={18} />} title={sessions.length ? "No matching sessions" : "No class sessions yet"} description={sessions.length ? "Try another search or format filter." : "Log a dated training class or study session to start your learning journal."} /></Card>}
+    </Card>)}</div>;
+  }
+
+  return <>
+    <PageHeading eyebrow="Build your skills" title="Training & classes" subtitle="Keep a dated journal of institute classes, online or virtual training, and self-study sessions." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Log a session</Button>} />
+    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>This log is separate from daily Learning. Add one entry for each class or study date to track the subject, format, materials, and what you learned.</span></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search training sessions" placeholder="Search course, date, topic, learning..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[modeFilter !== "All formats", courseFilter !== "All courses", dateFrom, dateTo].filter(Boolean).length}>
+      <Field label="Training format"><Select aria-label="Filter training format" value={modeFilter} onChange={(event) => setModeFilter(event.target.value)}><option>All formats</option>{TRAINING_DELIVERY_MODES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+      <Field label="Course / class"><Select aria-label="Filter by course" value={courseFilter} onChange={(event) => setCourseFilter(event.target.value)}><option>All courses</option>{[...new Set(sessions.map((session) => session.courseName))].sort((a, b) => a.localeCompare(b)).map((course) => <option key={course}>{course}</option>)}</Select></Field>
+      <Field label="From date"><DateInput aria-label="Filter training sessions from date" value={dateFrom} onValueChange={setDateFrom} /></Field>
+      <Field label="To date"><DateInput aria-label="Filter training sessions to date" value={dateTo} onValueChange={setDateTo} /></Field>
+      {[modeFilter !== "All formats", courseFilter !== "All courses", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setModeFilter("All formats"); setCourseFilter("All courses"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
+    </FilterDrawer><Field className="training-group-control" label="Group by"><Select aria-label="Group training sessions" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="course">Course</option><option value="none">No grouping</option></Select></Field><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
+    {visible.length ? groupBy === "date"
+      ? <DateGroupedRecords items={visible} getDate={(session) => session.date} title={(date) => `Training sessions · ${dateLabel(date)}`}>{renderTrainingCards}</DateGroupedRecords>
+      : groupBy === "none" ? renderTrainingCards(visible)
+        : <div className="training-record-groups">{trainingGroups.map((group) => <section key={group.key}>
+          <h2 className="shopping-record-group-title">{group.title}<span>{group.sessions.length}</span></h2>
+          {renderTrainingCards(group.sessions)}
+        </section>)}</div>
+      : <Card><EmptyState icon={<BookOpen size={18} />} title={sessions.length ? "No matching sessions" : "No class sessions yet"} description={sessions.length ? "Try another search or filter." : "Log a dated training class or study session to start your learning journal."} /></Card>}
     {editor !== undefined && <TrainingSessionModal key={editor?.id ?? "new-training-session"} initial={editor} onClose={() => setEditor(undefined)} onSave={(session) => { onSave(session, editor?.id); setEditor(undefined); }} />}
   </>;
 }
