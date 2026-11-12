@@ -2059,3 +2059,23 @@ body{background:#f3f5ef}
 .reminder-page-list.reminder-grid-layout .reminder-card>.reminder-category-badge{grid-column:2;grid-row:2;justify-self:start}
 .reminder-page-list.reminder-grid-layout .reminder-card>.reminder-status-badge{grid-column:3;grid-row:2;justify-self:end}
 .reminder-page-list.reminder-grid-layout .reminder-card>.table-actions{grid-column:2/-1;grid-row:3;justify-self:end}
+.shopping-filter-toolbar{align-items:flex-end;flex-wrap:wrap}
+.shopping-filter-toolbar>.search-wrap{flex:1 1 220px}
+.shopping-quick-filters{display:flex;align-items:flex-end;gap:8px;flex:2 1 380px;min-width:0}
+.shopping-quick-filters>.field-wrap{flex:1 1 110px;min-width:0}
+.shopping-filter-toolbar>.filter-drawer-trigger{align-self:flex-end}
+.shopping-record-group{display:grid;gap:8px;margin-bottom:12px}
+.shopping-record-group-title{display:flex;align-items:center;gap:8px;margin:3px 2px;color:#465548;font:700 13px Manrope,sans-serif}
+.shopping-record-group-title span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:20px;background:#edf4ee;color:#5d795f;font:600 10px "DM Sans",sans-serif}
+.app-shell.dark .shopping-record-group-title{color:#d4ddd4}
+.app-shell.dark .shopping-record-group-title span{background:#2b3d30;color:#a6c1a8}
+@media(max-width:760px){
+  .shopping-filter-toolbar{flex-wrap:wrap}
+  .shopping-filter-toolbar>.search-wrap,.shopping-quick-filters{flex:1 1 100%;width:100%}
+  .shopping-quick-filters>.field-wrap{flex:1 1 130px}
+}
+@media(max-width:430px){
+  .shopping-quick-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .shopping-quick-filters>.field-wrap{min-width:0}
+  .shopping-quick-filters>.field-wrap:last-child:nth-child(odd){grid-column:1/-1}
+}

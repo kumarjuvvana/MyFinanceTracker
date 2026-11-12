@@ -1177,16 +1177,47 @@ function ItemModal({ initial, products, onClose, onSave }: { initial?: ShoppingI
 function ShoppingList({ data, onToggle, onAdd, onEdit, onCopy, onDelete }: { data: TrackerData; onToggle: (item: ShoppingItem) => void; onAdd: () => void; onEdit: (item: ShoppingItem) => void; onCopy: (item: ShoppingItem) => void; onDelete: (item: ShoppingItem) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const [filter, setFilter] = useState("All items");
+  const [category, setCategory] = useState("All categories");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
-  const items = data.items.filter((item) => (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) && item.name.toLowerCase().includes(search.toLowerCase()))
+  const [groupBy, setGroupBy] = useState("category");
+  const items = data.items.filter((item) =>
+    (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) &&
+    (category === "All categories" || item.category === category) &&
+    item.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => sortBy === "category" ? a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
       : sortBy === "price-highest" ? b.estimatedPrice * b.quantity - a.estimatedPrice * a.quantity || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
+  const itemGroups = groupBy === "none"
+    ? [{ key: "all", title: "", items }]
+    : [...new Set(items.map((item) => groupBy === "category"
+      ? item.category
+      : item.purchased ? "Picked up" : "To buy"))]
+      .sort((a, b) => groupBy === "category" ? a.localeCompare(b) : a === "To buy" ? -1 : 1)
+      .map((title) => ({
+        key: title,
+        title,
+        items: items.filter((item) => (groupBy === "category"
+          ? item.category
+          : item.purchased ? "Picked up" : "To buy") === title),
+      }));
   return <><PageHeading eyebrow="Plan a little ahead" title="Shopping list" subtitle={`${data.items.filter((item) => !item.purchased).length} things waiting patiently for their turn.`} action={<Button onClick={onAdd}><Plus size={15} /> Add an item</Button>} />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={(filter === "All items" ? 0 : 1) + (sortBy !== "name" ? 1 : 0)}><Field label="Status"><Select aria-label="Filter list" value={filter} onChange={(e) => setFilter(e.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field><Field label="Sort by"><Select aria-label="Sort shopping list" value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="name">Name (A–Z)</option><option value="category">Category</option><option value="price-highest">Estimated total (highest)</option></Select></Field></FilterDrawer><Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge></div>
-    <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table>
-      {items.length === 0 && <EmptyState icon={<ClipboardList size={18} />} title={search ? "No items found" : "A fresh start"} description={search ? "Try another search or clear the filter." : "Add a few things you need and they will be right here."} />}</Card>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Category"><Select aria-label="Filter shopping list by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Status"><Select aria-label="Filter shopping list by status" value={filter} onChange={(event) => setFilter(event.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group shopping list" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={sortBy !== "name" ? 1 : 0}>
+        <Field label="Sort by"><Select aria-label="Sort shopping list" value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="name">Name (A–Z)</option><option value="category">Category</option><option value="price-highest">Estimated total (highest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge>
+    </div>
+    {items.length ? itemGroups.map((group) => <section className="shopping-record-group" key={group.key}>
+      {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.items.length}</span></h2>}
+      <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{group.items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>
+    </section>) : <Card className="table-card"><EmptyState icon={<ClipboardList size={18} />} title={search || category !== "All categories" ? "No items found" : "A fresh start"} description={search || category !== "All categories" ? "Try adjusting or clearing your filters." : "Add a few things you need and they will be right here."} /></Card>}
   </>;
 }
 
@@ -1221,6 +1252,9 @@ function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: Tracke
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sortBy, setSortBy] = useState("date-newest");
+  const [groupBy, setGroupBy] = useState("date");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const stores = [...new Set(data.trips.map((trip) => trip.store))].sort((a, b) => a.localeCompare(b));
   const trips = [...data.trips].filter((trip) => {
     const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
@@ -1237,13 +1271,41 @@ function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: Tracke
     }
     return b.date.localeCompare(a.date);
   });
+  const tripGroupKey = (trip: ShoppingTrip) => groupBy === "store" ? trip.store : groupBy === "month" ? monthKey(trip.date) : trip.date;
+  const tripGroups = groupBy === "none" ? [] : [...new Set(trips.map(tripGroupKey))].map((key) => ({
+    key,
+    title: groupBy === "store" ? key : groupBy === "month"
+      ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })
+      : `Shopping trips · ${dateLabel(key)}`,
+    records: trips.filter((trip) => tripGroupKey(trip) === key),
+  }));
+  function setTripGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+  const renderTripCards = (records: ShoppingTrip[]) => <div className="trip-grid">{records.map((trip) => {
+    const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
+    const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
+    return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} title="Copy trip without its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
+  })}</div>;
   return <><PageHeading eyebrow="Make a little plan" title="Shopping trips" subtitle="Your errands, saved in one easy place." action={<Button onClick={onAdd}><Plus size={15} /> Plan a trip</Button>} />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search shopping trips" placeholder="Search stores, notes, or purchased items..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[store !== "All stores", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Store"><Select aria-label="Filter trips by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort shopping trips" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="store">Store (A–Z)</option><option value="total-highest">Total (highest)</option></Select></Field></FilterDrawer><Badge>{trips.length} {trips.length === 1 ? "trip" : "trips"}</Badge></div>
-    {trips.length ? <DateGroupedRecords items={trips} getDate={(trip) => trip.date} title={(date) => `Shopping trips · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(dateTrips) => <div className="trip-grid">{dateTrips.map((trip) => {
-      const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
-      const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
-      return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} title="Copy trip without its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
-    })}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<ShoppingBag size={18} />} title={data.trips.length ? "No trips match your filters" : "No trips planned just yet"} description={data.trips.length ? "Try changing the search, store, or date range." : "Create a trip, choose a store and add items from your shopping list."} /></Card>}
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search shopping trips" placeholder="Search stores, notes, or purchased items..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Store"><Select aria-label="Filter trips by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group shopping trips" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
+        <Field label="Sort by"><Select aria-label="Sort shopping trips" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="store">Store (A–Z)</option><option value="total-highest">Total (highest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{trips.length} {trips.length === 1 ? "trip" : "trips"}</Badge>
+    </div>
+    {trips.length ? <>
+      {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setTripGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setTripGroupsExpanded(false)}>Hide all</Button></div>}
+      {groupBy === "none" ? renderTripCards(trips) : <div className="record-date-groups">{tripGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderTripCards(group.records)}</DevotionalRecordGroup>)}</div>}
+    </> : <Card><EmptyState icon={<ShoppingBag size={18} />} title={data.trips.length ? "No trips match your filters" : "No trips planned just yet"} description={data.trips.length ? "Try changing the search, store, or date range." : "Create a trip, choose a store and add items from your shopping list."} /></Card>}
     {editing && <TripEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(trip) => { onSave(trip); setEditing(null); }} />}
   </>;
 }
@@ -1289,20 +1351,53 @@ function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData
   const formatCurrency = useCurrencyFormatter();
   const [search, setSearch] = useState("");
   const [store, setStore] = useState("All stores");
+  const [category, setCategory] = useState("All categories");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sortBy, setSortBy] = useState("date-newest");
+  const [groupBy, setGroupBy] = useState("date");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [editing, setEditing] = useState<Purchase | null>(null);
   const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort();
-  const purchases = [...data.purchases].filter((purchase) => (!search || `${purchase.itemName} ${purchase.category} ${purchase.store}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && (store === "All stores" || purchase.store === store) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) =>
+  const purchases = [...data.purchases].filter((purchase) => (!search || `${purchase.itemName} ${purchase.category} ${purchase.store}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) && (store === "All stores" || purchase.store === store) && (category === "All categories" || purchase.category === category) && (!from || purchase.date >= from) && (!to || purchase.date <= to)).sort((a, b) =>
     sortBy === "date-oldest" ? a.date.localeCompare(b.date) :
       sortBy === "item" ? a.itemName.localeCompare(b.itemName) || b.date.localeCompare(a.date) :
         sortBy === "price-highest" ? b.price - a.price || b.date.localeCompare(a.date) : b.date.localeCompare(a.date));
   const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
+  const purchaseGroupKey = (purchase: Purchase) => groupBy === "store" ? purchase.store : groupBy === "category" ? purchase.category : groupBy === "month" ? monthKey(purchase.date) : purchase.date;
+  const purchaseGroups = groupBy === "none" ? [] : [...new Set(purchases.map(purchaseGroupKey))].map((key) => ({
+    key,
+    title: groupBy === "month"
+      ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })
+      : groupBy === "date" ? `Purchases · ${dateLabel(key)}` : key,
+    records: purchases.filter((purchase) => purchaseGroupKey(purchase) === key),
+  }));
+  function setPurchaseGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+  const renderPurchaseTable = (records: Purchase[]) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>;
   return <><PageHeading eyebrow="A record of the good stuff" title="Purchase history" subtitle="Everything you've brought home, in one place." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input placeholder="Search items, stores, categories..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div><FilterDrawer activeCount={[store !== "All stores", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Store"><Select aria-label="Filter by store" value={store} onChange={(e) => setStore(e.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} max={to || undefined} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort purchases" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Paid (highest)</option></Select></Field></FilterDrawer></div>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input placeholder="Search items, stores, categories..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Store"><Select aria-label="Filter purchases by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter purchases by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group purchases" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="category">Category</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
+        <Field label="Sort by"><Select aria-label="Sort purchases" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Paid (highest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{purchases.length} records</Badge>
+    </div>
     <div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div>
-    {purchases.length ? <DateGroupedRecords items={purchases} getDate={(purchase) => purchase.date} title={(date) => `Purchases · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(datePurchases) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{datePurchases.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>}</DateGroupedRecords> : <Card className="table-card"><EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store or item search." /></Card>}
+    {purchases.length ? <>
+      {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPurchaseGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPurchaseGroupsExpanded(false)}>Hide all</Button></div>}
+      {groupBy === "none" ? renderPurchaseTable(purchases) : <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPurchaseTable(group.records)}</DevotionalRecordGroup>)}</div>}
+    </> : <Card className="table-card"><EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store, category or item search." /></Card>}
     {editing && <PurchaseEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(purchase) => { onSave({ ...purchase, id: editing.id, ...(editing.tripId ? { tripId: editing.tripId } : {}) }); setEditing(null); }} />}
   </>;
 }
