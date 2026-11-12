@@ -2590,7 +2590,22 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       </Card>
     </div>}
     {stockTab === "stocks" && <Card className="stock-table-card"><div className="card-head"><div><h2 className="section-title">Tracked stocks</h2><p className="section-description">Showing {filteredStocks.length} of {stocks.length} {stocks.length === 1 ? "stock" : "stocks"} · Refresh all to add timestamped prices</p></div><Button variant="outline" onClick={() => refreshStocks()} disabled={busy || stocks.length === 0}><RefreshCw size={14} className={busy ? "spin" : ""} />Refresh all</Button></div>
-      <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></div><FilterDrawer activeCount={[stockBrokerFilter !== "all", stockExchangeFilter !== "all", stockHoldingFilter !== "all", stockQuoteFilter !== "all", stockSortBy !== "symbol", stockSortOrder !== "asc", stockGroupBy !== "none"].filter(Boolean).length}><Field label="Exchange"><Select value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field><Field label="Broker"><Select value={stockBrokerFilter} onChange={(event) => setStockBrokerFilter(event.target.value)}><option value="all">All brokers</option><option value="unassigned">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field><Field label="Position"><Select value={stockHoldingFilter} onChange={(event) => setStockHoldingFilter(event.target.value)}><option value="all">All stocks</option><option value="holdings">Holdings</option><option value="watchlist">Watchlist only</option></Select></Field><Field label="Quote"><Select value={stockQuoteFilter} onChange={(event) => setStockQuoteFilter(event.target.value)}><option value="all">Any price status</option><option value="priced">Has a price</option><option value="unpriced">No price yet</option></Select></Field><Field label="Sort by"><Select value={stockSortBy} onChange={(event) => setStockSortBy(event.target.value as typeof stockSortBy)}><option value="symbol">Stock code</option><option value="name">Name</option><option value="broker">Broker</option><option value="price">Latest price</option><option value="quantity">Shares owned</option><option value="value">Holding value</option><option value="profitLoss">Profit / loss</option></Select></Field><Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field><Field label="Group by"><Select value={stockGroupBy} onChange={(event) => { setStockGroupBy(event.target.value as typeof stockGroupBy); setCollapsedStockGroups(new Set()); }}><option value="none">No grouping</option><option value="broker">Broker</option><option value="exchange">Exchange</option></Select></Field>{activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}</FilterDrawer></div>
+      <div className="toolbar filter-toolbar shopping-filter-toolbar">
+        <div className="search-wrap"><Search size={15} /><Input aria-label="Search stocks" placeholder="Search code, name, or broker" value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} /></div>
+        <div className="shopping-quick-filters">
+          <Field label="Broker"><Select aria-label="Filter stocks by broker" value={stockBrokerFilter} onChange={(event) => setStockBrokerFilter(event.target.value)}><option value="all">All brokers</option><option value="unassigned">No broker</option>{brokers.map((entry) => <option key={entry} value={entry}>{entry}</option>)}</Select></Field>
+          <Field label="Exchange"><Select aria-label="Filter stocks by exchange" value={stockExchangeFilter} onChange={(event) => setStockExchangeFilter(event.target.value)}><option value="all">All exchanges</option><option value="NSE">NSE</option><option value="BSE">BSE</option></Select></Field>
+          <Field label="Group by"><Select aria-label="Group stocks" value={stockGroupBy} onChange={(event) => { setStockGroupBy(event.target.value as typeof stockGroupBy); setCollapsedStockGroups(new Set()); }}><option value="none">No grouping</option><option value="broker">Broker</option><option value="exchange">Exchange</option></Select></Field>
+        </div>
+        <FilterDrawer label="Apply filters" activeCount={[stockHoldingFilter !== "all", stockQuoteFilter !== "all", stockSortBy !== "symbol", stockSortOrder !== "asc"].filter(Boolean).length}>
+          <Field label="Position"><Select value={stockHoldingFilter} onChange={(event) => setStockHoldingFilter(event.target.value)}><option value="all">All stocks</option><option value="holdings">Holdings</option><option value="watchlist">Watchlist only</option></Select></Field>
+          <Field label="Quote"><Select value={stockQuoteFilter} onChange={(event) => setStockQuoteFilter(event.target.value)}><option value="all">Any price status</option><option value="priced">Has a price</option><option value="unpriced">No price yet</option></Select></Field>
+          <Field label="Sort by"><Select value={stockSortBy} onChange={(event) => setStockSortBy(event.target.value as typeof stockSortBy)}><option value="symbol">Stock code</option><option value="name">Name</option><option value="broker">Broker</option><option value="price">Latest price</option><option value="quantity">Shares owned</option><option value="value">Holding value</option><option value="profitLoss">Profit / loss</option></Select></Field>
+          <Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
+          {activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}
+        </FilterDrawer>
+        <Badge>{filteredStocks.length} stocks</Badge>
+      </div>
       {stocks.length ? filteredStocks.length ? <div className="stock-list"><div className={`stock-list-header${stockGroupBy !== "none" ? " stock-list-header-grouped" : ""}`} aria-hidden="true"><span>Stock</span><span>Latest price</span><span>Volume</span><span>Avg price</span><span>Invested amount</span><span>Current value</span><span>Actions</span><span /></div>{stockGroups.map((group) => {
         const collapsed = collapsedStockGroups.has(group.key);
         const groupTotals = group.stocks.reduce((totals, stock) => {
@@ -6425,6 +6440,9 @@ function LearningPage({ records, onSave, onDelete }: {
   const [levelFilter, setLevelFilter] = useState("All levels");
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [sortBy, setSortBy] = useState("status");
+  const [groupBy, setGroupBy] = useState("topic");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const query = search.trim().toLocaleLowerCase();
   const visible = records
     .filter((record) => (levelFilter === "All levels" || record.level === levelFilter) &&
@@ -6433,21 +6451,52 @@ function LearningPage({ records, onSave, onDelete }: {
     .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title) :
       sortBy === "started-newest" ? (b.startedDate ?? "").localeCompare(a.startedDate ?? "") || a.title.localeCompare(b.title) :
         (a.status.localeCompare(b.status) || a.title.localeCompare(b.title)));
+  const learningGroups = groupBy === "none" ? [] : [...new Set(visible.map((record) =>
+    groupBy === "status" ? record.status : record.topic.trim() || "No topic"))]
+    .sort((a, b) => groupBy === "status"
+      ? ["Not started", "In progress", "Completed"].indexOf(a) - ["Not started", "In progress", "Completed"].indexOf(b)
+      : a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .map((title) => ({
+      key: title,
+      title,
+      records: visible.filter((record) => (groupBy === "status" ? record.status : record.topic.trim() || "No topic") === title),
+    }));
+
+  function setLearningGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
 
   function deleteRecord(record: LearningRecord) {
     if (window.confirm(`Move "${record.title}" to the archive?`)) onDelete(record);
+  }
+  function renderLearningRecord(record: LearningRecord) {
+    return <Card className="learning-card" key={record.id}>
+      <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
+      <div className="learning-card-meta"><Badge>{record.level}</Badge>{record.startedDate && <span>Started {dateLabel(record.startedDate)}</span>}{record.completedDate && <span>Completed {dateLabel(record.completedDate)}</span>}</div>
+      {(record.resourceLink || record.aiLink) && <div className="learning-links">{record.resourceLink && <a className="personal-document-link" href={record.resourceLink} target="_blank" rel="noopener noreferrer">Open learning resource</a>}{record.aiLink && <a className="personal-document-link" href={record.aiLink} target="_blank" rel="noopener noreferrer">Open AI resource</a>}</div>}
+      {record.notes && <p className="learning-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
+    </Card>;
   }
 
   return <>
     <PageHeading eyebrow="Keep growing" title="Learning" subtitle="Capture what you are learning, track your progress from beginner to advanced, and keep useful resources close." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add learning</Button>} />
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Save skills, courses, progress, notes, and learning links. AI resource links are optional; add a trusted AI tutor or tool that supports your learning.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search learning records" placeholder="Search title, topic, source, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Learning filters" activeCount={(levelFilter !== "All levels" ? 1 : 0) + (statusFilter !== "All statuses" ? 1 : 0) + (sortBy !== "status" ? 1 : 0)}><Field label="Level"><Select aria-label="Filter learning level" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{(["Beginner", "Basic", "Intermediate", "Advanced", "Expert"] as const).map((level) => <option key={level}>{level}</option>)}</Select></Field><Field label="Status"><Select aria-label="Filter learning status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Not started</option><option>In progress</option><option>Completed</option></Select></Field><Field label="Sort by"><Select aria-label="Sort learning records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="status">Status</option><option value="title">Title</option><option value="started-newest">Start date (newest)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge></div>
-    <div className="learning-list">{visible.map((record) => <Card className="learning-card" key={record.id}>
-      <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
-      <div className="learning-card-meta"><Badge>{record.level}</Badge>{record.startedDate && <span>Started {dateLabel(record.startedDate)}</span>}{record.completedDate && <span>Completed {dateLabel(record.completedDate)}</span>}</div>
-      {(record.resourceLink || record.aiLink) && <div className="learning-links">{record.resourceLink && <a className="personal-document-link" href={record.resourceLink} target="_blank" rel="noopener noreferrer">Open learning resource</a>}{record.aiLink && <a className="personal-document-link" href={record.aiLink} target="_blank" rel="noopener noreferrer">Open AI resource</a>}</div>}
-      {record.notes && <p className="learning-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
-    </Card>)}</div>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search learning records" placeholder="Search title, topic, source, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Level"><Select aria-label="Filter learning level" value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option>All levels</option>{(["Beginner", "Basic", "Intermediate", "Advanced", "Expert"] as const).map((level) => <option key={level}>{level}</option>)}</Select></Field>
+        <Field label="Status"><Select aria-label="Filter learning status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All statuses</option><option>Not started</option><option>In progress</option><option>Completed</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group learning records" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setLearningGroupsExpanded(false); }}><option value="topic">Topic</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={sortBy !== "status" ? 1 : 0}>
+        <Field label="Sort by"><Select aria-label="Sort learning records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="status">Status</option><option value="title">Title</option><option value="started-newest">Start date (newest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge>
+    </div>
+    {groupBy !== "none" && visible.length > 0 && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(false)}>Hide all</Button></div>}
+    {groupBy === "none" ? <div className="learning-list">{visible.map(renderLearningRecord)}</div>
+      : <div className="record-date-groups">{learningGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}><div className="learning-list">{group.records.map(renderLearningRecord)}</div></DevotionalRecordGroup>)}</div>}
     {!visible.length && <Card><EmptyState icon={<BookOpen size={18} />} title={records.length ? "No matching learning records" : "No learning records yet"} description={records.length ? "Try another search or filter." : "Add a skill or course you are learning to start your progress log."} /></Card>}
     {editor !== undefined && <LearningRecordModal key={editor?.id ?? "new-learning-record"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
@@ -6681,13 +6730,20 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   const [trackingDate, setTrackingDate] = useState(today());
   const [search, setSearch] = useState("");
   const [emotionFilter, setEmotionFilter] = useState("All emotions");
+  const [reflectionDateFrom, setReflectionDateFrom] = useState("");
+  const [reflectionDateTo, setReflectionDateTo] = useState("");
+  const [reflectionGroupBy, setReflectionGroupBy] = useState("date");
+  const [reflectionGroupsExpanded, setExpandReflectionGroups] = useState(false);
+  const [reflectionGroupRevision, setReflectionGroupRevision] = useState(0);
   const [habitSearch, setHabitSearch] = useState("");
   const [habitSort, setHabitSort] = useState("title");
   const [habitStatusFilter, setHabitStatusFilter] = useState("All check-ins");
+  const [habitGroupBy, setHabitGroupBy] = useState("status");
   const query = search.trim().toLocaleLowerCase();
   const habitQuery = habitSearch.trim().toLocaleLowerCase();
   const visibleLogs = [...logs]
     .filter((log) => emotionFilter === "All emotions" || log.emotion === emotionFilter)
+    .filter((log) => (!reflectionDateFrom || log.date >= reflectionDateFrom) && (!reflectionDateTo || log.date <= reflectionDateTo))
     .filter((log) => [log.date, log.emotion, log.trigger, log.response, log.positiveAction, log.reflection]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -6704,17 +6760,37 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   ]);
   const recentHabitPractices = recentHabitPracticeKeys.size;
   const habitNames = new Map(habits.map((habit) => [habit.id, habit.title]));
+  const isHabitCheckedOnTrackingDate = (habit: MindfulHabit) => (habit.completedDates ?? []).includes(trackingDate) ||
+    logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
   const visibleHabits = [...habits]
     .filter((habit) => [habit.title, habit.description].some((value) => value.toLocaleLowerCase().includes(habitQuery)))
     .filter((habit) => {
-      const checked = (habit.completedDates ?? []).includes(trackingDate) ||
-        logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
+      const checked = isHabitCheckedOnTrackingDate(habit);
       return habitStatusFilter === "All check-ins" ||
         (habitStatusFilter === "Checked in" ? checked : !checked);
     })
     .sort((a, b) => habitSort === "started-newest"
       ? (b.startDate ?? "").localeCompare(a.startDate ?? "") || a.title.localeCompare(b.title)
       : a.title.localeCompare(b.title));
+  const habitGroups = habitGroupBy === "none" ? [] : ["Checked in", "Not checked in"]
+    .map((title) => ({
+      key: title,
+      title,
+      habits: visibleHabits.filter((habit) => isHabitCheckedOnTrackingDate(habit) === (title === "Checked in")),
+    }))
+    .filter((group) => group.habits.length > 0);
+  const reflectionGroups = (() => {
+    const groups = new Map<string, MindfulnessLog[]>();
+    for (const log of visibleLogs) {
+      const key = reflectionGroupBy === "emotion" ? log.emotion : log.date;
+      groups.set(key, [...(groups.get(key) ?? []), log]);
+    }
+    return [...groups.entries()].sort(([a], [b]) => reflectionGroupBy === "date" ? b.localeCompare(a) : a.localeCompare(b));
+  })();
+  function setReflectionGroupsExpanded(expanded: boolean) {
+    setExpandReflectionGroups(expanded);
+    setReflectionGroupRevision((revision) => revision + 1);
+  }
 
   function habitProgress(habit: MindfulHabit) {
     const startDate = habit.startDate ?? "";
@@ -6766,6 +6842,46 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   function archiveLog(log: MindfulnessLog) {
     if (window.confirm(`Move the ${log.date} reflection to the archive?`)) onArchiveLog(log);
   }
+  function renderHabitRow(habit: MindfulHabit) {
+    const progress = habitProgress(habit);
+    const completedDates = habit.completedDates ?? [];
+    const reflectedOnDate = logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
+    const checked = completedDates.includes(trackingDate) || reflectedOnDate;
+    const targetReached = progress.targetEndDate && trackingDate > progress.targetEndDate;
+    const canCheck = !!progress.startDate && trackingDate >= progress.startDate && trackingDate <= today() && !targetReached && !reflectedOnDate;
+    return <div className="education-entry habit-tracker-row" key={habit.id}>
+      <div className="habit-tracker-content">
+        <strong>{habit.title}</strong>
+        {habit.description && <span>{habit.description}</span>}
+        <div className="habit-progress-meta">
+          <span>{progress.targetDays ? `${progress.completedCount} / ${progress.targetDays} target days completed` : `Day ${progress.elapsedDays} · ${progress.completedCount} active ${progress.completedCount === 1 ? "day" : "days"}`}</span>
+          {progress.startDate && <span>Started {dateLabel(progress.startDate)}{progress.targetEndDate ? ` · Target ends ${dateLabel(progress.targetEndDate)}` : ""}</span>}
+        </div>
+        <div className="habit-progress-track" role="progressbar" aria-label={`${habit.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><span style={{ width: `${progress.percent}%` }} /></div>
+        {!progress.startDate && <small className="habit-tracker-hint">Edit this habit to set its start date before tracking check-ins.</small>}
+        {targetReached && <small className="habit-tracker-hint">The target period ended. Edit the duration or extend it to continue tracking.</small>}
+      </div>
+      <div className="habit-tracker-actions">
+        <label className="habit-day-check"><input type="checkbox" aria-label={`Mark ${habit.title} complete on ${trackingDate}`} checked={checked} disabled={!canCheck} onChange={() => toggleHabitDate(habit)} /><span>{reflectedOnDate ? "In reflection" : checked ? "Done" : "Done today"}</span></label>
+        <div className="table-actions">
+          <button className="icon-button" disabled={progress.targetDays === 3650} aria-label={progress.targetDays ? `Extend ${habit.title} target by 7 days` : `Set a target for ${habit.title}`} title={progress.targetDays ? "Extend target by 7 days" : "Set a 30-day target"} onClick={() => extendHabitTarget(habit)}><Plus size={14} /></button>
+          <button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button>
+          <button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)`, startDate: today(), completedDates: [] })}><Copy size={14} /></button>
+          <button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button>
+        </div>
+      </div>
+    </div>;
+  }
+  function renderReflectionCards(entries: MindfulnessLog[]) {
+    return <div className="mindful-log-list">{entries.map((log) => <Card className="mindful-log-card" key={log.id}>
+      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone={log.emotion === "Anger" || log.emotion === "Frustration" || log.emotion === "Stress" ? "amber" : "green"}>{log.emotion}</Badge><Badge>Intensity {log.intensity}/5</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
+      {log.trigger && <div className="mindful-log-section"><span>Situation</span><p>{log.trigger}</p></div>}
+      {log.response && <div className="mindful-log-section"><span>Response</span><p>{log.response}</p></div>}
+      {log.positiveAction && <div className="mindful-log-section mindful-positive"><span>Positive action</span><p>{log.positiveAction}</p></div>}
+      {log.reflection && <div className="mindful-log-section"><span>Reflection</span><p>{log.reflection}</p></div>}
+      {log.completedHabitIds.length > 0 && <div className="mindful-practiced"><strong>Habits practiced</strong>{log.completedHabitIds.map((id) => <Badge key={id}>{habitNames.get(id) ?? "Past habit"}</Badge>)}</div>}
+    </Card>)}</div>;
+  }
 
   return <>
     <PageHeading eyebrow="Practice with patience" title="Mind & habits" subtitle="Build daily habits, track progress toward a target, and reflect on emotions and meaningful actions." action={activeTab === "habits" ? <Button onClick={() => setHabitEditor(null)}><Plus size={15} /> Add habit</Button> : <Button onClick={() => setLogEditor(null)}><Plus size={15} /> Add reflection</Button>} />
@@ -6776,51 +6892,44 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><FileText size={14} />Reflections <Badge>{logs.length}</Badge></Button>
     </nav>
     {activeTab === "habits" && <>
-      <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search habits" placeholder="Search habit name or description..." value={habitSearch} onChange={(event) => setHabitSearch(event.target.value)} /></div><FilterDrawer label="Habit filters" activeCount={(habitSort !== "title" ? 1 : 0) + (habitStatusFilter !== "All check-ins" ? 1 : 0)}><Field label="Check-in status"><Select aria-label="Filter habits by check-in status" value={habitStatusFilter} onChange={(event) => setHabitStatusFilter(event.target.value)}><option>All check-ins</option><option>Checked in</option><option>Not checked in</option></Select></Field><Field label="Sort by"><Select aria-label="Sort habits" value={habitSort} onChange={(event) => setHabitSort(event.target.value)}><option value="title">Name</option><option value="started-newest">Start date (newest)</option></Select></Field></FilterDrawer><Badge>{visibleHabits.length} {visibleHabits.length === 1 ? "habit" : "habits"}</Badge></div>
+      <div className="toolbar filter-toolbar shopping-filter-toolbar">
+        <div className="search-wrap"><Search size={15} /><Input aria-label="Search habits" placeholder="Search habit name or description..." value={habitSearch} onChange={(event) => setHabitSearch(event.target.value)} /></div>
+        <div className="shopping-quick-filters">
+          <Field label="Check-in"><Select aria-label="Filter habits by check-in status" value={habitStatusFilter} onChange={(event) => setHabitStatusFilter(event.target.value)}><option>All check-ins</option><option>Checked in</option><option>Not checked in</option></Select></Field>
+          <Field label="Group by"><Select aria-label="Group habits" value={habitGroupBy} onChange={(event) => setHabitGroupBy(event.target.value)}><option value="status">Check-in status</option><option value="none">No grouping</option></Select></Field>
+        </div>
+        <FilterDrawer label="Apply filters" activeCount={habitSort !== "title" ? 1 : 0}>
+          <Field label="Sort by"><Select aria-label="Sort habits" value={habitSort} onChange={(event) => setHabitSort(event.target.value)}><option value="title">Name</option><option value="started-newest">Start date (newest)</option></Select></Field>
+        </FilterDrawer>
+        <Badge>{visibleHabits.length} {visibleHabits.length === 1 ? "habit" : "habits"}</Badge>
+      </div>
       <Card className="mindful-habits-card">
         <div className="toolbar habit-date-toolbar"><Field label="Track habits for"><DateInput required value={trackingDate} onValueChange={setTrackingDate} /></Field><span>Check a habit when you complete it on that date.</span></div>
-        {visibleHabits.length ? <div className="education-entry-list">{visibleHabits.map((habit) => {
-          const progress = habitProgress(habit);
-          const completedDates = habit.completedDates ?? [];
-          const reflectedOnDate = logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
-          const checked = completedDates.includes(trackingDate) || reflectedOnDate;
-          const targetReached = progress.targetEndDate && trackingDate > progress.targetEndDate;
-          const canCheck = !!progress.startDate && trackingDate >= progress.startDate && trackingDate <= today() && !targetReached && !reflectedOnDate;
-          return <div className="education-entry habit-tracker-row" key={habit.id}>
-            <div className="habit-tracker-content">
-              <strong>{habit.title}</strong>
-              {habit.description && <span>{habit.description}</span>}
-              <div className="habit-progress-meta">
-                <span>{progress.targetDays ? `${progress.completedCount} / ${progress.targetDays} target days completed` : `Day ${progress.elapsedDays} · ${progress.completedCount} active ${progress.completedCount === 1 ? "day" : "days"}`}</span>
-                {progress.startDate && <span>Started {dateLabel(progress.startDate)}{progress.targetEndDate ? ` · Target ends ${dateLabel(progress.targetEndDate)}` : ""}</span>}
-              </div>
-              <div className="habit-progress-track" role="progressbar" aria-label={`${habit.title} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><span style={{ width: `${progress.percent}%` }} /></div>
-              {!progress.startDate && <small className="habit-tracker-hint">Edit this habit to set its start date before tracking check-ins.</small>}
-              {targetReached && <small className="habit-tracker-hint">The target period ended. Edit the duration or extend it to continue tracking.</small>}
-            </div>
-            <div className="habit-tracker-actions">
-              <label className="habit-day-check"><input type="checkbox" aria-label={`Mark ${habit.title} complete on ${trackingDate}`} checked={checked} disabled={!canCheck} onChange={() => toggleHabitDate(habit)} /><span>{reflectedOnDate ? "In reflection" : checked ? "Done" : "Done today"}</span></label>
-              <div className="table-actions">
-                <button className="icon-button" disabled={progress.targetDays === 3650} aria-label={progress.targetDays ? `Extend ${habit.title} target by 7 days` : `Set a target for ${habit.title}`} title={progress.targetDays ? "Extend target by 7 days" : "Set a 30-day target"} onClick={() => extendHabitTarget(habit)}><Plus size={14} /></button>
-                <button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button>
-                <button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)`, startDate: today(), completedDates: [] })}><Copy size={14} /></button>
-                <button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button>
-              </div>
-            </div>
-          </div>;
-        })}</div> : <EmptyState icon={<Heart size={18} />} title={habits.length ? "No matching habits" : "No habits to track yet"} description={habits.length ? "Try another search." : "Add a repeatable habit to begin checking in each day."} />}
+        {visibleHabits.length ? habitGroupBy === "none"
+          ? <div className="education-entry-list">{visibleHabits.map(renderHabitRow)}</div>
+          : <div className="habit-checkin-groups">{habitGroups.map((group) => <section className="habit-checkin-group" key={group.key}><h3 className="shopping-record-group-title">{group.title}<span>{group.habits.length}</span></h3><div className="education-entry-list">{group.habits.map(renderHabitRow)}</div></section>)}</div>
+          : <EmptyState icon={<Heart size={18} />} title={habits.length ? "No matching habits" : "No habits to track yet"} description={habits.length ? "Try another search or check-in filter." : "Add a repeatable habit to begin checking in each day."} />}
       </Card>
     </>}
     {activeTab === "reflections" && <>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search reflections" placeholder="Search date, emotion, situation, response..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={emotionFilter === "All emotions" ? 0 : 1}><Field label="Emotion"><Select aria-label="Filter reflections by emotion" value={emotionFilter} onChange={(event) => setEmotionFilter(event.target.value)}><option>All emotions</option><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select></Field></FilterDrawer><Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge></div>
-    {visibleLogs.length ? <DateGroupedRecords items={visibleLogs} getDate={(log) => log.date} title={(date) => `Reflections · ${dateLabel(date)}`}>{(dateLogs) => <div className="mindful-log-list">{dateLogs.map((log) => <Card className="mindful-log-card" key={log.id}>
-      <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone={log.emotion === "Anger" || log.emotion === "Frustration" || log.emotion === "Stress" ? "amber" : "green"}>{log.emotion}</Badge><Badge>Intensity {log.intensity}/5</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
-      {log.trigger && <div className="mindful-log-section"><span>Situation</span><p>{log.trigger}</p></div>}
-      {log.response && <div className="mindful-log-section"><span>Response</span><p>{log.response}</p></div>}
-      {log.positiveAction && <div className="mindful-log-section mindful-positive"><span>Positive action</span><p>{log.positiveAction}</p></div>}
-      {log.reflection && <div className="mindful-log-section"><span>Reflection</span><p>{log.reflection}</p></div>}
-      {log.completedHabitIds.length > 0 && <div className="mindful-practiced"><strong>Habits practiced</strong>{log.completedHabitIds.map((id) => <Badge key={id}>{habitNames.get(id) ?? "Past habit"}</Badge>)}</div>}
-    </Card>)}</div>}</DateGroupedRecords> : <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search or emotion." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search reflections" placeholder="Search date, emotion, situation, response..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Emotion"><Select aria-label="Filter reflections by emotion" value={emotionFilter} onChange={(event) => setEmotionFilter(event.target.value)}><option>All emotions</option><option>Anger</option><option>Frustration</option><option>Stress</option><option>Calm</option><option>Love / kindness</option><option>Gratitude</option><option>Other</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group reflections" value={reflectionGroupBy} onChange={(event) => { setReflectionGroupBy(event.target.value); setExpandReflectionGroups(false); }}><option value="date">Date</option><option value="emotion">Emotion</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={Number(Boolean(reflectionDateFrom)) + Number(Boolean(reflectionDateTo))}>
+        <Field label="From date"><DateInput aria-label="Filter reflections from date" value={reflectionDateFrom} onValueChange={setReflectionDateFrom} max={reflectionDateTo || undefined} /></Field>
+        <Field label="To date"><DateInput aria-label="Filter reflections to date" value={reflectionDateTo} onValueChange={setReflectionDateTo} min={reflectionDateFrom || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge>
+    </div>
+    {visibleLogs.length && reflectionGroupBy === "emotion" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(false)}>Hide all</Button></div>}
+    {visibleLogs.length ? reflectionGroupBy === "date"
+      ? <DateGroupedRecords items={visibleLogs} getDate={(log) => log.date} title={(date) => `Reflections · ${dateLabel(date)}`}>{(dateLogs) => renderReflectionCards(dateLogs)}</DateGroupedRecords>
+      : reflectionGroupBy === "none" ? renderReflectionCards(visibleLogs)
+        : <div className="record-date-groups">{reflectionGroups.map(([emotion, entries]) => <DevotionalRecordGroup key={emotion} title={emotion} count={entries.length} expandAll={reflectionGroupsExpanded} expansionRevision={reflectionGroupRevision}>{renderReflectionCards(entries)}</DevotionalRecordGroup>)}</div>
+      : <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search, emotion, or date range." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
     </>}
     {habitEditor !== undefined && <MindfulHabitModal key={habitEditor?.id ?? "new-mindful-habit"} initial={habitEditor} onClose={() => setHabitEditor(undefined)} onSave={(habit) => { onSaveHabit(habit, habitEditor?.id); setHabitEditor(undefined); }} />}
     {logEditor !== undefined && <MindfulnessLogModal key={logEditor?.id ?? "new-mindfulness-log"} initial={logEditor} habits={habits} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
@@ -7930,6 +8039,8 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [statusFilter, setStatusFilter] = useState("All records");
+  const [serviceGroupBy, setServiceGroupBy] = useState("category");
+  const [transactionGroupBy, setTransactionGroupBy] = useState("month");
   const [transactionFrom, setTransactionFrom] = useState("");
   const [transactionTo, setTransactionTo] = useState("");
   const [transactionSort, setTransactionSort] = useState("newest");
@@ -7942,27 +8053,50 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   const dueSoon = pending.filter(({ transaction }) => transaction.dueDate && transaction.dueDate >= currentDate && transaction.dueDate <= upcomingDate);
   const inTransactionDateRange = (entry: SubscriptionTransaction) =>
     (!transactionFrom || entry.transactionDate >= transactionFrom) && (!transactionTo || entry.transactionDate <= transactionTo);
+  const matchesTransactionStatus = (entry: SubscriptionTransaction) => {
+    if (statusFilter === "All records") return true;
+    if (statusFilter === "Paid") return entry.paid;
+    if (statusFilter === "Pending") return !entry.paid;
+    if (statusFilter === "Overdue") return !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
+    return !entry.paid && Boolean(entry.dueDate) && entry.dueDate >= currentDate && entry.dueDate <= upcomingDate;
+  };
   const visible = accounts.filter((account) => {
     const matchesText = !query || [account.name, account.category, account.provider, account.accountReference, account.notes,
       ...account.transactions.flatMap((entry) => [entry.type, entry.reference, entry.notes])]
       .some((value) => value.toLocaleLowerCase().includes(query));
     const matchesCategory = categoryFilter === "All categories" || account.category === categoryFilter;
-    const matchesStatus = statusFilter === "All records" || account.transactions.some((entry) => {
-      if (!inTransactionDateRange(entry)) return false;
-      if (statusFilter === "Paid") return entry.paid;
-      if (statusFilter === "Pending") return !entry.paid;
-      if (statusFilter === "Overdue") return !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
-      return !entry.paid && Boolean(entry.dueDate) && entry.dueDate >= currentDate && entry.dueDate <= upcomingDate;
-    });
+    const matchesStatus = statusFilter === "All records" || account.transactions.some((entry) =>
+      inTransactionDateRange(entry) && matchesTransactionStatus(entry));
     const matchesDateRange = (!transactionFrom && !transactionTo) || account.transactions.some(inTransactionDateRange);
     return matchesText && matchesCategory && matchesStatus && matchesDateRange;
   }).sort((a, b) => a.name.localeCompare(b.name));
+  const serviceGroups = [...new Set(visible.map((account) => serviceGroupBy === "provider" ? account.provider || "No provider" : account.category))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((title) => ({
+      key: title,
+      title,
+      accounts: visible.filter((account) => (serviceGroupBy === "provider" ? account.provider || "No provider" : account.category) === title),
+    }));
 
   function archiveAccount(account: SubscriptionAccount) {
     if (window.confirm(`Move "${account.name}" and its transaction history to the archive?`)) onArchiveAccount(account);
   }
   function archiveTransaction(account: SubscriptionAccount, transaction: SubscriptionTransaction) {
     if (window.confirm(`Move this ${transaction.type.toLocaleLowerCase()} dated ${dateLabel(transaction.transactionDate)} for "${account.name}" to the archive?`)) onArchiveTransaction(account.id, transaction);
+  }
+  function renderTransactionRows(account: SubscriptionAccount, entries: SubscriptionTransaction[]) {
+    return <div className="electricity-record-list">{entries.map((entry) => {
+      const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
+      const isOverdue = !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
+      return <div className="electricity-record" key={entry.id}>
+        <div className="electricity-record-main">
+          <strong>{entry.type} · {dateLabel(entry.transactionDate)} <Badge tone={entry.paid ? "green" : isOverdue ? "amber" : "blue"}>{entry.paid ? "Paid" : isOverdue ? "Overdue" : "Pending"}</Badge></strong>
+          <span>{entry.amount !== null ? formatMoney(entry.amount, account.currency) : "Amount not recorded"}{entry.dueDate ? ` · Due ${dateLabel(entry.dueDate)}` : ""}{period ? ` · Period ${period}` : ""}</span>
+          <small><LinkifiedText>{[entry.paymentDate ? `Paid ${dateLabel(entry.paymentDate)}` : "", entry.reference, entry.notes].filter(Boolean).join(" · ") || "No additional details"}</LinkifiedText></small>
+        </div>
+        <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.type} for ${account.name}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveTransaction(account.id, copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
+      </div>;
+    })}</div>;
   }
 
   return <>
@@ -7973,31 +8107,47 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       <Card><span>Overdue</span><strong>{overdue.length}</strong></Card>
       <Card><span>Due in 30 days</span><strong>{dueSoon.length}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search subscriptions and bills" placeholder="Search service, provider, or reference..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Subscription filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (statusFilter !== "All records" ? 1 : 0) + (transactionFrom ? 1 : 0) + (transactionTo ? 1 : 0) + (transactionSort !== "newest" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter by service category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field><Field label="Payment status"><Select aria-label="Filter by payment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select></Field><Field label="Transaction from"><DateInput aria-label="Transaction from date" value={transactionFrom} onValueChange={setTransactionFrom} max={transactionTo || undefined} /></Field><Field label="Transaction to"><DateInput aria-label="Transaction to date" value={transactionTo} onValueChange={setTransactionTo} min={transactionFrom || undefined} /></Field><Field label="Sort transactions by"><Select aria-label="Sort subscription transactions" value={transactionSort} onChange={(event) => setTransactionSort(event.target.value)}><option value="newest">Date (newest)</option><option value="oldest">Date (oldest)</option><option value="amount-highest">Amount (highest)</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge></div>
-    {visible.length ? <div className="subscription-list">{visible.map((account) => {
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search subscriptions and bills" placeholder="Search service, provider, or reference..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Category"><Select aria-label="Filter by service category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
+        <Field label="Payment status"><Select aria-label="Filter by payment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select></Field>
+        <Field label="Group services"><Select aria-label="Group services by" value={serviceGroupBy} onChange={(event) => setServiceGroupBy(event.target.value)}><option value="category">Category</option><option value="provider">Provider</option></Select></Field>
+        <Field label="Payment history"><Select aria-label="Group payment history by" value={transactionGroupBy} onChange={(event) => setTransactionGroupBy(event.target.value)}><option value="month">Month</option><option value="date">Date</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={Number(Boolean(transactionFrom)) + Number(Boolean(transactionTo)) + Number(transactionSort !== "newest")}>
+        <Field label="Transaction from"><DateInput aria-label="Transaction from date" value={transactionFrom} onValueChange={setTransactionFrom} max={transactionTo || undefined} /></Field>
+        <Field label="Transaction to"><DateInput aria-label="Transaction to date" value={transactionTo} onValueChange={setTransactionTo} min={transactionFrom || undefined} /></Field>
+        <Field label="Sort transactions by"><Select aria-label="Sort subscription transactions" value={transactionSort} onChange={(event) => setTransactionSort(event.target.value)}><option value="newest">Date (newest)</option><option value="oldest">Date (oldest)</option><option value="amount-highest">Amount (highest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge>
+    </div>
+    {visible.length ? <div className="subscription-groups">{serviceGroups.map((group) => <section className="subscription-group" key={group.key}>
+      <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>
+      <div className="subscription-list">{group.accounts.map((account) => {
       const sorted = account.transactions.filter((entry) =>
-        (!transactionFrom || entry.transactionDate >= transactionFrom) && (!transactionTo || entry.transactionDate <= transactionTo))
+        inTransactionDateRange(entry) && matchesTransactionStatus(entry))
         .sort((a, b) => transactionSort === "oldest" ? a.transactionDate.localeCompare(b.transactionDate) :
           transactionSort === "amount-highest" ? (b.amount ?? -1) - (a.amount ?? -1) || b.transactionDate.localeCompare(a.transactionDate) :
             b.transactionDate.localeCompare(a.transactionDate));
-      const nextDue = account.transactions.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+      const transactionGroups = [...new Set(sorted.map((entry) => monthKey(entry.transactionDate)))].sort((a, b) => transactionSort === "oldest" ? a.localeCompare(b) : b.localeCompare(a));
+      const nextDue = sorted.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
       return <details className="subscription-card compact-details" key={account.id}>
         <summary className="subscription-card-summary compact-summary"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="subscription-card-due">{nextDue ? <><span>{nextDue.dueDate < currentDate ? "Overdue" : "Next due"}</span><strong>{dateLabel(nextDue.dueDate)}</strong></> : <span>{sorted.length ? `${sorted.length} transactions` : "No transactions"}</span>}</div><div className="table-actions"><Button variant="outline" onClick={(event) => { event.preventDefault(); setTransactionEditor({ account, transaction: null }); }}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={(event) => { event.preventDefault(); setAccountEditor(account); }}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={(event) => { event.preventDefault(); onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={(event) => { event.preventDefault(); archiveAccount(account); }}><Archive size={13} /></button></div></summary>
         <div className="compact-details-body">{account.notes && <p className="subscription-card-notes">{account.notes}</p>}
-        {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel([...sorted].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0].transactionDate)}</span></summary><DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`} groupOrder={transactionSort === "oldest" ? "oldest" : "newest"}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
-          const period = [entry.periodStart ? dateLabel(entry.periodStart) : "", entry.periodEnd ? dateLabel(entry.periodEnd) : ""].filter(Boolean).join(" – ");
-          const isOverdue = !entry.paid && Boolean(entry.dueDate) && entry.dueDate < currentDate;
-          return <div className="electricity-record" key={entry.id}>
-            <div className="electricity-record-main">
-              <strong>{entry.type} · {dateLabel(entry.transactionDate)} <Badge tone={entry.paid ? "green" : isOverdue ? "amber" : "blue"}>{entry.paid ? "Paid" : isOverdue ? "Overdue" : "Pending"}</Badge></strong>
-              <span>{entry.amount !== null ? formatMoney(entry.amount, account.currency) : "Amount not recorded"}{entry.dueDate ? ` · Due ${dateLabel(entry.dueDate)}` : ""}{period ? ` · Period ${period}` : ""}</span>
-              <small><LinkifiedText>{[entry.paymentDate ? `Paid ${dateLabel(entry.paymentDate)}` : "", entry.reference, entry.notes].filter(Boolean).join(" · ") || "No additional details"}</LinkifiedText></small></div>
-            <div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.type} for ${account.name}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveTransaction(account.id, copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></div>
-          </div>;
-        })}</div>}</DateGroupedRecords></details> : <p className="vehicle-empty">No transactions recorded yet.</p>}
+        {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel([...sorted].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0].transactionDate)}</span></summary>
+          {transactionGroupBy === "date"
+            ? <DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`} groupOrder={transactionSort === "oldest" ? "oldest" : "newest"}>{(dateEntries) => renderTransactionRows(account, dateEntries)}</DateGroupedRecords>
+            : <div className="record-date-groups">{transactionGroups.map((key) => {
+              const entries = sorted.filter((entry) => monthKey(entry.transactionDate) === key);
+              const title = new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+              return <DevotionalRecordGroup key={key} title={title} count={entries.length} expandAll={false} expansionRevision={0}>{renderTransactionRows(account, entries)}</DevotionalRecordGroup>;
+            })}</div>}
+        </details> : <p className="vehicle-empty">No transactions recorded yet.</p>}
         </div>
       </details>;
-    })}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title={accounts.length ? "No matching services or bills" : "No subscriptions or bills yet"} description={accounts.length ? "Try another search or filter." : "Add a service first, then record its bills, recharges, bookings, and renewal dates."} /></Card>}
+      })}</div>
+    </section>)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title={accounts.length ? "No matching services or bills" : "No subscriptions or bills yet"} description={accounts.length ? "Try another search or filter." : "Add a service first, then record its bills, recharges, bookings, and renewal dates."} /></Card>}
     {accountEditor !== undefined && <SubscriptionAccountModal key={accountEditor?.id ?? "new-subscription"} initial={accountEditor} onClose={() => setAccountEditor(undefined)} onSave={(account) => { onSaveAccount(account, accountEditor?.id); setAccountEditor(undefined); }} />}
     {transactionEditor && <SubscriptionTransactionModal key={transactionEditor.transaction?.id ?? `new-transaction-${transactionEditor.account.id}`} initial={transactionEditor.transaction} currency={transactionEditor.account.currency} onClose={() => setTransactionEditor(null)} onSave={(transaction) => { onSaveTransaction(transactionEditor.account.id, transaction, transactionEditor.transaction?.id); setTransactionEditor(null); }} />}
   </>;
@@ -10780,14 +10930,32 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
   onArchive: (account: BankAccount) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
+  const [bankFilter, setBankFilter] = useState("All banks");
+  const [accountTypeFilter, setAccountTypeFilter] = useState("All account types");
+  const [balanceFilter, setBalanceFilter] = useState("All balances");
+  const [groupBy, setGroupBy] = useState("bank");
   const [visibleAccountNumbers, setVisibleAccountNumbers] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<BankAccount | null | undefined>(undefined);
   const [error, setError] = useState("");
   const query = search.trim().toLocaleLowerCase();
-  const filteredAccounts = accounts.filter((account) => [
+  const banks = [...new Set(accounts.map((account) => account.bankName))].sort((a, b) => a.localeCompare(b));
+  const accountTypes = [...new Set(accounts.map((account) => account.accountType))].sort((a, b) => a.localeCompare(b));
+  const filteredAccounts = accounts.filter((account) =>
+    (bankFilter === "All banks" || account.bankName === bankFilter) &&
+    (accountTypeFilter === "All account types" || account.accountType === accountTypeFilter) &&
+    (balanceFilter === "All balances" || (balanceFilter === "Balance recorded" ? account.currentBalance != null : account.currentBalance == null)) && [
     account.bankName, account.accountHolder, account.accountType, account.accountNumber,
     account.routingCode, account.branch, account.website, account.customerService, account.notes,
   ].some((value) => value.toLocaleLowerCase().includes(query)));
+  const groupedAccounts = groupBy === "none"
+    ? [{ key: "all", title: "", accounts: filteredAccounts }]
+    : [...new Set(filteredAccounts.map((account) => groupBy === "bank" ? account.bankName : account.accountType))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((title) => ({
+        key: title,
+        title,
+        accounts: filteredAccounts.filter((account) => (groupBy === "bank" ? account.bankName : account.accountType) === title),
+      }));
   const reportedBalances = filteredAccounts.flatMap((account) =>
     account.currentBalance == null ? [] : [account.currentBalance]);
   const totalReportedBalance = reportedBalances.reduce((total, balance) => total + balance, 0);
@@ -10801,8 +10969,21 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
     <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details and dated balance snapshots are stored in a separate, readable Supabase table and included in JSON backups. Balances are manual snapshots; transaction history is not stored here. Anyone with database/service-role access can read these details. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {reportedBalances.length > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Total reported balance · INR</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(totalReportedBalance)}</strong></div><div><span>Accounts with a balance snapshot</span><strong>{reportedBalances.length} of {filteredAccounts.length}</strong></div></Card></div>}
-    <div className="toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search bank accounts" placeholder="Search bank, account holder, branch, code..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge></div>
-    {filteredAccounts.length ? <div className="credential-list">{filteredAccounts.map((account) => <details className="credential-card compact-details" key={account.id}>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search bank accounts" placeholder="Search bank, account holder, branch, code..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Bank"><Select aria-label="Filter bank accounts by bank" value={bankFilter} onChange={(event) => setBankFilter(event.target.value)}><option>All banks</option>{banks.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Account type"><Select aria-label="Filter bank accounts by type" value={accountTypeFilter} onChange={(event) => setAccountTypeFilter(event.target.value)}><option>All account types</option>{accountTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group bank accounts" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="bank">Bank</option><option value="accountType">Account type</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={balanceFilter === "All balances" ? 0 : 1}>
+        <Field label="Balance"><Select aria-label="Filter accounts by balance status" value={balanceFilter} onChange={(event) => setBalanceFilter(event.target.value)}><option>All balances</option><option>Balance recorded</option><option>No balance recorded</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge>
+    </div>
+    {filteredAccounts.length ? <div className="bank-account-groups">{groupedAccounts.map((group) => <section className="bank-account-group" key={group.key}>
+      {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>}
+      <div className="credential-list">{group.accounts.map((account) => <details className="credential-card compact-details" key={account.id}>
       <summary className="credential-card-head compact-summary"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
         <button type="button" className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={(event) => { event.preventDefault(); setEditor(account); }}><Pencil size={14} /></button>
         <button type="button" className="icon-button" aria-label={`Copy ${account.bankName} bank account`} title="Create a separately editable copy" onClick={(event) => {
@@ -10829,7 +11010,8 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       {account.website && <a className="personal-document-link" href={account.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
       {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
       </div>
-    </details>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try another search." : "Add a bank account for quick reference."} /></Card>}
+    </details>)}</div>
+    </section>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try adjusting the bank, account type, balance, or search filters." : "Add a bank account for quick reference."} /></Card>}
     {editor !== undefined && <DirectBankAccountModal key={editor?.id ?? "new-direct-bank-account"} initial={editor} onClose={() => setEditor(undefined)} onSave={onSave} />}
   </>;
 }

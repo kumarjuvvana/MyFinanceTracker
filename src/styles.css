@@ -2069,6 +2069,9 @@ body{background:#f3f5ef}
 .shopping-record-group-title span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:20px;background:#edf4ee;color:#5d795f;font:600 10px "DM Sans",sans-serif}
 .app-shell.dark .shopping-record-group-title{color:#d4ddd4}
 .app-shell.dark .shopping-record-group-title span{background:#2b3d30;color:#a6c1a8}
+.bank-account-groups,.subscription-groups,.habit-checkin-groups{display:grid;gap:12px}
+.bank-account-group,.subscription-group,.habit-checkin-group{display:grid;gap:8px;min-width:0}
+.bank-account-group>.credential-list,.subscription-group>.subscription-list{min-width:0}
 .report-filter-toolbar>.shopping-quick-filters{flex:2 1 420px}
 .reminder-filter-toolbar>.shopping-quick-filters{flex:2 1 380px}
 @media(max-width:760px){
