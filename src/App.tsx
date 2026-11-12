@@ -1411,6 +1411,9 @@ function PriceHistory({ data }: { data: TrackerData }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [sortBy, setSortBy] = useState("date-oldest");
+  const [groupBy, setGroupBy] = useState("item");
+  const [groupsExpanded, setGroupsExpanded] = useState(false);
+  const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const names = [...new Set(data.purchases.map((purchase) => purchase.itemName))].sort();
   const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort((a, b) => a.localeCompare(b));
   const categories = [...new Set(data.purchases.map((purchase) => purchase.category))].sort((a, b) => a.localeCompare(b));
@@ -1426,28 +1429,94 @@ function PriceHistory({ data }: { data: TrackerData }) {
     if (sortBy === "unit-price-highest") return b.price / b.quantity - a.price / a.quantity;
     return a.date.localeCompare(b.date) || a.itemName.localeCompare(b.itemName);
   });
+  const purchaseGroupKey = (purchase: Purchase) => groupBy === "item" ? purchase.itemName
+    : groupBy === "category" ? purchase.category
+      : groupBy === "store" ? purchase.store : purchase.date;
+  const purchaseGroupKeys = [...new Set(purchases.map(purchaseGroupKey))].sort((a, b) => groupBy === "date"
+    ? sortBy === "date-newest" ? b.localeCompare(a) : a.localeCompare(b)
+    : a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const purchaseGroups = groupBy === "none" ? [] : purchaseGroupKeys.map((key) => ({
+    key,
+    title: groupBy === "date" ? `Price history · ${dateLabel(key)}` : key,
+    records: purchases.filter((purchase) => purchaseGroupKey(purchase) === key),
+  }));
+  function setPriceGroupsExpanded(expanded: boolean) {
+    setGroupsExpanded(expanded);
+    setGroupExpansionRevision((revision) => revision + 1);
+  }
+  const renderPriceHistoryTable = (records: Purchase[]) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Date</th><th>Store</th><th>Quantity</th><th>Price paid</th><th>Unit price</th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Item"><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{purchase.category}</div></td><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Store">{purchase.store}</td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Price paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Unit price">{formatCurrency(purchase.price / purchase.quantity)} <span className="table-secondary">/ {purchase.unit}</span></td></tr>)}</tbody></table></Card>;
   return <><PageHeading eyebrow="A little perspective" title="Item price history" subtitle="See how the things you buy have changed over time." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search price history" placeholder="Search items, stores, or categories..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[item !== "All items", store !== "All stores", category !== "All categories", Boolean(from), Boolean(to), sortBy !== "date-oldest"].filter(Boolean).length}><Field label="Item"><Select aria-label="Filter price history by item" value={item} onChange={(event) => setItem(event.target.value)}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Store"><Select aria-label="Filter price history by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Category"><Select aria-label="Filter price history by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort price history" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-oldest">Date (oldest)</option><option value="date-newest">Date (newest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Price paid (highest)</option><option value="unit-price-highest">Unit price (highest)</option></Select></Field></FilterDrawer><Badge>{purchases.length} records</Badge></div>
-    {purchases.length ? <DateGroupedRecords items={purchases} getDate={(purchase) => purchase.date} title={(date) => `Price history · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(datePurchases) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Date</th><th>Store</th><th>Quantity</th><th>Price paid</th><th>Unit price</th></tr></thead><tbody>{datePurchases.map((purchase) => <tr key={purchase.id}><td data-label="Item"><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{purchase.category}</div></td><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Store">{purchase.store}</td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Price paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Unit price">{formatCurrency(purchase.price / purchase.quantity)} <span className="table-secondary">/ {purchase.unit}</span></td></tr>)}</tbody></table></Card>}</DateGroupedRecords> : <Card className="table-card"><EmptyState icon={<ArrowLeftRight size={18} />} title="No price history yet" description="Record a few purchases to see their price history here." /></Card>}
+    <div className="toolbar filter-toolbar shopping-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search price history" placeholder="Search items, stores, or categories..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="shopping-quick-filters">
+        <Field label="Item"><Select aria-label="Filter price history by item" value={item} onChange={(event) => setItem(event.target.value)}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Store"><Select aria-label="Filter price history by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter price history by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group price history" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="item">Item</option><option value="category">Category</option><option value="store">Store</option><option value="date">Date</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-oldest"].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
+        <Field label="Sort by"><Select aria-label="Sort price history" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-oldest">Date (oldest)</option><option value="date-newest">Date (newest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Price paid (highest)</option><option value="unit-price-highest">Unit price (highest)</option></Select></Field>
+      </FilterDrawer>
+      <Badge>{purchases.length} records</Badge>
+    </div>
+    {purchases.length ? groupBy === "none" ? renderPriceHistoryTable(purchases) : <>
+      <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPriceGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPriceGroupsExpanded(false)}>Hide all</Button></div>
+      <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPriceHistoryTable(group.records)}</DevotionalRecordGroup>)}</div>
+    </> : <Card className="table-card"><EmptyState icon={<ArrowLeftRight size={18} />} title={data.purchases.length ? "No matching price history" : "No price history yet"} description={data.purchases.length ? "Try changing the item, store, category, or date filters." : "Record a few purchases to see their price history here."} /></Card>}
   </>;
 }
 
 function Reports({ data }: { data: TrackerData }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
-  const current = new Date();
-  const months = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(current.getFullYear(), current.getMonth() - (5 - index), 1);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-    const purchases = data.purchases.filter((purchase) => monthKey(purchase.date) === key);
-    return { key, label: date.toLocaleDateString(undefined, { month: "short" }), total: purchases.reduce((sum, purchase) => sum + purchase.price, 0), purchases };
+  const [store, setStore] = useState("All stores");
+  const [category, setCategory] = useState("All categories");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [groupBy, setGroupBy] = useState("month");
+  const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort((a, b) => a.localeCompare(b));
+  const categories = [...new Set(data.purchases.map((purchase) => purchase.category))].sort((a, b) => a.localeCompare(b));
+  const purchases = data.purchases.filter((purchase) =>
+    (store === "All stores" || purchase.store === store) &&
+    (category === "All categories" || purchase.category === category) &&
+    (!from || purchase.date >= from) && (!to || purchase.date <= to));
+  const months = [...new Set(purchases.map((purchase) => monthKey(purchase.date)))].sort().slice(-6).map((key) => {
+    const entries = purchases.filter((purchase) => monthKey(purchase.date) === key);
+    const date = new Date(`${key}-01T12:00:00`);
+    return { key, label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }), total: entries.reduce((sum, purchase) => sum + purchase.price, 0) };
   });
   const max = Math.max(1, ...months.map((month) => month.total));
-  const allMonths = [...new Set(data.purchases.map((purchase) => monthKey(purchase.date)))].sort().reverse();
+  const reportGroupKey = (purchase: Purchase) => groupBy === "category" ? purchase.category
+    : groupBy === "store" ? purchase.store : monthKey(purchase.date);
+  const reportGroups = [...new Set(purchases.map(reportGroupKey))].sort((a, b) => groupBy === "month"
+    ? b.localeCompare(a) : a.localeCompare(b, undefined, { sensitivity: "base" })).map((key) => {
+      const entries = purchases.filter((purchase) => reportGroupKey(purchase) === key);
+      return {
+        key,
+        title: groupBy === "month" ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : key,
+        entries,
+        total: entries.reduce((sum, purchase) => sum + purchase.price, 0),
+      };
+    });
+  const latestMonthKey = months[months.length - 1]?.key;
   return <><PageHeading eyebrow="The bigger picture" title="Your reports" subtitle="A gentle look at where your shopping budget goes." />
-    <div className="report-grid"><Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Your last six months</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div><div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{month.total ? formatCurrency(month.total) : "—"}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === monthKey(today()) ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div></Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Spending by category</h2><p className="section-description">This month, so far</p></div></div><CategoryBreakdown purchases={data.purchases.filter((purchase) => monthKey(purchase.date) === monthKey(today()))} /></Card></div>
-    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Monthly summary</h2><p className="section-description">Every month you've recorded a purchase</p></div></div>{allMonths.length ? <div className="recent-list">{allMonths.map((key) => { const entries = data.purchases.filter((purchase) => monthKey(purchase.date) === key); const total = entries.reduce((sum, purchase) => sum + purchase.price, 0); const date = new Date(`${key}-01T12:00:00`); return <div className="recent-row" key={key}><div className="item-dot"><CalendarDays size={15} /></div><div className="recent-info"><div className="recent-name">{date.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</div><div className="recent-meta">{entries.length} purchases · {new Set(entries.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(total)}</div></div>; })}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No data to report yet" description="Your monthly summaries will appear once you start tracking purchases." />}</Card>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters">
+        <Field label="Store"><Select aria-label="Filter reports by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter reports by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group report summary" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="month">Month</option><option value="category">Category</option><option value="store">Store</option></Select></Field>
+      </div>
+      <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="Report from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="Report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{purchases.length} purchases · {formatCurrency(purchases.reduce((sum, purchase) => sum + purchase.price, 0))}</Badge>
+    </div>
+    <div className="report-grid"><Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Spending by category</h2><p className="section-description">Matching the selected filters and date range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card></div>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store summary"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{group.title}</div><div className="recent-meta">{group.entries.length} purchases · {new Set(group.entries.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
   </>;
 }
 
@@ -1593,11 +1662,13 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
     {activeTab === "list" && <>
     <div className="toolbar filter-toolbar reminder-filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-      <FilterDrawer activeCount={activeFilterCount} label="Filters, sorting & grouping">
+      <div className="shopping-quick-filters">
         <Field label="Status"><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select></Field>
         <Field label="Category"><Select aria-label="Filter reminders by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
-        <Field label="Sort by"><Select aria-label="Sort reminders" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="date-ascending">Due date (earliest)</option><option value="date-descending">Due date (latest)</option><option value="title">Title A–Z</option><option value="category">Category A–Z</option></Select></Field>
         <Field label="Group by"><Select aria-label="Group reminders" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setAllGroupsExpanded(false); }}><option value="date">Date</option><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+      </div>
+      <FilterDrawer activeCount={[Number(Boolean(dateFrom)), Number(Boolean(dateTo)), Number(sortOrder !== "date-ascending")].reduce((sum, count) => sum + count, 0)} label="Apply filters">
+        <Field label="Sort by"><Select aria-label="Sort reminders" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="date-ascending">Due date (earliest)</option><option value="date-descending">Due date (latest)</option><option value="title">Title A–Z</option><option value="category">Category A–Z</option></Select></Field>
         <Field label="From date"><DateInput aria-label="Filter reminders from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reminders to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       </FilterDrawer>

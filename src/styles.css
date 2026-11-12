@@ -2069,6 +2069,11 @@ body{background:#f3f5ef}
 .shopping-record-group-title span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:20px;background:#edf4ee;color:#5d795f;font:600 10px "DM Sans",sans-serif}
 .app-shell.dark .shopping-record-group-title{color:#d4ddd4}
 .app-shell.dark .shopping-record-group-title span{background:#2b3d30;color:#a6c1a8}
+.report-filter-toolbar>.shopping-quick-filters{flex:2 1 420px}
+.reminder-filter-toolbar>.shopping-quick-filters{flex:2 1 380px}
+@media(max-width:760px){
+  .reminder-filter-toolbar>.shopping-quick-filters{flex:1 1 100%;width:100%}
+}
 @media(max-width:760px){
   .shopping-filter-toolbar{flex-wrap:wrap}
   .shopping-filter-toolbar>.search-wrap,.shopping-quick-filters{flex:1 1 100%;width:100%}
