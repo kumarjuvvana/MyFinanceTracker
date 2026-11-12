@@ -544,23 +544,39 @@ body{background:#f3f5ef}
 .app-shell.dark .history-summary{border-color:#344539}
 .app-shell.dark .history-summary>strong{color:#e3e8e2}
 @media(max-width:900px){
-  .table-card{overflow:hidden}
-  .data-table{display:block;width:100%;min-width:0;padding:0 12px}
-  .data-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .data-table tbody{display:grid;gap:10px;padding:10px 0}
-  .data-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;padding:7px 11px;border:1px solid #e6ebe3;border-radius:12px;background:#fff}
-  .data-table tbody td{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-width:0;padding:8px 0;border-bottom:1px solid #edf0eb;white-space:normal;overflow-wrap:anywhere}
-  .data-table tbody td::before{content:attr(data-label);font-size:9px;font-weight:700;letter-spacing:.55px;text-transform:uppercase;color:#7a887c}
-  .data-table tbody td[data-label="Item"]{grid-column:1/-1}
-  .data-table tbody td[data-label="Actions"]{grid-column:1/-1;align-items:flex-end;border-bottom:0}
-  .data-table tbody td[data-label="Actions"]::before{content:none}
-  .data-table tbody tr td:last-child{border-bottom:0}
-  .data-table .table-actions{width:100%}
-  .app-shell.dark .data-table tbody tr{background:#202b24;border-color:#37483c}
-  .app-shell.dark .data-table tbody td{border-color:#344539}
-  .app-shell.dark .data-table tbody td::before{color:#adbdaf}
+  .table-card{overflow-x:auto}
+  .data-table{display:table;width:max-content;min-width:650px;padding:0}
+  .data-table.mobile-card-table{display:block;width:100%;min-width:0;padding:0 12px}
+  .mobile-card-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .mobile-card-table tbody{display:grid;gap:10px;padding:10px 0}
+  .mobile-card-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;padding:7px 11px;border:1px solid #e6ebe3;border-radius:12px;background:#fff}
+  .mobile-card-table tbody td{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-width:0;padding:8px 0;border-bottom:1px solid #edf0eb;white-space:normal;overflow-wrap:anywhere}
+  .mobile-card-table tbody td::before{content:attr(data-label);font-size:9px;font-weight:700;letter-spacing:.55px;text-transform:uppercase;color:#7a887c}
+  .mobile-card-table tbody td[data-label="Item"]{grid-column:1/-1}
+  .mobile-card-table tbody td[data-label="Actions"]{grid-column:1/-1;align-items:flex-end;border-bottom:0}
+  .mobile-card-table tbody td[data-label="Actions"]::before{content:none}
+  .mobile-card-table tbody tr td:last-child{border-bottom:0}
+  .mobile-card-table .table-actions{width:100%}
+  .app-shell.dark .mobile-card-table tbody tr{background:#202b24;border-color:#37483c}
+  .app-shell.dark .mobile-card-table tbody td{border-color:#344539}
+  .app-shell.dark .mobile-card-table tbody td::before{color:#adbdaf}
   .history-summary{padding:12px 14px}
   .history-summary>strong{font-size:12px}
+}
+
+@media(max-width:760px){
+  .filter-toolbar{flex-wrap:wrap}
+  .filter-toolbar>.search-wrap{flex:1 0 100%}
+  .page-head{align-items:flex-start;flex-wrap:wrap}
+  .page-head>.button{flex:none}
+  .mobile-nav button{flex:1;min-width:0;min-height:44px}
+}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:minmax(0,1fr)}
+  .form-grid>.full{grid-column:auto}
+  .icon-button{width:40px;height:40px}
+  .page-head>.button{width:100%;min-height:44px}
 }
 
 .prompt-list{display:grid;gap:12px}
