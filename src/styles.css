@@ -567,6 +567,7 @@ body{background:#f3f5ef}
 @media(max-width:760px){
   .filter-toolbar{flex-wrap:wrap}
   .filter-toolbar>.search-wrap{flex:1 0 100%}
+  .cooking-group-control,.issues-group-control,.career-group-control,.family-group-control{flex:1 1 130px;width:auto}
   .page-head{align-items:flex-start;flex-wrap:wrap}
   .page-head>.button{flex:none}
   .mobile-nav button{flex:1;min-width:0;min-height:44px}
@@ -982,6 +983,13 @@ body{background:#f3f5ef}
 .cooking-summary span{font-size:10px;color:#92998f}
 .cooking-summary strong{font:700 14px Manrope,sans-serif;color:#414a42}
 .cooking-section{display:grid;gap:10px;min-width:0}
+.cooking-record-groups,.issue-record-groups,.family-record-groups,.career-record-groups{display:grid;gap:14px;min-width:0}
+.cooking-record-groups>section,.issue-record-groups>section,.family-record-groups>section,.career-record-groups>section{display:grid;gap:10px;min-width:0}
+.cooking-group-control,.issues-group-control,.career-group-control,.family-group-control{width:min(100%,160px);margin:0}
+.cooking-plan-filter-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px}
+.cooking-plan-filter-controls>.field-wrap{flex:1 1 130px;min-width:120px}
+.cooking-plan-record-groups{display:grid;gap:12px}
+.cooking-plan-record-groups>section{display:grid;gap:8px;min-width:0}
 .cooking-list{display:grid;gap:10px}
 .cooking-card{min-width:0;padding:14px}
 .cooking-card h3{margin:4px 0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
