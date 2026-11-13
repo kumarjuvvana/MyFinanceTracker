@@ -3238,7 +3238,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
         <RefreshCw size={14} className={running ? "spin" : ""} />{running ? "Updating..." : "Run enabled types now"}
       </Button>
     </div>
-    <div className="alert"><Clock3 size={15} /><span>Enabled types run weekly on Saturday at about 23:00 India time. Hobby Cron timing can vary by up to 59 minutes. The provider’s latest available market/NAV date is saved.</span></div>
+    <div className="alert"><Clock3 size={15} /><span>Enabled types run weekly on Friday at about 23:00 India time. Hobby Cron timing can vary by up to 59 minutes. The provider’s latest available market/NAV date is saved.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {loading ? <Card><p className="section-description">Loading schedule settings...</p></Card> : <>

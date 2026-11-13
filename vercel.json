@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/asset-prices",
-      "schedule": "30 17 * * 6"
+      "schedule": "30 17 * * 5"
     }
   ],
   "functions": {
