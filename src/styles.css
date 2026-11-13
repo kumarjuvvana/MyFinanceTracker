@@ -818,7 +818,6 @@ body{background:#f3f5ef}
 .asset-price-schedule-title input{accent-color:var(--user-accent,#56815d)}
 .asset-price-schedule-title>span{color:var(--text-muted,#778077);font-size:10px}
 .asset-price-schedule-card>.section-description{margin:0}
-.asset-price-schedule-fields{display:grid;grid-template-columns:1fr 1.3fr;gap:8px}
 .asset-price-unsupported{display:grid;gap:9px}
 .asset-price-unsupported .section-title,.asset-price-unsupported .section-description{margin:0}
 .asset-price-unsupported>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:7px}
@@ -876,7 +875,7 @@ body{background:#f3f5ef}
 .asset-type-tabs button[aria-selected="true"] span{background:color-mix(in srgb,var(--user-accent,#56815d) 14%,transparent)}
 .app-shell.dark .asset-type-tabs button{border-color:#394239;background:#252d26;color:#a7b0a7}
 .app-shell.dark .asset-type-tabs button[aria-selected="true"]{border-color:#a6c1a8;background:#2c3b2e;color:#a6c1a8}
-@media(max-width:600px){.asset-price-schedule-fields{grid-template-columns:1fr}.asset-price-run-card{grid-template-columns:1fr auto}.asset-price-run-card>span:last-of-type{grid-column:1/-1}}
+@media(max-width:600px){.asset-price-run-card{grid-template-columns:1fr auto}.asset-price-run-card>span:last-of-type{grid-column:1/-1}}
 .digital-gold-summary .asset-total-card{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
 .nps-summary-list .asset-total-card{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
 .nps-scheme-editor{display:grid;gap:12px;padding:14px;border:1px solid var(--panel-line,#e6ebe3);border-radius:11px}

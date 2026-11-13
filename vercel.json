@@ -1,12 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/asset-price-job",
-      "schedule": "0 0 * * *"
+      "path": "/api/asset-prices",
+      "schedule": "30 17 * * 6"
     }
   ],
   "functions": {
-    "api/asset-price-job.ts": {
+    "api/asset-prices.ts": {
       "maxDuration": 60
     }
   }

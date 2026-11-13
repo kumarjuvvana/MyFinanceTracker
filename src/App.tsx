@@ -3073,7 +3073,6 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
 }
 
 const ASSET_PRICE_SCHEDULE_TYPES: AssetPriceSchedule["assetType"][] = ["Stocks", "Mutual fund", "NPS"];
-const ASSET_PRICE_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const UNSUPPORTED_ASSET_PRICE_TYPES = ASSET_MANAGER_VISIBLE_TYPES.filter((type) =>
   type !== "Stocks" && type !== "Mutual fund" && type !== "NPS");
 
@@ -3121,7 +3120,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
   const [notice, setNotice] = useState("");
 
   async function loadDashboard() {
-    const response = await fetch("/api/asset-price-settings");
+    const response = await fetch("/api/asset-prices");
     const payload: unknown = await response.json();
     if (!response.ok || !isRecord(payload) || !Array.isArray(payload.settings)) {
       const message = isRecord(payload) && typeof payload.error === "string"
@@ -3134,16 +3133,10 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
       if (!isRecord(row) ||
         (row.asset_type !== "Stocks" && row.asset_type !== "Mutual fund" && row.asset_type !== "NPS") ||
         typeof row.enabled !== "boolean" ||
-        typeof row.day_of_week !== "number" ||
-        typeof row.run_hour !== "number" ||
-        typeof row.timezone !== "string" ||
         !(row.last_run_at === null || typeof row.last_run_at === "string")) return [];
       return [{
         assetType: row.asset_type,
         enabled: row.enabled,
-        dayOfWeek: row.day_of_week,
-        runHour: row.run_hour,
-        timezone: row.timezone,
         lastRunAt: row.last_run_at,
       }];
     });
@@ -3177,7 +3170,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/asset-price-settings", {
+      const response = await fetch("/api/asset-prices", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: schedules }),
@@ -3188,7 +3181,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
           ? payload.error : "Could not save price schedules.");
       }
       await loadDashboard();
-      setNotice("Price schedules saved.");
+      setNotice("Weekly price update settings saved.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save price schedules.");
     } finally {
@@ -3201,7 +3194,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
     setError("");
     setNotice("");
     try {
-      const response = await fetch("/api/asset-price-job", {
+      const response = await fetch("/api/asset-prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "run-now" }),
@@ -3238,14 +3231,14 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
   return <div className="asset-price-automation">
     <div className="asset-price-automation-heading">
       <div>
-        <h2 className="section-title">Scheduled price updates</h2>
-        <p className="section-description">Choose which provider-backed asset classes to update automatically. Each class can use its own weekly day, local hour, and timezone.</p>
+        <h2 className="section-title">Weekly price updates</h2>
+        <p className="section-description">Choose which provider-backed asset classes to update automatically once a week.</p>
       </div>
       <Button type="button" variant="outline" onClick={() => void runNow()} disabled={loading || running || !schedules.some((schedule) => schedule.enabled)}>
         <RefreshCw size={14} className={running ? "spin" : ""} />{running ? "Updating..." : "Run enabled types now"}
       </Button>
     </div>
-    <div className="alert"><Clock3 size={15} /><span>On the current Vercel Hobby plan, Cron runs once daily at 00:00 UTC (05:30 in India). Choose the weekday and timezone for each asset type; the time of day is fixed by Vercel. Execution may be delayed, and the actual market/NAV date supplied by each provider is saved.</span></div>
+    <div className="alert"><Clock3 size={15} /><span>Enabled types run weekly on Saturday at about 23:00 India time. Hobby Cron timing can vary by up to 59 minutes. The provider’s latest available market/NAV date is saved.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {loading ? <Card><p className="section-description">Loading schedule settings...</p></Card> : <>
@@ -3260,10 +3253,6 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
             : schedule.assetType === "Mutual fund"
               ? "Latest published scheme NAVs from AMFI; holdings need a valid ISIN."
               : "Latest published scheme NAVs from NPS Trust; schemes must match unambiguously."}</p>
-          <div className="asset-price-schedule-fields">
-            <Field label="Run on"><Select value={String(schedule.dayOfWeek)} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { dayOfWeek: Number(event.target.value) })}>{ASSET_PRICE_DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</Select></Field>
-            <Field label="Timezone"><Input maxLength={64} value={schedule.timezone} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { timezone: event.target.value })} placeholder="Asia/Kolkata" /></Field>
-          </div>
           <p className="section-description">Last run: {formatDateTime(schedule.lastRunAt)}</p>
         </Card>)}
       </div>

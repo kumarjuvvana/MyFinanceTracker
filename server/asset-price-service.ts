@@ -1,15 +1,12 @@
-import { fetchMutualFundNavs } from "./mutual-fund-nav.js";
-import { fetchNpsNavs } from "./nps-nav.js";
-import { fetchStockQuote } from "./stock-price.js";
+import { fetchMutualFundNavs } from "../api/mutual-fund-nav.js";
+import { fetchNpsNavs } from "../api/nps-nav.js";
+import { fetchStockQuote } from "../api/stock-price.js";
 import { normalizeTrackerData, validateData } from "../src/lib/data.js";
 import type { AutomatedPriceAssetType, TrackerData } from "../src/types.js";
 
 interface SettingsRow {
   asset_type: AutomatedPriceAssetType;
   enabled: boolean;
-  day_of_week: number;
-  run_hour: number;
-  timezone: string;
   last_run_at: string | null;
 }
 
@@ -99,16 +96,13 @@ export async function loadPriceSettings(): Promise<SettingsRow[]> {
   return settings;
 }
 
-export async function savePriceSettings(settings: SettingsRow[]): Promise<void> {
+export async function savePriceSettings(settings: Array<Pick<SettingsRow, "asset_type" | "enabled">>): Promise<void> {
   await supabaseRequest("asset_price_update_settings?on_conflict=asset_type", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(settings.map((setting) => ({
       asset_type: setting.asset_type,
       enabled: setting.enabled,
-      day_of_week: setting.day_of_week,
-      run_hour: setting.run_hour,
-      timezone: setting.timezone,
       updated_at: new Date().toISOString(),
     }))),
   });
@@ -352,18 +346,18 @@ export async function runScheduledAssetPrices(now = new Date()): Promise<{
   results: Array<{ assetType: AutomatedPriceAssetType; status: string; updatedCount: number; details: string[] }>;
 }> {
   const settings = await loadPriceSettings();
-  const dueSettings = settings.filter((setting) => setting.enabled && isDue(setting, now));
-  if (!dueSettings.length) {
+  const enabledSettings = settings.filter((setting) => setting.enabled);
+  if (!enabledSettings.length) {
     return {
       started: 0,
-      skipped: settings.filter((setting) => setting.enabled).length,
+      skipped: 0,
       results: [],
     };
   }
   const results: Array<{ assetType: AutomatedPriceAssetType; status: string; updatedCount: number; details: string[] }> = [];
   const scheduledFor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours())).toISOString();
 
-  for (const setting of dueSettings) {
+  for (const setting of enabledSettings) {
     const run = await startPriceRun(setting.asset_type, "scheduled", scheduledFor);
     if (!run) continue;
     try {
@@ -378,23 +372,9 @@ export async function runScheduledAssetPrices(now = new Date()): Promise<{
   }
   return {
     started: results.length,
-    skipped: settings.filter((setting) => setting.enabled).length - results.length,
+    skipped: enabledSettings.length - results.length,
     results,
   };
-}
-
-function isDue(setting: SettingsRow, now: Date): boolean {
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: setting.timezone,
-      weekday: "short",
-    }).formatToParts(now);
-    const weekday = parts.find((part) => part.type === "weekday")?.value;
-    const weekdays: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    return weekdays[weekday ?? ""] === setting.day_of_week;
-  } catch (caught) {
-    throw new Error(`Invalid timezone for ${setting.asset_type} schedule: ${providerFailure(caught)}`);
-  }
 }
 
 export function isSupportedAssetType(value: unknown): value is AutomatedPriceAssetType {
@@ -405,18 +385,8 @@ function isSettingsRow(value: unknown): value is SettingsRow {
   if (typeof value !== "object" || value === null ||
     !("asset_type" in value) || !isSupportedAssetType(value.asset_type) ||
     !("enabled" in value) || typeof value.enabled !== "boolean" ||
-    !("day_of_week" in value) || typeof value.day_of_week !== "number" ||
-    !Number.isInteger(value.day_of_week) || value.day_of_week < 0 || value.day_of_week > 6 ||
-    !("run_hour" in value) || typeof value.run_hour !== "number" ||
-    !Number.isInteger(value.run_hour) || value.run_hour < 0 || value.run_hour > 23 ||
-    !("timezone" in value) || typeof value.timezone !== "string" ||
     !("last_run_at" in value) || !(value.last_run_at === null || typeof value.last_run_at === "string")) {
     return false;
   }
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: value.timezone });
-    return true;
-  } catch {
-    return false;
-  }
+  return true;
 }

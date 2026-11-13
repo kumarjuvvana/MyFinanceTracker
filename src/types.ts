@@ -182,9 +182,6 @@ export type AutomatedPriceAssetType = "Stocks" | "Mutual fund" | "NPS";
 export interface AssetPriceSchedule {
   assetType: AutomatedPriceAssetType;
   enabled: boolean;
-  dayOfWeek: number;
-  runHour: number;
-  timezone: string;
   lastRunAt: string | null;
 }
 
