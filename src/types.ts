@@ -177,6 +177,44 @@ export interface NpsNavSnapshot {
   fetchedAt: string;
 }
 
+export type AutomatedPriceAssetType = "Stocks" | "Mutual fund" | "NPS";
+
+export interface AssetPriceSchedule {
+  assetType: AutomatedPriceAssetType;
+  enabled: boolean;
+  dayOfWeek: number;
+  runHour: number;
+  timezone: string;
+  lastRunAt: string | null;
+}
+
+export interface AssetPriceHistoryRecord {
+  id: string;
+  asset_type: AutomatedPriceAssetType;
+  asset_id: string;
+  asset_name: string;
+  instrument_id: string;
+  instrument_name: string;
+  price: number;
+  price_date: string;
+  currency: string;
+  provider: string;
+  fetched_at: string;
+}
+
+export interface AssetPriceUpdateRun {
+  id: string;
+  asset_type: AutomatedPriceAssetType;
+  run_kind: "scheduled" | "manual";
+  scheduled_for: string | null;
+  started_at: string;
+  completed_at: string | null;
+  status: "running" | "succeeded" | "partial" | "failed";
+  updated_count: number;
+  failure_count: number;
+  details: string[];
+}
+
 export const ASSET_TYPES = [
   "Mutual fund",
   "NPS",

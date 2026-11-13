@@ -807,6 +807,39 @@ body{background:#f3f5ef}
 .app-shell.dark .vehicle-record{border-color:#343d35}
 .asset-total-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;margin:0 0 16px}
 .asset-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.asset-price-automation{display:grid;gap:14px}
+.asset-price-automation-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.asset-price-automation-heading>div{display:grid;gap:4px}
+.asset-price-automation-heading .section-title,.asset-price-automation-heading .section-description{margin:0}
+.asset-price-schedule-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:11px}
+.asset-price-schedule-card{display:grid;gap:10px}
+.asset-price-schedule-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.asset-price-schedule-title label{display:flex;align-items:center;gap:8px;color:var(--text,#303830);font-size:13px}
+.asset-price-schedule-title input{accent-color:var(--user-accent,#56815d)}
+.asset-price-schedule-title>span{color:var(--text-muted,#778077);font-size:10px}
+.asset-price-schedule-card>.section-description{margin:0}
+.asset-price-schedule-fields{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:8px}
+.asset-price-unsupported{display:grid;gap:9px}
+.asset-price-unsupported .section-title,.asset-price-unsupported .section-description{margin:0}
+.asset-price-unsupported>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:7px}
+.asset-price-unsupported label{display:flex;align-items:center;gap:7px;color:var(--text-muted,#778077);font-size:10px}
+.asset-price-unsupported input{accent-color:var(--user-accent,#56815d)}
+.asset-price-actions{display:flex;justify-content:flex-end}
+.asset-price-history-section{display:grid;gap:9px}
+.asset-price-history-section>.section-title{display:flex;align-items:center;gap:7px;margin:0}
+.asset-price-run-list{display:grid;gap:8px}
+.asset-price-run-card{display:grid;grid-template-columns:minmax(100px,1fr) auto auto;align-items:start;gap:7px 12px}
+.asset-price-run-card>div{display:grid;gap:3px}
+.asset-price-run-card>div span,.asset-price-run-card>span{color:var(--text-muted,#778077);font-size:10px}
+.asset-price-run-card .asset-price-run-status{font-weight:700;text-transform:capitalize}
+.asset-price-run-status.succeeded{color:#40834e}
+.asset-price-run-status.partial{color:#9a6a17}
+.asset-price-run-status.failed{color:#b3483d}
+.asset-price-run-card ul{grid-column:1/-1;margin:0;padding-left:17px;color:var(--text-muted,#778077);font-size:10px}
+.app-shell.dark .asset-price-schedule-title label{color:#e3e8e2}
+.app-shell.dark .asset-price-run-status.succeeded{color:#a8d1ad}
+.app-shell.dark .asset-price-run-status.partial{color:#e8c27e}
+.app-shell.dark .asset-price-run-status.failed{color:#f0aaa0}
 .asset-type-preferences{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--panel-line,#e6ebe3)}
 .asset-type-preferences .section-title,.asset-type-preferences .section-description{margin:0}
 .asset-type-preference-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -843,6 +876,7 @@ body{background:#f3f5ef}
 .asset-type-tabs button[aria-selected="true"] span{background:color-mix(in srgb,var(--user-accent,#56815d) 14%,transparent)}
 .app-shell.dark .asset-type-tabs button{border-color:#394239;background:#252d26;color:#a7b0a7}
 .app-shell.dark .asset-type-tabs button[aria-selected="true"]{border-color:#a6c1a8;background:#2c3b2e;color:#a6c1a8}
+@media(max-width:600px){.asset-price-schedule-fields{grid-template-columns:1fr 1fr}.asset-price-schedule-fields .field:last-child{grid-column:1/-1}.asset-price-run-card{grid-template-columns:1fr auto}.asset-price-run-card>span:last-of-type{grid-column:1/-1}}
 .digital-gold-summary .asset-total-card{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
 .nps-summary-list .asset-total-card{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
 .nps-scheme-editor{display:grid;gap:12px;padding:14px;border:1px solid var(--panel-line,#e6ebe3);border-radius:11px}

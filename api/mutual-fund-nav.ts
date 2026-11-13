@@ -9,7 +9,7 @@ interface MutualFundNavResponse {
   end(body?: string): void;
 }
 
-interface MutualFundNav {
+export interface MutualFundNav {
   schemeCode: string;
   schemeName: string;
   nav: number;
@@ -81,6 +81,30 @@ function parseNavFeed(feed: string, requested: Set<string>): Map<string, MutualF
   return matches;
 }
 
+export async function fetchMutualFundNavs(isins: string[]): Promise<Map<string, MutualFundNav>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+  try {
+    const navResponse = await fetch("https://portal.amfiindia.com/spages/NAVAll.txt", {
+      headers: { Accept: "text/plain" },
+      signal: controller.signal,
+    });
+    if (!navResponse.ok) throw new Error(`AMFI returned HTTP ${navResponse.status} while loading NAV data.`);
+    const feed = await navResponse.text();
+    if (!feed.includes(";") || feed.length > 12 * 1024 * 1024) {
+      throw new Error("AMFI returned an invalid or unexpectedly large NAV file.");
+    }
+    return parseNavFeed(feed, new Set(isins));
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "AbortError") {
+      throw new Error("The AMFI NAV request timed out. Try again later.");
+    }
+    throw caught;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function mutualFundNavHandler(
   request: MutualFundNavRequest,
   response: MutualFundNavResponse,
@@ -97,24 +121,8 @@ export default async function mutualFundNavHandler(
     return;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 9000);
   try {
-    const navResponse = await fetch("https://portal.amfiindia.com/spages/NAVAll.txt", {
-      headers: { Accept: "text/plain" },
-      signal: controller.signal,
-    });
-    if (!navResponse.ok) {
-      respond(response, 502, { error: `AMFI returned HTTP ${navResponse.status} while loading NAV data.` });
-      return;
-    }
-    const feed = await navResponse.text();
-    if (!feed.includes(";") || feed.length > 12 * 1024 * 1024) {
-      respond(response, 502, { error: "AMFI returned an invalid or unexpectedly large NAV file." });
-      return;
-    }
-
-    const latestNavs = parseNavFeed(feed, new Set(isins));
+    const latestNavs = await fetchMutualFundNavs(isins);
     respond(response, 200, {
       provider: "AMFI",
       navs: isins.map((isin) => {
@@ -123,11 +131,6 @@ export default async function mutualFundNavHandler(
       }),
     });
   } catch (caught) {
-    const message = caught instanceof Error && caught.name === "AbortError"
-      ? "The AMFI NAV request timed out. Try again later."
-      : "Could not load mutual-fund NAV data from AMFI.";
-    respond(response, 502, { error: message });
-  } finally {
-    clearTimeout(timeout);
+    respond(response, 502, { error: caught instanceof Error ? caught.message : "Could not load mutual-fund NAV data from AMFI." });
   }
 }

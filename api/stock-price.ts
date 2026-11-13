@@ -9,12 +9,16 @@ interface StockPriceResponse {
   end(body?: string): void;
 }
 
-interface NormalizedQuote {
+export interface NormalizedQuote {
   price: number;
   currency: string;
   timestamp: string;
   marketState: string;
   previousClose: number | null;
+}
+
+export interface StockPriceQuote extends NormalizedQuote {
+  provider: "Yahoo Finance" | "Twelve Data";
 }
 
 function respond(response: StockPriceResponse, status: number, body: Record<string, unknown>) {
@@ -126,6 +130,33 @@ async function fetchTwelveDataQuote(symbol: string, exchange: string, apiKey: st
   }
 }
 
+export async function fetchStockQuote(symbol: string, exchange: string): Promise<StockPriceQuote> {
+  let yahooError = "Yahoo Finance could not provide a quote.";
+  try {
+    const quote = await fetchYahooQuote(symbol, exchange);
+    if (validQuote(quote)) return { ...quote, provider: "Yahoo Finance" };
+  } catch (error) {
+    yahooError = error instanceof Error && error.name === "AbortError"
+      ? "Yahoo Finance timed out."
+      : error instanceof Error ? error.message : yahooError;
+  }
+
+  const twelveDataApiKey = process.env.TWELVE_DATA_API_KEY?.trim();
+  if (!twelveDataApiKey) {
+    throw new Error(`${yahooError} Add TWELVE_DATA_API_KEY to enable the Twelve Data fallback, or enter a verified price manually.`);
+  }
+  try {
+    const quote = await fetchTwelveDataQuote(symbol, exchange, twelveDataApiKey);
+    if (!validQuote(quote)) throw new Error("Twelve Data returned invalid quote information.");
+    return { ...quote, provider: "Twelve Data" };
+  } catch (error) {
+    const fallbackError = error instanceof Error && error.name === "AbortError"
+      ? "Twelve Data timed out."
+      : error instanceof Error ? error.message : "Twelve Data could not provide a quote.";
+    throw new Error(`${yahooError} Twelve Data fallback: ${fallbackError}`);
+  }
+}
+
 export default async function stockPriceHandler(request: StockPriceRequest, response: StockPriceResponse) {
   if (request.method !== "GET") {
     response.setHeader("Allow", "GET");
@@ -141,34 +172,11 @@ export default async function stockPriceHandler(request: StockPriceRequest, resp
     return;
   }
 
-  let yahooError = "Yahoo Finance could not provide a quote.";
   try {
-    const quote = await fetchYahooQuote(symbol, exchange);
-    if (validQuote(quote)) {
-      respond(response, 200, { symbol, exchange, ...quote, provider: "Yahoo Finance" });
-      return;
-    }
-  } catch (error) {
-    yahooError = error instanceof Error && error.name === "AbortError"
-      ? "Yahoo Finance timed out."
-      : error instanceof Error ? error.message : yahooError;
-  }
-
-  const twelveDataApiKey = process.env.TWELVE_DATA_API_KEY?.trim();
-  if (!twelveDataApiKey) {
-    respond(response, 502, {
-      error: `${yahooError} Add TWELVE_DATA_API_KEY to enable the Twelve Data fallback, or enter a verified price manually.`,
-    });
+    const quote = await fetchStockQuote(symbol, exchange);
+    respond(response, 200, { symbol, exchange, ...quote });
     return;
-  }
-  try {
-    const quote = await fetchTwelveDataQuote(symbol, exchange, twelveDataApiKey);
-    if (!validQuote(quote)) throw new Error("Twelve Data returned invalid quote information.");
-    respond(response, 200, { symbol, exchange, ...quote, provider: "Twelve Data" });
   } catch (error) {
-    const fallbackError = error instanceof Error && error.name === "AbortError"
-      ? "Twelve Data timed out."
-      : error instanceof Error ? error.message : "Twelve Data could not provide a quote.";
-    respond(response, 502, { error: `${yahooError} Twelve Data fallback: ${fallbackError}` });
+    respond(response, 502, { error: error instanceof Error ? error.message : "Could not load a stock quote." });
   }
 }

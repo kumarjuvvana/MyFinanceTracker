@@ -19,7 +19,7 @@ import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUs
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
 import type { CookingPlan } from "./types";
@@ -2705,7 +2705,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             </div>
           <details className="stock-history">
             <summary>Price history ({history.length} snapshots)</summary>
-            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">No price history saved yet. Enable Track price history before refreshing to record snapshots.</p>}
+            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">No manual stock snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track price history to record manual refreshes here.</p>}
           </details>
           </div>
         </details>;
@@ -3072,6 +3072,235 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
   </Modal>;
 }
 
+const ASSET_PRICE_SCHEDULE_TYPES: AssetPriceSchedule["assetType"][] = ["Stocks", "Mutual fund", "NPS"];
+const ASSET_PRICE_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const UNSUPPORTED_ASSET_PRICE_TYPES = ASSET_MANAGER_VISIBLE_TYPES.filter((type) =>
+  type !== "Stocks" && type !== "Mutual fund" && type !== "NPS");
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAssetPriceHistoryRecord(value: unknown): value is AssetPriceHistoryRecord {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.asset_type === "Stocks" || value.asset_type === "Mutual fund" || value.asset_type === "NPS") &&
+    typeof value.asset_id === "string" &&
+    typeof value.asset_name === "string" &&
+    typeof value.instrument_id === "string" &&
+    typeof value.instrument_name === "string" &&
+    typeof value.price === "number" && Number.isFinite(value.price) &&
+    typeof value.price_date === "string" &&
+    typeof value.currency === "string" &&
+    typeof value.provider === "string" &&
+    typeof value.fetched_at === "string";
+}
+
+function isAssetPriceUpdateRun(value: unknown): value is AssetPriceUpdateRun {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    (value.asset_type === "Stocks" || value.asset_type === "Mutual fund" || value.asset_type === "NPS") &&
+    (value.run_kind === "scheduled" || value.run_kind === "manual") &&
+    (value.scheduled_for === null || typeof value.scheduled_for === "string") &&
+    typeof value.started_at === "string" &&
+    (value.completed_at === null || typeof value.completed_at === "string") &&
+    (value.status === "running" || value.status === "succeeded" || value.status === "partial" || value.status === "failed") &&
+    typeof value.updated_count === "number" &&
+    typeof value.failure_count === "number" &&
+    Array.isArray(value.details) && value.details.every((detail) => typeof detail === "string");
+}
+
+function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stocks: TrackedStock[] }) {
+  const [schedules, setSchedules] = useState<AssetPriceSchedule[]>([]);
+  const [history, setHistory] = useState<AssetPriceHistoryRecord[]>([]);
+  const [runs, setRuns] = useState<AssetPriceUpdateRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function loadDashboard() {
+    const response = await fetch("/api/asset-price-settings");
+    const payload: unknown = await response.json();
+    if (!response.ok || !isRecord(payload) || !Array.isArray(payload.settings)) {
+      const message = isRecord(payload) && typeof payload.error === "string"
+        ? payload.error
+        : "Could not load automated price settings.";
+      throw new Error(message);
+    }
+
+    const loadedSchedules = payload.settings.flatMap((row): AssetPriceSchedule[] => {
+      if (!isRecord(row) ||
+        (row.asset_type !== "Stocks" && row.asset_type !== "Mutual fund" && row.asset_type !== "NPS") ||
+        typeof row.enabled !== "boolean" ||
+        typeof row.day_of_week !== "number" ||
+        typeof row.run_hour !== "number" ||
+        typeof row.timezone !== "string" ||
+        !(row.last_run_at === null || typeof row.last_run_at === "string")) return [];
+      return [{
+        assetType: row.asset_type,
+        enabled: row.enabled,
+        dayOfWeek: row.day_of_week,
+        runHour: row.run_hour,
+        timezone: row.timezone,
+        lastRunAt: row.last_run_at,
+      }];
+    });
+    if (loadedSchedules.length !== ASSET_PRICE_SCHEDULE_TYPES.length) {
+      throw new Error("Supabase has incomplete price schedule settings. Reapply the asset price migration.");
+    }
+    setSchedules(loadedSchedules);
+    setHistory(Array.isArray(payload.history) ? payload.history.filter(isAssetPriceHistoryRecord) : []);
+    setRuns(Array.isArray(payload.runs) ? payload.runs.filter(isAssetPriceUpdateRun) : []);
+  }
+
+  useEffect(() => {
+    let active = true;
+    void loadDashboard().catch((caught: unknown) => {
+      if (active) setError(caught instanceof Error ? caught.message : "Could not load automated price settings.");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  function updateSchedule(assetType: AssetPriceSchedule["assetType"], patch: Partial<AssetPriceSchedule>) {
+    setSchedules((current) => current.map((schedule) =>
+      schedule.assetType === assetType ? { ...schedule, ...patch } : schedule));
+    setError("");
+    setNotice("");
+  }
+
+  async function saveSchedules() {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/asset-price-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: schedules }),
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        throw new Error(isRecord(payload) && typeof payload.error === "string"
+          ? payload.error : "Could not save price schedules.");
+      }
+      await loadDashboard();
+      setNotice("Price schedules saved.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save price schedules.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function runNow() {
+    setRunning(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/asset-price-job", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "run-now" }),
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        throw new Error(isRecord(payload) && typeof payload.error === "string"
+          ? payload.error : "Could not start the price update.");
+      }
+      await loadDashboard();
+      setNotice("Price update finished. Review each run’s status and messages below.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not start the price update.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function assetCount(assetType: AssetPriceSchedule["assetType"]): number {
+    if (assetType === "Stocks") return stocks.length;
+    if (assetType === "Mutual fund") return assets.filter((asset) => asset.type === "Mutual fund").length;
+    return assets.reduce((count, asset) => count + (asset.type === "NPS" ? asset.npsSchemes?.length ?? 0 : 0), 0);
+  }
+
+  function formatPrice(price: number, currency: string): string {
+    try { return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(price); }
+    catch { return `${currency} ${price.toFixed(2)}`; }
+  }
+
+  function formatDateTime(value: string | null): string {
+    return value ? new Date(value).toLocaleString() : "Never";
+  }
+
+  return <div className="asset-price-automation">
+    <div className="asset-price-automation-heading">
+      <div>
+        <h2 className="section-title">Scheduled price updates</h2>
+        <p className="section-description">Choose which provider-backed asset classes to update automatically. Each class can use its own weekly day, local hour, and timezone.</p>
+      </div>
+      <Button type="button" variant="outline" onClick={() => void runNow()} disabled={loading || running || !schedules.some((schedule) => schedule.enabled)}>
+        <RefreshCw size={14} className={running ? "spin" : ""} />{running ? "Updating..." : "Run enabled types now"}
+      </Button>
+    </div>
+    <div className="alert"><Clock3 size={15} /><span>Vercel checks schedules hourly. Run time is selected to the hour; execution may be delayed by the Vercel Cron service. The actual market/NAV date supplied by each provider is saved, so weekend runs may record Friday’s latest market price.</span></div>
+    {error && <div className="alert alert-error" role="alert">{error}</div>}
+    {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    {loading ? <Card><p className="section-description">Loading schedule settings...</p></Card> : <>
+      <div className="asset-price-schedule-list">
+        {schedules.map((schedule) => <Card className="asset-price-schedule-card" key={schedule.assetType}>
+          <div className="asset-price-schedule-title">
+            <label><input type="checkbox" checked={schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { enabled: event.currentTarget.checked })} /><strong>{schedule.assetType === "Stocks" ? "Stocks" : schedule.assetType}</strong></label>
+            <span>{assetCount(schedule.assetType)} {schedule.assetType === "NPS" ? "schemes" : schedule.assetType === "Stocks" ? "stocks" : "funds"}</span>
+          </div>
+          <p className="section-description">{schedule.assetType === "Stocks"
+            ? "Yahoo Finance with Twelve Data fallback when configured."
+            : schedule.assetType === "Mutual fund"
+              ? "Latest published scheme NAVs from AMFI; holdings need a valid ISIN."
+              : "Latest published scheme NAVs from NPS Trust; schemes must match unambiguously."}</p>
+          <div className="asset-price-schedule-fields">
+            <Field label="Run on"><Select value={String(schedule.dayOfWeek)} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { dayOfWeek: Number(event.target.value) })}>{ASSET_PRICE_DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</Select></Field>
+            <Field label="At (local time)"><Select value={String(schedule.runHour)} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { runHour: Number(event.target.value) })}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{`${String(hour).padStart(2, "0")}:00`}</option>)}</Select></Field>
+            <Field label="Timezone"><Input maxLength={64} value={schedule.timezone} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { timezone: event.target.value })} placeholder="Asia/Kolkata" /></Field>
+          </div>
+          <p className="section-description">Last run: {formatDateTime(schedule.lastRunAt)}</p>
+        </Card>)}
+      </div>
+      <Card className="asset-price-unsupported">
+        <h3 className="section-title">Not available for automatic pricing</h3>
+        <p className="section-description">These asset types stay excluded because the app has no reliable price provider for them. They will not receive automated history entries.</p>
+        <div>{UNSUPPORTED_ASSET_PRICE_TYPES.map((type) => <label key={type}><input type="checkbox" disabled checked={false} readOnly />{type}</label>)}</div>
+      </Card>
+      <div className="asset-price-actions"><Button type="button" onClick={() => void saveSchedules()} disabled={saving || !schedules.length}>{saving ? "Saving..." : "Save price schedules"}</Button></div>
+      <section className="asset-price-history-section">
+        <h2 className="section-title"><History size={16} /> Automated price history</h2>
+        {history.length ? <Card className="table-card"><table className="data-table mobile-card-table">
+          <thead><tr><th>Asset type</th><th>Asset / scheme</th><th>Price date</th><th>Price</th><th>Source</th><th>Recorded</th></tr></thead>
+          <tbody>{history.map((record) => <tr key={record.id}>
+            <td data-label="Asset type">{record.asset_type}</td>
+            <td data-label="Asset / scheme"><div className="table-primary">{record.asset_name}</div><div className="table-secondary">{record.instrument_name}</div></td>
+            <td data-label="Price date">{record.price_date}</td>
+            <td data-label="Price" className="table-total">{formatPrice(record.price, record.currency)}</td>
+            <td data-label="Source">{record.provider}</td>
+            <td data-label="Recorded">{formatDateTime(record.fetched_at)}</td>
+          </tr>)}</tbody>
+        </table></Card> : <Card><EmptyState icon={<History size={18} />} title="No automated price history yet" description="Enable a supported asset class and let its scheduled job run, or use Run enabled types now." /></Card>}
+      </section>
+      <section className="asset-price-history-section">
+        <h2 className="section-title"><Clock3 size={16} /> Job history</h2>
+        {runs.length ? <div className="asset-price-run-list">{runs.map((run) => <Card className="asset-price-run-card" key={run.id}>
+          <div><strong>{run.asset_type}</strong><span>{run.run_kind === "scheduled" ? "Scheduled" : "Manual"} · {formatDateTime(run.started_at)}</span></div>
+          <span className={`asset-price-run-status ${run.status}`}>{run.status}</span>
+          <span>{run.updated_count} updated · {run.failure_count} failed</span>
+          {run.details.length > 0 && <ul>{run.details.map((detail) => <li key={`${run.id}:${detail}`}>{detail}</li>)}</ul>}
+        </Card>)}</div> : <Card><EmptyState icon={<Clock3 size={18} />} title="No job runs yet" description="Run enabled types now or wait for the next scheduled time." /></Card>}
+      </section>
+    </>}
+  </div>;
+}
+
 function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs, onSaveStockQuote }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
@@ -3109,6 +3338,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   }>) => void;
   onSaveStockQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
 }) {
+  const [managerView, setManagerView] = useState<"assets" | "price-automation">("assets");
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
   const [newAssetType, setNewAssetType] = useState<AssetType>("Other");
@@ -3867,6 +4097,19 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     if (window.confirm(`Move "${asset.name}" to the archive?`)) onDelete(asset);
   }
 
+  const managerTabs = <div className="asset-type-tabs" role="tablist" aria-label="Asset manager sections">
+    <button type="button" role="tab" aria-selected={managerView === "assets"} onClick={() => setManagerView("assets")}>Assets</button>
+    <button type="button" role="tab" aria-selected={managerView === "price-automation"} onClick={() => setManagerView("price-automation")}><Clock3 size={13} />Price automation</button>
+  </div>;
+
+  if (managerView === "price-automation") {
+    return <>
+      <PageHeading eyebrow="Asset manager" title="Price automation" subtitle="Schedule provider-backed prices and review the saved history." />
+      {managerTabs}
+      <AssetPriceAutomation assets={assets} stocks={stocks} />
+    </>;
+  }
+
   return <>
     <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<div className="asset-heading-actions">
       {stocks.length > 0 && <label className="stock-history-toggle"><input type="checkbox" checked={trackStockPriceHistory} disabled={stockQuoteBusy} onChange={(event) => setTrackStockPriceHistory(event.target.checked)} />Track stock price history</label>}
@@ -3883,6 +4126,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       </Button>}
       {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
     </div>} />
+    {managerTabs}
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {stockQuoteMessage && <div className="alert alert-success" role="status">{stockQuoteMessage}</div>}
     {stockQuoteErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some stock prices could not be refreshed:</strong><ul>{stockQuoteErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
@@ -4256,7 +4500,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
               <strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: asset.currency, maximumFractionDigits: 6 }).format(snapshot.nav)}</strong>
               <small>Fetched {new Date(snapshot.fetchedAt).toLocaleString()}</small>
             </div>)
-            : <p className="section-description">No NAV snapshots saved. Enable Track NAV history before manually refreshing to record future fetches.</p>}
+            : <p className="section-description">No manual NAV snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track NAV history to record manual refreshes here.</p>}
         </details>}
         {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <div className="nps-scheme-list">
           <strong>Current scheme holdings</strong>
@@ -4275,7 +4519,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
               <strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: asset.currency, maximumFractionDigits: 6 }).format(snapshot.nav)}</strong>
               <small>Scheme {snapshot.schemeId} · fetched {new Date(snapshot.fetchedAt).toLocaleString()}</small>
             </div>)}
-          {!((asset.npsSchemes ?? []).some((scheme) => (scheme.navHistory?.length ?? 0) > 0)) && <p className="section-description">No NPS NAV snapshots saved. Enable Track NPS NAV history before manually refreshing to record future fetches.</p>}
+          {!((asset.npsSchemes ?? []).some((scheme) => (scheme.navHistory?.length ?? 0) > 0)) && <p className="section-description">No manual NPS NAV snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track NPS NAV history to record manual refreshes here.</p>}
         </details>}
         {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
         {asset.tags.length > 0 && <div className="credential-tags">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}

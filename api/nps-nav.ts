@@ -8,7 +8,7 @@ interface NpsNavResponse {
   end(body?: string): void;
 }
 
-interface NpsNav {
+export interface NpsNav {
   schemeId: string;
   schemeName: string;
   pfmName: string;
@@ -49,13 +49,7 @@ function parseNavFeed(feed: string): NpsNav[] {
   return [...latestNavs.values()];
 }
 
-export default async function npsNavHandler(request: NpsNavRequest, response: NpsNavResponse) {
-  if (request.method !== "POST") {
-    response.setHeader("Allow", "POST");
-    respond(response, 405, { error: "Only POST requests are supported." });
-    return;
-  }
-
+export async function fetchNpsNavs(): Promise<NpsNav[]> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 9000);
   try {
@@ -64,27 +58,36 @@ export default async function npsNavHandler(request: NpsNavRequest, response: Np
       signal: controller.signal,
     });
     if (!navResponse.ok) {
-      respond(response, 502, { error: `NPS Trust returned HTTP ${navResponse.status} while loading NAV data.` });
-      return;
+      throw new Error(`NPS Trust returned HTTP ${navResponse.status} while loading NAV data.`);
     }
     const feed = await navResponse.text();
     if (!feed.includes("SCHEME ID") || feed.length > 4 * 1024 * 1024) {
-      respond(response, 502, { error: "NPS Trust returned an invalid or unexpectedly large NAV file." });
-      return;
+      throw new Error("NPS Trust returned an invalid or unexpectedly large NAV file.");
     }
-
     const navs = parseNavFeed(feed);
-    if (!navs.length) {
-      respond(response, 502, { error: "NPS Trust did not provide any usable scheme NAVs." });
-      return;
-    }
-    respond(response, 200, { provider: "NPS Trust", navs });
+    if (!navs.length) throw new Error("NPS Trust did not provide any usable scheme NAVs.");
+    return navs;
   } catch (caught) {
-    const message = caught instanceof Error && caught.name === "AbortError"
-      ? "The NPS Trust NAV request timed out. Try again later."
-      : "Could not load NPS Trust NAV data.";
-    respond(response, 502, { error: message });
+    if (caught instanceof Error && caught.name === "AbortError") {
+      throw new Error("The NPS Trust NAV request timed out. Try again later.");
+    }
+    throw caught;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export default async function npsNavHandler(request: NpsNavRequest, response: NpsNavResponse) {
+  if (request.method !== "POST") {
+    response.setHeader("Allow", "POST");
+    respond(response, 405, { error: "Only POST requests are supported." });
+    return;
+  }
+
+  try {
+    const navs = await fetchNpsNavs();
+    respond(response, 200, { provider: "NPS Trust", navs });
+  } catch (caught) {
+    respond(response, 502, { error: caught instanceof Error ? caught.message : "Could not load NPS Trust NAV data." });
   }
 }
