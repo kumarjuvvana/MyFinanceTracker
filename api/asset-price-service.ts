@@ -388,13 +388,10 @@ function isDue(setting: SettingsRow, now: Date): boolean {
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: setting.timezone,
       weekday: "short",
-      hour: "2-digit",
-      hourCycle: "h23",
     }).formatToParts(now);
     const weekday = parts.find((part) => part.type === "weekday")?.value;
-    const hour = Number(parts.find((part) => part.type === "hour")?.value);
     const weekdays: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    return weekdays[weekday ?? ""] === setting.day_of_week && hour === setting.run_hour;
+    return weekdays[weekday ?? ""] === setting.day_of_week;
   } catch (caught) {
     throw new Error(`Invalid timezone for ${setting.asset_type} schedule: ${providerFailure(caught)}`);
   }

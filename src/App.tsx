@@ -3245,7 +3245,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
         <RefreshCw size={14} className={running ? "spin" : ""} />{running ? "Updating..." : "Run enabled types now"}
       </Button>
     </div>
-    <div className="alert"><Clock3 size={15} /><span>Vercel checks schedules hourly. Run time is selected to the hour; execution may be delayed by the Vercel Cron service. The actual market/NAV date supplied by each provider is saved, so weekend runs may record Friday’s latest market price.</span></div>
+    <div className="alert"><Clock3 size={15} /><span>On the current Vercel Hobby plan, Cron runs once daily at 00:00 UTC (05:30 in India). Choose the weekday and timezone for each asset type; the time of day is fixed by Vercel. Execution may be delayed, and the actual market/NAV date supplied by each provider is saved.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {loading ? <Card><p className="section-description">Loading schedule settings...</p></Card> : <>
@@ -3262,7 +3262,6 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
               : "Latest published scheme NAVs from NPS Trust; schemes must match unambiguously."}</p>
           <div className="asset-price-schedule-fields">
             <Field label="Run on"><Select value={String(schedule.dayOfWeek)} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { dayOfWeek: Number(event.target.value) })}>{ASSET_PRICE_DAYS.map((day, index) => <option key={day} value={index}>{day}</option>)}</Select></Field>
-            <Field label="At (local time)"><Select value={String(schedule.runHour)} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { runHour: Number(event.target.value) })}>{Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{`${String(hour).padStart(2, "0")}:00`}</option>)}</Select></Field>
             <Field label="Timezone"><Input maxLength={64} value={schedule.timezone} disabled={!schedule.enabled} onChange={(event) => updateSchedule(schedule.assetType, { timezone: event.target.value })} placeholder="Asia/Kolkata" /></Field>
           </div>
           <p className="section-description">Last run: {formatDateTime(schedule.lastRunAt)}</p>
