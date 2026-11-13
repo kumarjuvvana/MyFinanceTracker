@@ -2186,6 +2186,31 @@ function latestStockQuotesById(quotes: StockQuoteSnapshot[], stocks: TrackedStoc
   return latest;
 }
 
+async function fetchStockQuote(stock: TrackedStock): Promise<Omit<StockQuoteSnapshot, "id" | "stockId">> {
+  const params = new URLSearchParams({ symbol: stock.symbol, exchange: stock.exchange });
+  const response = await fetch(`/api/stock-price?${params.toString()}`);
+  const payload: unknown = await response.json();
+  const providerError = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+    ? payload.error
+    : "The quote response was invalid.";
+  if (!response.ok || typeof payload !== "object" || payload === null ||
+    !("price" in payload) || typeof payload.price !== "number" || !Number.isFinite(payload.price) ||
+    !("currency" in payload) || typeof payload.currency !== "string" ||
+    !("timestamp" in payload) || typeof payload.timestamp !== "string" || Number.isNaN(Date.parse(payload.timestamp)) ||
+    !("marketState" in payload) || typeof payload.marketState !== "string" ||
+    !("previousClose" in payload) || (payload.previousClose !== null &&
+      (typeof payload.previousClose !== "number" || !Number.isFinite(payload.previousClose)))) {
+    throw new Error(providerError);
+  }
+  return {
+    price: payload.price,
+    currency: payload.currency,
+    timestamp: payload.timestamp,
+    marketState: payload.marketState,
+    previousClose: payload.previousClose,
+  };
+}
+
 function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, onAddBroker, onRenameBroker, onDeleteBroker, onSaveQuote }: {
   stocks: TrackedStock[];
   brokers: string[];
@@ -2453,30 +2478,6 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
     setImportText("");
     setImportError("");
     setNotice(`Imported ${imported.length} ${imported.length === 1 ? "stock" : "stocks"}.`);
-  }
-  async function fetchStockQuote(stock: TrackedStock): Promise<Omit<StockQuoteSnapshot, "id" | "stockId">> {
-    const params = new URLSearchParams({ symbol: stock.symbol, exchange: stock.exchange });
-    const response = await fetch(`/api/stock-price?${params.toString()}`);
-    const payload: unknown = await response.json();
-    const providerError = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
-      ? payload.error
-      : "The quote response was invalid.";
-    if (!response.ok || typeof payload !== "object" || payload === null ||
-      !("price" in payload) || typeof payload.price !== "number" || !Number.isFinite(payload.price) ||
-      !("currency" in payload) || typeof payload.currency !== "string" ||
-      !("timestamp" in payload) || typeof payload.timestamp !== "string" || Number.isNaN(Date.parse(payload.timestamp)) ||
-      !("marketState" in payload) || typeof payload.marketState !== "string" ||
-      !("previousClose" in payload) || (payload.previousClose !== null &&
-        (typeof payload.previousClose !== "number" || !Number.isFinite(payload.previousClose)))) {
-      throw new Error(providerError);
-    }
-    return {
-      price: payload.price,
-      currency: payload.currency,
-      timestamp: payload.timestamp,
-      marketState: payload.marketState,
-      previousClose: payload.previousClose,
-    };
   }
   async function refreshStocks(selectedStocks: TrackedStock[] = stocks) {
     if (!selectedStocks.length) { setError("Add at least one stock before refreshing prices."); return; }
@@ -3069,7 +3070,7 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
   </Modal>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs, onSaveStockQuote }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
@@ -3104,6 +3105,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     currentValue?: number;
     historySnapshot?: NpsNavSnapshot;
   }>) => void;
+  onSaveStockQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
 }) {
   const [editor, setEditor] = useState<AssetRecord | null | undefined>(undefined);
   const [vehicleEditor, setVehicleEditor] = useState<Vehicle | null>(null);
@@ -3127,6 +3129,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [npsNavMessage, setNpsNavMessage] = useState("");
   const [npsNavErrors, setNpsNavErrors] = useState<string[]>([]);
   const [trackNpsNavHistory, setTrackNpsNavHistory] = useState(false);
+  const [stockQuoteBusy, setStockQuoteBusy] = useState(false);
+  const [stockQuoteMessage, setStockQuoteMessage] = useState("");
+  const [stockQuoteErrors, setStockQuoteErrors] = useState<string[]>([]);
+  const [trackStockPriceHistory, setTrackStockPriceHistory] = useState(false);
   const savedTypesKey = savedVisibleTypes.join("|");
   const savedHiddenItemsKey = JSON.stringify(savedHiddenItems);
   useEffect(() => {
@@ -3809,6 +3815,48 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     }
   }
 
+  async function refreshStockPrices() {
+    if (!stocks.length) {
+      setStockQuoteMessage("");
+      setStockQuoteErrors(["No tracked stocks are available to refresh."]);
+      return;
+    }
+
+    setStockQuoteBusy(true);
+    setStockQuoteMessage("");
+    setStockQuoteErrors([]);
+    let updated = 0;
+    const errors: string[] = [];
+    try {
+      for (const stock of stocks) {
+        try {
+          onSaveStockQuote({
+            stockId: stock.id,
+            ...await fetchStockQuote(stock),
+          }, trackStockPriceHistory);
+          updated++;
+        } catch (caught) {
+          errors.push(`${stock.symbol} (${stock.exchange}): ${caught instanceof Error ? caught.message : "Could not load quote."}`);
+        }
+      }
+
+      if (updated) {
+        setStockQuoteMessage(
+          trackStockPriceHistory
+            ? `Updated prices for ${updated} of ${stocks.length} stocks and saved price history.`
+            : `Updated latest prices for ${updated} of ${stocks.length} stocks; price history was not saved.`,
+        );
+      } else if (!errors.length) {
+        errors.push("No stock quotes were returned.");
+      }
+      setStockQuoteErrors(errors);
+    } catch (caught) {
+      setStockQuoteErrors([caught instanceof Error ? caught.message : "Could not refresh stock prices."]);
+    } finally {
+      setStockQuoteBusy(false);
+    }
+  }
+
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   }
@@ -3819,6 +3867,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
 
   return <>
     <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<div className="asset-heading-actions">
+      {stocks.length > 0 && <label className="stock-history-toggle"><input type="checkbox" checked={trackStockPriceHistory} disabled={stockQuoteBusy} onChange={(event) => setTrackStockPriceHistory(event.target.checked)} />Track stock price history</label>}
+      {stocks.length > 0 && <Button type="button" variant="outline" onClick={() => void refreshStockPrices()} disabled={stockQuoteBusy}>
+        <RefreshCw size={14} className={stockQuoteBusy ? "spin" : ""} />{stockQuoteBusy ? "Refreshing stock prices..." : "Refresh stock prices"}
+      </Button>}
       {assets.some((asset) => asset.type === "Mutual fund") && <label className="stock-history-toggle"><input type="checkbox" checked={trackMutualFundNavHistory} disabled={mutualFundNavBusy} onChange={(event) => setTrackMutualFundNavHistory(event.target.checked)} />Track NAV history</label>}
       {assets.some((asset) => asset.type === "Mutual fund") && <Button type="button" variant="outline" onClick={() => void refreshMutualFundNavs()} disabled={mutualFundNavBusy}>
         <RefreshCw size={14} className={mutualFundNavBusy ? "spin" : ""} />{mutualFundNavBusy ? "Refreshing NAVs..." : "Refresh mutual fund NAVs"}
@@ -3830,6 +3882,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
     </div>} />
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
+    {stockQuoteMessage && <div className="alert alert-success" role="status">{stockQuoteMessage}</div>}
+    {stockQuoteErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some stock prices could not be refreshed:</strong><ul>{stockQuoteErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {mutualFundNavMessage && <div className="alert alert-success" role="status">{mutualFundNavMessage}</div>}
     {mutualFundNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some mutual-fund NAVs could not be refreshed:</strong><ul>{mutualFundNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {npsNavMessage && <div className="alert alert-success" role="status">{npsNavMessage}</div>}
@@ -4013,7 +4067,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div><span>Positions with saved quotes</span><strong>{total.pricedPositions}</strong></div>
       </Card>;
     })}</div>}
-    {activeType === "Stocks" && <div className="alert">Stock holdings and quote history are read directly from the Stocks menu’s existing data. Price and market value reflect the latest saved quote; edit holdings or refresh quotes in Stocks.</div>}
+    {activeType === "Stocks" && <div className="alert">Stock holdings and quote history are read directly from the Stocks menu’s existing data. Price and market value reflect the latest saved quote; refresh stock prices above or manage holdings in Stocks.</div>}
     {activeType === "Stocks" && visibleStocks.length > 0 && visibleStockGroups.map((group) => <section className="asset-list-group" key={group.key}>
       {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
       <div className="asset-list">{group.records.map((stock) => {
@@ -13743,7 +13797,7 @@ export default function App() {
       return { ...withArchivedRecord(previous, `Product: ${product.name}`, { products: [product] }), products: (previous.products ?? []).filter((entry) => entry.id !== id) };
     })} onAddReminderCategory={addReminderCategory} onRenameReminderCategory={renameReminderCategory} onDeleteReminderCategory={deleteReminderCategory} />,
     Stocks: <StockWorkspace stocks={data.stocks ?? []} brokers={data.brokers ?? []} quotes={data.stockQuotes ?? []} onSaveStock={saveStock} onDeleteStock={deleteStock} onAddBroker={addBroker} onRenameBroker={renameBroker} onDeleteBroker={deleteBroker} onSaveQuote={saveStockQuote} />,
-    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} savedHiddenItems={data.preferences?.assetManagerHiddenItems ?? {}} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onRefreshMutualFundNavs={(navUpdates) => {
+    "Asset manager": <AssetManager assets={data.assets ?? []} stocks={data.stocks ?? []} stockQuotes={data.stockQuotes ?? []} bankAccounts={data.bankAccounts ?? []} vehicles={data.vehicles ?? []} savedVisibleTypes={data.preferences?.assetManagerVisibleTypes ?? ASSET_MANAGER_VISIBLE_TYPES} savedHiddenItems={data.preferences?.assetManagerHiddenItems ?? {}} onSave={saveAsset} onDelete={deleteAsset} onOpenStocks={() => changePage("Stocks")} onOpenBankAccounts={() => changePage("Bank accounts")} onSaveVehicle={saveVehicle} onSaveVehicleValuation={saveVehicleValuation} onOpenVehicles={() => changePage("Vehicles")} onSaveStockQuote={saveStockQuote} onRefreshMutualFundNavs={(navUpdates) => {
       const updatesById = new Map(navUpdates.map((entry) => [entry.id, entry]));
       update((previous) => ({
         ...previous,
