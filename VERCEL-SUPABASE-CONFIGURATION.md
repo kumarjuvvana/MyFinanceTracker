@@ -34,7 +34,7 @@ Configure these under **Vercel → Project → Settings → Environment Variable
 | `DATA_ACCESS_PASSWORD` | Yes | The shared Daybook sign-in passphrase. Use a strong, private value at least 16 characters long. | Secret. It is the app login password, not the PostgreSQL password. |
 | `SUPABASE_DB_URL` | Optional | Supabase **Transaction pooler** PostgreSQL URI for the same project. | Secret; server-only. Used by Database manager and Hosting & storage. |
 | `SUPABASE_DB_CA_CERT_BASE64` | Optional | Base64-encoded contents of the Supabase database CA certificate file. | Server-only. Used to verify the PostgreSQL server certificate while TLS verification remains enabled. |
-| `VITE_GOOGLE_CLIENT_ID` | Optional | Google OAuth web client ID for the Gmail test connector. | Browser-visible client ID; not a client secret. |
+| `VITE_GOOGLE_CLIENT_ID` | Optional | Google OAuth web client ID for the Gmail connector. Transaction sync requests read-only access; the email test requests send access separately. | Browser-visible client ID; not a client secret. |
 | `TWELVE_DATA_API_KEY` | Optional | Twelve Data API key for stock-price requests. | Secret; server-only. |
 
 Do not configure the following local-development variables in Vercel:

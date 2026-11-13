@@ -57,6 +57,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function validateImportedBankTransactions(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || value.length > 10000) return false;
+  const messageIds: string[] = [];
+  for (const transaction of value) {
+    if (!isRecord(transaction) ||
+      typeof transaction.gmailMessageId !== "string" || transaction.gmailMessageId.length === 0 ||
+      transaction.gmailMessageId.length > 256 ||
+      typeof transaction.transactionDate !== "string" || Number.isNaN(Date.parse(transaction.transactionDate)) ||
+      (transaction.direction !== "debit" && transaction.direction !== "credit") ||
+      typeof transaction.amount !== "number" || !Number.isFinite(transaction.amount) || transaction.amount <= 0 ||
+      typeof transaction.description !== "string" || transaction.description.length > 300 ||
+      typeof transaction.importedAt !== "string" || Number.isNaN(Date.parse(transaction.importedAt))) return false;
+    messageIds.push(transaction.gmailMessageId);
+  }
+  return new Set(messageIds).size === messageIds.length;
+}
+
 function isNonNegativeNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
@@ -938,7 +956,8 @@ export function validateData(value: unknown): value is TrackerData {
       (typeof account.currentBalance === "number" && Number.isFinite(account.currentBalance))) &&
     (account.balanceAsOfDate === undefined || account.balanceAsOfDate === null ||
       (typeof account.balanceAsOfDate === "string" &&
-        (account.balanceAsOfDate === "" || !Number.isNaN(Date.parse(account.balanceAsOfDate)))))));
+        (account.balanceAsOfDate === "" || !Number.isNaN(Date.parse(account.balanceAsOfDate))))) &&
+    validateImportedBankTransactions(account.importedTransactions)));
   const credentialRecordsOk = value.credentialRecords === undefined || (Array.isArray(value.credentialRecords) && value.credentialRecords.every((record) =>
     isRecord(record) && typeof record.id === "string" && record.id.length > 0 &&
     (record.kind === undefined || record.kind === "bank-account") &&

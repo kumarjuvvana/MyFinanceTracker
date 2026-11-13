@@ -1022,6 +1022,16 @@ export interface BankAccount {
   notes: string;
   currentBalance?: number | null;
   balanceAsOfDate?: string | null;
+  importedTransactions?: BankTransaction[];
+}
+
+export interface BankTransaction {
+  gmailMessageId: string;
+  transactionDate: string;
+  direction: "debit" | "credit";
+  amount: number;
+  description: string;
+  importedAt: string;
 }
 
 export interface EncryptedCredentialVault {

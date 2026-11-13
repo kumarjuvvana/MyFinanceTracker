@@ -17,6 +17,8 @@ import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } fro
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
+import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
+import type { BankTransaction } from "./types";
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
@@ -11262,6 +11264,7 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
         notes: notes.trim(),
         currentBalance: parsedBalance,
         balanceAsOfDate: balanceAsOfDate.trim(),
+        importedTransactions: initial?.importedTransactions ?? [],
       });
       onClose();
     } catch (caught) {
@@ -11336,7 +11339,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       <Button variant="primary" aria-pressed="true"><Landmark size={14} />Bank accounts</Button>
       <Button variant="outline" onClick={() => onNavigate("Account credentials")}><KeyRound size={14} />Account credentials</Button>
     </nav>
-    <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details and dated balance snapshots are stored in a separate, readable Supabase table and included in JSON backups. Balances are manual snapshots; transaction history is not stored here. Anyone with database/service-role access can read these details. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
+    <div className="alert"><Landmark size={15} style={{ flex: "none", marginTop: 1 }} /><span>These details, dated balance snapshots, and imported transaction details are stored in a readable Supabase table and included in JSON backups. Anyone with database/service-role access can read them. Account numbers are masked on screen by default. Never store PINs, passwords, one-time codes, or recovery codes.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {reportedBalances.length > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Total reported balance · INR</span><strong>{new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(totalReportedBalance)}</strong></div><div><span>Accounts with a balance snapshot</span><strong>{reportedBalances.length} of {filteredAccounts.length}</strong></div></Card></div>}
     <div className="toolbar filter-toolbar shopping-filter-toolbar">
@@ -11377,6 +11380,17 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
         {account.branch && <div><span>Branch</span><strong>{account.branch}</strong></div>}
         {account.customerService && <div><span>Customer service</span><strong>{account.customerService}</strong></div>}
       </div>
+      {(account.importedTransactions?.length ?? 0) > 0 && <div className="bank-imported-transactions">
+        <h3>Recent imported transactions</h3>
+        {[...(account.importedTransactions ?? [])].sort((left, right) =>
+          right.transactionDate.localeCompare(left.transactionDate)).slice(0, 5).map((transaction) =>
+          <div key={transaction.gmailMessageId}>
+            <span>{dateLabel(transaction.transactionDate)} · {transaction.description}</span>
+            <strong className={transaction.direction === "debit" ? "bank-transaction-debit" : "bank-transaction-credit"}>
+              {transaction.direction === "debit" ? "−" : "+"}{new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(transaction.amount)}
+            </strong>
+          </div>)}
+      </div>}
       {account.website && <a className="personal-document-link" href={account.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
       {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
       </div>
@@ -11905,7 +11919,10 @@ function encodeSubject(value: string): string {
 
 type GmailSession = { email: string; accessToken: string };
 
-function GmailAuthorization({ onSignIn }: { onSignIn: (session: GmailSession) => void }) {
+function GmailAuthorization({ purpose, onSignIn }: {
+  purpose: "read" | "send";
+  onSignIn: (session: GmailSession) => void;
+}) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const [googleReady, setGoogleReady] = useState(Boolean(window.google?.accounts.oauth2));
   const [busy, setBusy] = useState(false);
@@ -11936,7 +11953,9 @@ function GmailAuthorization({ onSignIn }: { onSignIn: (session: GmailSession) =>
     try {
       window.google?.accounts.oauth2.initTokenClient({
         client_id: clientId,
-        scope: "openid email https://www.googleapis.com/auth/gmail.send",
+        scope: purpose === "read"
+          ? "openid email https://www.googleapis.com/auth/gmail.readonly"
+          : "openid email https://www.googleapis.com/auth/gmail.send",
         callback: async (response) => {
           if (response.error) {
             setBusy(false);
@@ -11979,13 +11998,61 @@ function GmailAuthorization({ onSignIn }: { onSignIn: (session: GmailSession) =>
   }
 
   return <div className="gmail-authorization">
-    <Button type="button" disabled={busy || !clientId || !googleReady} onClick={signIn}>{busy ? "Connecting..." : !clientId ? "Google OAuth setup required" : googleReady ? "Connect Gmail" : "Loading Google sign-in..."}</Button>
+    <Button type="button" disabled={busy || !clientId || !googleReady} onClick={signIn}>{busy ? "Connecting..." : !clientId ? "Google OAuth setup required" : googleReady ? purpose === "read" ? "Connect Gmail for transaction sync" : "Connect Gmail to send test email" : "Loading Google sign-in..."}</Button>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
   </div>;
 }
 
-function TestConnectors() {
+interface GmailReviewRow extends GmailTransactionCandidate {
+  accountId: string;
+  amountInput: string;
+  selected: boolean;
+}
+
+async function gmailGet(accessToken: string, url: string): Promise<unknown> {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("Gmail access was denied or expired. Disconnect and connect Gmail again, and allow read-only access.");
+    }
+    throw new Error(`Gmail could not load transaction emails (${response.status}).`);
+  }
+  return response.json();
+}
+
+async function findGmailTransactions(accessToken: string): Promise<GmailTransactionCandidate[]> {
+  const query = new URLSearchParams({
+    q: "newer_than:90d {debited credited debit credit withdrawal deposit purchase transaction}",
+    maxResults: "50",
+  });
+  const list = await gmailGet(accessToken, `https://gmail.googleapis.com/gmail/v1/users/me/messages?${query}`);
+  if (typeof list !== "object" || list === null || !("messages" in list)) {
+    throw new Error("Gmail returned an unexpected message list.");
+  }
+  const messageList = list.messages;
+  if (!Array.isArray(messageList)) return [];
+  const ids = messageList.flatMap((message) =>
+    typeof message === "object" && message !== null && "id" in message && typeof message.id === "string"
+      ? [message.id]
+      : []);
+  const candidates: GmailTransactionCandidate[] = [];
+  for (let index = 0; index < ids.length; index += 5) {
+    const batch = await Promise.all(ids.slice(index, index + 5).map(async (id) => {
+      const message = await gmailGet(accessToken,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full`);
+      return parseGmailTransactionMessage(decodeGmailMessage(message));
+    }));
+    candidates.push(...batch.filter((candidate): candidate is GmailTransactionCandidate => candidate !== null));
+  }
+  return candidates;
+}
+
+function TestConnectors({ accounts, onImport }: {
+  accounts: BankAccount[];
+  onImport: (updatedAccounts: BankAccount[]) => Promise<void>;
+}) {
   const [session, setSession] = useState<GmailSession | null>(null);
+  const [sendSession, setSendSession] = useState<GmailSession | null>(null);
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("Daybook test reminder");
   const [content, setContent] = useState("This is a test email from your Daybook shopping tracker.");
@@ -11996,6 +12063,121 @@ function TestConnectors() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [sendNotice, setSendNotice] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [reviewRows, setReviewRows] = useState<GmailReviewRow[]>([]);
+  const [importing, setImporting] = useState(false);
+
+  const importedMessageIds = new Set(accounts.flatMap((account) =>
+    (account.importedTransactions ?? []).map((transaction) => transaction.gmailMessageId)));
+
+  function updateReviewRow(messageId: string, updates: Partial<GmailReviewRow>) {
+    setReviewRows((rows) => rows.map((row) =>
+      row.gmailMessageId === messageId ? { ...row, ...updates } : row));
+  }
+
+  async function scanGmail() {
+    if (!session) return;
+    setError("");
+    setNotice("");
+    setScanning(true);
+    try {
+      const candidates = await findGmailTransactions(session.accessToken);
+      setReviewRows(candidates.map((candidate) => {
+        const matchingAccounts = candidate.accountSuffix
+          ? accounts.filter((account) => account.accountNumber.replace(/\D/g, "").endsWith(candidate.accountSuffix))
+          : [];
+        const accountId = matchingAccounts.length === 1 ? matchingAccounts[0].id : "";
+        return {
+          ...candidate,
+          accountId,
+          amountInput: candidate.amount === null ? "" : String(candidate.amount),
+          selected: candidate.amount !== null && candidate.direction !== null &&
+            Boolean(accountId) && !importedMessageIds.has(candidate.gmailMessageId),
+        };
+      }));
+      setNotice(candidates.length
+        ? `Found ${candidates.length} possible transaction emails. Review each one before importing.`
+        : "No matching transaction emails were found in the last 90 days.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not scan Gmail for transaction emails.");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  async function importReviewedTransactions() {
+    setError("");
+    setNotice("");
+    const selectedRows = reviewRows.filter((row) => row.selected)
+      .sort((left, right) => left.transactionDate.localeCompare(right.transactionDate));
+    if (!selectedRows.length) {
+      setError("Select at least one transaction to import.");
+      return;
+    }
+    const updatedById = new Map<string, BankAccount>();
+    const newlyImportedIds = new Set<string>();
+    for (const row of selectedRows) {
+      const account = updatedById.get(row.accountId) ?? accounts.find((entry) => entry.id === row.accountId);
+      const baselineAccount = accounts.find((entry) => entry.id === row.accountId);
+      const amount = Number(row.amountInput);
+      if (!account || !Number.isFinite(amount) || amount <= 0 ||
+        (row.direction !== "debit" && row.direction !== "credit") ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(row.transactionDate) ||
+        Number.isNaN(Date.parse(row.transactionDate))) {
+        setError("Each selected email needs a bank account, valid amount, direction, and date.");
+        return;
+      }
+      if (importedMessageIds.has(row.gmailMessageId) || newlyImportedIds.has(row.gmailMessageId)) {
+        setError("A selected email was already imported. Scan again to refresh the list.");
+        return;
+      }
+      if (!baselineAccount || baselineAccount.currentBalance == null || !baselineAccount.balanceAsOfDate) {
+        setError(`Add a current balance and its date for ${account.bankName} before importing transactions.`);
+        return;
+      }
+      if (account.currentBalance == null) {
+        setError(`The current balance for ${account.bankName} is missing.`);
+        return;
+      }
+      if (row.transactionDate <= baselineAccount.balanceAsOfDate) {
+        setError(`The transaction from ${row.transactionDate} is not after ${account.bankName}'s starting balance date (${baselineAccount.balanceAsOfDate}).`);
+        return;
+      }
+      const transaction: BankTransaction = {
+        gmailMessageId: row.gmailMessageId,
+        transactionDate: row.transactionDate,
+        direction: row.direction,
+        amount: Math.round(amount * 100) / 100,
+        description: row.description.trim().slice(0, 300) || "Gmail bank transaction",
+        importedAt: new Date().toISOString(),
+      };
+      const nextBalance = account.currentBalance + (transaction.direction === "debit" ? -transaction.amount : transaction.amount);
+      const nextAccount: BankAccount = {
+        ...account,
+        currentBalance: Math.round((nextBalance + Number.EPSILON) * 100) / 100,
+        balanceAsOfDate: transaction.transactionDate > (account.balanceAsOfDate ?? "")
+          ? transaction.transactionDate
+          : account.balanceAsOfDate,
+        importedTransactions: [...(account.importedTransactions ?? []), transaction],
+      };
+      updatedById.set(account.id, nextAccount);
+      newlyImportedIds.add(row.gmailMessageId);
+    }
+
+    setImporting(true);
+    try {
+      await onImport([...updatedById.values()]);
+      const total = selectedRows.length;
+      setReviewRows((rows) => rows.map((row) => ({ ...row, selected: false })));
+      setNotice(`Imported ${total} transaction${total === 1 ? "" : "s"} and updated ${updatedById.size} account balance${updatedById.size === 1 ? "" : "s"}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The transactions could not be saved.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function testAccessPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -12015,14 +12197,14 @@ function TestConnectors() {
 
   async function sendTestEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setNotice("");
-    if (!session) {
-      setError("Connect Gmail before sending a test email.");
+    setSendError("");
+    setSendNotice("");
+    if (!sendSession) {
+      setSendError("Connect Gmail with send permission before sending a test email.");
       return;
     }
     if (/[\r\n]/.test(subject) || /[\r\n]/.test(recipient)) {
-      setError("The recipient and subject must each be a single line.");
+      setSendError("The recipient and subject must each be a single line.");
       return;
     }
     setBusy(true);
@@ -12038,7 +12220,7 @@ function TestConnectors() {
       const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${session.accessToken}`,
+          Authorization: `Bearer ${sendSession.accessToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ raw: encodeBase64Url(message) }),
@@ -12047,15 +12229,15 @@ function TestConnectors() {
         const detail = await response.text();
         throw new Error(`Gmail could not send the email (${response.status}). ${detail || response.statusText}`);
       }
-      setNotice(`Test email sent to ${recipient.trim()}. Check your inbox.`);
+      setSendNotice(`Test email sent to ${recipient.trim()}. Check your inbox.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The test email could not be sent.");
+      setSendError(caught instanceof Error ? caught.message : "The test email could not be sent.");
     } finally {
       setBusy(false);
     }
   }
 
-  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Test the Daybook password or try Gmail email delivery." />
+  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Test the Daybook password, Gmail email delivery, or review bank transactions from Gmail." />
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Daybook access password test</h2><p className="section-description">Verify the Vercel password setting without signing out or loading data again.</p></div><Badge tone="neutral">No data access</Badge></div>
       <form className="connector-form" onSubmit={(event) => void testAccessPassword(event)}>
         <Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => { setAccessPassword(event.target.value); setPasswordValid(false); setPasswordError(""); }} /></Field>
@@ -12064,16 +12246,52 @@ function TestConnectors() {
         <div className="full"><Button type="submit" disabled={passwordBusy}>{passwordBusy ? "Checking..." : "Validate password"}</Button></div>
       </form>
     </Card>
-    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail test reminder</h2><p className="section-description">Connect Gmail only when you want to send a test email.</p></div><Badge tone={session ? "green" : "neutral"}>{session ? `Connected: ${session.email}` : "Not connected"}</Badge></div>
-      <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>Gmail authorization is optional and requested only here. The access token stays in memory and is discarded when you leave this page or reload. The email is sent from the Google account you authorize.</span></div>
-      {!session && <GmailAuthorization onSignIn={(connected) => { setSession(connected); setRecipient(connected.email); setError(""); setNotice(""); }} />}
-      {session && <Button type="button" variant="outline" onClick={() => { setSession(null); setNotice(""); setError(""); }}>Disconnect Gmail</Button>}
-      {session && <form className="connector-form" onSubmit={sendTestEmail}>
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail connection</h2><p className="section-description">Connect Gmail to send a test email or search for bank transaction alerts.</p></div><Badge tone={session ? "green" : "neutral"}>{session ? `Connected: ${session.email}` : "Not connected"}</Badge></div>
+      <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>Gmail access is optional and only used on this page. The access token stays in memory and is discarded when you leave or reload. Scanning reads matching email content for the last 90 days (up to 50 messages). Review every transaction before importing; raw email content is not saved.</span></div>
+      {!session && <GmailAuthorization purpose="read" onSignIn={(connected) => { setSession(connected); setError(""); setNotice(""); }} />}
+      {session && <div className="connector-actions"><Button type="button" onClick={() => void scanGmail()} disabled={scanning}>{scanning ? "Searching Gmail..." : "Search transaction emails"}</Button><Button type="button" variant="outline" onClick={() => { setSession(null); setReviewRows([]); setNotice(""); setError(""); }}>Disconnect Gmail</Button></div>}
+      {session && <p className="section-description">A Gmail search is not a bank statement. Some emails may be missed or parsed incorrectly. The suggested date is the email date, not necessarily the bank's transaction date. Check the bank account, amount, direction, and date before approval.</p>}
+      {reviewRows.length > 0 && <div className="gmail-transaction-list">
+        {reviewRows.map((row) => {
+          const account = accounts.find((entry) => entry.id === row.accountId);
+          const isDuplicate = importedMessageIds.has(row.gmailMessageId);
+          const balanceReady = account?.currentBalance != null && Boolean(account.balanceAsOfDate) &&
+            row.transactionDate > (account?.balanceAsOfDate ?? "");
+          return <div className="gmail-transaction-row" key={row.gmailMessageId}>
+            <label className="gmail-transaction-select"><input type="checkbox" checked={row.selected && !isDuplicate}
+              disabled={isDuplicate || !balanceReady || !account} onChange={(event) => updateReviewRow(row.gmailMessageId, { selected: event.target.checked })} />
+              <span>{isDuplicate ? "Already imported" : row.from || "Bank email"}{row.subject ? ` · ${row.subject}` : ""}</span></label>
+            <div className="connector-form">
+              <Field label="Bank account"><Select value={row.accountId} onChange={(event) => updateReviewRow(row.gmailMessageId, {
+                accountId: event.target.value,
+                selected: false,
+              })}><option value="">Choose account</option>{accounts.map((entry) => <option key={entry.id} value={entry.id}>{entry.bankName} · •••• {entry.accountNumber.slice(-4)}</option>)}</Select></Field>
+              <Field label="Amount"><Input type="number" min="0.01" step="0.01" value={row.amountInput} onChange={(event) => updateReviewRow(row.gmailMessageId, { amountInput: event.target.value, selected: false })} /></Field>
+              <Field label="Direction"><Select value={row.direction ?? ""} onChange={(event) => updateReviewRow(row.gmailMessageId, {
+                direction: event.target.value === "debit" || event.target.value === "credit" ? event.target.value as GmailTransactionDirection : null,
+                selected: false,
+              })}><option value="">Choose debit or credit</option><option value="debit">Debit (money out)</option><option value="credit">Credit (money in)</option></Select></Field>
+              <Field label="Transaction date"><DateInput value={row.transactionDate} onValueChange={(value) => updateReviewRow(row.gmailMessageId, { transactionDate: value, selected: false })} /></Field>
+              <Field className="full" label="Description"><Input maxLength={300} value={row.description} onChange={(event) => updateReviewRow(row.gmailMessageId, { description: event.target.value })} /></Field>
+            </div>
+            {isDuplicate && <p className="section-description">This Gmail message has already been imported.</p>}
+            {!isDuplicate && row.accountId && !balanceReady && <p className="section-description">This account needs a dated balance before this transaction can update it, and the transaction date must be later than that balance date.</p>}
+          </div>;
+        })}
+        <Button type="button" onClick={() => void importReviewedTransactions()} disabled={importing || !reviewRows.some((row) => row.selected)}>{importing ? "Saving transactions..." : "Apply selected transactions"}</Button>
+      </div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    </Card>
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail test reminder</h2><p className="section-description">Optional sending test using a separate Gmail permission.</p></div><Badge tone={sendSession ? "green" : "neutral"}>{sendSession ? `Connected: ${sendSession.email}` : "Not connected"}</Badge></div>
+      {!sendSession && <GmailAuthorization purpose="send" onSignIn={(connected) => { setSendSession(connected); setRecipient(connected.email); setSendError(""); setSendNotice(""); }} />}
+      {sendSession && <div className="connector-actions"><Button type="button" variant="outline" onClick={() => setSendSession(null)}>Disconnect sending access</Button></div>}
+      {sendSession && <form className="connector-form" onSubmit={sendTestEmail}>
         <Field label="Send to"><Input type="email" autoComplete="email" required placeholder="you@example.com" value={recipient} onChange={(event) => setRecipient(event.target.value)} /></Field>
         <Field label="Subject"><Input required maxLength={200} value={subject} onChange={(event) => setSubject(event.target.value)} /></Field>
         <Field className="full" label="Email content"><textarea className="field textarea" required rows={6} maxLength={10000} value={content} onChange={(event) => setContent(event.target.value)} /></Field>
-        {error && <div className="alert alert-error full" role="alert">{error}</div>}
-        {notice && <div className="alert alert-success full" role="status">{notice}</div>}
+        {sendError && <div className="alert alert-error full" role="alert">{sendError}</div>}
+        {sendNotice && <div className="alert alert-success full" role="status">{sendNotice}</div>}
         <div className="full"><Button type="submit" disabled={busy}>{busy ? "Sending..." : "Send test reminder email"}</Button></div>
       </form>}
     </Card>
@@ -13952,7 +14170,16 @@ export default function App() {
         bankAccounts: [...banks, ...(previous.bankAccounts ?? []).filter((entry) => !banks.some((account) => account.id === entry.id))],
       }))} />,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
-    "R&D / Test Connectors": <TestConnectors />,
+    "R&D / Test Connectors": <TestConnectors
+      accounts={data.bankAccounts ?? []}
+      onImport={(updatedAccounts) => persistUpdate((previous) => {
+        const updates = new Map(updatedAccounts.map((account) => [account.id, account]));
+        return {
+          ...previous,
+          bankAccounts: (previous.bankAccounts ?? []).map((account) => updates.get(account.id) ?? account),
+        };
+      })}
+    />,
   };
   return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
