@@ -33,7 +33,7 @@ Import the repository into Vercel and use the Vite defaults:
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
 
-See [VERCEL-SUPABASE-CONFIGURATION.md](./VERCEL-SUPABASE-CONFIGURATION.md) for the environment-variable inventory, Supabase PostgreSQL pooler and CA setup, and security notes.
+See [VERCEL-SUPABASE-CONFIGURATION.md](./documents/VERCEL-SUPABASE-CONFIGURATION.md) for the environment-variable inventory, Supabase PostgreSQL pooler and CA setup, and security notes.
 
 Or deploy with the Vercel CLI using `vercel` and `vercel --prod`. Application data is stored in Supabase, independently of source-code deployments.
 

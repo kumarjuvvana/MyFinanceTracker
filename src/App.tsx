@@ -28,6 +28,8 @@ import type { CookingInventoryUsage } from "./types";
 import type { NpsSchemeHolding } from "./types";
 import type { VehicleValuation } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
+import { buildReport, reportDimensionValues } from "./lib/reportAnalytics";
+import { shoppingPurchaseReport } from "./lib/shoppingReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -1491,30 +1493,36 @@ function Reports({ data }: { data: TrackerData }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [groupBy, setGroupBy] = useState("month");
-  const stores = [...new Set(data.purchases.map((purchase) => purchase.store))].sort((a, b) => a.localeCompare(b));
-  const categories = [...new Set(data.purchases.map((purchase) => purchase.category))].sort((a, b) => a.localeCompare(b));
-  const purchases = data.purchases.filter((purchase) =>
-    (store === "All stores" || purchase.store === store) &&
-    (category === "All categories" || purchase.category === category) &&
-    (!from || purchase.date >= from) && (!to || purchase.date <= to));
-  const months = [...new Set(purchases.map((purchase) => monthKey(purchase.date)))].sort().slice(-6).map((key) => {
-    const entries = purchases.filter((purchase) => monthKey(purchase.date) === key);
+  const stores = reportDimensionValues(data.purchases, shoppingPurchaseReport, "store");
+  const categories = reportDimensionValues(data.purchases, shoppingPurchaseReport, "category");
+  const filters = {
+    ...(store === "All stores" ? {} : { store }),
+    ...(category === "All categories" ? {} : { category }),
+  };
+  const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
+  const groupByOption = groupBy === "month"
+    ? { type: "time" as const, unit: "month" as const }
+    : { type: "dimension" as const, id: groupBy };
+  const report = buildReport(data.purchases, shoppingPurchaseReport, {
+    dateRange,
+    filters,
+    groupBy: groupByOption,
+    measureId: "spend",
+  });
+  const monthlyReport = buildReport(data.purchases, shoppingPurchaseReport, {
+    dateRange,
+    filters,
+    groupBy: { type: "time", unit: "month" },
+    measureId: "spend",
+  });
+  const purchases = report.records;
+  const months = monthlyReport.groups.filter((group) => group.key !== "undated").slice(-6).map((group) => {
+    const key = group.key;
     const date = new Date(`${key}-01T12:00:00`);
-    return { key, label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }), total: entries.reduce((sum, purchase) => sum + purchase.price, 0) };
+    return { key, label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }), total: group.total };
   });
   const max = Math.max(1, ...months.map((month) => month.total));
-  const reportGroupKey = (purchase: Purchase) => groupBy === "category" ? purchase.category
-    : groupBy === "store" ? purchase.store : monthKey(purchase.date);
-  const reportGroups = [...new Set(purchases.map(reportGroupKey))].sort((a, b) => groupBy === "month"
-    ? b.localeCompare(a) : a.localeCompare(b, undefined, { sensitivity: "base" })).map((key) => {
-      const entries = purchases.filter((purchase) => reportGroupKey(purchase) === key);
-      return {
-        key,
-        title: groupBy === "month" ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : key,
-        entries,
-        total: entries.reduce((sum, purchase) => sum + purchase.price, 0),
-      };
-    });
+  const reportGroups = groupBy === "month" ? [...report.groups].reverse() : report.groups;
   const latestMonthKey = months[months.length - 1]?.key;
   return <><PageHeading eyebrow="The bigger picture" title="Your reports" subtitle="A gentle look at where your shopping budget goes." />
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
@@ -1527,11 +1535,11 @@ function Reports({ data }: { data: TrackerData }) {
         <Field label="From date"><DateInput className="filter-date" aria-label="Report from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
         <Field label="To date"><DateInput className="filter-date" aria-label="Report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
       </FilterDrawer>
-      <Badge>{purchases.length} purchases · {formatCurrency(purchases.reduce((sum, purchase) => sum + purchase.price, 0))}</Badge>
+      <Badge>{report.recordCount} purchases · {formatCurrency(report.total)}</Badge>
     </div>
     <div className="report-grid"><Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
       <Card><div className="card-head"><div><h2 className="section-title">Spending by category</h2><p className="section-description">Matching the selected filters and date range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card></div>
-    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store summary"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{group.title}</div><div className="recent-meta">{group.entries.length} purchases · {new Set(group.entries.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store summary"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} purchases · {new Set(group.records.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
   </>;
 }
 
