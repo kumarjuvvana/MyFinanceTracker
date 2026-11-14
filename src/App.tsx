@@ -1486,7 +1486,71 @@ function PriceHistory({ data }: { data: TrackerData }) {
   </>;
 }
 
-function ShoppingReports({ data }: { data: TrackerData }) {
+interface ShoppingTripReportRow {
+  id: string;
+  date: string;
+  store: string;
+  total: number;
+  purchaseCount: number;
+}
+
+function summarizeShoppingTrips(purchases: readonly Purchase[], trips: readonly ShoppingTrip[]): ShoppingTripReportRow[] {
+  const tripsById = new Map(trips.map((trip) => [trip.id, trip]));
+  const summaries = new Map<string, ShoppingTripReportRow>();
+  for (const purchase of purchases) {
+    if (!purchase.tripId) continue;
+    const trip = tripsById.get(purchase.tripId);
+    const summary = summaries.get(purchase.tripId) ?? {
+      id: purchase.tripId,
+      date: trip?.date ?? purchase.date,
+      store: trip?.store ?? purchase.store,
+      total: 0,
+      purchaseCount: 0,
+    };
+    summary.total += purchase.price;
+    summary.purchaseCount += 1;
+    summaries.set(purchase.tripId, summary);
+  }
+  return [...summaries.values()].sort((left, right) => right.total - left.total || right.date.localeCompare(left.date));
+}
+
+interface ShoppingItemPatternRow {
+  id: string;
+  name: string;
+  category: string;
+  purchaseCount: number;
+  total: number;
+  averagePurchase: number;
+  latestDate: string;
+}
+
+function summarizeShoppingItems(purchases: readonly Purchase[]): ShoppingItemPatternRow[] {
+  const summaries = new Map<string, ShoppingItemPatternRow>();
+  for (const purchase of purchases) {
+    const id = purchase.itemId.trim() || purchase.itemName.trim().toLocaleLowerCase();
+    const summary = summaries.get(id) ?? {
+      id,
+      name: purchase.itemName,
+      category: purchase.category,
+      purchaseCount: 0,
+      total: 0,
+      averagePurchase: 0,
+      latestDate: purchase.date,
+    };
+    summary.purchaseCount += 1;
+    summary.total += purchase.price;
+    summary.latestDate = purchase.date > summary.latestDate ? purchase.date : summary.latestDate;
+    summary.averagePurchase = summary.total / summary.purchaseCount;
+    summaries.set(id, summary);
+  }
+  return [...summaries.values()].sort((left, right) =>
+    right.purchaseCount - left.purchaseCount || right.total - left.total || left.name.localeCompare(right.name));
+}
+
+function ShoppingReports({ data, onSaveBudget }: {
+  data: TrackerData;
+  onSaveBudget: (amount: number | undefined) => Promise<void>;
+}) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
   const [store, setStore] = useState("All stores");
@@ -1494,6 +1558,12 @@ function ShoppingReports({ data }: { data: TrackerData }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [groupBy, setGroupBy] = useState("month");
+  const [budgetDraft, setBudgetDraft] = useState(() => data.preferences?.monthlyShoppingBudget?.toString() ?? "");
+  const [budgetSaving, setBudgetSaving] = useState(false);
+  const [budgetMessage, setBudgetMessage] = useState("");
+  useEffect(() => {
+    setBudgetDraft(data.preferences?.monthlyShoppingBudget?.toString() ?? "");
+  }, [data.preferences?.monthlyShoppingBudget]);
   const stores = reportDimensionValues(data.purchases, shoppingPurchaseReport, "store");
   const categories = reportDimensionValues(data.purchases, shoppingPurchaseReport, "category");
   const filters = {
@@ -1517,15 +1587,65 @@ function ShoppingReports({ data }: { data: TrackerData }) {
     measureId: "spend",
   });
   const purchases = report.records;
-  const months = monthlyReport.groups.filter((group) => group.key !== "undated").slice(-6).map((group) => {
+  const monthlyGroups = monthlyReport.groups.filter((group) => group.key !== "undated").slice(-6);
+  const months = monthlyGroups.map((group) => {
     const key = group.key;
     const date = new Date(`${key}-01T12:00:00`);
-    return { key, label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }), total: group.total };
+    return {
+      key,
+      label: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+      total: group.total,
+      records: group.records,
+    };
   });
   const max = Math.max(1, ...months.map((month) => month.total));
   const reportGroups = groupBy === "month" ? [...report.groups].reverse() : report.groups;
   const latestMonthKey = months[months.length - 1]?.key;
-  return <><PageHeading eyebrow="The bigger picture" title="Your reports" subtitle="A gentle look at where your shopping budget goes." />
+  const categoryTrendGroups = months.map((month) => buildReport(month.records, shoppingPurchaseReport, {
+    groupBy: { type: "dimension", id: "category" },
+    measureId: "spend",
+  }).groups);
+  const categoryTrendRows = reportDimensionValues(purchases, shoppingPurchaseReport, "category").map((name) => ({
+    name,
+    totals: categoryTrendGroups.map((groups) => groups.find((group) => group.key === name)?.total ?? 0),
+  }));
+  const tripRows = summarizeShoppingTrips(purchases, data.trips);
+  const itemRows = summarizeShoppingItems(purchases);
+  const monthlyBudget = data.preferences?.monthlyShoppingBudget;
+  const currentMonthActual = buildReport(data.purchases, shoppingPurchaseReport, {
+    dateRange: resolveReportDateRange("month-to-date"),
+    groupBy: { type: "time", unit: "month" },
+    measureId: "spend",
+  }).total;
+  const budgetUsedPercent = monthlyBudget && monthlyBudget > 0
+    ? Math.min(100, currentMonthActual / monthlyBudget * 100)
+    : currentMonthActual > 0 ? 100 : 0;
+
+  async function persistMonthlyBudget(amount: number | undefined) {
+    setBudgetSaving(true);
+    setBudgetMessage("");
+    try {
+      await onSaveBudget(amount);
+      setBudgetMessage(amount === undefined ? "Monthly budget removed." : "Monthly budget saved.");
+    } catch (caught) {
+      setBudgetMessage(caught instanceof Error ? caught.message : "Could not save the monthly budget.");
+    } finally {
+      setBudgetSaving(false);
+    }
+  }
+
+  async function saveMonthlyBudget(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = budgetDraft.trim();
+    const amount = value ? Number(value) : undefined;
+    if (value && (!Number.isFinite(amount) || (amount ?? -1) < 0)) {
+      setBudgetMessage("Enter a valid non-negative monthly budget.");
+      return;
+    }
+    await persistMonthlyBudget(amount);
+  }
+
+  return <><PageHeading eyebrow="The bigger picture" title="Shopping reports" subtitle="Explore spending trends, stores, trips, and item purchase patterns." />
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
       <div className="shopping-quick-filters">
         <Field label="Store"><Select aria-label="Filter reports by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
@@ -1538,9 +1658,31 @@ function ShoppingReports({ data }: { data: TrackerData }) {
       </FilterDrawer>
       <Badge>{report.recordCount} purchases · {formatCurrency(report.total)}</Badge>
     </div>
-    <div className="report-grid"><Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Spending by category</h2><p className="section-description">Matching the selected filters and date range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card></div>
-    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store summary"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} purchases · {new Set(group.records.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
+    <div className="report-grid">
+      <Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Category trend</h2><p className="section-description">Monthly category spending within the selected filters</p></div></div>{categoryTrendRows.length && months.length ? <div className="shopping-report-table-wrap"><table className="data-table"><thead><tr><th>Category</th>{months.map((month) => <th key={month.key}>{month.label}</th>)}</tr></thead><tbody>{categoryTrendRows.map((row) => <tr key={row.name}><td><div className="table-primary">{row.name}</div></td>{row.totals.map((total, index) => <td key={`${row.name}:${months[index].key}`}>{formatCurrency(total)}</td>)}</tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No category trends yet" description="Try widening the date range or changing the store and category." />}</Card>
+    </div>
+    <div className="report-grid" style={{ marginTop: 16 }}>
+      <Card><div className="card-head"><div><h2 className="section-title">Category breakdown</h2><p className="section-description">Share of recorded spend in the selected range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store comparison"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} purchases · {new Set(group.records.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
+    </div>
+    <div className="report-grid" style={{ marginTop: 16 }}>
+      <Card><div className="card-head"><div><h2 className="section-title">Trip spending</h2><p className="section-description">Totals from purchases matching the selected filters</p></div><Badge>{tripRows.length} trips</Badge></div>{tripRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Store</th><th>Purchases</th><th>Total</th></tr></thead><tbody>{tripRows.map((trip) => <tr key={trip.id}><td data-label="Date">{dateLabel(trip.date)}</td><td data-label="Store">{trip.store}</td><td data-label="Purchases">{trip.purchaseCount}</td><td data-label="Total" className="table-total">{formatCurrency(trip.total)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBag size={18} />} title="No trip-linked purchases" description="Purchases without a saved trip are not included in trip totals." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Item purchase patterns</h2><p className="section-description">Repeat frequency and average paid amount for matching purchases</p></div><Badge>{itemRows.length} items</Badge></div>{itemRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Purchases</th><th>Average paid</th><th>Total</th></tr></thead><tbody>{itemRows.slice(0, 10).map((item) => <tr key={item.id}><td data-label="Item"><div className="table-primary">{item.name}</div><div className="table-secondary">Last purchased {dateLabel(item.latestDate)}</div></td><td data-label="Category">{item.category}</td><td data-label="Purchases">{item.purchaseCount}</td><td data-label="Average paid">{formatCurrency(item.averagePurchase)}</td><td data-label="Total" className="table-total">{formatCurrency(item.total)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No item patterns yet" description="Matching purchases will appear here after they are recorded." />}</Card>
+    </div>
+    <Card className="shopping-report-budget">
+      <div className="card-head"><div><h2 className="section-title">Monthly budget vs actual</h2><p className="section-description">Overall shopping budget compared with recorded spending this calendar month. This comparison is independent of the report filters.</p></div><Badge tone={monthlyBudget === undefined ? "neutral" : currentMonthActual > monthlyBudget ? "amber" : "green"}>{monthlyBudget === undefined ? "Budget not set" : `${currency} monthly budget`}</Badge></div>
+      {monthlyBudget === undefined ? <p className="section-description">Set a monthly budget to compare it with this month’s recorded purchases.</p> : <>
+        <div className="shopping-report-budget-summary"><strong>{formatCurrency(currentMonthActual)}</strong><span>of {formatCurrency(monthlyBudget)} budget · {currentMonthActual > monthlyBudget ? `${formatCurrency(currentMonthActual - monthlyBudget)} over budget` : `${formatCurrency(monthlyBudget - currentMonthActual)} remaining`}</span></div>
+        <div className="shopping-report-budget-meter" role="progressbar" aria-label="Monthly shopping budget used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetUsedPercent}><span style={{ width: `${budgetUsedPercent}%` }} /></div>
+      </>}
+      <form className="shopping-report-budget-form" onSubmit={(event) => void saveMonthlyBudget(event)}>
+        <Field label={`Monthly budget (${currency})`}><Input type="number" min="0" step="0.01" value={budgetDraft} onChange={(event) => setBudgetDraft(event.target.value)} placeholder="Enter budget amount" /></Field>
+        <div className="shopping-report-budget-actions"><Button type="submit" disabled={budgetSaving}>{budgetSaving ? "Saving..." : "Save budget"}</Button>{monthlyBudget !== undefined && <Button type="button" variant="outline" disabled={budgetSaving} onClick={() => { setBudgetDraft(""); void persistMonthlyBudget(undefined); }}>Clear</Button>}</div>
+      </form>
+      {budgetMessage && <p className="section-description" role="status">{budgetMessage}</p>}
+      <p className="shopping-report-budget-note">Purchase records have no per-record currency, so the selected currency only formats amounts; it does not convert them. Budget settings are saved with your Daybook preferences.</p>
+    </Card>
   </>;
 }
 
@@ -1556,7 +1698,11 @@ const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
   { id: "saved", label: "Saved reports" },
 ];
 
-function ReportsAnalytics({ data, onPage }: { data: TrackerData; onPage: (page: Page) => void }) {
+function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
+  data: TrackerData;
+  onPage: (page: Page) => void;
+  onSaveShoppingBudget: (amount: number | undefined) => Promise<void>;
+}) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
   const [section, setSection] = useState<ReportHubSection>("overview");
@@ -1629,7 +1775,7 @@ function ReportsAnalytics({ data, onPage }: { data: TrackerData; onPage: (page: 
         onClick={() => setSection(entry.id)}
       >{entry.label}</button>)}
     </div>
-    {section === "shopping" ? <ShoppingReports data={data} /> : section === "overview" ? <>
+    {section === "shopping" ? <ShoppingReports data={data} onSaveBudget={onSaveShoppingBudget} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} recorded purchases · {currency}</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">Available for Shopping reports</div></Card>
@@ -13680,6 +13826,17 @@ export default function App() {
         }
         : stock),
       stockQuotes: trackHistory
+  function saveShoppingBudget(amount: number | undefined): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        monthlyShoppingBudget: amount,
+      },
+    }));
+  }
         ? [{ ...quote, id: createId() }, ...(previous.stockQuotes ?? [])]
         : previous.stockQuotes ?? [],
     }));
@@ -14499,8 +14656,8 @@ export default function App() {
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
-    Reports: <ReportsAnalytics data={data} onPage={changePage} />,
-    "Reports & Analytics": <ReportsAnalytics data={data} onPage={changePage} />,
+    Reports: <ReportsAnalytics data={data} onPage={changePage} onSaveShoppingBudget={saveShoppingBudget} />,
+    "Reports & Analytics": <ReportsAnalytics data={data} onPage={changePage} onSaveShoppingBudget={saveShoppingBudget} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
     "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {

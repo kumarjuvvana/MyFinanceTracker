@@ -1189,6 +1189,7 @@ export interface TrackerPreferences {
   activityCompletedItemIds?: string[];
   assetManagerVisibleTypes?: AssetManagerVisibleType[];
   assetManagerHiddenItems?: Partial<Record<AssetManagerVisibleType, string[]>>;
+  monthlyShoppingBudget?: number;
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {

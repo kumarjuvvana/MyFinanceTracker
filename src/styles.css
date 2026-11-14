@@ -2179,3 +2179,21 @@ body{background:#f3f5ef}
 @media(max-width:760px){
   .reports-hub-grid,.reports-hub-foot-grid{grid-template-columns:1fr}
 }
+.shopping-report-table-wrap{width:100%;overflow-x:auto}
+.shopping-report-table-wrap .data-table{min-width:520px}
+.shopping-report-budget{display:grid;gap:12px;margin-top:16px}
+.shopping-report-budget .card-head{margin-bottom:0}
+.shopping-report-budget-summary{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.shopping-report-budget-summary strong{font:700 19px Manrope,sans-serif;color:var(--text-main,#303830)}
+.shopping-report-budget-summary span,.shopping-report-budget-note{font-size:10px;color:var(--text-muted,#858d83)}
+.shopping-report-budget-meter{height:9px;overflow:hidden;border-radius:20px;background:var(--panel-line,#e3e8e1)}
+.shopping-report-budget-meter>span{display:block;height:100%;border-radius:inherit;background:var(--user-accent,#729777);transition:width .2s}
+.shopping-report-budget-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
+.shopping-report-budget-actions{display:flex;align-items:center;gap:8px}
+.shopping-report-budget-note{margin:0;line-height:1.55}
+.app-shell.dark .shopping-report-budget-summary strong{color:#e3e8e2}
+.app-shell.dark .shopping-report-budget-summary span,.app-shell.dark .shopping-report-budget-note{color:#a7b0a7}
+@media(max-width:600px){
+  .shopping-report-budget-form{grid-template-columns:minmax(0,1fr)}
+  .shopping-report-budget-actions{flex-wrap:wrap}
+}

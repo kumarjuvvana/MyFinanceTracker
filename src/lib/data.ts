@@ -279,6 +279,10 @@ export function validateData(value: unknown): value is TrackerData {
       typeof preferences.showScreenDescriptions === "boolean" &&
       typeof preferences.groupMenus === "boolean" &&
       (preferences.menuSortOrder === "current" || preferences.menuSortOrder === "ascending") &&
+      (preferences.monthlyShoppingBudget === undefined ||
+        (typeof preferences.monthlyShoppingBudget === "number" &&
+          Number.isFinite(preferences.monthlyShoppingBudget) &&
+          preferences.monthlyShoppingBudget >= 0)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
         preferences.activityCompletedItemIds.every((id) => typeof id === "string" && id.trim().length > 0) &&
