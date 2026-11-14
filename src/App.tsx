@@ -12706,6 +12706,65 @@ function encodeSubject(value: string): string {
 }
 
 type GmailSession = { email: string; accessToken: string };
+type GmailEmailSchedule = {
+  id: string;
+  google_email: string;
+  recipient: string;
+  subject: string;
+  content: string;
+  scheduled_for: string;
+  recurrence: "once" | "daily" | "weekly";
+  status: "pending" | "sending" | "sent" | "failed" | "cancelled";
+  created_at: string;
+  sent_at: string | null;
+  last_error: string | null;
+};
+
+const GMAIL_SCHEDULE_TIME_ZONE = "Asia/Kolkata";
+
+function istDateTimeInput(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: GMAIL_SCHEDULE_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}T${value("hour")}:${value("minute")}`;
+}
+
+function istDateTimeToIso(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    throw new Error("Choose a valid date and time in India Standard Time.");
+  }
+  const date = new Date(`${value}:00+05:30`);
+  if (Number.isNaN(date.getTime()) || istDateTimeInput(date) !== value) {
+    throw new Error("Choose a valid date and time in India Standard Time.");
+  }
+  return date.toISOString();
+}
+
+function formatIstDateTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    timeZone: GMAIL_SCHEDULE_TIME_ZONE,
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getIstWeekday(value: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      timeZone: GMAIL_SCHEDULE_TIME_ZONE,
+    }).format(new Date(istDateTimeToIso(value)));
+  } catch {
+    return "selected weekday";
+  }
+}
 
 function GmailAuthorization({ purpose, onSignIn }: {
   purpose: "read" | "send";
@@ -12856,9 +12915,195 @@ function TestConnectors({ accounts, onImport }: {
   const [scanning, setScanning] = useState(false);
   const [reviewRows, setReviewRows] = useState<GmailReviewRow[]>([]);
   const [importing, setImporting] = useState(false);
+  const [scheduleRecipient, setScheduleRecipient] = useState("");
+  const [scheduleSubject, setScheduleSubject] = useState("Daybook reminder");
+  const [scheduleContent, setScheduleContent] = useState("");
+  const [scheduleAt, setScheduleAt] = useState(() => istDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [scheduleRecurrence, setScheduleRecurrence] = useState<"once" | "daily" | "weekly">("once");
+  const [gmailSchedules, setGmailSchedules] = useState<GmailEmailSchedule[]>([]);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
+  const [scheduleNotice, setScheduleNotice] = useState("");
+  const [scheduleConnectedEmail, setScheduleConnectedEmail] = useState<string | null>(null);
 
   const importedMessageIds = new Set(accounts.flatMap((account) =>
     (account.importedTransactions ?? []).map((transaction) => transaction.gmailMessageId)));
+
+  async function refreshGmailSchedules() {
+    setScheduleLoading(true);
+    setScheduleError("");
+    try {
+      const response = await fetch("/api/gmail-schedules", { credentials: "same-origin", cache: "no-store" });
+      const payload: unknown = await response.json();
+      if (!response.ok || typeof payload !== "object" || payload === null ||
+        !("schedules" in payload) || !Array.isArray(payload.schedules) ||
+        !("connectedEmail" in payload) ||
+        (payload.connectedEmail !== null && typeof payload.connectedEmail !== "string")) {
+        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : `Could not load scheduled emails (${response.status}).`;
+        throw new Error(message);
+      }
+      setGmailSchedules(payload.schedules as GmailEmailSchedule[]);
+      setScheduleConnectedEmail(payload.connectedEmail);
+    } catch (caught) {
+      setScheduleError(caught instanceof Error ? caught.message : "Could not load scheduled emails.");
+    } finally {
+      setScheduleLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshGmailSchedules();
+    function handleOAuthMessage(event: MessageEvent<unknown>) {
+      if (event.origin !== window.location.origin || typeof event.data !== "object" || event.data === null ||
+        !("type" in event.data) || event.data.type !== "daybook-gmail-oauth") return;
+      if ("success" in event.data && event.data.success === true) {
+        setScheduleNotice("Gmail sending access connected securely.");
+        void refreshGmailSchedules();
+      } else {
+        setScheduleError("Gmail authorization was not completed. Check the popup and try connecting again.");
+      }
+    }
+    window.addEventListener("message", handleOAuthMessage);
+    return () => window.removeEventListener("message", handleOAuthMessage);
+  }, []);
+
+  async function connectScheduledGmail() {
+    setScheduleError("");
+    setScheduleNotice("");
+    const popup = window.open("about:blank", "daybook-gmail-oauth", "popup,width=600,height=720");
+    if (!popup) {
+      setScheduleError("Allow popups for Daybook, then choose Connect Gmail again.");
+      return;
+    }
+    setScheduleBusy(true);
+    try {
+      const response = await fetch("/api/gmail-oauth", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok || typeof payload !== "object" || payload === null ||
+        !("authorizationUrl" in payload) || typeof payload.authorizationUrl !== "string") {
+        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : `Could not start Google authorization (${response.status}).`;
+        throw new Error(message);
+      }
+      popup.location.href = payload.authorizationUrl;
+    } catch (caught) {
+      popup.close();
+      setScheduleError(caught instanceof Error ? caught.message : "Could not connect Gmail for scheduled sending.");
+    } finally {
+      setScheduleBusy(false);
+    }
+  }
+
+  async function scheduleEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setScheduleError("");
+    setScheduleNotice("");
+    if (!scheduleConnectedEmail) {
+      setScheduleError("Connect Gmail for scheduled sending before saving an email.");
+      return;
+    }
+    let scheduledFor: string;
+    try {
+      scheduledFor = istDateTimeToIso(scheduleAt);
+    } catch (caught) {
+      setScheduleError(caught instanceof Error ? caught.message : "Choose a valid send time.");
+      return;
+    }
+    setScheduleBusy(true);
+    try {
+      const response = await fetch("/api/gmail-schedules", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipient: scheduleRecipient.trim(),
+          subject: scheduleSubject,
+          content: scheduleContent,
+          scheduledFor,
+          recurrence: scheduleRecurrence,
+        }),
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : `Could not schedule email (${response.status}).`;
+        throw new Error(message);
+      }
+      setScheduleNotice(
+        scheduleRecurrence === "once"
+          ? "Email saved. Daybook will send this saved email at the selected IST time."
+          : `Email saved. Daybook will send this saved email ${scheduleRecurrence === "daily" ? "daily" : `weekly on ${new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: GMAIL_SCHEDULE_TIME_ZONE }).format(new Date(scheduledFor))}`} at the selected IST time until you cancel it.`,
+      );
+      setScheduleContent("");
+      await refreshGmailSchedules();
+    } catch (caught) {
+      setScheduleError(caught instanceof Error ? caught.message : "Could not schedule the email.");
+    } finally {
+      setScheduleBusy(false);
+    }
+  }
+
+  async function cancelScheduledEmail(id: string) {
+    setScheduleError("");
+    setScheduleNotice("");
+    try {
+      const response = await fetch(`/api/gmail-schedules?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : `Could not cancel scheduled email (${response.status}).`;
+        throw new Error(message);
+      }
+      setScheduleNotice("Scheduled email cancelled.");
+      await refreshGmailSchedules();
+    } catch (caught) {
+      setScheduleError(caught instanceof Error ? caught.message : "Could not cancel scheduled email.");
+    }
+  }
+
+  async function disconnectScheduledGmail() {
+    const pending = gmailSchedules.filter((schedule) => schedule.status === "pending").length;
+    const confirmation = pending
+      ? `Disconnect Gmail and cancel ${pending} pending scheduled email${pending === 1 ? "" : "s"}? Google authorization will also be revoked.`
+      : "Disconnect Gmail and revoke Daybook's scheduled sending authorization?";
+    if (!window.confirm(confirmation)) return;
+    setScheduleError("");
+    setScheduleNotice("");
+    setScheduleBusy(true);
+    try {
+      const response = await fetch("/api/gmail-schedules", {
+        method: "PATCH",
+        credentials: "same-origin",
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : `Could not disconnect Gmail (${response.status}).`;
+        throw new Error(message);
+      }
+      setScheduleNotice("Gmail sending access revoked and pending emails cancelled.");
+      await refreshGmailSchedules();
+    } catch (caught) {
+      setScheduleError(caught instanceof Error ? caught.message : "Could not disconnect Gmail.");
+    } finally {
+      setScheduleBusy(false);
+    }
+  }
 
   function updateReviewRow(messageId: string, updates: Partial<GmailReviewRow>) {
     setReviewRows((rows) => rows.map((row) =>
@@ -13070,6 +13315,33 @@ function TestConnectors({ accounts, onImport }: {
       </div>}
       {error && <div className="alert alert-error" role="alert">{error}</div>}
       {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    </Card>
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Schedule an email</h2><p className="section-description">Choose who receives it, the subject, message, repeat frequency, and send time in IST.</p></div><Badge tone={scheduleConnectedEmail ? "green" : "neutral"}>{scheduleConnectedEmail ? `Sender: ${scheduleConnectedEmail}` : "Gmail sender not connected"}</Badge></div>
+      <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>The background job only checks for emails that you explicitly save here and whose selected send time is due; it does not send anything just because the job runs. Choose once, daily, or weekly. Daily and weekly emails repeat until cancelled. The Gmail refresh token is encrypted in Supabase, but recipients, subjects, and message content are stored as readable schedule data. Anyone with the Daybook password can manage schedules and send from this Gmail account, so keep that password private. Disconnecting revokes Gmail authorization and cancels pending emails. Delivery may be a little later than the selected time.</span></div>
+      {!scheduleConnectedEmail && <div className="connector-actions"><Button type="button" onClick={() => void connectScheduledGmail()} disabled={scheduleBusy}>{scheduleBusy ? "Starting Google authorization..." : "Connect Gmail for scheduled sending"}</Button></div>}
+      {scheduleConnectedEmail && <div className="connector-actions"><Button type="button" variant="outline" onClick={() => void disconnectScheduledGmail()} disabled={scheduleBusy}>{scheduleBusy ? "Disconnecting..." : "Disconnect and revoke Gmail access"}</Button><Button type="button" variant="outline" onClick={() => void refreshGmailSchedules()} disabled={scheduleLoading}>{scheduleLoading ? "Refreshing..." : "Refresh schedules"}</Button></div>}
+      {scheduleConnectedEmail && <form className="connector-form" onSubmit={(event) => void scheduleEmail(event)}>
+        <Field label="Send to"><Input type="email" autoComplete="email" required maxLength={320} placeholder="you@example.com" value={scheduleRecipient} onChange={(event) => setScheduleRecipient(event.target.value)} /></Field>
+        <Field label="Subject"><Input required maxLength={200} value={scheduleSubject} onChange={(event) => setScheduleSubject(event.target.value)} /></Field>
+        <Field className="full" label="Email content"><textarea className="field textarea" required rows={5} maxLength={10000} value={scheduleContent} onChange={(event) => setScheduleContent(event.target.value)} /></Field>
+        <Field label="Repeat"><Select value={scheduleRecurrence} onChange={(event) => setScheduleRecurrence(event.target.value as "once" | "daily" | "weekly")}><option value="once">Once</option><option value="daily">Every day</option><option value="weekly">Every week</option></Select></Field>
+        <Field label={scheduleRecurrence === "once" ? "Send date and time (IST)" : `First send date and time (IST)${scheduleRecurrence === "weekly" ? ` · ${getIstWeekday(scheduleAt)}` : ""}`}><Input type="datetime-local" required min={istDateTimeInput(new Date(Date.now() + 60_000))} value={scheduleAt} onChange={(event) => setScheduleAt(event.target.value)} /></Field>
+        <div className="full"><Button type="submit" disabled={scheduleBusy}>{scheduleBusy ? "Saving schedule..." : "Save email schedule"}</Button></div>
+      </form>}
+      {scheduleError && !scheduleConnectedEmail && <div className="alert alert-error" role="alert">{scheduleError}</div>}
+      {scheduleNotice && !scheduleConnectedEmail && <div className="alert alert-success" role="status">{scheduleNotice}</div>}
+      {gmailSchedules.length > 0 && <div className="gmail-scheduled-list">
+        <h3>Scheduled and recent emails</h3>
+        {gmailSchedules.map((schedule) => <div className="gmail-scheduled-item" key={schedule.id}>
+          <div><strong>{schedule.subject}</strong><span>To {schedule.recipient} · {schedule.google_email}</span>
+            <span>{schedule.recurrence === "once" ? "One time" : schedule.recurrence === "daily" ? "Every day" : `Every ${new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: GMAIL_SCHEDULE_TIME_ZONE }).format(new Date(schedule.scheduled_for))}`}{schedule.status === "pending" ? ` · Next send ${formatIstDateTime(schedule.scheduled_for)} IST` : ` · ${schedule.status[0].toLocaleUpperCase()}${schedule.status.slice(1)} · ${formatIstDateTime(schedule.scheduled_for)} IST`}</span>
+            {schedule.last_error && <span className="gmail-schedule-error">{schedule.last_error}</span>}
+          </div>
+          {schedule.status === "pending" && <Button type="button" variant="outline" size="sm" onClick={() => void cancelScheduledEmail(schedule.id)}>Cancel</Button>}
+        </div>)}
+      </div>}
+      {scheduleError && scheduleConnectedEmail && <div className="alert alert-error" role="alert">{scheduleError}</div>}
+      {scheduleNotice && scheduleConnectedEmail && <div className="alert alert-success" role="status">{scheduleNotice}</div>}
     </Card>
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail test reminder</h2><p className="section-description">Optional sending test using a separate Gmail permission.</p></div><Badge tone={sendSession ? "green" : "neutral"}>{sendSession ? `Connected: ${sendSession.email}` : "Not connected"}</Badge></div>
       {!sendSession && <GmailAuthorization purpose="send" onSignIn={(connected) => { setSendSession(connected); setRecipient(connected.email); setSendError(""); setSendNotice(""); }} />}
@@ -13700,6 +13972,17 @@ export default function App() {
       setError(caught instanceof Error ? caught.message : "Could not save preferences to Supabase.");
     });
   }
+  function saveShoppingBudget(amount: number | undefined): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        monthlyShoppingBudget: amount,
+      },
+    }));
+  }
   function restoreArchivedRecord(id: string) {
     update((previous) => {
       const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
@@ -13972,17 +14255,6 @@ export default function App() {
         }
         : stock),
       stockQuotes: trackHistory
-  function saveShoppingBudget(amount: number | undefined): Promise<void> {
-    return persistPreferenceUpdate((previous) => ({
-      ...previous,
-      preferences: {
-        ...DEFAULT_TRACKER_PREFERENCES,
-        ...previous.preferences,
-        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
-        monthlyShoppingBudget: amount,
-      },
-    }));
-  }
         ? [{ ...quote, id: createId() }, ...(previous.stockQuotes ?? [])]
         : previous.stockQuotes ?? [],
     }));

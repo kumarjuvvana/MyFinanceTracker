@@ -1,4 +1,30 @@
 {
+  "rewrites": [
+    {
+      "source": "/api/stock-price",
+      "destination": "/api/market-data?handler=stock"
+    },
+    {
+      "source": "/api/mutual-fund-nav",
+      "destination": "/api/market-data?handler=mutual-fund-nav"
+    },
+    {
+      "source": "/api/nps-nav",
+      "destination": "/api/market-data?handler=nps-nav"
+    },
+    {
+      "source": "/api/gmail-oauth",
+      "destination": "/api/gmail?handler=oauth"
+    },
+    {
+      "source": "/api/gmail-oauth-callback",
+      "destination": "/api/gmail?handler=callback"
+    },
+    {
+      "source": "/api/gmail-schedules",
+      "destination": "/api/gmail?handler=schedules"
+    }
+  ],
   "crons": [
     {
       "path": "/api/asset-prices",
@@ -7,6 +33,9 @@
   ],
   "functions": {
     "api/asset-prices.ts": {
+      "maxDuration": 60
+    },
+    "api/gmail.ts": {
       "maxDuration": 60
     }
   }

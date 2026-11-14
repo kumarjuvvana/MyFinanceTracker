@@ -3,13 +3,15 @@ import react from "@vitejs/plugin-react";
 import { readdir, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import stockPriceHandler from "./api/stock-price";
-import mutualFundNavHandler from "./api/mutual-fund-nav";
-import npsNavHandler from "./api/nps-nav";
+import stockPriceHandler from "./server/stock-price";
+import mutualFundNavHandler from "./server/mutual-fund-nav";
+import npsNavHandler from "./server/nps-nav";
 import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
 import databaseHandler from "./api/database";
 import usageHandler from "./api/usage";
+import gmailOAuthHandler, { gmailOAuthCallbackHandler } from "./server/gmail-oauth";
+import gmailSchedulesHandler from "./server/gmail-schedules";
 import dataAuthHandler from "./src/lib/dataAuth";
 import type { ResolvedConfig } from "vite";
 
@@ -58,7 +60,7 @@ function hostingUsagePlugin() {
 export default defineConfig(({ command, mode }) => {
   if (command === "serve") {
     const env = loadEnv(mode, process.cwd(), "");
-    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "SUPABASE_DB_CA_CERT_BASE64", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS", "TWELVE_DATA_API_KEY"]) {
+    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "SUPABASE_DB_CA_CERT_BASE64", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS", "TWELVE_DATA_API_KEY", "VITE_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_TOKEN_ENCRYPTION_KEY", "GMAIL_OAUTH_REDIRECT_URI", "CRON_SECRET"]) {
       if (!process.env[key] && env[key]) process.env[key] = env[key];
     }
   }
@@ -75,6 +77,9 @@ export default defineConfig(({ command, mode }) => {
           ["/api/documents", documentsHandler],
           ["/api/database", databaseHandler],
           ["/api/usage", usageHandler],
+          ["/api/gmail-oauth", gmailOAuthHandler],
+          ["/api/gmail-oauth-callback", gmailOAuthCallbackHandler],
+          ["/api/gmail-schedules", gmailSchedulesHandler],
         ];
         for (const [path, handler] of routes) {
           server.middlewares.use(path, (request, response, next) => {

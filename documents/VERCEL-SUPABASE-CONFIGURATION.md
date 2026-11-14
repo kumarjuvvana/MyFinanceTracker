@@ -32,10 +32,13 @@ Configure these under **Vercel → Project → Settings → Environment Variable
 | `SUPABASE_URL` | Yes | `https://ijgxodotgscoldjevpwp.supabase.co` | Server-side. Leave the existing value unchanged when configuring PostgreSQL access. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | The service-role secret key for this same Supabase project. | Secret; server-only. Never prefix with `VITE_`, expose to the browser, or commit it. |
 | `DATA_ACCESS_PASSWORD` | Yes | The shared Daybook sign-in passphrase. Use a strong, private value at least 16 characters long. | Secret. It is the app login password, not the PostgreSQL password. |
-| `CRON_SECRET` | Yes for automated asset prices | A random secret used by Vercel Cron to authorize `/api/asset-prices`. | Secret; server-only. Configure it for Production (and Preview only if scheduled previews are intentionally enabled). |
+| `CRON_SECRET` | Yes for scheduled jobs | A random secret used to authorize `/api/asset-prices` and `/api/gmail-schedules`. | Secret; server-only. Store the same value in Supabase Vault for the Gmail cron job. |
 | `SUPABASE_DB_URL` | Optional | Supabase **Transaction pooler** PostgreSQL URI for the same project. | Secret; server-only. Used by Database manager and Hosting & storage. |
 | `SUPABASE_DB_CA_CERT_BASE64` | Optional | Base64-encoded contents of the Supabase database CA certificate file. | Server-only. Used to verify the PostgreSQL server certificate while TLS verification remains enabled. |
 | `VITE_GOOGLE_CLIENT_ID` | Optional | Google OAuth web client ID for the Gmail connector. Transaction sync requests read-only access; the email test requests send access separately. | Browser-visible client ID; not a client secret. |
+| `GOOGLE_CLIENT_SECRET` | Required for scheduled Gmail email | Client secret for the same Google OAuth Web application as `VITE_GOOGLE_CLIENT_ID`. | Secret; server-only. Never prefix with `VITE_`, expose to the browser, or commit it. |
+| `GMAIL_TOKEN_ENCRYPTION_KEY` | Required for scheduled Gmail email | Base64-encoded random 32-byte key used to encrypt the Gmail refresh token before storing it in Supabase. | Secret; server-only. Back it up securely; changing it makes the saved Gmail connection unreadable. |
+| `GMAIL_OAUTH_REDIRECT_URI` | Required for scheduled Gmail email | `https://myfinance-tracker-lac.vercel.app/api/gmail-oauth-callback` | Server-side callback URL. Register this exact URL as an Authorized redirect URI in Google Cloud. |
 | `TWELVE_DATA_API_KEY` | Optional | Twelve Data API key for stock-price requests. | Secret; server-only. |
 
 Do not configure the following local-development variables in Vercel:
@@ -82,9 +85,29 @@ Changing the database password in Supabase is different from putting that passwo
 - Other feature migrations are listed under `supabase/migrations/`. A migration existing in Git does not prove it has been applied to the live Supabase project.
 - The app stores records in the Supabase database and document files in Supabase Storage. Vercel's deployment filesystem is not the persistent data store.
 - Automated asset price updates use one Vercel Cron entry in `vercel.json` (weekly Friday at 17:30 UTC, or about 23:00 in India), which is compatible with the Hobby plan. Hobby timing may vary by up to 59 minutes. Choose which supported asset classes are enabled in Asset manager → Price automation; there are no separate per-class timers.
-- Vercel Hobby allows Cron jobs on every plan, with a minimum interval of once per day; weekly execution is supported. Cron calls use Serverless Function invocations and count toward the plan’s normal function usage. The price automation API is consolidated into one endpoint to stay within Hobby’s 12-function deployment limit.
+- Vercel Hobby allows Cron jobs on every plan, with a minimum interval of once per day; weekly execution is supported. Cron calls use Serverless Function invocations and count toward the plan’s normal function usage. The price automation API uses one endpoint; market-data and scheduled-Gmail URLs are rewrite aliases to shared handlers. Together with the other APIs, the deployment uses 11 functions, within Hobby’s 12-function limit.
 - Apply `supabase/migrations/20261113130000_add_scheduled_asset_price_updates.sql` in the Supabase SQL Editor before using Price automation. It creates the asset price history, schedule, and run tables and the server-only function that updates the normalized asset records.
 - Provider-supported scheduled prices are Stocks (Yahoo Finance, with the configured Twelve Data fallback), Mutual fund (AMFI), and NPS (NPS Trust). Other asset types, including bank accounts, are not automatically priced.
+- Scheduled Gmail delivery supports one-time, daily, and weekly schedules explicitly saved in Daybook. Supabase `pg_cron` and `pg_net` call the protected Vercel `/api/gmail-schedules` endpoint every minute; the job only sends saved schedules whose chosen time is due, and sends nothing when there are no due schedules. Enable the `pg_cron`, `pg_net`, and `supabase_vault` extensions, apply `supabase/migrations/20261113190000_add_scheduled_gmail_reminders.sql`, then create two Supabase Vault secrets named `daybook_gmail_cron_url` and `daybook_gmail_cron_secret`. Set their values to `https://myfinance-tracker-lac.vercel.app/api/gmail-schedules` and the same value configured as Vercel `CRON_SECRET`, respectively. Schedule the job in SQL Editor:
+
+  ```sql
+  select cron.schedule(
+    'daybook-gmail-reminders',
+    '* * * * *',
+    $job$
+    select net.http_get(
+      url := (select decrypted_secret from vault.decrypted_secrets where name = 'daybook_gmail_cron_url'),
+      headers := jsonb_build_object(
+        'Authorization',
+        'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'daybook_gmail_cron_secret')
+      ),
+      timeout_milliseconds := 60000
+    );
+    $job$
+  );
+  ```
+
+  The email is eligible at its saved IST time and is checked at the next minute tick. Keep the cron request under the 60-second function limit by setting `timeout_milliseconds := 60000`; the app also caps each Gmail run to a small due-job batch so a slow provider or refresh-token fetch cannot leave rows stuck in `sending`. Use `cron.unschedule` to remove the job. Do not put secret values in Git or the SQL command.
 
 ## Database manager write safeguards
 

@@ -137,6 +137,12 @@ button{cursor:pointer}
 .bank-imported-transactions span{overflow-wrap:anywhere}
 .bank-transaction-debit{color:#a74e43}
 .bank-transaction-credit{color:#527957}
+.gmail-scheduled-list{display:grid;gap:12px;margin-top:20px}
+.gmail-scheduled-list h3{margin:0;font-size:14px}
+.gmail-scheduled-item{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:12px;border:1px solid var(--border);border-radius:10px}
+.gmail-scheduled-item>div{display:grid;gap:5px;min-width:0}
+.gmail-scheduled-item span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.gmail-schedule-error{color:#a74e43!important}
 .connector-form .alert{margin:0}
 .connector-card code{font-family:Consolas,monospace;font-size:10px}
 .app-shell.dark .connector-card .alert{background:#332f24;border-color:#51462f;color:#e0c991}
