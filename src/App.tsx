@@ -19,7 +19,7 @@ import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUs
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
 import type { CookingPlan } from "./types";
@@ -31,6 +31,8 @@ import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
+import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
+import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
@@ -1548,17 +1550,106 @@ function summarizeShoppingItems(purchases: readonly Purchase[]): ShoppingItemPat
     right.purchaseCount - left.purchaseCount || right.total - left.total || left.name.localeCompare(right.name));
 }
 
-function ShoppingReports({ data, onSaveBudget }: {
+type SaveReportView = (name: string, filters: Record<string, string>) => Promise<void>;
+
+function ReportExportActions({ label, rows, summary }: {
+  label: string;
+  rows: readonly object[];
+  summary: string;
+}) {
+  const [message, setMessage] = useState("");
+
+  function downloadCsv() {
+    const csv = exportCsvRows(rows);
+    if (!csv) {
+      setMessage("There are no filtered records to export.");
+      return;
+    }
+    const fileName = `${label.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "report"}-${today()}.csv`;
+    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMessage("CSV export downloaded.");
+  }
+
+  async function copySummary() {
+    if (!navigator.clipboard?.writeText) {
+      setMessage("Clipboard access is unavailable in this browser context.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(summary);
+      setMessage("Report summary copied.");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? `Could not copy the report summary: ${caught.message}` : "Could not copy the report summary.");
+    }
+  }
+
+  return <div className="report-actions">
+    <Button type="button" size="sm" variant="outline" onClick={downloadCsv}><Download size={13} /> Export CSV</Button>
+    <Button type="button" size="sm" variant="outline" onClick={() => window.print()}><FileText size={13} /> Print</Button>
+    <Button type="button" size="sm" variant="outline" onClick={() => void copySummary()}><Copy size={13} /> Copy summary</Button>
+    {message && <span className="report-action-message" role="status">{message}</span>}
+  </div>;
+}
+
+function SavedViewControls({ filters, onSave }: {
+  filters: Record<string, string>;
+  onSave?: SaveReportView;
+}) {
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setMessage("Enter a name for this saved report.");
+      return;
+    }
+    if (!onSave) {
+      setMessage("Saved reports are unavailable.");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      await onSave(trimmed, filters);
+      setName("");
+      setMessage("Report view saved.");
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Could not save this report view.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <form className="saved-view-controls" onSubmit={(event) => void submit(event)}>
+    <Field label="Save current filters as"><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Name this view" /></Field>
+    <Button type="submit" size="sm" variant="outline" disabled={!onSave || saving}>{saving ? "Saving..." : "Save view"}</Button>
+    {message && <span className="report-action-message" role="status">{message}</span>}
+  </form>;
+}
+
+function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
   data: TrackerData;
   onSaveBudget: (amount: number | undefined) => Promise<void>;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
-  const [store, setStore] = useState("All stores");
-  const [category, setCategory] = useState("All categories");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [groupBy, setGroupBy] = useState("month");
+  const [store, setStore] = useState(() => initialFilters?.store ?? "All stores");
+  const [category, setCategory] = useState(() => initialFilters?.category ?? "All categories");
+  const [from, setFrom] = useState(() => initialFilters?.from ?? "");
+  const [to, setTo] = useState(() => initialFilters?.to ?? "");
+  const [groupBy, setGroupBy] = useState(() => initialFilters?.groupBy ?? "month");
   const [budgetDraft, setBudgetDraft] = useState(() => data.preferences?.monthlyShoppingBudget?.toString() ?? "");
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
@@ -1621,6 +1712,16 @@ function ShoppingReports({ data, onSaveBudget }: {
   const budgetUsedPercent = monthlyBudget && monthlyBudget > 0
     ? Math.min(100, currentMonthActual / monthlyBudget * 100)
     : currentMonthActual > 0 ? 100 : 0;
+  const exportRows = purchases.map((purchase) => ({
+    date: purchase.date,
+    item: purchase.itemName,
+    category: purchase.category,
+    quantity: purchase.quantity,
+    unit: purchase.unit,
+    price: purchase.price,
+    store: purchase.store,
+  }));
+  const savedFilters = { store, category, from, to, groupBy };
 
   async function persistMonthlyBudget(amount: number | undefined) {
     setBudgetSaving(true);
@@ -1659,6 +1760,10 @@ function ShoppingReports({ data, onSaveBudget }: {
       </FilterDrawer>
       <Badge>{report.recordCount} purchases · {formatCurrency(report.total)}</Badge>
     </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="shopping-report" rows={exportRows} summary={`${report.recordCount} recorded purchases; total ${formatCurrency(report.total)}; filters: ${store}, ${category}, ${from || "any date"} to ${to || "any date"}.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
+    </div>
     <div className="report-grid">
       <Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
       <Card><div className="card-head"><div><h2 className="section-title">Category trend</h2><p className="section-description">Monthly category spending within the selected filters</p></div></div>{categoryTrendRows.length && months.length ? <div className="shopping-report-table-wrap"><table className="data-table"><thead><tr><th>Category</th>{months.map((month) => <th key={month.key}>{month.label}</th>)}</tr></thead><tbody>{categoryTrendRows.map((row) => <tr key={row.name}><td><div className="table-primary">{row.name}</div></td>{row.totals.map((total, index) => <td key={`${row.name}:${months[index].key}`}>{formatCurrency(total)}</td>)}</tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No category trends yet" description="Try widening the date range or changing the store and category." />}</Card>
@@ -1687,12 +1792,16 @@ function ShoppingReports({ data, onSaveBudget }: {
   </>;
 }
 
-function FinanceCashflowReports({ data }: { data: TrackerData }) {
+function FinanceCashflowReports({ data, initialFilters, onSaveView }: {
+  data: TrackerData;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+}) {
   const accounts = data.bankAccounts ?? [];
   const rows = bankActivityRecords(accounts);
-  const [accountId, setAccountId] = useState("all");
-  const [from, setFrom] = useState(() => resolveReportDateRange("last-30-days")?.from ?? "");
-  const [to, setTo] = useState(() => resolveReportDateRange("last-30-days")?.to ?? "");
+  const [accountId, setAccountId] = useState(() => initialFilters?.accountId ?? "all");
+  const [from, setFrom] = useState(() => initialFilters?.from ?? resolveReportDateRange("last-30-days")?.from ?? "");
+  const [to, setTo] = useState(() => initialFilters?.to ?? resolveReportDateRange("last-30-days")?.to ?? "");
   const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
   const selectedAccounts = accounts.filter((account) => accountId === "all" || account.id === accountId);
   const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
@@ -1734,8 +1843,20 @@ function FinanceCashflowReports({ data }: { data: TrackerData }) {
     net: month.credits - month.debits,
   }))).sort((left, right) => left.key.localeCompare(right.key) || left.account.localeCompare(right.account));
   const transactionCount = summaries.reduce((count, summary) => count + summary.count, 0);
-  const missingDateCount = selectedAccounts.reduce((count, account) => count +
-    rows.filter((row) => row.accountId === account.id && !reportDateKey(row.transactionDate)).length, 0);
+  const missingDateCount = from || to ? selectedAccounts.reduce((count, account) => count +
+    rows.filter((row) => row.accountId === account.id && !reportDateKey(row.transactionDate)).length, 0) : 0;
+  const filteredTransactions = rows.filter((row) => {
+    if (accountId !== "all" && row.accountId !== accountId) return false;
+    const date = reportDateKey(row.transactionDate);
+    return (!from || Boolean(date && date >= from)) && (!to || Boolean(date && date <= to));
+  }).map((row) => ({
+    account: row.accountName,
+    date: reportDateKey(row.transactionDate) ?? "",
+    direction: row.direction,
+    amount: row.amount,
+    currency: "Not recorded",
+  }));
+  const savedFilters = { accountId, from, to };
 
   return <>
     <PageHeading eyebrow="Recorded money movement" title="Finance & cashflow" subtitle="Review imported bank credits and debits by account and period." />
@@ -1750,6 +1871,10 @@ function FinanceCashflowReports({ data }: { data: TrackerData }) {
       </FilterDrawer>
       <Badge>{transactionCount} imported transactions</Badge>
     </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="finance-cashflow-report" rows={filteredTransactions} summary={`${transactionCount} imported transactions across selected bank accounts; currency is not recorded; credits and debits are not verified income and expenses.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
+    </div>
     <div className="report-grid">
       <Card><div className="card-head"><div><h2 className="section-title">Credits vs debits</h2><p className="section-description">Recorded bank transaction directions, shown separately for each account.</p></div></div>{summaries.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Account</th><th>Credits</th><th>Debits</th><th>Net movement</th><th>Records</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.id}><td data-label="Account"><div className="table-primary">{summary.name}</div><div className="table-secondary">Currency not recorded</div></td><td data-label="Credits">{formatAmount(summary.credits)}</td><td data-label="Debits">{formatAmount(summary.debits)}</td><td data-label="Net movement" className="table-total">{formatAmount(summary.net)}</td><td data-label="Records">{summary.count}</td></tr>)}</tbody></table></div> : <EmptyState icon={<Wallet size={18} />} title={rows.length ? "No transactions in this date range" : "No imported bank transactions"} description={rows.length ? "Try widening the date range or choosing another account." : "Import transactions from a bank account to see recorded movement."} />}</Card>
       <Card><div className="card-head"><div><h2 className="section-title">Savings rate</h2><p className="section-description">Not calculated from the available records.</p></div><Badge>Unavailable</Badge></div><p className="section-description">Imported transactions are not guaranteed to include all accounts or complete income and expenses. Their currency is also not recorded, so a savings percentage could be misleading.</p><div className="reports-hub-source"><strong>{transactionCount}</strong><span>bank transactions in the selected date range</span></div></Card>
@@ -1758,12 +1883,16 @@ function FinanceCashflowReports({ data }: { data: TrackerData }) {
   </>;
 }
 
-function SubscriptionSpendingReports({ data }: { data: TrackerData }) {
+function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
+  data: TrackerData;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+}) {
   const accounts = data.subscriptions ?? [];
   const rows = subscriptionActivityRecords(accounts);
-  const [accountId, setAccountId] = useState("all");
-  const [from, setFrom] = useState(() => resolveReportDateRange("last-30-days")?.from ?? "");
-  const [to, setTo] = useState(() => resolveReportDateRange("last-30-days")?.to ?? "");
+  const [accountId, setAccountId] = useState(() => initialFilters?.accountId ?? "all");
+  const [from, setFrom] = useState(() => initialFilters?.from ?? resolveReportDateRange("last-30-days")?.from ?? "");
+  const [to, setTo] = useState(() => initialFilters?.to ?? resolveReportDateRange("last-30-days")?.to ?? "");
   const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
   const selectedAccounts = accounts.filter((account) => accountId === "all" || account.id === accountId);
   const summaries = selectedAccounts.map((account) => {
@@ -1822,6 +1951,21 @@ function SubscriptionSpendingReports({ data }: { data: TrackerData }) {
   }))).sort((left, right) => left.key.localeCompare(right.key) || left.account.localeCompare(right.account));
   const paidCount = summaries.reduce((count, summary) => count + summary.paid.recordCount, 0);
   const unpaidCount = summaries.reduce((count, summary) => count + summary.unpaid.recordCount, 0);
+  const exportRows = rows.filter((row) => {
+    if (accountId !== "all" && row.accountId !== accountId) return false;
+    const date = reportDateKey(row.paid ? row.paymentDate || row.transactionDate : row.dueDate);
+    return (!from || Boolean(date && date >= from)) && (!to || Boolean(date && date <= to));
+  }).map((row) => ({
+    account: row.accountName,
+    provider: row.provider,
+    category: row.category,
+    billingType: row.billingType,
+    status: row.paid ? "Paid" : "Unpaid",
+    date: reportDateKey(row.paid ? row.paymentDate || row.transactionDate : row.dueDate) ?? "",
+    amount: row.amount,
+    currency: row.currency,
+  }));
+  const savedFilters = { accountId, from, to };
 
   return <>
     <PageHeading eyebrow="Recorded recurring costs" title="Subscriptions & bills" subtitle="Review paid transaction history and unpaid due entries by account and currency." />
@@ -1835,6 +1979,10 @@ function SubscriptionSpendingReports({ data }: { data: TrackerData }) {
         <Field label="To date"><DateInput className="filter-date" aria-label="Subscription report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
       </FilterDrawer>
       <Badge>{paidCount} paid · {unpaidCount} unpaid entries</Badge>
+    </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="subscriptions-report" rows={exportRows} summary={`${paidCount} paid and ${unpaidCount} unpaid subscription records; paid history and scheduled dues remain separate and currency totals are not combined.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
     </div>
     <Card><div className="card-head"><div><h2 className="section-title">Paid amounts by account</h2><p className="section-description">Recurring type, paid history, and unpaid due records remain separate.</p></div></div>{summaries.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Account</th><th>Billing</th><th>Currency</th><th>Paid records</th><th>Paid total</th><th>Unpaid due</th><th>Due amount</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.id}><td data-label="Account"><div className="table-primary">{summary.name}</div><div className="table-secondary">{summary.provider} · {summary.category}</div></td><td data-label="Billing">{summary.billingType}</td><td data-label="Currency">{summary.currency}</td><td data-label="Paid records">{summary.paid.recordCount}</td><td data-label="Paid total" className="table-total">{formatMoney(summary.paid.total, summary.currency)}</td><td data-label="Unpaid due">{summary.unpaid.recordCount}</td><td data-label="Due amount">{formatMoney(summary.unpaid.total, summary.currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<CalendarDays size={18} />} title="No subscription activity in this date range" description={rows.length ? "Try widening the date range or choosing another account." : "Recorded paid transactions and due entries will appear here."} />}</Card>
     <div className="report-grid" style={{ marginTop: 16 }}>
@@ -1856,14 +2004,676 @@ const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
   { id: "saved", label: "Saved reports" },
 ];
 
-function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
+function useAutomatedAssetPriceHistory() {
+  const [records, setRecords] = useState<AssetPriceHistoryRecord[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch("/api/asset-prices?historyPage=0&historyPageSize=100", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        let payload: unknown;
+        try {
+          payload = await response.json();
+        } catch {
+          throw new Error("The automated price history endpoint returned invalid JSON.");
+        }
+        if (!response.ok) {
+          const message = isRecord(payload) && typeof payload.error === "string"
+            ? payload.error
+            : `Could not load automated price history (${response.status}).`;
+          throw new Error(message);
+        }
+        if (!isRecord(payload) || !Array.isArray(payload.history) ||
+          typeof payload.historyTotal !== "number" || !Number.isSafeInteger(payload.historyTotal) ||
+          payload.historyTotal < 0) {
+          throw new Error("The automated price history response is incomplete.");
+        }
+        if (!controller.signal.aborted) {
+          setRecords(payload.history.filter(isAssetPriceHistoryRecord));
+          setTotal(payload.historyTotal);
+          setError("");
+        }
+      } catch (caught) {
+        if (!controller.signal.aborted) {
+          setError(caught instanceof Error ? caught.message : "Could not load automated price history.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, []);
+
+  return { records, error, loading, total };
+}
+
+function mergeAutomatedAssetHistory(
+  data: TrackerData,
+  storedHistory: readonly AssetHistoryPoint[],
+  automatedHistory: readonly AssetPriceHistoryRecord[],
+): AssetHistoryPoint[] {
+  const automatedPoints = automatedHistory.flatMap((record): AssetHistoryPoint[] => {
+    if (!reportDateKey(record.price_date) || !Number.isFinite(record.price) || record.price <= 0) return [];
+    const stock = record.asset_type === "Stocks"
+      ? (data.stocks ?? []).find((entry) => entry.id === record.asset_id)
+      : undefined;
+    const asset = record.asset_type === "Stocks"
+      ? undefined
+      : (data.assets ?? []).find((entry) => entry.id === record.asset_id);
+    const scheme = record.asset_type === "NPS"
+      ? asset?.npsSchemes?.find((entry) => entry.schemeId === record.instrument_id)
+      : undefined;
+    const seriesId = record.asset_type === "Stocks"
+      ? `stock:${record.asset_id}`
+      : record.asset_type === "NPS"
+        ? `nps:${record.asset_id}:${record.instrument_id}`
+        : `asset:${record.asset_id}`;
+    const point: AssetHistoryPoint = {
+      id: `automated:${record.id}`,
+      seriesId,
+      name: record.instrument_name || record.asset_name,
+      assetType: record.asset_type === "Stocks" ? "Stock" : record.asset_type,
+      date: record.price_date,
+      value: record.price,
+      currency: record.currency,
+      unit: record.asset_type === "Stocks" ? "per share" : "per unit",
+      units: stock?.quantity ?? scheme?.units ?? asset?.quantity ?? null,
+      source: `${record.provider} automated history`,
+    };
+    return storedHistory.some((stored) =>
+      stored.seriesId === point.seriesId && stored.date === point.date &&
+      stored.value === point.value && stored.currency === point.currency)
+      ? []
+      : [point];
+  });
+  return [...storedHistory, ...automatedPoints]
+    .sort((left, right) => right.date.localeCompare(left.date) || left.name.localeCompare(right.name));
+}
+
+function reportCurrencyAmount(amount: number | null, currency: string): string {
+  if (amount === null) return "Not recorded";
+  const knownCurrency = CURRENCIES.find((entry) => entry === currency);
+  if (knownCurrency) return formatMoney(amount, knownCurrency);
+  const formatted = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(amount);
+  return currency === "Not recorded" ? `${formatted} (currency not recorded)` : `${formatted} ${currency}`;
+}
+
+function isWithinReportDateRange(date: string, from: string, to: string): boolean {
+  const key = reportDateKey(date);
+  return Boolean(key && (!from || key >= from) && (!to || key <= to));
+}
+
+const REPORT_PAGE_SIZE = 25;
+
+function ReportPagination({ count, page, onPageChange }: {
+  count: number;
+  page: number;
+  onPageChange: (page: number) => void;
+}) {
+  const pages = Math.ceil(count / REPORT_PAGE_SIZE);
+  if (pages <= 1) return null;
+  return <div className="report-pagination">
+    <Button type="button" size="sm" variant="outline" disabled={page === 0} onClick={() => onPageChange(page - 1)}><ChevronLeft size={13} /> Previous</Button>
+    <span>Page {page + 1} of {pages} · {count} records</span>
+    <Button type="button" size="sm" variant="outline" disabled={page + 1 >= pages} onClick={() => onPageChange(page + 1)}>Next <ChevronRight size={13} /></Button>
+  </div>;
+}
+
+function pageRecords<T>(records: readonly T[], page: number): T[] {
+  return records.slice(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE);
+}
+
+function InvestmentReports({ data, initialFilters, onSaveView }: {
   data: TrackerData;
-  onPage: (page: Page) => void;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+}) {
+  const automatedHistory = useAutomatedAssetPriceHistory();
+  const positions = buildInvestmentPositions(data, automatedHistory.records);
+  const allHistory = mergeAutomatedAssetHistory(data, buildAssetHistory(data), automatedHistory.records);
+  const [assetType, setAssetType] = useState(() => initialFilters?.assetType ?? "All types");
+  const [currency, setCurrency] = useState(() => initialFilters?.currency ?? "All currencies");
+  const [search, setSearch] = useState(() => initialFilters?.search ?? "");
+  const [from, setFrom] = useState(() => initialFilters?.from ?? "");
+  const [to, setTo] = useState(() => initialFilters?.to ?? "");
+  const [groupBy, setGroupBy] = useState(() => initialFilters?.groupBy ?? "type");
+  const [positionPage, setPositionPage] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const typeOptions = [...new Set(positions.map((position) => position.assetType))].sort();
+  const currencyOptions = [...new Set(positions.map((position) => position.currency))].sort();
+  const matchesPosition = (position: InvestmentPosition) =>
+    (assetType === "All types" || position.assetType === assetType) &&
+    (currency === "All currencies" || position.currency === currency) &&
+    (!search || `${position.name} ${position.institution} ${position.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+    (!from && !to || isWithinReportDateRange(position.valueDate, from, to));
+  const filteredPositions = positions.filter(matchesPosition);
+  const filteredHistory = allHistory.filter((point) =>
+    (assetType === "All types" || point.assetType === assetType) &&
+    (currency === "All currencies" || point.currency === currency) &&
+    (!search || `${point.name} ${point.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+    (!from && !to || isWithinReportDateRange(point.date, from, to)));
+  const groups = new Map<string, { type: string; currency: string; count: number; current: number; invested: number; currentCount: number; investedCount: number }>();
+  for (const position of filteredPositions) {
+    const key = `${groupBy === "institution" ? position.institution : position.assetType}\u0000${position.currency}`;
+    const group = groups.get(key) ?? {
+      type: groupBy === "institution" ? position.institution : position.assetType,
+      currency: position.currency,
+      count: 0,
+      current: 0,
+      invested: 0,
+      currentCount: 0,
+      investedCount: 0,
+    };
+    group.count += 1;
+    if (position.currentValue !== null) {
+      group.current += position.currentValue;
+      group.currentCount += 1;
+    }
+    if (position.investedValue !== null) {
+      group.invested += position.investedValue;
+      group.investedCount += 1;
+    }
+    groups.set(key, group);
+  }
+  const groupedRows = [...groups.values()].sort((left, right) =>
+    left.currency.localeCompare(right.currency) || left.type.localeCompare(right.type));
+  const savedFilters = { assetType, currency, search, from, to, groupBy };
+  const exportRows = filteredPositions.map((position) => ({
+    type: position.assetType,
+    holding: position.name,
+    institution: position.institution,
+    currency: position.currency,
+    units: position.quantity,
+    investedValue: position.investedValue,
+    latestRecordedValue: position.currentValue,
+    recordedDifference: position.recordedDifference,
+    valueDate: position.valueDate || "Not recorded",
+    source: position.source,
+  }));
+  const historyExportRows = filteredHistory.map((point) => ({
+    date: point.date,
+    holding: point.name,
+    type: point.assetType,
+    priceOrNav: point.value,
+    currency: point.currency,
+    unit: point.unit,
+    unitsRecorded: point.units,
+    source: point.source,
+  }));
+  const visiblePositions = pageRecords(filteredPositions, positionPage);
+  const visibleHistory = pageRecords(filteredHistory, historyPage);
+
+  return <>
+    <PageHeading eyebrow="Recorded holdings" title="Investment & portfolio" subtitle="Review reported holdings, recorded values, and available market/NAV history." />
+    <p className="reports-hub-caveat">Recorded differences are current value minus entered cost, not verified investment returns. Holdings can be incomplete or stale; currencies are kept separate and no exchange-rate conversion or return annualization is performed.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters report-quick-filters">
+        <Field label="Holding type"><Select value={assetType} onChange={(event) => { setAssetType(event.target.value); setPositionPage(0); setHistoryPage(0); }}><option>All types</option>{typeOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
+        <Field label="Currency"><Select value={currency} onChange={(event) => { setCurrency(event.target.value); setPositionPage(0); setHistoryPage(0); }}><option>All currencies</option>{currencyOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
+        <Field label="Group totals by"><Select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="type">Holding type</option><option value="institution">Institution</option></Select></Field>
+        <Field label="Search holdings"><Input value={search} onChange={(event) => { setSearch(event.target.value); setPositionPage(0); setHistoryPage(0); }} placeholder="Name or institution" /></Field>
+      </div>
+      <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" value={from} onValueChange={(value) => { setFrom(value); setPositionPage(0); setHistoryPage(0); }} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" value={to} onValueChange={(value) => { setTo(value); setPositionPage(0); setHistoryPage(0); }} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{filteredPositions.length} holdings · {filteredHistory.length} history points</Badge>
+    </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="investment-portfolio-report" rows={exportRows} summary={`${filteredPositions.length} recorded investment positions; current values and invested amounts are grouped by currency and are not converted.`} />
+      <ReportExportActions label="investment-price-history" rows={historyExportRows} summary={`${filteredHistory.length} filtered recorded market/NAV history points; each is a per-unit observation.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
+    </div>
+    {automatedHistory.error && <p className="alert alert-error" role="alert">Automated price history could not be loaded: {automatedHistory.error} Stored in-app snapshots are still shown.</p>}
+    {automatedHistory.loading && <p className="section-description" role="status">Loading automated price history…</p>}
+    {!automatedHistory.loading && automatedHistory.total > automatedHistory.records.length &&
+      <p className="shopping-report-budget-note">Showing the latest {automatedHistory.records.length} of {automatedHistory.total} automated price-history records. Use the Price automation page for paginated history.</p>}
+    <Card><div className="card-head"><div><h2 className="section-title">Recorded allocation</h2><p className="section-description">Totals include only positions with recorded values. Each currency and grouping remains separate.</p></div></div>{groupedRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>{groupBy === "institution" ? "Institution" : "Holding type"}</th><th>Currency</th><th>Positions</th><th>Recorded current value</th><th>Recorded invested value</th></tr></thead><tbody>{groupedRows.map((group) => <tr key={`${group.type}:${group.currency}`}><td data-label={groupBy === "institution" ? "Institution" : "Holding type"}>{group.type}</td><td data-label="Currency">{group.currency}</td><td data-label="Positions">{group.count}</td><td data-label="Recorded current value">{group.currentCount ? reportCurrencyAmount(group.current, group.currency) : "Not recorded"}</td><td data-label="Recorded invested value">{group.investedCount ? reportCurrencyAmount(group.invested, group.currency) : "Not recorded"}</td></tr>)}</tbody></table></div> : <EmptyState icon={<TrendingUp size={18} />} title="No positions match these filters" description={positions.length ? "Try changing the filters or date range." : "Tracked stock and asset positions will appear when recorded."} />}</Card>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Holdings and recorded value differences</h2><p className="section-description">No value is inferred when required quantity, price, or valuation data is missing.</p></div></div>{filteredPositions.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Holding</th><th>Type</th><th>Currency</th><th>Units</th><th>Invested value</th><th>Current value</th><th>Difference</th><th>Value date</th></tr></thead><tbody>{visiblePositions.map((position) => <tr key={position.id}><td data-label="Holding"><div className="table-primary">{position.name}</div><div className="table-secondary">{position.institution} · {position.source}</div></td><td data-label="Type">{position.assetType}</td><td data-label="Currency">{position.currency}</td><td data-label="Units">{position.quantity ?? "Not recorded"}</td><td data-label="Invested value">{reportCurrencyAmount(position.investedValue, position.currency)}</td><td data-label="Current value">{reportCurrencyAmount(position.currentValue, position.currency)}</td><td data-label="Difference">{reportCurrencyAmount(position.recordedDifference, position.currency)}</td><td data-label="Value date">{position.valueDate || "Not recorded"}</td></tr>)}</tbody></table></div><ReportPagination count={filteredPositions.length} page={positionPage} onPageChange={setPositionPage} /></> : <p className="report-empty">No matching recorded holdings.</p>}</Card>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Recorded price and NAV history</h2><p className="section-description">Per-unit quotes and NAVs are displayed as recorded, not treated as total portfolio value.</p></div><Badge>{filteredHistory.length} points</Badge></div>{filteredHistory.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Holding</th><th>Type</th><th>Recorded price / NAV</th><th>Currency</th><th>Units recorded</th><th>Source</th></tr></thead><tbody>{visibleHistory.map((point) => <tr key={point.id}><td data-label="Date">{point.date}</td><td data-label="Holding">{point.name}</td><td data-label="Type">{point.assetType}</td><td data-label="Price / NAV">{reportCurrencyAmount(point.value, point.currency)} / {point.unit}</td><td data-label="Currency">{point.currency}</td><td data-label="Units">{point.units ?? "Not recorded"}</td><td data-label="Source">{point.source}</td></tr>)}</tbody></table></div><ReportPagination count={filteredHistory.length} page={historyPage} onPageChange={setHistoryPage} /></> : <EmptyState icon={<History size={18} />} title="No dated market history matches these filters" description="Only saved quote and NAV snapshots with recorded dates are included." />}</Card>
+  </>;
+}
+
+function AssetManagerReports({ data, initialFilters, onSaveView }: {
+  data: TrackerData;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+}) {
+  const automatedHistory = useAutomatedAssetPriceHistory();
+  const records = buildAssetManagerRecords(data, automatedHistory.records);
+  const history = mergeAutomatedAssetHistory(data, buildAssetHistory(data), automatedHistory.records);
+  const [assetType, setAssetType] = useState(() => initialFilters?.assetType ?? "All types");
+  const [currency, setCurrency] = useState(() => initialFilters?.currency ?? "All currencies");
+  const [search, setSearch] = useState(() => initialFilters?.search ?? "");
+  const [from, setFrom] = useState(() => initialFilters?.from ?? "");
+  const [to, setTo] = useState(() => initialFilters?.to ?? "");
+  const [groupBy, setGroupBy] = useState(() => initialFilters?.groupBy ?? "type");
+  const [page, setPage] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const typeOptions = [...new Set(records.map((record) => record.assetType))].sort();
+  const currencyOptions = [...new Set(records.map((record) => record.currency))].sort();
+  const filtered = records.filter((record) =>
+    (assetType === "All types" || record.assetType === assetType) &&
+    (currency === "All currencies" || record.currency === currency) &&
+    (!search || `${record.name} ${record.institution} ${record.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+    (!from && !to || isWithinReportDateRange(record.valueDate, from, to)));
+  const filteredHistory = history.filter((point) =>
+    (assetType === "All types" || point.assetType === assetType) &&
+    (currency === "All currencies" || point.currency === currency) &&
+    (!search || `${point.name} ${point.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
+    (!from && !to || isWithinReportDateRange(point.date, from, to)));
+  const groupMap = new Map<string, { name: string; currency: string; liability: boolean; count: number; total: number; valuedCount: number }>();
+  for (const record of filtered) {
+    const name = groupBy === "institution" ? record.institution : record.assetType;
+    const key = `${name}\u0000${record.currency}\u0000${record.isLiability}`;
+    const group = groupMap.get(key) ?? { name, currency: record.currency, liability: record.isLiability, count: 0, total: 0, valuedCount: 0 };
+    group.count += 1;
+    if (record.currentValue !== null) {
+      group.total += record.currentValue;
+      group.valuedCount += 1;
+    }
+    groupMap.set(key, group);
+  }
+  const groups = [...groupMap.values()].sort((left, right) =>
+    Number(right.liability) - Number(left.liability) || left.currency.localeCompare(right.currency) || left.name.localeCompare(right.name));
+  const missingValuations = filtered.filter((record) => record.currentValue === null).length;
+  const staleValuations = filtered.filter((record) => {
+    const valueDate = reportDateKey(record.valueDate);
+    if (!valueDate) return true;
+    const ageDays = (Date.now() - Date.parse(`${valueDate}T00:00:00`)) / 86400000;
+    return ageDays > 365;
+  }).length;
+  const exportRows = filtered.map((record) => ({
+    name: record.name,
+    type: record.assetType,
+    liability: record.isLiability,
+    institution: record.institution,
+    currency: record.currency,
+    currentValue: record.currentValue,
+    investedValue: record.investedValue,
+    valueDate: record.valueDate || "Not recorded",
+    source: record.source,
+  }));
+  const historyExportRows = filteredHistory.map((point) => ({
+    date: point.date,
+    asset: point.name,
+    type: point.assetType,
+    value: point.value,
+    currency: point.currency,
+    unit: point.unit,
+    source: point.source,
+  }));
+  const savedFilters = { assetType, currency, search, from, to, groupBy };
+  const visibleRecords = pageRecords(filtered, page);
+  const visibleHistory = pageRecords(filteredHistory, historyPage);
+
+  return <>
+    <PageHeading eyebrow="Asset coverage and valuation" title="Assets & portfolio analytics" subtitle="Review recorded assets, liabilities, valuation coverage, and dated value history." />
+    <p className="reports-hub-caveat">This is not a net-worth statement. Loans are shown separately as liabilities; vehicle and bank-account currencies are marked not recorded where the source has none. Totals never combine different currencies.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters report-quick-filters">
+        <Field label="Asset type"><Select value={assetType} onChange={(event) => { setAssetType(event.target.value); setPage(0); setHistoryPage(0); }}><option>All types</option>{typeOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
+        <Field label="Currency"><Select value={currency} onChange={(event) => { setCurrency(event.target.value); setPage(0); setHistoryPage(0); }}><option>All currencies</option>{currencyOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
+        <Field label="Group by"><Select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="type">Asset type</option><option value="institution">Institution</option></Select></Field>
+        <Field label="Search"><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); setHistoryPage(0); }} placeholder="Asset or institution" /></Field>
+      </div>
+      <FilterDrawer label="Apply valuation-date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" value={from} onValueChange={(value) => { setFrom(value); setPage(0); setHistoryPage(0); }} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" value={to} onValueChange={(value) => { setTo(value); setPage(0); setHistoryPage(0); }} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{filtered.length} records · {missingValuations} without value</Badge>
+    </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="asset-manager-report" rows={exportRows} summary={`${filtered.length} asset and liability records; ${missingValuations} missing current values; ${staleValuations} missing dates or older than 365 days. Totals remain separated by currency.`} />
+      <ReportExportActions label="asset-valuation-history" rows={historyExportRows} summary={`${filteredHistory.length} filtered dated asset valuation/history records.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
+    </div>
+    {automatedHistory.error && <p className="alert alert-error" role="alert">Automated price history could not be loaded: {automatedHistory.error} Stored in-app snapshots are still shown.</p>}
+    {automatedHistory.loading && <p className="section-description" role="status">Loading automated price history…</p>}
+    {!automatedHistory.loading && automatedHistory.total > automatedHistory.records.length &&
+      <p className="shopping-report-budget-note">Showing the latest {automatedHistory.records.length} of {automatedHistory.total} automated price-history records. Use the Price automation page for paginated history.</p>}
+    <div className="report-grid">
+      <Card><div className="card-head"><div><h2 className="section-title">Coverage check</h2><p className="section-description">Valuation dates older than one year or absent are flagged for review.</p></div></div><div className="reports-hub-source"><strong>{missingValuations}</strong><span>records without a current recorded value</span></div><div className="reports-hub-source"><strong>{staleValuations}</strong><span>records without a date or with a valuation over 365 days old</span></div></Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Value totals by currency</h2><p className="section-description">Asset and liability records are separated and currencies are never added together.</p></div></div>{groups.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>{groupBy === "institution" ? "Institution" : "Asset type"}</th><th>Kind</th><th>Currency</th><th>Records</th><th>Recorded value total</th></tr></thead><tbody>{groups.map((group) => <tr key={`${group.name}:${group.currency}:${group.liability}`}><td data-label={groupBy === "institution" ? "Institution" : "Asset type"}>{group.name}</td><td data-label="Kind">{group.liability ? "Liability" : "Asset"}</td><td data-label="Currency">{group.currency}</td><td data-label="Records">{group.count}</td><td data-label="Recorded value total">{group.valuedCount ? reportCurrencyAmount(group.total, group.currency) : "Not recorded"}</td></tr>)}</tbody></table></div> : <p className="report-empty">No matching assets or liabilities.</p>}</Card>
+    </div>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Asset and liability records</h2><p className="section-description">Each recorded amount keeps its source date and source description.</p></div></div>{filtered.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Name</th><th>Type</th><th>Kind</th><th>Institution</th><th>Currency</th><th>Current value</th><th>Invested / sanctioned</th><th>Valuation date</th></tr></thead><tbody>{visibleRecords.map((record) => <tr key={record.id}><td data-label="Name">{record.name}</td><td data-label="Type">{record.assetType}</td><td data-label="Kind">{record.isLiability ? "Liability" : "Asset"}</td><td data-label="Institution">{record.institution}</td><td data-label="Currency">{record.currency}</td><td data-label="Current value">{reportCurrencyAmount(record.currentValue, record.currency)}</td><td data-label="Invested / sanctioned">{reportCurrencyAmount(record.investedValue, record.currency)}</td><td data-label="Valuation date">{record.valueDate || "Not recorded"}</td></tr>)}</tbody></table></div><ReportPagination count={filtered.length} page={page} onPageChange={setPage} /></> : <EmptyState icon={<Wallet size={18} />} title="No asset records match these filters" description="Try widening the valuation date range or changing the type." />}</Card>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Dated valuation history</h2><p className="section-description">Only stored and automated price/NAV snapshots and vehicle valuation records are included.</p></div><Badge>{filteredHistory.length} points</Badge></div>{filteredHistory.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Asset</th><th>Type</th><th>Recorded value</th><th>Currency</th><th>Source</th></tr></thead><tbody>{visibleHistory.map((point) => <tr key={point.id}><td data-label="Date">{point.date}</td><td data-label="Asset">{point.name}</td><td data-label="Type">{point.assetType}</td><td data-label="Recorded value">{reportCurrencyAmount(point.value, point.currency)} · {point.unit}</td><td data-label="Currency">{point.currency}</td><td data-label="Source">{point.source}</td></tr>)}</tbody></table></div><ReportPagination count={filteredHistory.length} page={historyPage} onPageChange={setHistoryPage} /></> : <EmptyState icon={<History size={18} />} title="No dated valuation history" description="The report does not infer a trend from a single current value." />}</Card>
+  </>;
+}
+
+function monthlyPurchaseValues(purchases: readonly Purchase[]): MonthlyValue[] {
+  const totals = new Map<string, number>();
+  const currentMonth = today().slice(0, 7);
+  for (const purchase of purchases) {
+    const date = reportDateKey(purchase.date);
+    if (!date || !Number.isFinite(purchase.price) || purchase.price < 0) continue;
+    const month = monthKey(date);
+    if (month >= currentMonth) continue;
+    totals.set(month, (totals.get(month) ?? 0) + purchase.price);
+  }
+  return [...totals.entries()].sort(([left], [right]) => left.localeCompare(right))
+    .slice(-6).map(([period, value]) => ({ period, value }));
+}
+
+function monthlyInstrumentValues(points: readonly AssetHistoryPoint[]): Array<{
+  seriesId: string;
+  name: string;
+  assetType: string;
+  currency: string;
+  unit: string;
+  units: number | null;
+  values: MonthlyValue[];
+}> {
+  const currentMonth = today().slice(0, 7);
+  const series = new Map<string, AssetHistoryPoint[]>();
+  for (const point of points) {
+    const current = series.get(point.seriesId) ?? [];
+    current.push(point);
+    series.set(point.seriesId, current);
+  }
+  return [...series.entries()].flatMap(([seriesId, entries]) => {
+    const sorted = [...entries].sort((left, right) => left.date.localeCompare(right.date));
+    const monthly = new Map<string, AssetHistoryPoint>();
+    for (const point of sorted) monthly.set(monthKey(point.date), point);
+    const latest = sorted[sorted.length - 1];
+    return [{
+      seriesId,
+      name: latest.name,
+      assetType: latest.assetType,
+      currency: latest.currency,
+      unit: latest.unit,
+      units: latest.units,
+      values: [...monthly.entries()].filter(([period]) => period < currentMonth).sort(([left], [right]) => left.localeCompare(right))
+        .slice(-6).map(([period, point]) => ({ period, value: point.value })),
+    }];
+  });
+}
+
+function ForecastReports({ data, initialFilters, onSaveView, onSavePreferences }: {
+  data: TrackerData;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+  onSavePreferences: (mutator: (previous: TrackerPreferences) => TrackerPreferences) => Promise<void>;
+}) {
+  const [currencyFilter, setCurrencyFilter] = useState(() => initialFilters?.currency ?? "All currencies");
+  const [goalName, setGoalName] = useState(data.preferences?.forecastSavingsGoal?.name ?? "");
+  const [goalTarget, setGoalTarget] = useState(data.preferences?.forecastSavingsGoal?.targetAmount.toString() ?? "");
+  const [goalCurrent, setGoalCurrent] = useState(data.preferences?.forecastSavingsGoal?.currentAmount.toString() ?? "0");
+  const [goalContribution, setGoalContribution] = useState(data.preferences?.forecastSavingsGoal?.monthlyContribution.toString() ?? "");
+  const [goalCurrency, setGoalCurrency] = useState<Currency>(data.preferences?.forecastSavingsGoal?.currency ?? data.preferences?.currency ?? "INR");
+  const [goalMessage, setGoalMessage] = useState("");
+  const [goalSaving, setGoalSaving] = useState(false);
+  const spending = projectLinearTrend(monthlyPurchaseValues(data.purchases).slice(-6), 3);
+  const automatedHistory = useAutomatedAssetPriceHistory();
+  const assetHistory = mergeAutomatedAssetHistory(data, buildAssetHistory(data), automatedHistory.records);
+  const instrumentSeries = monthlyInstrumentValues(assetHistory)
+    .filter((series) => currencyFilter === "All currencies" || series.currency === currencyFilter)
+    .map((series) => ({ ...series, trend: projectLinearTrend(series.values.slice(-6), 3) }))
+    .filter((series) => series.trend.status === "ready");
+  const currencies = [...new Set([
+    ...assetHistory.map((point) => point.currency),
+    data.preferences?.forecastSavingsGoal?.currency ?? "",
+  ].filter(Boolean))].sort();
+  const todayKey = today();
+  const horizonEnd = new Date();
+  horizonEnd.setDate(horizonEnd.getDate() + 90);
+  const horizonEndKey = `${horizonEnd.getFullYear()}-${String(horizonEnd.getMonth() + 1).padStart(2, "0")}-${String(horizonEnd.getDate()).padStart(2, "0")}`;
+  const upcomingDue = subscriptionActivityRecords(data.subscriptions ?? []).filter((row) =>
+    !row.paid && row.amount !== null && isWithinReportDateRange(row.dueDate, todayKey, horizonEndKey));
+  const monthlyBudget = data.preferences?.monthlyShoppingBudget;
+  const currentMonthRecords = data.purchases.filter((purchase) => reportDateKey(purchase.date)?.slice(0, 7) === todayKey.slice(0, 7));
+  const currentMonthTotal = currentMonthRecords.reduce((sum, purchase) => sum + purchase.price, 0);
+  const dayOfMonth = new Date().getDate();
+  const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const runRate = currentMonthRecords.length > 0 && dayOfMonth >= 3 ? currentMonthTotal / dayOfMonth * daysInMonth : null;
+  const goal = data.preferences?.forecastSavingsGoal;
+  const goalMonths = goal
+    ? goal.currentAmount >= goal.targetAmount
+      ? 0
+      : goal.monthlyContribution > 0
+        ? Math.ceil((goal.targetAmount - goal.currentAmount) / goal.monthlyContribution)
+        : null
+    : null;
+  const goalDate = goalMonths === null ? null : (() => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() + goalMonths);
+    return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  })();
+  const savedFilters = { currency: currencyFilter };
+  const exportRows = [
+    ...(spending.status === "ready" ? spending.projection.projected.map((point) => ({
+      forecastType: "Shopping recorded spend trend",
+      period: point.period,
+      amount: point.value,
+      currency: "Display preference; purchase currency not recorded",
+      note: "Trend from contiguous months with recorded purchases; coverage is unverified.",
+    })) : []),
+    ...instrumentSeries.flatMap((series) => series.trend.status === "ready"
+      ? series.trend.projection.projected.map((point) => ({
+        forecastType: `${series.assetType} recorded price trend`,
+        instrument: series.name,
+        period: point.period,
+        amount: point.value,
+        currency: series.currency,
+        unitsRecorded: series.units,
+        note: "Linear trend scenario only; not a recommendation or guarantee.",
+      }))
+      : []),
+    ...upcomingDue.map((row) => ({
+      forecastType: "Recorded unpaid due",
+      account: row.accountName,
+      period: row.dueDate,
+      amount: row.amount,
+      currency: row.currency,
+      note: "Existing unpaid due entry; no recurring charges inferred.",
+    })),
+    ...(runRate === null ? [] : [{
+      forecastType: "Current-month recorded spend pace",
+      period: todayKey.slice(0, 7),
+      amount: runRate,
+      currency: "Display preference; purchase currency not recorded",
+      budget: monthlyBudget ?? null,
+      note: "Month-end straight daily run rate from recorded month-to-date purchases.",
+    }]),
+    ...(goal ? [{
+      forecastType: "Savings goal",
+      goal: goal.name,
+      targetAmount: goal.targetAmount,
+      currentAmount: goal.currentAmount,
+      monthlyContribution: goal.monthlyContribution,
+      monthsToTarget: goalMonths,
+      estimatedTargetMonth: goalDate ?? "Unavailable",
+      currency: goal.currency,
+      note: "Straight-line estimate; no interest or investment returns assumed.",
+    }] : []),
+  ];
+
+  useEffect(() => {
+    setGoalName(goal?.name ?? "");
+    setGoalTarget(goal?.targetAmount.toString() ?? "");
+    setGoalCurrent(goal?.currentAmount.toString() ?? "0");
+    setGoalContribution(goal?.monthlyContribution.toString() ?? "");
+    setGoalCurrency(goal?.currency ?? data.preferences?.currency ?? "INR");
+  }, [goal?.name, goal?.targetAmount, goal?.currentAmount, goal?.monthlyContribution, goal?.currency, data.preferences?.currency]);
+
+  async function saveGoal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const targetAmount = Number(goalTarget);
+    const currentAmount = Number(goalCurrent);
+    const monthlyContribution = Number(goalContribution);
+    if (!goalName.trim() || !Number.isFinite(targetAmount) || targetAmount <= 0 ||
+      !Number.isFinite(currentAmount) || currentAmount < 0 ||
+      !Number.isFinite(monthlyContribution) || monthlyContribution < 0) {
+      setGoalMessage("Enter a name, positive target, and non-negative current amount and monthly contribution.");
+      return;
+    }
+    setGoalSaving(true);
+    setGoalMessage("");
+    try {
+      await onSavePreferences((previous) => ({
+        ...previous,
+        forecastSavingsGoal: {
+          name: goalName.trim(),
+          targetAmount,
+          currentAmount,
+          monthlyContribution,
+          currency: goalCurrency,
+        },
+      }));
+      setGoalMessage("Savings goal saved to preferences.");
+    } catch (caught) {
+      setGoalMessage(caught instanceof Error ? caught.message : "Could not save the savings goal.");
+    } finally {
+      setGoalSaving(false);
+    }
+  }
+
+  async function clearGoal() {
+    setGoalSaving(true);
+    setGoalMessage("");
+    try {
+      await onSavePreferences((previous) => ({ ...previous, forecastSavingsGoal: undefined }));
+      setGoalMessage("Savings goal removed.");
+    } catch (caught) {
+      setGoalMessage(caught instanceof Error ? caught.message : "Could not remove the savings goal.");
+    } finally {
+      setGoalSaving(false);
+    }
+  }
+
+  return <>
+    <PageHeading eyebrow="Planning scenarios" title="Forecasts" subtitle="Conservative, history-based estimates with visible coverage limits and assumptions." />
+    <p className="reports-hub-caveat">These are descriptive scenarios, not financial advice or guarantees. Missing transaction months block trend projections; asset trends use saved monthly prices/NAVs only. Spending currency and investment growth are not inferred.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters report-quick-filters">
+        <Field label="Market history currency"><Select value={currencyFilter} onChange={(event) => setCurrencyFilter(event.target.value)}><option>All currencies</option>{currencies.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+      </div>
+      <Badge>3-month trend horizon · 90-day recorded dues</Badge>
+    </div>
+    <div className="report-actions-row">
+      <ReportExportActions label="forecast-report" rows={exportRows} summary={`Three-month trend horizon; ${spending.status === "ready" ? "shopping trend available" : spending.message}; ${instrumentSeries.length} instrument price trends available; ${upcomingDue.length} unpaid due entries are dated within 90 days.`} />
+      <SavedViewControls filters={savedFilters} onSave={onSaveView} />
+    </div>
+    {automatedHistory.error && <p className="alert alert-error" role="alert">Automated price history could not be loaded: {automatedHistory.error} Stored in-app snapshots are still used.</p>}
+    {automatedHistory.loading && <p className="section-description" role="status">Loading automated price history…</p>}
+    {!automatedHistory.loading && automatedHistory.total > automatedHistory.records.length &&
+      <p className="shopping-report-budget-note">Forecasts use at most the latest {automatedHistory.records.length} of {automatedHistory.total} automated price-history records.</p>}
+    <div className="report-grid">
+      <Card><div className="card-head"><div><h2 className="section-title">Recorded shopping spend trend</h2><p className="section-description">Linear trend of up to six completed, contiguous months with recorded purchases; amount currency is not stored per purchase.</p></div><Badge>{spending.status === "ready" ? "Scenario" : "Not enough coverage"}</Badge></div>{spending.status === "ready" ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Projected recorded spend</th><th>Planning range</th></tr></thead><tbody>{spending.projection.projected.map((point) => <tr key={point.period}><td data-label="Month">{point.period}</td><td data-label="Projected recorded spend">{new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(point.value)}</td><td data-label="Planning range">{new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Math.max(0, point.value - 1.96 * spending.projection.residualError))}–{new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(point.value + 1.96 * spending.projection.residualError)}</td></tr>)}</tbody></table><p className="shopping-report-budget-note">Range uses ±1.96× historical model residual error; it is not a statistical confidence interval. Missing months are not treated as zero.</p></div> : <EmptyState icon={<TrendingUp size={18} />} title="No shopping projection shown" description={spending.message} />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Current month budget pace</h2><p className="section-description">Run-rate scenario based on recorded month-to-date purchases, not a future commitment.</p></div><Badge>{monthlyBudget === undefined ? "Budget not set" : "Month to date"}</Badge></div>{runRate === null ? <p className="section-description">At least one recorded purchase and three elapsed days are needed to show a month-end pace. A configured monthly budget is {monthlyBudget === undefined ? "not set" : "available"}.</p> : <><div className="reports-hub-source"><strong>{new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(runRate)}</strong><span>projected month-end spend from {currentMonthRecords.length} recorded purchase records, using a straight daily run rate</span></div>{monthlyBudget !== undefined && <p className="section-description">{runRate > monthlyBudget ? "The current pace is above" : "The current pace is below"} the saved monthly budget by {new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(Math.abs(runRate - monthlyBudget))}.</p>}</>}</Card>
+    </div>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Investment price/NAV trend scenarios</h2><p className="section-description">Available only with at least three completed, contiguous months of recorded price history.</p></div><Badge>{instrumentSeries.length} eligible instruments</Badge></div>{instrumentSeries.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Instrument</th><th>Type</th><th>Currency</th><th>Latest recorded units</th><th>Latest projected price</th><th>3-month price scenario</th></tr></thead><tbody>{instrumentSeries.map((series) => series.trend.status === "ready" && <tr key={series.seriesId}><td data-label="Instrument">{series.name}</td><td data-label="Type">{series.assetType}</td><td data-label="Currency">{series.currency}</td><td data-label="Latest recorded units">{series.units ?? "Not recorded"}</td><td data-label="Latest projected price">{reportCurrencyAmount(series.trend.projection.projected[0]?.value ?? null, series.currency)} / {series.unit}</td><td data-label="3-month price scenario">{reportCurrencyAmount(series.trend.projection.projected[2]?.value ?? null, series.currency)} / {series.unit}</td></tr>)}</tbody></table></div> : <EmptyState icon={<TrendingUp size={18} />} title="No investment trend scenario available" description="Saved quote or NAV history needs at least three contiguous monthly observations. Sparse history is not interpolated." />}</Card>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Recorded unpaid subscription dues</h2><p className="section-description">Existing unpaid entries due within the next 90 days; this does not assume future recurring payments.</p></div><Badge>{upcomingDue.length} due entries</Badge></div>{upcomingDue.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Due date</th><th>Account</th><th>Provider</th><th>Amount</th><th>Currency</th></tr></thead><tbody>{upcomingDue.sort((left, right) => left.dueDate.localeCompare(right.dueDate)).map((row) => <tr key={`${row.accountId}:${row.id}`}><td data-label="Due date">{row.dueDate}</td><td data-label="Account">{row.accountName}</td><td data-label="Provider">{row.provider}</td><td data-label="Amount">{reportCurrencyAmount(row.amount, row.currency)}</td><td data-label="Currency">{row.currency}</td></tr>)}</tbody></table></div> : <p className="report-empty">No dated unpaid entries are recorded for the next 90 days.</p>}</Card>
+    <Card className="shopping-report-budget" style={{ marginTop: 16 }}>
+      <div className="card-head"><div><h2 className="section-title">Savings goal projection</h2><p className="section-description">A straight-line estimate from your manually entered starting balance and monthly contribution; no interest or investment returns are assumed.</p></div><Badge>{goal ? goal.currency : "Not configured"}</Badge></div>
+      {goal && <p className="section-description">{goalMonths === 0 ? "The current amount meets the target." : goalMonths === null ? "Enter a positive monthly contribution to estimate a target date." : `${goalMonths} months at the saved contribution rate · estimated ${goalDate}.`}</p>}
+      <form className="forecast-goal-form" onSubmit={(event) => void saveGoal(event)}>
+        <Field label="Goal name"><Input value={goalName} onChange={(event) => setGoalName(event.target.value)} maxLength={80} placeholder="Emergency fund" /></Field>
+        <Field label="Currency"><Select value={goalCurrency} onChange={(event) => {
+          const selected = CURRENCIES.find((entry) => entry === event.target.value);
+          if (selected) setGoalCurrency(selected);
+        }}>{CURRENCIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Target amount"><Input type="number" min="0.01" step="0.01" value={goalTarget} onChange={(event) => setGoalTarget(event.target.value)} /></Field>
+        <Field label="Current amount"><Input type="number" min="0" step="0.01" value={goalCurrent} onChange={(event) => setGoalCurrent(event.target.value)} /></Field>
+        <Field label="Monthly contribution"><Input type="number" min="0" step="0.01" value={goalContribution} onChange={(event) => setGoalContribution(event.target.value)} /></Field>
+        <div className="shopping-report-budget-actions"><Button type="submit" disabled={goalSaving}>{goalSaving ? "Saving..." : "Save goal"}</Button>{goal && <Button type="button" variant="outline" disabled={goalSaving} onClick={() => void clearGoal()}>Clear goal</Button>}</div>
+      </form>
+      {goalMessage && <p className="section-description" role="status">{goalMessage}</p>}
+      <p className="shopping-report-budget-note">The goal is stored in existing Daybook preferences. This adds no database tables or columns.</p>
+    </Card>
+  </>;
+}
+
+function SavedReports({ views, onApply, onDelete }: {
+  views: readonly SavedReportView[];
+  onApply: (view: SavedReportView) => void;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [message, setMessage] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+  const labels: Record<SavedReportSection, string> = {
+    shopping: "Shopping",
+    finance: "Finance & investments",
+    assets: "Assets & portfolio analytics",
+    subscriptions: "Subscriptions & bills",
+    forecasts: "Forecasts",
+  };
+  const exportRows = views.map((view) => ({
+    name: view.name,
+    report: labels[view.section],
+    filters: Object.entries(view.filters).map(([key, value]) => `${key}: ${value || "(any)"}`).join("; "),
+    createdAt: view.createdAt,
+  }));
+
+  async function remove(view: SavedReportView) {
+    setDeletingId(view.id);
+    setMessage("");
+    try {
+      await onDelete(view.id);
+      setMessage(`Removed “${view.name}”.`);
+    } catch (caught) {
+      setMessage(caught instanceof Error ? caught.message : "Could not remove the saved report.");
+    } finally {
+      setDeletingId("");
+    }
+  }
+
+  return <>
+    <PageHeading eyebrow="Personalized views" title="Saved reports" subtitle="Open a report with its saved, independent filters or remove an old view." />
+    <div className="report-actions-row"><ReportExportActions label="saved-reports" rows={exportRows} summary={`${views.length} saved report views. Each view stores only its report type and filter values in shared preferences.`} /></div>
+    {views.length ? <div className="saved-report-list">{views.map((view) => <Card className="saved-report-card" key={view.id}>
+      <div><h2 className="section-title">{view.name}</h2><p className="section-description">{labels[view.section]} · {Object.keys(view.filters).length} saved filters · {new Date(view.createdAt).toLocaleDateString()}</p><div className="saved-report-filter-summary">{Object.entries(view.filters).filter(([, value]) => Boolean(value)).map(([key, value]) => <Badge key={key}>{key}: {value}</Badge>)}</div></div>
+      <div className="saved-report-actions"><Button type="button" size="sm" onClick={() => onApply(view)}>Open report</Button><Button type="button" size="sm" variant="outline" disabled={deletingId === view.id} onClick={() => void remove(view)}><Trash2 size={13} /> Remove</Button></div>
+    </Card>)}</div> : <EmptyState icon={<Star size={18} />} title="No saved report views" description="Save a filter combination from any report to keep it here." />}
+    {message && <p className="section-description" role="status">{message}</p>}
+    <p className="shopping-report-budget-note">Saved views are capped at 20 and stored in the existing shared preferences JSON; no database schema change is used.</p>
+  </>;
+}
+
+function FinanceAndInvestmentReports({ data, initialFilters, onSaveView }: {
+  data: TrackerData;
+  initialFilters?: Record<string, string>;
+  onSaveView?: SaveReportView;
+}) {
+  const [subreport, setSubreport] = useState(() =>
+    initialFilters?.reportKind === "investment" ? "investment" : "cashflow");
+  const savedKind = initialFilters?.reportKind;
+  const childFilters = savedKind === subreport && initialFilters
+    ? Object.fromEntries(Object.entries(initialFilters).filter(([key]) => key !== "reportKind"))
+    : undefined;
+  const saveChildView = (kind: "cashflow" | "investment") => async (name: string, filters: Record<string, string>) => {
+    if (onSaveView) await onSaveView(name, { ...filters, reportKind: kind });
+  };
+
+  return <>
+    <div className="report-subnav" role="group" aria-label="Finance and investment reports">
+      <button type="button" className={`reports-hub-tab${subreport === "cashflow" ? " active" : ""}`} aria-pressed={subreport === "cashflow"} onClick={() => setSubreport("cashflow")}>Finance & cashflow</button>
+      <button type="button" className={`reports-hub-tab${subreport === "investment" ? " active" : ""}`} aria-pressed={subreport === "investment"} onClick={() => setSubreport("investment")}>Investment & portfolio</button>
+    </div>
+    {subreport === "cashflow"
+      ? <FinanceCashflowReports key="cashflow" data={data} initialFilters={childFilters} onSaveView={saveChildView("cashflow")} />
+      : <InvestmentReports key="investment" data={data} initialFilters={childFilters} onSaveView={saveChildView("investment")} />}
+  </>;
+}
+
+function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences }: {
+  data: TrackerData;
   onSaveShoppingBudget: (amount: number | undefined) => Promise<void>;
+  onSaveReportPreferences: (mutator: (previous: TrackerPreferences) => TrackerPreferences) => Promise<void>;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
   const [section, setSection] = useState<ReportHubSection>("overview");
+  const [activeSavedView, setActiveSavedView] = useState<SavedReportView | null>(null);
   const monthRange = resolveReportDateRange("month-to-date");
   const monthPurchases = buildReport(data.purchases, shoppingPurchaseReport, {
     dateRange: monthRange,
@@ -1873,40 +2683,41 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
   const assets = data.assets ?? [];
   const stocks = data.stocks ?? [];
   const subscriptions = data.subscriptions ?? [];
+  const savedViews = data.preferences?.savedReportViews ?? [];
+  const activeFilters = activeSavedView?.section === section ? activeSavedView.filters : undefined;
 
-  const sectionContent: Record<Exclude<ReportHubSection, "overview" | "shopping" | "finance" | "subscriptions">, {
-    title: string;
-    description: string;
-    sourceCount: string;
-    sourceLabel: string;
-    page?: Page;
-    action?: string;
-  }> = {
-    assets: {
-      title: "Assets & portfolio",
-      description: "Portfolio analytics are not available yet. Recorded holdings can have missing, stale, estimated, or mixed-currency values.",
-      sourceCount: `${assets.length + stocks.length}`,
-      sourceLabel: "asset and stock records available as sources",
-      page: "Asset manager",
-      action: "Open asset manager",
-    },
-    forecasts: {
-      title: "Forecasts",
-      description: "Forecasts are planned for a later phase. They will be introduced only when there is enough dated history and clear assumptions to show reliable coverage.",
-      sourceCount: "Not available yet",
-      sourceLabel: "No projections or investment recommendations are shown.",
-    },
-    saved: {
-      title: "Saved reports",
-      description: "Named report views and saved filter combinations are planned after report settings and their storage behavior are designed.",
-      sourceCount: "No saved views",
-      sourceLabel: "This feature is not available yet.",
-    },
-  };
+  function openSection(next: ReportHubSection) {
+    setSection(next);
+    setActiveSavedView(null);
+  }
 
-  const activeSection = section === "overview" || section === "shopping" || section === "finance" || section === "subscriptions"
-    ? null
-    : sectionContent[section];
+  async function saveView(name: string, viewSection: SavedReportSection, filters: Record<string, string>) {
+    if (name.length > 80 || Object.keys(filters).length > 16 ||
+      Object.entries(filters).some(([key, value]) => key.length > 80 || value.length > 160)) {
+      throw new Error("This report view has filters that exceed the supported length.");
+    }
+    await onSaveReportPreferences((previous) => {
+      const current = previous.savedReportViews ?? [];
+      if (current.length >= 20) throw new Error("You can save up to 20 report views. Remove one before saving another.");
+      return {
+        ...previous,
+        savedReportViews: [...current, {
+          id: createId(),
+          name,
+          section: viewSection,
+          filters,
+          createdAt: new Date().toISOString(),
+        }],
+      };
+    });
+  }
+
+  async function deleteSavedView(id: string) {
+    await onSaveReportPreferences((previous) => ({
+      ...previous,
+      savedReportViews: (previous.savedReportViews ?? []).filter((view) => view.id !== id),
+    }));
+  }
 
   return <>
     <PageHeading eyebrow="Reports hub" title="Reports & Analytics" subtitle="Explore recorded activity and see which report areas are ready." />
@@ -1916,10 +2727,10 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
         type="button"
         aria-pressed={section === entry.id}
         className={`reports-hub-tab${section === entry.id ? " active" : ""}`}
-        onClick={() => setSection(entry.id)}
+        onClick={() => openSection(entry.id)}
       >{entry.label}</button>)}
     </div>
-    {section === "shopping" ? <ShoppingReports data={data} onSaveBudget={onSaveShoppingBudget} /> : section === "overview" ? <>
+    {section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} recorded purchases · {currency}</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">Available for Shopping reports</div></Card>
@@ -1927,6 +2738,12 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
         <Card className="stat-card"><div className="stat-top"><span>Subscription accounts</span><span className="stat-icon icon-purple"><CalendarDays size={16} /></span></div><p className="stat-value">{subscriptions.length.toLocaleString()}</p><div className="stat-foot">Amounts and billing history may be incomplete</div></Card>
       </div>
       <p className="reports-hub-caveat">Currency is a display preference; recorded amounts are not converted. Other summaries count saved records and do not imply complete financial coverage.</p>
+      <div className="report-actions-row"><ReportExportActions label="reports-overview" rows={[
+        { metric: "Shopping spend this month", value: monthPurchases.total, currency },
+        { metric: "Purchase records", value: data.purchases.length, currency: "Not applicable" },
+        { metric: "Investment source records", value: assets.length + stocks.length, currency: "Not applicable" },
+        { metric: "Subscription accounts", value: subscriptions.length, currency: "Not applicable" },
+      ]} summary={`Overview: ${monthPurchases.recordCount} recorded purchases this month; ${assets.length + stocks.length} asset and stock records; ${subscriptions.length} subscription accounts. Amounts are not converted.`} /></div>
       <div className="reports-hub-grid">
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-green"><ShoppingBasket size={18} /></div>
@@ -1937,37 +2754,32 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-blue"><Wallet size={18} /></div>
           <h2 className="section-title">Finance & investments</h2>
-          <p className="section-description">Review imported bank credits and debits by account, plus recorded paid subscription costs.</p>
-          <Button type="button" onClick={() => setSection("finance")}>Open finance reports <ChevronRight size={14} /></Button>
+          <p className="section-description">Review recorded bank movement, investment holdings, and market/NAV history without implying completeness.</p>
+          <Button type="button" onClick={() => openSection("finance")}>Open finance reports <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-purple"><BarChart3 size={18} /></div>
           <h2 className="section-title">Assets & portfolio</h2>
-          <p className="section-description">Portfolio reports will account for missing history, valuation dates, and mixed currencies.</p>
-          <Button type="button" variant="outline" onClick={() => setSection("assets")}>View availability <ChevronRight size={14} /></Button>
+          <p className="section-description">Review valuation coverage, assets, liabilities, and dated history without claiming complete net worth.</p>
+          <Button type="button" variant="outline" onClick={() => openSection("assets")}>Open asset analytics <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-peach"><CalendarDays size={18} /></div>
           <h2 className="section-title">Subscriptions & bills</h2>
           <p className="section-description">Review actual paid history and recorded unpaid amounts by account and currency.</p>
-          <Button type="button" onClick={() => setSection("subscriptions")}>Open subscriptions report <ChevronRight size={14} /></Button>
+          <Button type="button" onClick={() => openSection("subscriptions")}>Open subscriptions report <ChevronRight size={14} /></Button>
         </Card>
       </div>
       <div className="reports-hub-foot-grid">
-        <Card className="reports-hub-note"><div><TrendingUp size={17} /><strong>Forecasts</strong></div><p>Planned after enough dated history and clear assumptions are available.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("forecasts")}>Learn more</Button></Card>
-        <Card className="reports-hub-note"><div><Star size={17} /><strong>Saved reports</strong></div><p>Saved filters and named views are planned for a later phase.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("saved")}>Learn more</Button></Card>
+        <Card className="reports-hub-note"><div><TrendingUp size={17} /><strong>Forecasts</strong></div><p>History-based scenarios show their coverage and assumptions; no investment advice is generated.</p><Button type="button" size="sm" variant="outline" onClick={() => openSection("forecasts")}>Open forecasts</Button></Card>
+        <Card className="reports-hub-note"><div><Star size={17} /><strong>Saved reports</strong></div><p>Save and reopen report filters from the existing preferences store.</p><Button type="button" size="sm" variant="outline" onClick={() => openSection("saved")}>Open saved reports</Button></Card>
       </div>
-    </> : section === "finance" ? <FinanceCashflowReports data={data} />
-      : section === "subscriptions" ? <SubscriptionSpendingReports data={data} />
-      : activeSection ? <Card className="reports-hub-detail">
-      <div className="reports-hub-card-icon icon-blue"><BarChart3 size={18} /></div>
-      <h2 className="section-title">{activeSection.title}</h2>
-      <p className="section-description">{activeSection.description}</p>
-      <div className="reports-hub-source"><strong>{activeSection.sourceCount}</strong><span>{activeSection.sourceLabel}</span></div>
-      {activeSection.page && activeSection.action && <Button type="button" variant="outline" onClick={() => {
-        if (activeSection.page) onPage(activeSection.page);
-      }}>{activeSection.action} <ChevronRight size={14} /></Button>}
-    </Card> : null}
+    </> : section === "finance" ? <FinanceAndInvestmentReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "finance", filters)} />
+      : section === "assets" ? <AssetManagerReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "assets", filters)} />
+      : section === "subscriptions" ? <SubscriptionSpendingReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "subscriptions", filters)} />
+      : section === "forecasts" ? <ForecastReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "forecasts", filters)} onSavePreferences={onSaveReportPreferences} />
+      : section === "saved" ? <SavedReports views={savedViews} onApply={(view) => { setActiveSavedView(view); setSection(view.section); }} onDelete={deleteSavedView} />
+      : null}
   </>;
 }
 
@@ -13995,6 +14807,16 @@ export default function App() {
       },
     }));
   }
+  function saveReportPreferences(mutator: (previous: TrackerPreferences) => TrackerPreferences): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: mutator({
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+      }),
+    }));
+  }
   function restoreArchivedRecord(id: string) {
     update((previous) => {
       const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
@@ -15086,8 +15908,8 @@ export default function App() {
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
-    Reports: <ReportsAnalytics data={data} onPage={changePage} onSaveShoppingBudget={saveShoppingBudget} />,
-    "Reports & Analytics": <ReportsAnalytics data={data} onPage={changePage} onSaveShoppingBudget={saveShoppingBudget} />,
+    Reports: <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} />,
+    "Reports & Analytics": <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
     "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {

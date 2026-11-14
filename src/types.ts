@@ -1142,6 +1142,24 @@ export const DASHBOARD_WIDGETS = [
 export type DashboardWidget = (typeof DASHBOARD_WIDGETS)[number];
 export type MenuSortOrder = "current" | "ascending";
 
+export type SavedReportSection = "shopping" | "finance" | "assets" | "subscriptions" | "forecasts";
+
+export interface SavedReportView {
+  id: string;
+  name: string;
+  section: SavedReportSection;
+  filters: Record<string, string>;
+  createdAt: string;
+}
+
+export interface ForecastSavingsGoal {
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution: number;
+  currency: Currency;
+}
+
 export interface ActivityChecklistItem {
   id: string;
   name: string;
@@ -1190,6 +1208,8 @@ export interface TrackerPreferences {
   assetManagerVisibleTypes?: AssetManagerVisibleType[];
   assetManagerHiddenItems?: Partial<Record<AssetManagerVisibleType, string[]>>;
   monthlyShoppingBudget?: number;
+  savedReportViews?: SavedReportView[];
+  forecastSavingsGoal?: ForecastSavingsGoal;
 }
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {

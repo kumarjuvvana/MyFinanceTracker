@@ -27,3 +27,7 @@ No Supabase migration or new persistence endpoint is required.
 - Manual navigation check: new top-level entry opens the overview; Shopping category opens the existing report; other categories clearly distinguish source-management links from analytics not yet available.
 - Compatibility check: legacy Reports URLs and saved favorites resolve to the new hub.
 - Responsive and light/dark theme check for category controls and cards.
+
+## Status after follow-on phases
+
+The Finance & investments category now contains separate Finance & cashflow and Investment & portfolio subreports. The original source-availability placeholders for assets, forecasts, and saved reports have been replaced by the implementations documented in [Phase 7](./REPORTS-ANALYTICS-PHASE-7.md), [Phase 8](./REPORTS-ANALYTICS-PHASE-8.md), [Phase 9](./REPORTS-ANALYTICS-PHASE-9.md), [Phase 10](./REPORTS-ANALYTICS-PHASE-10.md), [Phase 11](./REPORTS-ANALYTICS-PHASE-11.md), [Phase 12](./REPORTS-ANALYTICS-PHASE-12.md), and [Phase 13](./REPORTS-ANALYTICS-PHASE-13.md). Phase 4's original completion notes above describe the initial hub release.

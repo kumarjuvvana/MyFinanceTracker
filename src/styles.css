@@ -2203,3 +2203,45 @@ body{background:#f3f5ef}
   .shopping-report-budget-form{grid-template-columns:minmax(0,1fr)}
   .shopping-report-budget-actions{flex-wrap:wrap}
 }
+.report-actions-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.report-subnav{display:flex;gap:7px;overflow-x:auto;margin:0 0 14px;padding:2px 1px 5px}
+.report-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.report-action-message{font-size:10px;color:var(--text-muted,var(--muted,#747d73))}
+.saved-view-controls{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.saved-view-controls>.field-wrap{min-width:190px}
+.report-quick-filters{grid-template-columns:repeat(4,minmax(140px,1fr))}
+.report-pagination{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 0 2px;color:var(--text-muted,var(--muted,#747d73));font-size:10px}
+.saved-report-list{display:grid;gap:10px}
+.saved-report-card{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.saved-report-card .section-title{margin:0 0 4px}
+.saved-report-card .section-description{margin:0}
+.saved-report-filter-summary,.saved-report-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.saved-report-filter-summary{margin-top:8px}
+.saved-report-actions{flex:none}
+.forecast-goal-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:10px}
+.forecast-goal-form .shopping-report-budget-actions{grid-column:1/-1}
+.app-shell.dark .report-action-message{color:#a7b0a7}
+@media(max-width:900px){
+  .report-quick-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:600px){
+  .report-actions-row{align-items:stretch}
+  .report-actions,.saved-view-controls{width:100%}
+  .saved-view-controls>.field-wrap{flex:1;min-width:150px}
+  .report-quick-filters{grid-template-columns:1fr}
+  .saved-report-card{align-items:flex-start;flex-direction:column}
+  .saved-report-actions{width:100%}
+  .forecast-goal-form{grid-template-columns:1fr}
+  .forecast-goal-form .shopping-report-budget-actions{grid-column:auto}
+  .report-pagination{justify-content:space-between;gap:5px}
+}
+@media print{
+  .sidebar,.topbar,.mobile-nav,.reports-hub-tabs,.report-filter-toolbar,.report-actions-row,.report-pagination{display:none!important}
+  .main-area{margin:0!important}
+  .main-content{max-width:none!important;padding:0!important}
+  .app-shell,.app-shell.dark{background:#fff!important;color:#111!important}
+  .card{break-inside:avoid;box-shadow:none!important;border-color:#ccc!important}
+  .shopping-report-table-wrap{overflow:visible!important}
+  .data-table{min-width:0!important}
+  .reports-hub-caveat,.section-description,.shopping-report-budget-note{color:#444!important}
+}

@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -55,6 +55,29 @@ export function makeSeedData(): TrackerData {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidSavedReportViews(value: unknown): boolean {
+  const sections: SavedReportSection[] = ["shopping", "finance", "assets", "subscriptions", "forecasts"];
+  return Array.isArray(value) && value.length <= 20 && value.every((view) =>
+    isRecord(view) &&
+    typeof view.id === "string" && view.id.trim().length > 0 && view.id.length <= 80 &&
+    typeof view.name === "string" && view.name.trim().length > 0 && view.name.length <= 80 &&
+    typeof view.section === "string" && sections.includes(view.section as SavedReportSection) &&
+    typeof view.createdAt === "string" && !Number.isNaN(Date.parse(view.createdAt)) &&
+    isRecord(view.filters) && Object.keys(view.filters).length <= 16 &&
+    Object.entries(view.filters).every(([key, filter]) =>
+      key.length > 0 && key.length <= 80 && typeof filter === "string" && filter.length <= 160)) &&
+    new Set(value.map((view) => isRecord(view) ? view.id : null)).size === value.length;
+}
+
+function isValidForecastSavingsGoal(value: unknown): boolean {
+  return isRecord(value) &&
+    typeof value.name === "string" && value.name.trim().length > 0 && value.name.length <= 80 &&
+    typeof value.targetAmount === "number" && Number.isFinite(value.targetAmount) && value.targetAmount > 0 &&
+    typeof value.currentAmount === "number" && Number.isFinite(value.currentAmount) && value.currentAmount >= 0 &&
+    typeof value.monthlyContribution === "number" && Number.isFinite(value.monthlyContribution) && value.monthlyContribution >= 0 &&
+    typeof value.currency === "string" && CURRENCIES.includes(value.currency as Currency);
 }
 
 function validateImportedBankTransactions(value: unknown): boolean {
@@ -283,6 +306,8 @@ export function validateData(value: unknown): value is TrackerData {
         (typeof preferences.monthlyShoppingBudget === "number" &&
           Number.isFinite(preferences.monthlyShoppingBudget) &&
           preferences.monthlyShoppingBudget >= 0)) &&
+      (preferences.savedReportViews === undefined || isValidSavedReportViews(preferences.savedReportViews)) &&
+      (preferences.forecastSavingsGoal === undefined || isValidForecastSavingsGoal(preferences.forecastSavingsGoal)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
         preferences.activityCompletedItemIds.every((id) => typeof id === "string" && id.trim().length > 0) &&
