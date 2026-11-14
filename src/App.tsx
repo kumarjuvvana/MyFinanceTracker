@@ -28,7 +28,7 @@ import type { CookingInventoryUsage } from "./types";
 import type { NpsSchemeHolding } from "./types";
 import type { VehicleValuation } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
-import { buildReport, reportDimensionValues } from "./lib/reportAnalytics";
+import { buildReport, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
