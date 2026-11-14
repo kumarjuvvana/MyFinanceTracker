@@ -1,6 +1,6 @@
-import { fetchMutualFundNavs } from "../api/mutual-fund-nav.js";
-import { fetchNpsNavs } from "../api/nps-nav.js";
-import { fetchStockQuote } from "../api/stock-price.js";
+import { fetchMutualFundNavs } from "./mutual-fund-nav.js";
+import { fetchNpsNavs } from "./nps-nav.js";
+import { fetchStockQuote } from "./stock-price.js";
 import { normalizeTrackerData, validateData } from "../src/lib/data.js";
 import type { AutomatedPriceAssetType, TrackerData } from "../src/types.js";
 
