@@ -20,6 +20,7 @@ export type Page =
   | "Purchase history"
   | "Price history"
   | "Reports"
+  | "Reports & Analytics"
   | "Notes & reminders"
   | "Important dates"
   | "Master data"
@@ -51,7 +52,7 @@ export type Page =
   | "R&D / Test Connectors";
 export const FAVORITABLE_PAGES: Page[] = [
   "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
-  "Price history", "Reports", "Notes & reminders", "Important dates", "Master data", "Stocks", "Asset manager", "Bank accounts",
+  "Price history", "Reports", "Reports & Analytics", "Notes & reminders", "Important dates", "Master data", "Stocks", "Asset manager", "Bank accounts",
   "Learning", "Mind & habits", "Activities", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",

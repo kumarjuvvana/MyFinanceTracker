@@ -85,7 +85,7 @@ const navigation: NavigationItem[] = [
   { name: "Shopping trips", icon: ShoppingBag, group: "Shopping" },
   { name: "Purchase history", icon: Clock3, group: "Shopping" },
   { name: "Price history", icon: ArrowLeftRight, group: "Shopping" },
-  { name: "Reports", icon: BarChart3, group: "Shopping" },
+  { name: "Reports & Analytics", icon: BarChart3, group: "Overview" },
   { name: "Notes & reminders", icon: Bell, group: "Shopping" },
   { name: "Important dates", icon: CalendarDays, group: "Home & family" },
   { name: "Master data", icon: Database, group: "Shopping" },
@@ -123,7 +123,8 @@ function readAppRoute() {
   const requestedPage = params.get("page") as Page | null;
   const knownPages = new Set<Page>([...navigation.map((entry) => entry.name), "Data management"]);
   return {
-    page: requestedPage && knownPages.has(requestedPage) ? requestedPage : "Dashboard" as Page,
+    page: requestedPage === "Reports" ? "Reports & Analytics" as Page
+      : requestedPage && knownPages.has(requestedPage) ? requestedPage : "Dashboard" as Page,
     query: params.get("q") ?? "",
     selectedKey: params.get("record"),
   };
@@ -812,7 +813,7 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
         <RecentPurchases purchases={[...data.purchases].sort((a, b) => b.date.localeCompare(a.date))} onViewAll={() => onPage("Purchase history")} /></div>
       <div className="section-grid"><Card><div className="card-head"><div><h2 className="section-title">A few things to pick up</h2><p className="section-description">Your next trip is already taking shape</p></div><button className="text-link" onClick={() => onPage("Shopping list")}>See the list <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div>
         {pending.slice(0, 4).length ? <div className="recent-list">{pending.slice(0, 4).map((item) => <div className="recent-row" key={item.id}><div className="item-dot"><Leaf size={15} /></div><div className="recent-info"><div className="recent-name">{item.name}</div><div className="recent-meta">{item.quantity} {item.unit} · {item.category}</div></div><div className="recent-price">{formatCurrency(item.estimatedPrice * item.quantity)}</div></div>)}</div> : <EmptyState icon={<CheckCircle2 size={18} />} title="All caught up!" description="Your shopping list is clear. Enjoy the moment." />}</Card>
-        <Card><div className="card-head"><div><h2 className="section-title">Where it goes</h2><p className="section-description">This month's spending by category</p></div><button className="text-link" onClick={() => onPage("Reports")}>Full report <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div><CategoryBreakdown purchases={monthlyPurchases} /></Card></div>
+        <Card><div className="card-head"><div><h2 className="section-title">Where it goes</h2><p className="section-description">This month's spending by category</p></div><button className="text-link" onClick={() => onPage("Reports & Analytics")}>Full report <ChevronRight size={12} style={{ verticalAlign: "middle" }} /></button></div><CategoryBreakdown purchases={monthlyPurchases} /></Card></div>
     </>}
     {widgets.includes("reminders") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Notes & reminders</h2><p className="section-description">Due now or coming up in the next 7 days</p></div><button className="text-link" onClick={() => onPage("Notes & reminders")}>See all <ChevronRight size={12} /></button></div>{reminders.length ? <div className="reminder-list">{reminders.slice(0, 4).map((reminder) => <div className="reminder-row" key={reminder.id}><Bell size={15} /><div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{reminder.category || "General"} · <LinkifiedText>{reminder.details || "No extra details"}</LinkifiedText></div></div><Badge tone={reminder.date < today() ? "amber" : "green"}>{reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : dateLabel(reminder.date)}</Badge></div>)}</div> : <p className="dashboard-module-empty">No upcoming reminders.</p>}</Card>}
     <ImportantDatesDashboardCard onPage={onPage} />
@@ -1485,7 +1486,7 @@ function PriceHistory({ data }: { data: TrackerData }) {
   </>;
 }
 
-function Reports({ data }: { data: TrackerData }) {
+function ShoppingReports({ data }: { data: TrackerData }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
   const [store, setStore] = useState("All stores");
@@ -1540,6 +1541,141 @@ function Reports({ data }: { data: TrackerData }) {
     <div className="report-grid"><Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
       <Card><div className="card-head"><div><h2 className="section-title">Spending by category</h2><p className="section-description">Matching the selected filters and date range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card></div>
     <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store summary"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} purchases · {new Set(group.records.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
+  </>;
+}
+
+type ReportHubSection = "overview" | "shopping" | "finance" | "assets" | "subscriptions" | "forecasts" | "saved";
+
+const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "shopping", label: "Shopping" },
+  { id: "finance", label: "Finance & investments" },
+  { id: "assets", label: "Assets & portfolio" },
+  { id: "subscriptions", label: "Subscriptions & bills" },
+  { id: "forecasts", label: "Forecasts" },
+  { id: "saved", label: "Saved reports" },
+];
+
+function ReportsAnalytics({ data, onPage }: { data: TrackerData; onPage: (page: Page) => void }) {
+  const formatCurrency = useCurrencyFormatter();
+  const currency = useContext(CurrencyContext);
+  const [section, setSection] = useState<ReportHubSection>("overview");
+  const monthRange = resolveReportDateRange("month-to-date");
+  const monthPurchases = buildReport(data.purchases, shoppingPurchaseReport, {
+    dateRange: monthRange,
+    groupBy: { type: "time", unit: "month" },
+    measureId: "spend",
+  });
+  const assets = data.assets ?? [];
+  const stocks = data.stocks ?? [];
+  const subscriptions = data.subscriptions ?? [];
+
+  const sectionContent: Record<Exclude<ReportHubSection, "overview" | "shopping">, {
+    title: string;
+    description: string;
+    sourceCount: string;
+    sourceLabel: string;
+    page?: Page;
+    action?: string;
+  }> = {
+    finance: {
+      title: "Finance & investments",
+      description: "Account activity and investment reporting will be added after source coverage and currency rules are validated.",
+      sourceCount: `${stocks.length + assets.length}`,
+      sourceLabel: "stock and asset records available as sources",
+      page: "Stocks",
+      action: "Open stocks",
+    },
+    assets: {
+      title: "Assets & portfolio",
+      description: "Portfolio analytics are not available yet. Recorded holdings can have missing, stale, estimated, or mixed-currency values.",
+      sourceCount: `${assets.length + stocks.length}`,
+      sourceLabel: "asset and stock records available as sources",
+      page: "Asset manager",
+      action: "Open asset manager",
+    },
+    subscriptions: {
+      title: "Subscriptions & bills",
+      description: "Bill and renewal summaries will follow after recurring schedules and amount coverage are reviewed.",
+      sourceCount: `${subscriptions.length}`,
+      sourceLabel: subscriptions.length === 1 ? "subscription account recorded" : "subscription accounts recorded",
+      page: "Subscriptions & bills",
+      action: "Open subscriptions",
+    },
+    forecasts: {
+      title: "Forecasts",
+      description: "Forecasts are planned for a later phase. They will be introduced only when there is enough dated history and clear assumptions to show reliable coverage.",
+      sourceCount: "Not available yet",
+      sourceLabel: "No projections or investment recommendations are shown.",
+    },
+    saved: {
+      title: "Saved reports",
+      description: "Named report views and saved filter combinations are planned after report settings and their storage behavior are designed.",
+      sourceCount: "No saved views",
+      sourceLabel: "This feature is not available yet.",
+    },
+  };
+
+  const activeSection = section === "overview" || section === "shopping" ? null : sectionContent[section];
+
+  return <>
+    <PageHeading eyebrow="Reports hub" title="Reports & Analytics" subtitle="Explore recorded activity and see which report areas are ready." />
+    <div className="reports-hub-tabs" role="group" aria-label="Report categories">
+      {REPORT_HUB_SECTIONS.map((entry) => <button
+        key={entry.id}
+        type="button"
+        aria-pressed={section === entry.id}
+        className={`reports-hub-tab${section === entry.id ? " active" : ""}`}
+        onClick={() => setSection(entry.id)}
+      >{entry.label}</button>)}
+    </div>
+    {section === "shopping" ? <ShoppingReports data={data} /> : section === "overview" ? <>
+      <div className="stat-grid reports-hub-stats">
+        <Card className="stat-card"><div className="stat-top"><span>Shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} recorded purchases · {currency}</div></Card>
+        <Card className="stat-card"><div className="stat-top"><span>Purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">Available for Shopping reports</div></Card>
+        <Card className="stat-card"><div className="stat-top"><span>Investment source records</span><span className="stat-icon icon-blue"><TrendingUp size={16} /></span></div><p className="stat-value">{(assets.length + stocks.length).toLocaleString()}</p><div className="stat-foot">Holdings recorded; not a net-worth total</div></Card>
+        <Card className="stat-card"><div className="stat-top"><span>Subscription accounts</span><span className="stat-icon icon-purple"><CalendarDays size={16} /></span></div><p className="stat-value">{subscriptions.length.toLocaleString()}</p><div className="stat-foot">Amounts and billing history may be incomplete</div></Card>
+      </div>
+      <p className="reports-hub-caveat">Currency is a display preference; recorded amounts are not converted. Other summaries count saved records and do not imply complete financial coverage.</p>
+      <div className="reports-hub-grid">
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-green"><ShoppingBasket size={18} /></div>
+          <h2 className="section-title">Shopping</h2>
+          <p className="section-description">Review spending by month, category, or store with date and store filters.</p>
+          <Button type="button" onClick={() => setSection("shopping")}>Open shopping reports <ChevronRight size={14} /></Button>
+        </Card>
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-blue"><Wallet size={18} /></div>
+          <h2 className="section-title">Finance & investments</h2>
+          <p className="section-description">Dedicated account and investment analytics are planned; no combined cash-flow total is calculated yet.</p>
+          <Button type="button" variant="outline" onClick={() => setSection("finance")}>View availability <ChevronRight size={14} /></Button>
+        </Card>
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-purple"><BarChart3 size={18} /></div>
+          <h2 className="section-title">Assets & portfolio</h2>
+          <p className="section-description">Portfolio reports will account for missing history, valuation dates, and mixed currencies.</p>
+          <Button type="button" variant="outline" onClick={() => setSection("assets")}>View availability <ChevronRight size={14} /></Button>
+        </Card>
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-peach"><CalendarDays size={18} /></div>
+          <h2 className="section-title">Subscriptions & bills</h2>
+          <p className="section-description">Recorded recurring accounts can be explored in a future dedicated report.</p>
+          <Button type="button" variant="outline" onClick={() => setSection("subscriptions")}>View availability <ChevronRight size={14} /></Button>
+        </Card>
+      </div>
+      <div className="reports-hub-foot-grid">
+        <Card className="reports-hub-note"><div><TrendingUp size={17} /><strong>Forecasts</strong></div><p>Planned after enough dated history and clear assumptions are available.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("forecasts")}>Learn more</Button></Card>
+        <Card className="reports-hub-note"><div><Star size={17} /><strong>Saved reports</strong></div><p>Saved filters and named views are planned for a later phase.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("saved")}>Learn more</Button></Card>
+      </div>
+    </> : activeSection ? <Card className="reports-hub-detail">
+      <div className="reports-hub-card-icon icon-blue"><BarChart3 size={18} /></div>
+      <h2 className="section-title">{activeSection.title}</h2>
+      <p className="section-description">{activeSection.description}</p>
+      <div className="reports-hub-source"><strong>{activeSection.sourceCount}</strong><span>{activeSection.sourceLabel}</span></div>
+      {activeSection.page && activeSection.action && <Button type="button" variant="outline" onClick={() => {
+        if (activeSection.page) onPage(activeSection.page);
+      }}>{activeSection.action} <ChevronRight size={14} /></Button>}
+    </Card> : null}
   </>;
 }
 
@@ -12223,7 +12359,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     </Card>
     </SettingsDisclosure>
     <SettingsDisclosure title="Navigation menu" description="Grouping, ordering and menu display" icon={<ListTree size={17} />}><Card className="settings-card"><div className="card-head"><div><h2 className="section-title">Navigation menu</h2><p className="section-description">Reduce sidebar clutter by grouping screens. Choose the menu order used within groups, or across the flat menu.</p></div><ListTree size={17} /></div><div className="settings-grid navigation-settings-grid"><label className="dashboard-widget-option"><input type="checkbox" checked={groupMenus} onChange={(event) => onGroupMenusChange(event.target.checked)} /><span><strong>Group menus by category</strong><small>{groupMenus ? "Groups start collapsed; the active section opens automatically." : "Show every screen in one flat list."}</small></span></label><Field label="Menu order"><Select value={menuSortOrder} onChange={(event) => onMenuSortOrderChange(event.target.value as MenuSortOrder)}><option value="current">Current order</option><option value="ascending">Ascending (A–Z)</option></Select></Field></div></Card></SettingsDisclosure>
-    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save to the shared Supabase preferences table, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase preferences"}</small></span></label>)}</div></Card></SettingsDisclosure>
+    <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save to the shared Supabase preferences table, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.filter((page) => page !== "Reports").map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase preferences"}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved with shared Daybook data.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Screen descriptions" description="Show or hide helper text under screen titles" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies across screens that display a title description and syncs across devices.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
@@ -14297,11 +14433,12 @@ export default function App() {
     setNotice("Data cleared. Saving the empty data file to shared storage…");
   }
   function changePage(next: Page) {
-    setPage(next);
+    const targetPage = next === "Reports" ? "Reports & Analytics" : next;
+    setPage(targetPage);
     setSelectedSearchResultKey(null);
     setMobileMenu(false);
-    const params = new URLSearchParams({ page: next });
-    if (next === "Global search" && globalSearchQuery.trim()) params.set("q", globalSearchQuery.trim());
+    const params = new URLSearchParams({ page: targetPage });
+    if (targetPage === "Global search" && globalSearchQuery.trim()) params.set("q", globalSearchQuery.trim());
     window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -14362,7 +14499,8 @@ export default function App() {
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
-    Reports: <Reports data={data} />,
+    Reports: <ReportsAnalytics data={data} onPage={changePage} />,
+    "Reports & Analytics": <ReportsAnalytics data={data} onPage={changePage} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
     "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {

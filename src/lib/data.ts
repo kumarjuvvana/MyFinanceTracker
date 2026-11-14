@@ -1167,6 +1167,9 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
   const stockQuotes = [...(data.stockQuotes ?? [])];
   return {
     ...data,
+    favoritePages: data.favoritePages
+      ? [...new Set(data.favoritePages.map((page) => page === "Reports" ? "Reports & Analytics" : page))]
+      : data.favoritePages,
     preferences: {
       ...DEFAULT_TRACKER_PREFERENCES,
       ...data.preferences,
