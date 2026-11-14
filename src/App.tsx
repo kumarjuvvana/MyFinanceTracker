@@ -28,7 +28,8 @@ import type { CookingInventoryUsage } from "./types";
 import type { NpsSchemeHolding } from "./types";
 import type { VehicleValuation } from "./types";
 import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
-import { buildReport, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
+import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
+import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -1686,6 +1687,163 @@ function ShoppingReports({ data, onSaveBudget }: {
   </>;
 }
 
+function FinanceCashflowReports({ data }: { data: TrackerData }) {
+  const accounts = data.bankAccounts ?? [];
+  const rows = bankActivityRecords(accounts);
+  const [accountId, setAccountId] = useState("all");
+  const [from, setFrom] = useState(() => resolveReportDateRange("last-30-days")?.from ?? "");
+  const [to, setTo] = useState(() => resolveReportDateRange("last-30-days")?.to ?? "");
+  const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
+  const selectedAccounts = accounts.filter((account) => accountId === "all" || account.id === accountId);
+  const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+  const formatAmount = (amount: number) => numberFormat.format(amount);
+  const summaries = selectedAccounts.map((account) => {
+    const accountRows = rows.filter((row) => row.accountId === account.id);
+    const credits = buildReport(accountRows.filter((row) => row.direction === "credit"), bankActivityReport, {
+      dateRange,
+      groupBy: { type: "time", unit: "month" },
+      measureId: "amount",
+    });
+    const debits = buildReport(accountRows.filter((row) => row.direction === "debit"), bankActivityReport, {
+      dateRange,
+      groupBy: { type: "time", unit: "month" },
+      measureId: "amount",
+    });
+    const monthKeys = [...new Set([...credits.groups, ...debits.groups]
+      .map((group) => group.key)
+      .filter((key) => key !== "undated"))].sort();
+    return {
+      id: account.id,
+      name: account.bankName,
+      credits: credits.total,
+      debits: debits.total,
+      net: credits.total - debits.total,
+      count: credits.recordCount + debits.recordCount,
+      missingDateCount: accountRows.filter((row) => !reportDateKey(row.transactionDate)).length,
+      months: monthKeys.map((key) => ({
+        key,
+        credits: credits.groups.find((group) => group.key === key)?.total ?? 0,
+        debits: debits.groups.find((group) => group.key === key)?.total ?? 0,
+      })),
+    };
+  }).filter((summary) => summary.count > 0);
+  const monthlyRows = summaries.flatMap((summary) => summary.months.map((month) => ({
+    accountId: summary.id,
+    ...month,
+    account: summary.name,
+    net: month.credits - month.debits,
+  }))).sort((left, right) => left.key.localeCompare(right.key) || left.account.localeCompare(right.account));
+  const transactionCount = summaries.reduce((count, summary) => count + summary.count, 0);
+  const missingDateCount = selectedAccounts.reduce((count, account) => count +
+    rows.filter((row) => row.accountId === account.id && !reportDateKey(row.transactionDate)).length, 0);
+
+  return <>
+    <PageHeading eyebrow="Recorded money movement" title="Finance & cashflow" subtitle="Review imported bank credits and debits by account and period." />
+    <p className="reports-hub-caveat">Bank imports may be partial. Transactions have no currency or category, so amounts stay separate by account; credits and debits are not verified income and expenses. A savings rate is not calculated.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters">
+        <Field label="Bank account"><Select aria-label="Filter finance report by bank account" value={accountId} onChange={(event) => setAccountId(event.target.value)}><option value="all">All accounts</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.bankName} · {account.accountType}</option>)}</Select></Field>
+      </div>
+      <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="Finance report from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="Finance report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{transactionCount} imported transactions</Badge>
+    </div>
+    <div className="report-grid">
+      <Card><div className="card-head"><div><h2 className="section-title">Credits vs debits</h2><p className="section-description">Recorded bank transaction directions, shown separately for each account.</p></div></div>{summaries.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Account</th><th>Credits</th><th>Debits</th><th>Net movement</th><th>Records</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.id}><td data-label="Account"><div className="table-primary">{summary.name}</div><div className="table-secondary">Currency not recorded</div></td><td data-label="Credits">{formatAmount(summary.credits)}</td><td data-label="Debits">{formatAmount(summary.debits)}</td><td data-label="Net movement" className="table-total">{formatAmount(summary.net)}</td><td data-label="Records">{summary.count}</td></tr>)}</tbody></table></div> : <EmptyState icon={<Wallet size={18} />} title={rows.length ? "No transactions in this date range" : "No imported bank transactions"} description={rows.length ? "Try widening the date range or choosing another account." : "Import transactions from a bank account to see recorded movement."} />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Savings rate</h2><p className="section-description">Not calculated from the available records.</p></div><Badge>Unavailable</Badge></div><p className="section-description">Imported transactions are not guaranteed to include all accounts or complete income and expenses. Their currency is also not recorded, so a savings percentage could be misleading.</p><div className="reports-hub-source"><strong>{transactionCount}</strong><span>bank transactions in the selected date range</span></div></Card>
+    </div>
+    <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Monthly movement by account</h2><p className="section-description">Credits, debits, and their difference in each account’s unrecorded source currency.</p></div></div>{monthlyRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Account</th><th>Credits</th><th>Debits</th><th>Net movement</th></tr></thead><tbody>{monthlyRows.map((row) => <tr key={`${row.accountId}:${row.key}`}><td data-label="Month">{new Date(`${row.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</td><td data-label="Account">{row.account}</td><td data-label="Credits">{formatAmount(row.credits)}</td><td data-label="Debits">{formatAmount(row.debits)}</td><td data-label="Net movement" className="table-total">{formatAmount(row.net)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<CalendarDays size={18} />} title="No monthly movement to show" description="Dated bank activity in the selected range will appear here." />}{missingDateCount > 0 && <p className="shopping-report-budget-note">{missingDateCount} imported transaction{missingDateCount === 1 ? " has" : "s have"} no valid date and are omitted when a date filter is active.</p>}</Card>
+  </>;
+}
+
+function SubscriptionSpendingReports({ data }: { data: TrackerData }) {
+  const accounts = data.subscriptions ?? [];
+  const rows = subscriptionActivityRecords(accounts);
+  const [accountId, setAccountId] = useState("all");
+  const [from, setFrom] = useState(() => resolveReportDateRange("last-30-days")?.from ?? "");
+  const [to, setTo] = useState(() => resolveReportDateRange("last-30-days")?.to ?? "");
+  const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
+  const selectedAccounts = accounts.filter((account) => accountId === "all" || account.id === accountId);
+  const summaries = selectedAccounts.map((account) => {
+    const accountRows = rows.filter((row) => row.accountId === account.id);
+    const paid = buildReport(accountRows.filter((row) => row.paid && row.amount !== null), subscriptionPaymentReport, {
+      dateRange,
+      groupBy: { type: "time", unit: "month" },
+      measureId: "amount",
+    });
+    const unpaid = buildReport(accountRows.filter((row) => !row.paid), subscriptionDueReport, {
+      dateRange,
+      groupBy: { type: "time", unit: "month" },
+      measureId: "amount",
+    });
+    const categories = buildReport(paid.records, subscriptionPaymentReport, {
+      groupBy: { type: "dimension", id: "category" },
+      measureId: "amount",
+    }).groups;
+    return {
+      id: account.id,
+      name: account.name,
+      provider: account.provider,
+      category: account.category,
+      billingType: account.billingType,
+      currency: account.currency,
+      paid,
+      unpaid,
+      categories,
+      months: paid.groups.filter((group) => group.key !== "undated"),
+    };
+  }).filter((summary) => summary.paid.recordCount > 0 || summary.unpaid.recordCount > 0);
+  const categoryTotals = new Map<string, { category: string; currency: Currency; total: number; count: number }>();
+  for (const summary of summaries) {
+    for (const group of summary.categories) {
+      const key = `${summary.currency}:${group.key}`;
+      const current = categoryTotals.get(key) ?? {
+        category: group.label,
+        currency: summary.currency,
+        total: 0,
+        count: 0,
+      };
+      current.total += group.total;
+      current.count += group.recordCount;
+      categoryTotals.set(key, current);
+    }
+  }
+  const categoryRows = [...categoryTotals.values()].sort((left, right) =>
+    left.currency.localeCompare(right.currency) || right.total - left.total || left.category.localeCompare(right.category));
+  const monthlyRows = summaries.flatMap((summary) => summary.months.map((month) => ({
+    accountId: summary.id,
+    account: summary.name,
+    currency: summary.currency,
+    key: month.key,
+    total: month.total,
+    count: month.recordCount,
+  }))).sort((left, right) => left.key.localeCompare(right.key) || left.account.localeCompare(right.account));
+  const paidCount = summaries.reduce((count, summary) => count + summary.paid.recordCount, 0);
+  const unpaidCount = summaries.reduce((count, summary) => count + summary.unpaid.recordCount, 0);
+
+  return <>
+    <PageHeading eyebrow="Recorded recurring costs" title="Subscriptions & bills" subtitle="Review paid transaction history and unpaid due entries by account and currency." />
+    <p className="reports-hub-caveat">Only transactions marked paid with a recorded amount count as actual outflows; they use payment date when available. Unpaid entries are shown separately by due date. Totals are never combined across currencies.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters">
+        <Field label="Subscription account"><Select aria-label="Filter subscription report by account" value={accountId} onChange={(event) => setAccountId(event.target.value)}><option value="all">All accounts</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}</Select></Field>
+      </div>
+      <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label="From date"><DateInput className="filter-date" aria-label="Subscription report from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+        <Field label="To date"><DateInput className="filter-date" aria-label="Subscription report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{paidCount} paid · {unpaidCount} unpaid entries</Badge>
+    </div>
+    <Card><div className="card-head"><div><h2 className="section-title">Paid amounts by account</h2><p className="section-description">Recurring type, paid history, and unpaid due records remain separate.</p></div></div>{summaries.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Account</th><th>Billing</th><th>Currency</th><th>Paid records</th><th>Paid total</th><th>Unpaid due</th><th>Due amount</th></tr></thead><tbody>{summaries.map((summary) => <tr key={summary.id}><td data-label="Account"><div className="table-primary">{summary.name}</div><div className="table-secondary">{summary.provider} · {summary.category}</div></td><td data-label="Billing">{summary.billingType}</td><td data-label="Currency">{summary.currency}</td><td data-label="Paid records">{summary.paid.recordCount}</td><td data-label="Paid total" className="table-total">{formatMoney(summary.paid.total, summary.currency)}</td><td data-label="Unpaid due">{summary.unpaid.recordCount}</td><td data-label="Due amount">{formatMoney(summary.unpaid.total, summary.currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<CalendarDays size={18} />} title="No subscription activity in this date range" description={rows.length ? "Try widening the date range or choosing another account." : "Recorded paid transactions and due entries will appear here."} />}</Card>
+    <div className="report-grid" style={{ marginTop: 16 }}>
+      <Card><div className="card-head"><div><h2 className="section-title">Paid spending by category</h2><p className="section-description">Amounts are grouped by account currency; the same category in different currencies stays separate.</p></div></div>{categoryRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Category</th><th>Currency</th><th>Paid records</th><th>Total paid</th></tr></thead><tbody>{categoryRows.map((row) => <tr key={`${row.currency}:${row.category}`}><td data-label="Category">{row.category}</td><td data-label="Currency">{row.currency}</td><td data-label="Paid records">{row.count}</td><td data-label="Total paid" className="table-total">{formatMoney(row.total, row.currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No paid spending by category" description="Paid transactions with amounts and dates will appear here." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Monthly paid trend</h2><p className="section-description">Monthly payment totals stay separated by account and currency.</p></div></div>{monthlyRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Account</th><th>Currency</th><th>Paid records</th><th>Total paid</th></tr></thead><tbody>{monthlyRows.map((row) => <tr key={`${row.accountId}:${row.key}`}><td data-label="Month">{new Date(`${row.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</td><td data-label="Account">{row.account}</td><td data-label="Currency">{row.currency}</td><td data-label="Paid records">{row.count}</td><td data-label="Total paid" className="table-total">{formatMoney(row.total, row.currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<CalendarDays size={18} />} title="No dated payments yet" description="Paid transactions within the selected range will appear here." />}</Card>
+    </div>
+  </>;
+}
+
 type ReportHubSection = "overview" | "shopping" | "finance" | "assets" | "subscriptions" | "forecasts" | "saved";
 
 const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
@@ -1716,7 +1874,7 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
   const stocks = data.stocks ?? [];
   const subscriptions = data.subscriptions ?? [];
 
-  const sectionContent: Record<Exclude<ReportHubSection, "overview" | "shopping">, {
+  const sectionContent: Record<Exclude<ReportHubSection, "overview" | "shopping" | "finance" | "subscriptions">, {
     title: string;
     description: string;
     sourceCount: string;
@@ -1724,14 +1882,6 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
     page?: Page;
     action?: string;
   }> = {
-    finance: {
-      title: "Finance & investments",
-      description: "Account activity and investment reporting will be added after source coverage and currency rules are validated.",
-      sourceCount: `${stocks.length + assets.length}`,
-      sourceLabel: "stock and asset records available as sources",
-      page: "Stocks",
-      action: "Open stocks",
-    },
     assets: {
       title: "Assets & portfolio",
       description: "Portfolio analytics are not available yet. Recorded holdings can have missing, stale, estimated, or mixed-currency values.",
@@ -1739,14 +1889,6 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
       sourceLabel: "asset and stock records available as sources",
       page: "Asset manager",
       action: "Open asset manager",
-    },
-    subscriptions: {
-      title: "Subscriptions & bills",
-      description: "Bill and renewal summaries will follow after recurring schedules and amount coverage are reviewed.",
-      sourceCount: `${subscriptions.length}`,
-      sourceLabel: subscriptions.length === 1 ? "subscription account recorded" : "subscription accounts recorded",
-      page: "Subscriptions & bills",
-      action: "Open subscriptions",
     },
     forecasts: {
       title: "Forecasts",
@@ -1762,7 +1904,9 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
     },
   };
 
-  const activeSection = section === "overview" || section === "shopping" ? null : sectionContent[section];
+  const activeSection = section === "overview" || section === "shopping" || section === "finance" || section === "subscriptions"
+    ? null
+    : sectionContent[section];
 
   return <>
     <PageHeading eyebrow="Reports hub" title="Reports & Analytics" subtitle="Explore recorded activity and see which report areas are ready." />
@@ -1793,8 +1937,8 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-blue"><Wallet size={18} /></div>
           <h2 className="section-title">Finance & investments</h2>
-          <p className="section-description">Dedicated account and investment analytics are planned; no combined cash-flow total is calculated yet.</p>
-          <Button type="button" variant="outline" onClick={() => setSection("finance")}>View availability <ChevronRight size={14} /></Button>
+          <p className="section-description">Review imported bank credits and debits by account, plus recorded paid subscription costs.</p>
+          <Button type="button" onClick={() => setSection("finance")}>Open finance reports <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-purple"><BarChart3 size={18} /></div>
@@ -1805,15 +1949,17 @@ function ReportsAnalytics({ data, onPage, onSaveShoppingBudget }: {
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-peach"><CalendarDays size={18} /></div>
           <h2 className="section-title">Subscriptions & bills</h2>
-          <p className="section-description">Recorded recurring accounts can be explored in a future dedicated report.</p>
-          <Button type="button" variant="outline" onClick={() => setSection("subscriptions")}>View availability <ChevronRight size={14} /></Button>
+          <p className="section-description">Review actual paid history and recorded unpaid amounts by account and currency.</p>
+          <Button type="button" onClick={() => setSection("subscriptions")}>Open subscriptions report <ChevronRight size={14} /></Button>
         </Card>
       </div>
       <div className="reports-hub-foot-grid">
         <Card className="reports-hub-note"><div><TrendingUp size={17} /><strong>Forecasts</strong></div><p>Planned after enough dated history and clear assumptions are available.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("forecasts")}>Learn more</Button></Card>
         <Card className="reports-hub-note"><div><Star size={17} /><strong>Saved reports</strong></div><p>Saved filters and named views are planned for a later phase.</p><Button type="button" size="sm" variant="outline" onClick={() => setSection("saved")}>Learn more</Button></Card>
       </div>
-    </> : activeSection ? <Card className="reports-hub-detail">
+    </> : section === "finance" ? <FinanceCashflowReports data={data} />
+      : section === "subscriptions" ? <SubscriptionSpendingReports data={data} />
+      : activeSection ? <Card className="reports-hub-detail">
       <div className="reports-hub-card-icon icon-blue"><BarChart3 size={18} /></div>
       <h2 className="section-title">{activeSection.title}</h2>
       <p className="section-description">{activeSection.description}</p>
