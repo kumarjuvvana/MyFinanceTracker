@@ -12992,7 +12992,7 @@ function TestConnectors({ accounts, onImport }: {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: "{}",
+        body: JSON.stringify({ clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID }),
       });
       const payload: unknown = await response.json();
       if (!response.ok || typeof payload !== "object" || payload === null ||

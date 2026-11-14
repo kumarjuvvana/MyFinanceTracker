@@ -6,6 +6,7 @@ interface ApiRequest {
   method?: string;
   url?: string;
   headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
 }
 
 interface ApiResponse {
@@ -58,6 +59,28 @@ function safeEqual(left: string, right: string): boolean {
   return leftBytes.length === rightBytes.length && timingSafeEqual(leftBytes, rightBytes);
 }
 
+function requestClientId(request: ApiRequest): string {
+  let body = request.body;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      throw new Error("The Gmail authorization request body is invalid.");
+    }
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body) ||
+    !("clientId" in body) || typeof body.clientId !== "string" || body.clientId.length > 300) {
+    return "";
+  }
+  return body.clientId.trim();
+}
+
+function decodeClientId(value: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) return "";
+  const clientId = Buffer.from(value, "base64url").toString("utf8");
+  return Buffer.from(clientId, "utf8").toString("base64url") === value ? clientId : "";
+}
+
 function oauthResultPage(response: ApiResponse, success: boolean, message: string, origin: string) {
   const payload = JSON.stringify({ type: "daybook-gmail-oauth", success, message }).replace(/</g, "\\u003c");
   const returnUrl = new URL("/", origin);
@@ -88,16 +111,21 @@ function authorizeStart(request: ApiRequest, response: ApiResponse) {
     return;
   }
   try {
-    const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    if (!clientId || !clientSecret) {
-      throw new Error("Set VITE_GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel before connecting scheduled Gmail sending.");
+    const configuredClientId = process.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
+    const suppliedClientId = requestClientId(request);
+    if (configuredClientId && suppliedClientId && configuredClientId !== suppliedClientId) {
+      throw new Error("The Gmail client ID does not match the deployed app configuration.");
     }
+    const clientId = configuredClientId || suppliedClientId;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId) throw new Error("The deployed app has no VITE_GOOGLE_CLIENT_ID. Rebuild it with the Google OAuth client ID.");
+    if (!clientSecret) throw new Error("Set GOOGLE_CLIENT_SECRET for the Production environment in Vercel, then redeploy.");
     validateGmailCryptoConfiguration();
     const redirect = redirectUri();
     const stateNonce = randomBytes(32).toString("base64url");
     const verifier = randomBytes(48).toString("base64url");
-    const state = `${stateNonce}.${signGmailOAuthState(stateNonce)}`;
+    const encodedClientId = Buffer.from(clientId, "utf8").toString("base64url");
+    const state = `${stateNonce}.${signGmailOAuthState(`${stateNonce}.${encodedClientId}`)}`;
     const challenge = createHash("sha256").update(verifier).digest("base64url");
     const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     authorization.search = new URLSearchParams({
@@ -112,7 +140,7 @@ function authorizeStart(request: ApiRequest, response: ApiResponse) {
       code_challenge: challenge,
       code_challenge_method: "S256",
     }).toString();
-    response.setHeader("Set-Cookie", cookie(`${stateNonce}.${verifier}`, STATE_LIFETIME_SECONDS));
+    response.setHeader("Set-Cookie", cookie(`${stateNonce}.${verifier}.${encodedClientId}`, STATE_LIFETIME_SECONDS));
     respond(response, 200, { authorizationUrl: authorization.toString() });
   } catch (caught) {
     respond(response, 503, { error: caught instanceof Error ? caught.message : "Could not start Gmail authorization." });
@@ -141,19 +169,18 @@ async function authorizeCallback(request: ApiRequest, response: ApiResponse) {
     oauthResultPage(response, false, "Gmail authorization was cancelled or denied.", origin);
     return;
   }
-  const cookieParts = readCookie(request).split(".");
-  const [cookieNonce, verifier, extra] = cookieParts;
+  const [cookieNonce, verifier, encodedClientId, extra] = readCookie(request).split(".");
   const [stateNonce, signature, stateExtra] = state.split(".");
+  const clientId = encodedClientId ? decodeClientId(encodedClientId) : "";
   if (!code || !cookieNonce || !verifier || extra !== undefined || !stateNonce || !signature ||
-    stateExtra !== undefined || !safeEqual(cookieNonce, stateNonce) ||
-    !safeEqual(signature, signGmailOAuthState(stateNonce))) {
+    !clientId || stateExtra !== undefined || !safeEqual(cookieNonce, stateNonce) ||
+    !safeEqual(signature, signGmailOAuthState(`${stateNonce}.${encodedClientId}`))) {
     oauthResultPage(response, false, "The Gmail authorization state was invalid or expired.", origin);
     return;
   }
   try {
-    const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    if (!clientId || !clientSecret) throw new Error("Google OAuth server settings are incomplete.");
+    if (!clientSecret) throw new Error("Google OAuth server settings are incomplete.");
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
