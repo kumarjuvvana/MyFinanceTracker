@@ -826,6 +826,17 @@ body{background:#f3f5ef}
 .asset-price-actions{display:flex;justify-content:flex-end}
 .asset-price-history-section{display:grid;gap:9px}
 .asset-price-history-section>.section-title{display:flex;align-items:center;gap:7px;margin:0}
+.asset-price-filter-toolbar{display:grid;grid-template-columns:minmax(210px,2fr) repeat(4,minmax(120px,1fr));align-items:end;gap:9px}
+.asset-price-filter-toolbar>.field-wrap{min-width:0}
+.asset-price-filter-toolbar .search-wrap{min-width:0}
+.asset-price-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.asset-price-pagination>span,.asset-price-pagination>div>span{font-size:10px;color:var(--text-muted,#778077)}
+.asset-price-pagination>div{display:flex;align-items:end;gap:7px}
+.asset-price-pagination .field-wrap{width:80px}
+.asset-price-group-row th{background:color-mix(in srgb,var(--user-accent,#56815d) 9%,var(--panel,#fff));color:var(--text,#303830);text-align:left}
+.asset-price-group-row th span,.asset-price-run-group h3 span{color:var(--text-muted,#778077);font-size:10px;font-weight:500}
+.asset-price-run-group{display:grid;gap:7px}
+.asset-price-run-group h3{margin:2px 0 0;color:var(--text,#303830);font-size:12px}
 .asset-price-run-list{display:grid;gap:8px}
 .asset-price-run-card{display:grid;grid-template-columns:minmax(100px,1fr) auto auto;align-items:start;gap:7px 12px}
 .asset-price-run-card>div{display:grid;gap:3px}
@@ -839,6 +850,8 @@ body{background:#f3f5ef}
 .app-shell.dark .asset-price-run-status.succeeded{color:#a8d1ad}
 .app-shell.dark .asset-price-run-status.partial{color:#e8c27e}
 .app-shell.dark .asset-price-run-status.failed{color:#f0aaa0}
+@media(max-width:900px){.asset-price-filter-toolbar{grid-template-columns:repeat(3,minmax(0,1fr))}.asset-price-filter-toolbar>.search-wrap{grid-column:1/-1}}
+@media(max-width:600px){.asset-price-filter-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}.asset-price-filter-toolbar>.search-wrap{grid-column:1/-1}.asset-price-pagination{align-items:flex-start}.asset-price-pagination>div{flex-wrap:wrap;justify-content:flex-end}.asset-price-run-card{grid-template-columns:1fr auto}.asset-price-run-card>span:last-of-type{grid-column:1/-1}}
 .asset-type-preferences{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--panel-line,#e6ebe3)}
 .asset-type-preferences .section-title,.asset-type-preferences .section-description{margin:0}
 .asset-type-preference-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}

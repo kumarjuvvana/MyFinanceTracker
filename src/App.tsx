@@ -3120,22 +3120,61 @@ function isAssetPriceUpdateRun(value: unknown): value is AssetPriceUpdateRun {
 function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stocks: TrackedStock[] }) {
   const [schedules, setSchedules] = useState<AssetPriceSchedule[]>([]);
   const [history, setHistory] = useState<AssetPriceHistoryRecord[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
   const [runs, setRuns] = useState<AssetPriceUpdateRun[]>([]);
+  const [runsTotal, setRunsTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyAssetType, setHistoryAssetType] = useState("");
+  const [historyProvider, setHistoryProvider] = useState("");
+  const [historyFrom, setHistoryFrom] = useState("");
+  const [historyTo, setHistoryTo] = useState("");
+  const [historyGroupBy, setHistoryGroupBy] = useState("asset_type");
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyPageSize, setHistoryPageSize] = useState(25);
+  const [runSearch, setRunSearch] = useState("");
+  const [runAssetType, setRunAssetType] = useState("");
+  const [runStatus, setRunStatus] = useState("");
+  const [runKind, setRunKind] = useState("");
+  const [runGroupBy, setRunGroupBy] = useState("asset_type");
+  const [runPage, setRunPage] = useState(0);
+  const [runPageSize, setRunPageSize] = useState(10);
 
-  async function loadDashboard() {
-    const response = await fetch("/api/asset-prices");
+  function dashboardQuery(): URLSearchParams {
+    return new URLSearchParams({
+      historyPage: String(historyPage),
+      historyPageSize: String(historyPageSize),
+      historySearch,
+      historyAssetType,
+      historyProvider,
+      historyFrom,
+      historyTo,
+      runPage: String(runPage),
+      runPageSize: String(runPageSize),
+      runSearch,
+      runAssetType,
+      runStatus,
+      runKind,
+    });
+  }
+
+  async function loadDashboard(query = dashboardQuery(), isCurrent: () => boolean = () => true) {
+    const response = await fetch(`/api/asset-prices?${query.toString()}`, { cache: "no-store" });
     const payload: unknown = await response.json();
-    if (!response.ok || !isRecord(payload) || !Array.isArray(payload.settings)) {
+    if (!response.ok || !isRecord(payload) || !Array.isArray(payload.settings) ||
+      !Array.isArray(payload.history) || !Array.isArray(payload.runs) ||
+      typeof payload.historyTotal !== "number" || typeof payload.runsTotal !== "number") {
       const message = isRecord(payload) && typeof payload.error === "string"
         ? payload.error
         : "Could not load automated price settings.";
       throw new Error(message);
     }
+    if (!isCurrent()) return;
 
     const loadedSchedules = payload.settings.flatMap((row): AssetPriceSchedule[] => {
       if (!isRecord(row) ||
@@ -3151,20 +3190,36 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
     if (loadedSchedules.length !== ASSET_PRICE_SCHEDULE_TYPES.length) {
       throw new Error("Supabase has incomplete price schedule settings. Reapply the asset price migration.");
     }
-    setSchedules(loadedSchedules);
+    setSchedules((current) => loadedSchedules.map((schedule) => ({
+      ...schedule,
+      enabled: current.find((saved) => saved.assetType === schedule.assetType)?.enabled ?? schedule.enabled,
+    })));
     setHistory(Array.isArray(payload.history) ? payload.history.filter(isAssetPriceHistoryRecord) : []);
+    setHistoryTotal(payload.historyTotal);
     setRuns(Array.isArray(payload.runs) ? payload.runs.filter(isAssetPriceUpdateRun) : []);
+    setRunsTotal(payload.runsTotal);
   }
 
   useEffect(() => {
     let active = true;
-    void loadDashboard().catch((caught: unknown) => {
-      if (active) setError(caught instanceof Error ? caught.message : "Could not load automated price settings.");
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => { active = false; };
-  }, []);
+    const query = dashboardQuery();
+    const timeout = window.setTimeout(() => {
+      setRefreshing(true);
+      void loadDashboard(query, () => active).catch((caught: unknown) => {
+        if (active) setError(caught instanceof Error ? caught.message : "Could not load automated price settings.");
+      }).finally(() => {
+        if (active) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [historyPage, historyPageSize, historySearch, historyAssetType, historyProvider, historyFrom, historyTo,
+    runPage, runPageSize, runSearch, runAssetType, runStatus, runKind]);
 
   function updateSchedule(assetType: AssetPriceSchedule["assetType"], patch: Partial<AssetPriceSchedule>) {
     setSchedules((current) => current.map((schedule) =>
@@ -3236,6 +3291,34 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
     return value ? new Date(value).toLocaleString() : "Never";
   }
 
+  const historyGroups = (() => {
+    if (historyGroupBy === "none") return [["", history]] as Array<[string, AssetPriceHistoryRecord[]]>;
+    const groups = new Map<string, AssetPriceHistoryRecord[]>();
+    for (const record of history) {
+      const key = historyGroupBy === "asset_type" ? record.asset_type
+        : historyGroupBy === "asset" ? record.asset_name
+          : historyGroupBy === "date" ? record.price_date
+            : record.provider;
+      groups.set(key, [...(groups.get(key) ?? []), record]);
+    }
+    return [...groups.entries()];
+  })();
+  const runGroups = (() => {
+    if (runGroupBy === "none") return [["", runs]] as Array<[string, AssetPriceUpdateRun[]]>;
+    const groups = new Map<string, AssetPriceUpdateRun[]>();
+    for (const run of runs) {
+      const key = runGroupBy === "asset_type" ? run.asset_type
+        : runGroupBy === "run_kind" ? (run.run_kind === "scheduled" ? "Scheduled" : "Manual")
+          : run.status;
+      groups.set(key, [...(groups.get(key) ?? []), run]);
+    }
+    return [...groups.entries()];
+  })();
+  const historyPageCount = Math.max(1, Math.ceil(historyTotal / historyPageSize));
+  const runPageCount = Math.max(1, Math.ceil(runsTotal / runPageSize));
+  const paginationLabel = (total: number, page: number, size: number) =>
+    total ? `Rows ${page * size + 1}–${Math.min((page + 1) * size, total)} of ${total}` : "0 records";
+
   return <div className="asset-price-automation">
     <div className="asset-price-automation-heading">
       <div>
@@ -3272,26 +3355,63 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
       <div className="asset-price-actions"><Button type="button" onClick={() => void saveSchedules()} disabled={saving || !schedules.length}>{saving ? "Saving..." : "Save price schedules"}</Button></div>
       <section className="asset-price-history-section">
         <h2 className="section-title"><History size={16} /> Automated price history</h2>
+        <div className="asset-price-filter-toolbar">
+          <div className="search-wrap"><Search size={15} /><Input aria-label="Search automated price history" placeholder="Search asset, scheme, symbol, or provider..." value={historySearch} onChange={(event) => { setHistorySearch(event.target.value); setHistoryPage(0); }} /></div>
+          <Field label="Asset type"><Select aria-label="Filter price history by asset type" value={historyAssetType} onChange={(event) => { setHistoryAssetType(event.target.value); setHistoryPage(0); }}><option value="">All types</option><option>Stocks</option><option>Mutual fund</option><option>NPS</option></Select></Field>
+          <Field label="Provider"><Select aria-label="Filter price history by provider" value={historyProvider} onChange={(event) => { setHistoryProvider(event.target.value); setHistoryPage(0); }}><option value="">All providers</option><option>Yahoo Finance</option><option>Twelve Data</option><option>AMFI</option><option>NPS Trust</option></Select></Field>
+          <Field label="Price date from"><Input aria-label="Price history from date" type="date" value={historyFrom} max={historyTo || undefined} onChange={(event) => { setHistoryFrom(event.target.value); setHistoryPage(0); }} /></Field>
+          <Field label="Price date to"><Input aria-label="Price history to date" type="date" value={historyTo} min={historyFrom || undefined} onChange={(event) => { setHistoryTo(event.target.value); setHistoryPage(0); }} /></Field>
+          <Field label="Group by"><Select aria-label="Group automated price history" value={historyGroupBy} onChange={(event) => setHistoryGroupBy(event.target.value)}><option value="asset_type">Asset type</option><option value="asset">Asset / scheme</option><option value="date">Price date</option><option value="provider">Provider</option><option value="none">No grouping</option></Select></Field>
+        </div>
+        <div className="asset-price-pagination">
+          <span aria-live="polite">{paginationLabel(historyTotal, historyPage, historyPageSize)}{refreshing ? " · Updating..." : ""}</span>
+          <div><Field label="Rows"><Select aria-label="Price history rows per page" value={String(historyPageSize)} onChange={(event) => { setHistoryPageSize(Number(event.target.value)); setHistoryPage(0); }}><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field>
+            <Button type="button" size="sm" variant="outline" disabled={refreshing || historyPage === 0} onClick={() => setHistoryPage((page) => page - 1)}>Previous</Button>
+            <span>Page {historyPage + 1} of {historyPageCount}</span>
+            <Button type="button" size="sm" variant="outline" disabled={refreshing || historyPage + 1 >= historyPageCount} onClick={() => setHistoryPage((page) => page + 1)}>Next</Button>
+          </div>
+        </div>
         {history.length ? <Card className="table-card"><table className="data-table mobile-card-table">
           <thead><tr><th>Asset type</th><th>Asset / scheme</th><th>Price date</th><th>Price</th><th>Source</th><th>Recorded</th></tr></thead>
-          <tbody>{history.map((record) => <tr key={record.id}>
-            <td data-label="Asset type">{record.asset_type}</td>
-            <td data-label="Asset / scheme"><div className="table-primary">{record.asset_name}</div><div className="table-secondary">{record.instrument_name}</div></td>
-            <td data-label="Price date">{record.price_date}</td>
-            <td data-label="Price" className="table-total">{formatPrice(record.price, record.currency)}</td>
-            <td data-label="Source">{record.provider}</td>
-            <td data-label="Recorded">{formatDateTime(record.fetched_at)}</td>
-          </tr>)}</tbody>
-        </table></Card> : <Card><EmptyState icon={<History size={18} />} title="No automated price history yet" description="Enable a supported asset class and let its scheduled job run, or use Run enabled types now." /></Card>}
+          {historyGroups.map(([group, records]) => <tbody key={group || "ungrouped"}>
+            {historyGroupBy !== "none" && <tr className="asset-price-group-row"><th colSpan={6}>{group} <span>({records.length})</span></th></tr>}
+            {records.map((record) => <tr key={record.id}>
+              <td data-label="Asset type">{record.asset_type}</td>
+              <td data-label="Asset / scheme"><div className="table-primary">{record.asset_name}</div><div className="table-secondary">{record.instrument_name}</div></td>
+              <td data-label="Price date">{record.price_date}</td>
+              <td data-label="Price" className="table-total">{formatPrice(record.price, record.currency)}</td>
+              <td data-label="Source">{record.provider}</td>
+              <td data-label="Recorded">{formatDateTime(record.fetched_at)}</td>
+            </tr>)}
+          </tbody>)}
+        </table></Card> : <Card><EmptyState icon={<History size={18} />} title={historyTotal ? "No matching price history" : "No automated price history yet"} description={historyTotal ? "Try changing the search or filters." : "Enable a supported asset class and let its scheduled job run, or use Run enabled types now."} /></Card>}
       </section>
       <section className="asset-price-history-section">
         <h2 className="section-title"><Clock3 size={16} /> Job history</h2>
-        {runs.length ? <div className="asset-price-run-list">{runs.map((run) => <Card className="asset-price-run-card" key={run.id}>
-          <div><strong>{run.asset_type}</strong><span>{run.run_kind === "scheduled" ? "Scheduled" : "Manual"} · {formatDateTime(run.started_at)}</span></div>
-          <span className={`asset-price-run-status ${run.status}`}>{run.status}</span>
-          <span>{run.updated_count} updated · {run.failure_count} failed</span>
-          {run.details.length > 0 && <ul>{run.details.map((detail) => <li key={`${run.id}:${detail}`}>{detail}</li>)}</ul>}
-        </Card>)}</div> : <Card><EmptyState icon={<Clock3 size={18} />} title="No job runs yet" description="Run enabled types now or wait for the next scheduled time." /></Card>}
+        <div className="asset-price-filter-toolbar asset-price-run-filter-toolbar">
+          <div className="search-wrap"><Search size={15} /><Input aria-label="Search price job history" placeholder="Search asset type, run type, or status..." value={runSearch} onChange={(event) => { setRunSearch(event.target.value); setRunPage(0); }} /></div>
+          <Field label="Asset type"><Select aria-label="Filter job history by asset type" value={runAssetType} onChange={(event) => { setRunAssetType(event.target.value); setRunPage(0); }}><option value="">All types</option><option>Stocks</option><option>Mutual fund</option><option>NPS</option></Select></Field>
+          <Field label="Run type"><Select aria-label="Filter job history by run type" value={runKind} onChange={(event) => { setRunKind(event.target.value); setRunPage(0); }}><option value="">All runs</option><option value="manual">Manual</option><option value="scheduled">Scheduled</option></Select></Field>
+          <Field label="Status"><Select aria-label="Filter job history by status" value={runStatus} onChange={(event) => { setRunStatus(event.target.value); setRunPage(0); }}><option value="">All statuses</option><option value="succeeded">Succeeded</option><option value="partial">Partial</option><option value="failed">Failed</option><option value="running">Running</option></Select></Field>
+          <Field label="Group by"><Select aria-label="Group price job history" value={runGroupBy} onChange={(event) => setRunGroupBy(event.target.value)}><option value="asset_type">Asset type</option><option value="run_kind">Run type</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+        </div>
+        <div className="asset-price-pagination">
+          <span aria-live="polite">{paginationLabel(runsTotal, runPage, runPageSize)}{refreshing ? " · Updating..." : ""}</span>
+          <div><Field label="Rows"><Select aria-label="Job history rows per page" value={String(runPageSize)} onChange={(event) => { setRunPageSize(Number(event.target.value)); setRunPage(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></Select></Field>
+            <Button type="button" size="sm" variant="outline" disabled={refreshing || runPage === 0} onClick={() => setRunPage((page) => page - 1)}>Previous</Button>
+            <span>Page {runPage + 1} of {runPageCount}</span>
+            <Button type="button" size="sm" variant="outline" disabled={refreshing || runPage + 1 >= runPageCount} onClick={() => setRunPage((page) => page + 1)}>Next</Button>
+          </div>
+        </div>
+        {runs.length ? <div className="asset-price-run-list">{runGroups.map(([group, groupRuns]) => <div className="asset-price-run-group" key={group || "ungrouped"}>
+          {runGroupBy !== "none" && <h3>{group} <span>({groupRuns.length})</span></h3>}
+          {groupRuns.map((run) => <Card className="asset-price-run-card" key={run.id}>
+            <div><strong>{run.asset_type}</strong><span>{run.run_kind === "scheduled" ? "Scheduled" : "Manual"} · {formatDateTime(run.started_at)}</span></div>
+            <span className={`asset-price-run-status ${run.status}`}>{run.status}</span>
+            <span>{run.updated_count} updated · {run.failure_count} failed</span>
+            {run.details.length > 0 && <ul>{run.details.map((detail) => <li key={`${run.id}:${detail}`}>{detail}</li>)}</ul>}
+          </Card>)}
+        </div>)}</div> : <Card><EmptyState icon={<Clock3 size={18} />} title={runsTotal ? "No matching job runs" : "No job runs yet"} description={runsTotal ? "Try changing the search or filters." : "Run enabled types now or wait for the next scheduled time."} /></Card>}
       </section>
     </>}
   </div>;

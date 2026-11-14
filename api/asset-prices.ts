@@ -7,11 +7,13 @@ import {
   runScheduledAssetPrices,
   savePriceSettings,
   startPriceRun,
+  type PriceDashboardQuery,
 } from "../server/asset-price-service.js";
 import type { AssetPriceSchedule, AutomatedPriceAssetType } from "../src/types.js";
 
 interface ApiRequest {
   method?: string;
+  url?: string;
   headers: Record<string, string | string[] | undefined>;
   body?: unknown;
 }
@@ -53,6 +55,47 @@ function validSchedule(value: unknown): value is AssetPriceSchedule {
 
 function isSupportedAssetType(value: unknown): value is AutomatedPriceAssetType {
   return value === "Stocks" || value === "Mutual fund" || value === "NPS";
+}
+
+function pageNumber(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? Math.min(parsed, 100000) : fallback;
+}
+
+function pageSize(value: string | null, allowed: number[], fallback: number): number {
+  const parsed = Number(value);
+  return allowed.includes(parsed) ? parsed : fallback;
+}
+
+function filterValue(value: string | null, allowed: string[]): string {
+  return value && allowed.includes(value) ? value : "";
+}
+
+function searchValue(value: string | null): string {
+  return (value ?? "").trim().slice(0, 100);
+}
+
+function dateValue(value: string | null): string {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function priceDashboardQuery(request: ApiRequest, host: string): PriceDashboardQuery {
+  const url = new URL(request.url ?? "/api/asset-prices", `https://${host || "localhost"}`);
+  return {
+    historyPage: pageNumber(url.searchParams.get("historyPage"), 0),
+    historyPageSize: pageSize(url.searchParams.get("historyPageSize"), [25, 50, 100], 25),
+    historySearch: searchValue(url.searchParams.get("historySearch")),
+    historyAssetType: filterValue(url.searchParams.get("historyAssetType"), ["Stocks", "Mutual fund", "NPS"]),
+    historyProvider: filterValue(url.searchParams.get("historyProvider"), ["Yahoo Finance", "Twelve Data", "AMFI", "NPS Trust"]),
+    historyFrom: dateValue(url.searchParams.get("historyFrom")),
+    historyTo: dateValue(url.searchParams.get("historyTo")),
+    runPage: pageNumber(url.searchParams.get("runPage"), 0),
+    runPageSize: pageSize(url.searchParams.get("runPageSize"), [10, 25, 50], 10),
+    runSearch: searchValue(url.searchParams.get("runSearch")),
+    runAssetType: filterValue(url.searchParams.get("runAssetType"), ["Stocks", "Mutual fund", "NPS"]),
+    runStatus: filterValue(url.searchParams.get("runStatus"), ["running", "succeeded", "partial", "failed"]),
+    runKind: filterValue(url.searchParams.get("runKind"), ["scheduled", "manual"]),
+  };
 }
 
 async function runManualUpdates() {
@@ -107,7 +150,7 @@ export default async function assetPricesHandler(request: ApiRequest, response: 
 
   if (request.method === "GET") {
     try {
-      respond(response, 200, await loadPriceDashboardData());
+      respond(response, 200, await loadPriceDashboardData(priceDashboardQuery(request, header(request, "host"))));
     } catch (caught) {
       const error = caught instanceof Error ? caught.message : "Could not load asset price settings.";
       console.error("Asset price dashboard load failed:", caught);

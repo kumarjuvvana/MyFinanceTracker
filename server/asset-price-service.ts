@@ -108,16 +108,116 @@ export async function savePriceSettings(settings: Array<Pick<SettingsRow, "asset
   });
 }
 
-export async function loadPriceDashboardData() {
+export interface PriceDashboardQuery {
+  historyPage: number;
+  historyPageSize: number;
+  historySearch: string;
+  historyAssetType: string;
+  historyProvider: string;
+  historyFrom: string;
+  historyTo: string;
+  runPage: number;
+  runPageSize: number;
+  runSearch: string;
+  runAssetType: string;
+  runStatus: string;
+  runKind: string;
+}
+
+function searchExpression(search: string, columns: string[]): string | null {
+  const term = search.trim().slice(0, 100)
+    .replace(/[\\",()%_*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return term
+    ? `(${columns.map((column) => `${column}.ilike."*${term}*"`).join(",")})`
+    : null;
+}
+
+function parseCount(response: Response): number {
+  const contentRange = response.headers.get("content-range");
+  const total = contentRange?.slice(contentRange.lastIndexOf("/") + 1);
+  const count = Number(total);
+  return Number.isSafeInteger(count) && count >= 0 ? count : 0;
+}
+
+function pageRequest(
+  table: string,
+  order: string,
+  page: number,
+  pageSize: number,
+  filters: Record<string, string | string[]>,
+  search: string,
+  searchColumns: string[],
+): string {
+  const params = new URLSearchParams({
+    select: "*",
+    order,
+    limit: String(pageSize),
+    offset: String(page * pageSize),
+  });
+  for (const [column, value] of Object.entries(filters)) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const filter of values) {
+      if (filter) params.append(column, /^(eq|gte|lte|gt|lt|neq|is|in|like|ilike|cs|cd|ov|fts|plfts|phfts|wfts)\./.test(filter)
+        ? filter
+        : `eq.${filter}`);
+    }
+  }
+  const searchFilter = searchExpression(search, searchColumns);
+  if (searchFilter) params.set("or", searchFilter);
+  return `${table}?${params.toString()}`;
+}
+
+async function loadPage<T>(path: string): Promise<{ rows: T[]; total: number }> {
+  const response = await supabaseRequest(path, { headers: { Prefer: "count=exact" } });
+  const rows: unknown = await response.json();
+  if (!Array.isArray(rows)) throw new Error("Supabase returned an invalid price history page.");
+  return {
+    rows: rows as T[],
+    total: parseCount(response),
+  };
+}
+
+export async function loadPriceDashboardData(query: PriceDashboardQuery) {
   const [settings, historyResponse, runsResponse] = await Promise.all([
     loadPriceSettings(),
-    supabaseRequest("asset_price_history?select=*&order=price_date.desc,fetched_at.desc&limit=100"),
-    supabaseRequest("asset_price_update_runs?select=*&order=started_at.desc&limit=30"),
+    loadPage<unknown>(pageRequest(
+      "asset_price_history",
+      "price_date.desc,fetched_at.desc",
+      query.historyPage,
+      query.historyPageSize,
+      {
+        asset_type: query.historyAssetType,
+        provider: query.historyProvider,
+        price_date: [
+          query.historyFrom ? `gte.${query.historyFrom}` : "",
+          query.historyTo ? `lte.${query.historyTo}` : "",
+        ],
+      },
+      query.historySearch,
+      ["asset_name", "asset_id", "instrument_name", "provider"],
+    )),
+    loadPage<unknown>(pageRequest(
+      "asset_price_update_runs",
+      "started_at.desc",
+      query.runPage,
+      query.runPageSize,
+      {
+        asset_type: query.runAssetType,
+        status: query.runStatus,
+        run_kind: query.runKind,
+      },
+      query.runSearch,
+      ["asset_type", "status", "run_kind"],
+    )),
   ]);
   return {
     settings,
-    history: await historyResponse.json(),
-    runs: await runsResponse.json(),
+    history: historyResponse.rows,
+    historyTotal: historyResponse.total,
+    runs: runsResponse.rows,
+    runsTotal: runsResponse.total,
   };
 }
 
