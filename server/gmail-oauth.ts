@@ -60,13 +60,17 @@ function safeEqual(left: string, right: string): boolean {
 
 function oauthResultPage(response: ApiResponse, success: boolean, message: string, origin: string) {
   const payload = JSON.stringify({ type: "daybook-gmail-oauth", success, message }).replace(/</g, "\\u003c");
+  const returnUrl = new URL("/", origin);
+  returnUrl.searchParams.set("page", "R&D / Test Connectors");
+  returnUrl.searchParams.set("gmailOAuth", success ? "connected" : "failed");
+  const fallbackUrl = JSON.stringify(returnUrl.toString()).replace(/</g, "\\u003c");
   response.statusCode = success ? 200 : 400;
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; frame-ancestors 'none'");
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Set-Cookie", cookie("", 0));
-  response.end(`<!doctype html><meta charset="utf-8"><title>Daybook Gmail authorization</title><p>${success ? "Gmail sending access connected. You can close this window." : "Gmail connection could not be completed. Return to Daybook and try again."}</p><script>if(window.opener){window.opener.postMessage(${payload},${JSON.stringify(origin)});window.close()}</script>`);
+  response.end(`<!doctype html><meta charset="utf-8"><title>Daybook Gmail authorization</title><p>${success ? "Gmail sending access connected. You can close this window." : "Gmail connection could not be completed. Return to Daybook and try again."}</p><script>if(window.opener){window.opener.postMessage(${payload},${JSON.stringify(origin)});window.close()}else{window.location.replace(${fallbackUrl})}</script>`);
 }
 
 function authorizeStart(request: ApiRequest, response: ApiResponse) {

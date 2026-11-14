@@ -12956,6 +12956,17 @@ function TestConnectors({ accounts, onImport }: {
 
   useEffect(() => {
     void refreshGmailSchedules();
+    const url = new URL(window.location.href);
+    const oauthResult = url.searchParams.get("gmailOAuth");
+    if (oauthResult === "connected") {
+      setScheduleNotice("Gmail sending access connected securely.");
+    } else if (oauthResult === "failed") {
+      setScheduleError("Gmail authorization was not completed. Check the Google consent screen and try again.");
+    }
+    if (oauthResult !== null) {
+      url.searchParams.delete("gmailOAuth");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     function handleOAuthMessage(event: MessageEvent<unknown>) {
       if (event.origin !== window.location.origin || typeof event.data !== "object" || event.data === null ||
         !("type" in event.data) || event.data.type !== "daybook-gmail-oauth") return;
@@ -12973,13 +12984,10 @@ function TestConnectors({ accounts, onImport }: {
   async function connectScheduledGmail() {
     setScheduleError("");
     setScheduleNotice("");
-    const popup = window.open("about:blank", "daybook-gmail-oauth", "popup,width=600,height=720");
-    if (!popup) {
-      setScheduleError("Allow popups for Daybook, then choose Connect Gmail again.");
-      return;
-    }
     setScheduleBusy(true);
+    let popup: Window | null = null;
     try {
+      popup = window.open("about:blank", "daybook-gmail-oauth", "popup,width=600,height=720");
       const response = await fetch("/api/gmail-oauth", {
         method: "POST",
         credentials: "same-origin",
@@ -12994,9 +13002,13 @@ function TestConnectors({ accounts, onImport }: {
           : `Could not start Google authorization (${response.status}).`;
         throw new Error(message);
       }
-      popup.location.href = payload.authorizationUrl;
+      if (popup) {
+        popup.location.href = payload.authorizationUrl;
+      } else {
+        window.location.assign(payload.authorizationUrl);
+      }
     } catch (caught) {
-      popup.close();
+      popup?.close();
       setScheduleError(caught instanceof Error ? caught.message : "Could not connect Gmail for scheduled sending.");
     } finally {
       setScheduleBusy(false);
