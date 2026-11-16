@@ -1054,6 +1054,7 @@ body{background:#f3f5ef}
 .cooking-plan-record-groups{display:grid;gap:12px}
 .cooking-plan-record-groups>section{display:grid;gap:8px;min-width:0}
 .cooking-list{display:grid;gap:10px}
+.cooking-recipe-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start}
 .cooking-card{min-width:0;padding:14px}
 .cooking-card h3{margin:4px 0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
 .cooking-card p{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
