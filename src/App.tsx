@@ -8334,6 +8334,10 @@ function HabitTargetExtensionModal({ habit, onClose, onSave }: {
   const maxDays = 3650 - (currentTargetDays ?? 0);
   const [days, setDays] = useState("");
   const [error, setError] = useState("");
+  const parsedDays = days === "" ? null : Number(days);
+  const newTargetDays = parsedDays !== null && Number.isInteger(parsedDays) && parsedDays > 0
+    ? (currentTargetDays ?? 0) + parsedDays
+    : null;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -8350,7 +8354,7 @@ function HabitTargetExtensionModal({ habit, onClose, onSave }: {
       <Field className="full" label={currentTargetDays ? "Days to add" : "Target duration (days)"}>
         <Input autoFocus required type="number" min={1} max={maxDays} step={1} value={days} onChange={(event) => { setDays(event.target.value); setError(""); }} />
       </Field>
-      {currentTargetDays !== null && <p className="field-hint full">Current target: {currentTargetDays} days.</p>}
+      {(currentTargetDays !== null || newTargetDays !== null) && <p className="field-hint full">{currentTargetDays !== null && <>Current target: {currentTargetDays} days.</>}{newTargetDays !== null && <>{currentTargetDays !== null ? " " : ""}New target: {newTargetDays} days.</>}</p>}
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{currentTargetDays ? "Extend target" : "Set target"}</Button></div>
     </form>
