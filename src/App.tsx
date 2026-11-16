@@ -8325,6 +8325,38 @@ function MindfulHabitModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
+function HabitTargetExtensionModal({ habit, onClose, onSave }: {
+  habit: MindfulHabit;
+  onClose: () => void;
+  onSave: (days: number) => void;
+}) {
+  const currentTargetDays = habit.targetDays ?? null;
+  const maxDays = 3650 - (currentTargetDays ?? 0);
+  const [days, setDays] = useState("");
+  const [error, setError] = useState("");
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const parsedDays = Number(days);
+    if (!Number.isInteger(parsedDays) || parsedDays < 1 || parsedDays > maxDays) {
+      setError(`Enter a whole number between 1 and ${maxDays}.`);
+      return;
+    }
+    onSave(parsedDays);
+  }
+
+  return <Modal title={currentTargetDays ? `Extend target · ${habit.title}` : `Set target · ${habit.title}`} onClose={onClose}>
+    <form onSubmit={submit}><div className="form-grid">
+      <Field className="full" label={currentTargetDays ? "Days to add" : "Target duration (days)"}>
+        <Input autoFocus required type="number" min={1} max={maxDays} step={1} value={days} onChange={(event) => { setDays(event.target.value); setError(""); }} />
+      </Field>
+      {currentTargetDays !== null && <p className="field-hint full">Current target: {currentTargetDays} days. You can add up to {maxDays} days.</p>}
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{currentTargetDays ? "Extend target" : "Set target"}</Button></div>
+    </form>
+  </Modal>;
+}
+
 function MindfulnessLogModal({ initial, habits, onClose, onSave }: {
   initial: MindfulnessLog | null;
   habits: MindfulHabit[];
@@ -8395,6 +8427,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
 }) {
   const [activeTab, setActiveTab] = useState<"habits" | "reflections">("habits");
   const [habitEditor, setHabitEditor] = useState<MindfulHabit | null | undefined>(undefined);
+  const [targetExtensionHabit, setTargetExtensionHabit] = useState<MindfulHabit | null>(null);
   const [logEditor, setLogEditor] = useState<MindfulnessLog | null | undefined>(undefined);
   const [trackingDate, setTrackingDate] = useState(today());
   const [search, setSearch] = useState("");
@@ -8495,13 +8528,14 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
     }, habit.id);
   }
 
-  function extendHabitTarget(habit: MindfulHabit) {
-    const { targetDays, elapsedDays } = habitProgress(habit);
+  function extendHabitTarget(habit: MindfulHabit, days: number) {
+    const { targetDays } = habitProgress(habit);
     onSaveHabit({
       ...habit,
       startDate: habit.startDate || today(),
-      targetDays: targetDays === null ? Math.max(30, elapsedDays + 30) : Math.min(3650, targetDays + 7),
+      targetDays: (targetDays ?? 0) + days,
     }, habit.id);
+    setTargetExtensionHabit(null);
   }
 
   function archiveHabit(habit: MindfulHabit) {
@@ -8533,7 +8567,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       <div className="habit-tracker-actions">
         <label className="habit-day-check"><input type="checkbox" aria-label={`Mark ${habit.title} complete on ${trackingDate}`} checked={checked} disabled={!canCheck} onChange={() => toggleHabitDate(habit)} /><span>{reflectedOnDate ? "In reflection" : checked ? "Done" : "Done today"}</span></label>
         <div className="table-actions">
-          <button className="icon-button" disabled={progress.targetDays === 3650} aria-label={progress.targetDays ? `Extend ${habit.title} target by 7 days` : `Set a target for ${habit.title}`} title={progress.targetDays ? "Extend target by 7 days" : "Set a 30-day target"} onClick={() => extendHabitTarget(habit)}><Plus size={14} /></button>
+          <button className="icon-button" disabled={progress.targetDays === 3650} aria-label={progress.targetDays ? `Extend ${habit.title} target` : `Set a target for ${habit.title}`} title={progress.targetDays ? "Choose how many days to extend the target" : "Choose a target duration"} onClick={() => setTargetExtensionHabit(habit)}><Plus size={14} /></button>
           <button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button>
           <button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)`, startDate: today(), completedDates: [] })}><Copy size={14} /></button>
           <button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button>
@@ -8601,6 +8635,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       : <Card><EmptyState icon={<Heart size={18} />} title={logs.length ? "No matching reflections" : "No reflections yet"} description={logs.length ? "Try another search, emotion, or date range." : "Add a reflection when you want to note a feeling, a response, or a positive moment."} /></Card>}
     </>}
     {habitEditor !== undefined && <MindfulHabitModal key={habitEditor?.id ?? "new-mindful-habit"} initial={habitEditor} onClose={() => setHabitEditor(undefined)} onSave={(habit) => { onSaveHabit(habit, habitEditor?.id); setHabitEditor(undefined); }} />}
+    {targetExtensionHabit && <HabitTargetExtensionModal key={targetExtensionHabit.id} habit={targetExtensionHabit} onClose={() => setTargetExtensionHabit(null)} onSave={(days) => extendHabitTarget(targetExtensionHabit, days)} />}
     {logEditor !== undefined && <MindfulnessLogModal key={logEditor?.id ?? "new-mindfulness-log"} initial={logEditor} habits={habits} onClose={() => setLogEditor(undefined)} onSave={(log) => { onSaveLog(log, logEditor?.id); setLogEditor(undefined); }} />}
   </>;
 }
