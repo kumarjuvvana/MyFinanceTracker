@@ -8350,7 +8350,7 @@ function HabitTargetExtensionModal({ habit, onClose, onSave }: {
       <Field className="full" label={currentTargetDays ? "Days to add" : "Target duration (days)"}>
         <Input autoFocus required type="number" min={1} max={maxDays} step={1} value={days} onChange={(event) => { setDays(event.target.value); setError(""); }} />
       </Field>
-      {currentTargetDays !== null && <p className="field-hint full">Current target: {currentTargetDays} days. You can add up to {maxDays} days.</p>}
+      {currentTargetDays !== null && <p className="field-hint full">Current target: {currentTargetDays} days.</p>}
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{currentTargetDays ? "Extend target" : "Set target"}</Button></div>
     </form>
