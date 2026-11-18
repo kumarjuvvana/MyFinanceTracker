@@ -13,6 +13,10 @@
       "destination": "/api/market-data?handler=nps-nav"
     },
     {
+      "source": "/api/gold-price",
+      "destination": "/api/market-data?handler=gold-price"
+    },
+    {
       "source": "/api/gmail-oauth",
       "destination": "/api/gmail?handler=oauth"
     },

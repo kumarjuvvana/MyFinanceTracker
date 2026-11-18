@@ -1,6 +1,7 @@
 import stockPriceHandler from "../server/stock-price.js";
 import mutualFundNavHandler from "../server/mutual-fund-nav.js";
 import npsNavHandler from "../server/nps-nav.js";
+import goldPriceHandler from "../server/gold-price.js";
 
 interface ApiRequest {
   method?: string;
@@ -22,6 +23,7 @@ function routeFor(request: ApiRequest): string {
     "/api/stock-price": "stock",
     "/api/mutual-fund-nav": "mutual-fund-nav",
     "/api/nps-nav": "nps-nav",
+    "/api/gold-price": "gold-price",
   }[url.pathname] ?? "";
 }
 
@@ -42,6 +44,9 @@ export default async function marketDataHandler(request: ApiRequest, response: A
       return;
     case "nps-nav":
       await npsNavHandler(request, response);
+      return;
+    case "gold-price":
+      await goldPriceHandler(request, response);
       return;
     default:
       respondNotFound(response);

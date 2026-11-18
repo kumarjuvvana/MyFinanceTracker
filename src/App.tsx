@@ -4314,7 +4314,7 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
         </div>)}
       </div>}
     </div>
-    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank. Mutual-fund and NPS NAVs can be refreshed manually; other asset valuations are not fetched or independently verified.</p>
+    <p className="section-description" style={{ marginTop: 12 }}>Only name and type are required. Leave unknown values blank. Mutual-fund and NPS NAVs and 24K gold estimates can be refreshed manually; other asset valuations are not fetched or independently verified.</p>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
     <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{submitLabel}</Button></div></form>
   </Modal>;
@@ -4657,7 +4657,7 @@ function AssetPriceAutomation({ assets, stocks }: { assets: AssetRecord[]; stock
   </div>;
 }
 
-function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs, onSaveStockQuote }: {
+function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, savedVisibleTypes, savedHiddenItems, onSave, onDelete, onOpenStocks, onOpenBankAccounts, onSaveVehicle, onSaveVehicleValuation, onOpenVehicles, onSaveVisibleTypes, onRefreshMutualFundNavs, onRefreshNpsNavs, onRefreshGoldValues, onSaveStockQuote }: {
   assets: AssetRecord[];
   stocks: TrackedStock[];
   stockQuotes: StockQuoteSnapshot[];
@@ -4692,6 +4692,12 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     currentValue?: number;
     historySnapshot?: NpsNavSnapshot;
   }>) => void;
+  onRefreshGoldValues: (updates: Array<{
+    id: string;
+    currentValue: number;
+    valuationDate: string;
+    currency: Currency;
+  }>) => void;
   onSaveStockQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
 }) {
   const [managerView, setManagerView] = useState<"assets" | "price-automation">("assets");
@@ -4717,6 +4723,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [npsNavMessage, setNpsNavMessage] = useState("");
   const [npsNavErrors, setNpsNavErrors] = useState<string[]>([]);
   const [trackNpsNavHistory, setTrackNpsNavHistory] = useState(false);
+  const [goldPriceBusy, setGoldPriceBusy] = useState(false);
+  const [goldPriceMessage, setGoldPriceMessage] = useState("");
+  const [goldPriceErrors, setGoldPriceErrors] = useState<string[]>([]);
   const [stockQuoteBusy, setStockQuoteBusy] = useState(false);
   const [stockQuoteMessage, setStockQuoteMessage] = useState("");
   const [stockQuoteErrors, setStockQuoteErrors] = useState<string[]>([]);
@@ -5445,6 +5454,99 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     }
   }
 
+  async function refreshGoldValues() {
+    const goldAssets = assets.filter((asset) =>
+      asset.type === "Digital gold" || asset.type === "Gold savings scheme");
+    if (!goldAssets.length) {
+      setGoldPriceMessage("");
+      setGoldPriceErrors(["No digital-gold or gold-scheme records are available to refresh."]);
+      return;
+    }
+
+    setGoldPriceBusy(true);
+    setGoldPriceMessage("");
+    setGoldPriceErrors([]);
+    try {
+      const currencies = [...new Set(goldAssets.map((asset) => asset.currency))];
+      const response = await fetch(`/api/gold-price?currencies=${encodeURIComponent(currencies.join(","))}`, {
+        cache: "no-store",
+      });
+      const payload: unknown = await response.json();
+      const providerError = typeof payload === "object" && payload !== null && "error" in payload &&
+        typeof payload.error === "string" ? payload.error : "The gold-price response was invalid.";
+      if (!response.ok || typeof payload !== "object" || payload === null ||
+        !("prices" in payload) || !Array.isArray(payload.prices) ||
+        !("errors" in payload) || !Array.isArray(payload.errors)) throw new Error(providerError);
+
+      const prices = new Map<Currency, { pricePerGram: number; priceDate: string }>();
+      for (const result of payload.prices) {
+        if (typeof result !== "object" || result === null ||
+          !("currency" in result) || typeof result.currency !== "string" ||
+          !CURRENCIES.includes(result.currency as Currency) ||
+          !("pricePerGram" in result) || typeof result.pricePerGram !== "number" ||
+          !Number.isFinite(result.pricePerGram) || result.pricePerGram <= 0 ||
+          !("priceDate" in result) || typeof result.priceDate !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(result.priceDate)) continue;
+        prices.set(result.currency as Currency, {
+          pricePerGram: result.pricePerGram,
+          priceDate: result.priceDate,
+        });
+      }
+
+      const providerErrors = new Map<string, string>();
+      for (const result of payload.errors) {
+        if (typeof result === "object" && result !== null &&
+          "currency" in result && typeof result.currency === "string" &&
+          "error" in result && typeof result.error === "string") {
+          providerErrors.set(result.currency, result.error);
+        }
+      }
+
+      const errors: string[] = [];
+      const updates: Array<{
+        id: string;
+        currentValue: number;
+        valuationDate: string;
+        currency: Currency;
+      }> = [];
+      for (const asset of goldAssets) {
+        const quote = prices.get(asset.currency);
+        if (!quote) {
+          errors.push(`${asset.name}: ${providerErrors.get(asset.currency) ?? `No gold price was returned in ${asset.currency}.`}`);
+          continue;
+        }
+        if (asset.quantity === null || !Number.isFinite(asset.quantity) || asset.quantity <= 0) {
+          errors.push(`${asset.name}: add a positive gold weight in grams before refreshing its value.`);
+          continue;
+        }
+        updates.push({
+          id: asset.id,
+          currentValue: Math.round(asset.quantity * quote.pricePerGram * 100) / 100,
+          valuationDate: quote.priceDate,
+          currency: asset.currency,
+        });
+      }
+
+      if (updates.length) {
+        onRefreshGoldValues(updates);
+        const quoteSummary = [...prices.entries()]
+          .filter(([currency]) => currencies.includes(currency))
+          .map(([currency, quote]) => `${formatAmount(quote.pricePerGram, currency)}/g (${dateLabel(quote.priceDate)})`)
+          .join(", ");
+        setGoldPriceMessage(
+          `Updated ${updates.length} of ${goldAssets.length} gold holdings using the latest 24K spot price: ${quoteSummary}. ` +
+          "Estimates exclude taxes, fees, and provider buy/sell spreads.",
+        );
+      }
+      setGoldPriceErrors(errors);
+      if (!updates.length && !errors.length) setGoldPriceErrors(["No gold holdings could be valued."]);
+    } catch (caught) {
+      setGoldPriceErrors([caught instanceof Error ? caught.message : "Could not refresh gold values."]);
+    } finally {
+      setGoldPriceBusy(false);
+    }
+  }
+
   function formatAmount(amount: number, currency: string) {
     return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(amount);
   }
@@ -5480,6 +5582,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <Button type="button" variant="outline" onClick={() => void refreshNpsNavs()} disabled={npsNavBusy}>
         <RefreshCw size={14} className={npsNavBusy ? "spin" : ""} />{npsNavBusy ? "Refreshing NPS NAVs..." : "Refresh NPS NAVs"}
       </Button>}
+      {assets.some((asset) => asset.type === "Digital gold" || asset.type === "Gold savings scheme") && <Button type="button" variant="outline" onClick={() => void refreshGoldValues()} disabled={goldPriceBusy}>
+        <RefreshCw size={14} className={goldPriceBusy ? "spin" : ""} />{goldPriceBusy ? "Refreshing gold values..." : "Refresh 24K gold values"}
+      </Button>}
       {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
     </div>} />
     {managerTabs}
@@ -5490,6 +5595,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     {mutualFundNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some mutual-fund NAVs could not be refreshed:</strong><ul>{mutualFundNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {npsNavMessage && <div className="alert alert-success" role="status">{npsNavMessage}</div>}
     {npsNavErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some NPS NAVs could not be refreshed:</strong><ul>{npsNavErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
+    {goldPriceMessage && <div className="alert alert-success" role="status">{goldPriceMessage}</div>}
+    {goldPriceErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some gold holdings could not be refreshed:</strong><ul>{goldPriceErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {totals.size > 0 && <div className="asset-total-list">{[...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}><div><span>Assets · {currency}</span><strong>{formatAmount(total.assets, currency)}</strong></div><div><span>Loans · {currency}</span><strong>{formatAmount(total.liabilities, currency)}</strong></div><div><span>Net · {currency}</span><strong>{formatAmount(total.assets - total.liabilities, currency)}</strong></div></Card>)}</div>}
     <div className="asset-type-tabs" role="tablist" aria-label="Asset classes">
       {assetTabs.map((type) => {
@@ -5768,8 +5875,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
       </Card>;
     })}</div>}
-    {activeType === "Digital gold" && <div className="alert">Digital gold values are manually recorded snapshots, not live provider prices. Per-gram value is derived from current value ÷ grams; returns are not annualized. Update the valuation date when refreshing a provider balance.</div>}
-    {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Amounts and installments are copied from the supplied screenshot; verify whether the amount is cumulative before relying on returns.</div>}
+    {activeType === "Digital gold" && <div className="alert">Refresh 24K gold values to estimate holdings from the latest XAU spot price and recorded grams. Estimates exclude taxes, fees, and provider buy/sell spreads; actual wallet redemption values may differ.</div>}
+    {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Refresh 24K gold values to estimate the recorded gold weight; scheme-specific installments, bonuses, fees, or maturity terms are not included.</div>}
     {activeType === "Real estate" && realEstateTotals.size > 0 && <div className="asset-total-list">{[...realEstateTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
       <div><span>Current market value · {currency}</span><strong className={total.comparableProperties === total.properties ? profitClass(total.estimatedChange) : ""}>{total.currentCount ? formatAmount(total.current, currency) : "Not recorded"}{total.currentCount < total.properties ? ` · ${total.currentCount} of ${total.properties} properties` : ""}</strong></div>
       <div><span>Purchase value · {currency}</span><strong>{total.purchaseCount ? formatAmount(total.purchase, currency) : "Not recorded"}{total.purchaseCount < total.properties ? ` · ${total.purchaseCount} of ${total.properties} properties` : ""}</strong></div>
@@ -16017,6 +16124,21 @@ export default function App() {
             ...(completeValuation ? {
               currentValue: npsSchemes.reduce((total, scheme) => total + (scheme.currentValue ?? 0), 0),
             } : {}),
+          };
+        }),
+      }));
+    }} onRefreshGoldValues={(goldUpdates) => {
+      const updatesById = new Map(goldUpdates.map((entry) => [entry.id, entry]));
+      update((previous) => ({
+        ...previous,
+        assets: (previous.assets ?? []).map((asset) => {
+          const goldUpdate = updatesById.get(asset.id);
+          if (!goldUpdate || (asset.type !== "Digital gold" && asset.type !== "Gold savings scheme")) return asset;
+          return {
+            ...asset,
+            currentValue: goldUpdate.currentValue,
+            valuationDate: goldUpdate.valuationDate,
+            currency: goldUpdate.currency,
           };
         }),
       }));
