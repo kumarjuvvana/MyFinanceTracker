@@ -31,7 +31,7 @@ import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
-import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
+import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, isAssetValuationStale, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -2285,12 +2285,7 @@ function AssetManagerReports({ data, initialFilters, onSaveView }: {
   const groups = [...groupMap.values()].sort((left, right) =>
     Number(right.liability) - Number(left.liability) || left.currency.localeCompare(right.currency) || left.name.localeCompare(right.name));
   const missingValuations = filtered.filter((record) => record.currentValue === null).length;
-  const staleValuations = filtered.filter((record) => {
-    const valueDate = reportDateKey(record.valueDate);
-    if (!valueDate) return true;
-    const ageDays = (Date.now() - Date.parse(`${valueDate}T00:00:00`)) / 86400000;
-    return ageDays > 365;
-  }).length;
+  const staleValuations = filtered.filter((record) => isAssetValuationStale(record.valueDate)).length;
   const exportRows = filtered.map((record) => ({
     name: record.name,
     type: record.assetType,
@@ -4215,6 +4210,15 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
       insuranceSumAssured: isInsuranceAsset ? parsedInsuredAmount : undefined,
       insurancePremium: isInsuranceAsset ? parsedInsurancePremium : undefined,
       insurancePremiumFrequency: isInsuranceAsset ? insurancePremiumFrequency : undefined,
+      valuationUpdatedAt: initial &&
+        (asset.type === "Digital gold" || asset.type === "Gold savings scheme") &&
+        (initial.type === "Digital gold" || initial.type === "Gold savings scheme") &&
+        parsedCurrent === initial.currentValue &&
+        parsedQuantity === initial.quantity &&
+        asset.currency === initial.currency &&
+        (asset.valuationDate ?? "") === (initial.valuationDate ?? "")
+        ? initial.valuationUpdatedAt
+        : undefined,
       latestNav: asset.type === "Mutual fund" ? asset.latestNav : undefined,
       latestNavDate: asset.type === "Mutual fund" ? asset.latestNavDate : undefined,
       investedValue: parsedInvested,
@@ -4243,6 +4247,7 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
   const isLoan = asset.type === "Loan" || asset.type === "Home loan";
   const isHomeLoan = asset.type === "Home loan";
   const isFixedDeposit = asset.type === "Fixed deposit";
+  const isMutualFund = asset.type === "Mutual fund";
   const isGold = asset.type === "Digital gold";
   const isGoldScheme = asset.type === "Gold savings scheme";
   const isNps = asset.type === "NPS";
@@ -4294,7 +4299,7 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
       {isNps && numericInput("Charges deducted", chargesValue, setChargesValue)}
       {!isVehicleAsset && <Field label={isInsurance ? "Policy start date" : isFixedDeposit ? "Deposit start date" : isHomeLoan ? "Loan sanction / open date" : isLoan ? "Start / disbursal date" : isNps ? "Account start date" : isBond ? "Investment date" : "Purchase / start date"}><DateInput value={asset.startDate} onValueChange={(startDate) => setAsset((current) => ({ ...current, startDate }))} /></Field>}
       {!isNps && !isVehicleAsset && <Field label={isInsurance ? "Policy maturity date (if applicable)" : isBond ? "Repayment / maturity date" : "Maturity / renewal date"}><DateInput value={asset.maturityDate} onValueChange={(maturityDate) => setAsset((current) => ({ ...current, maturityDate }))} /></Field>}
-      {(asset.type === "Mutual fund" || isGold || isNps) && <Field label="Statement / valuation date"><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
+      {!isVehicleAsset && !isHomeLoan && <Field label={isMutualFund ? "NAV / valuation date" : isNps ? "Current value / NAV date" : isGold ? "Gold quote / valuation date" : "Current value / statement date"}><DateInput value={asset.valuationDate ?? ""} onValueChange={(valuationDate) => setAsset((current) => ({ ...current, valuationDate }))} /></Field>}
       {isHomeLoan && <><Field label="First EMI date"><DateInput value={firstEmiDate} onValueChange={setFirstEmiDate} /></Field><Field label="Latest statement date"><DateInput value={lastStatementDate} onValueChange={setLastStatementDate} /></Field><Field className="full" label="Loan product / terms"><Input maxLength={200} placeholder="Optional, e.g. variable rate, monthly rest" value={lenderLoanType} onChange={(event) => setLenderLoanType(event.target.value)} /></Field></>}
       {isNps && <Field label="Most recent withdrawal date"><DateInput value={lastWithdrawalDate} onValueChange={setLastWithdrawalDate} /></Field>}
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
@@ -4696,6 +4701,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     id: string;
     currentValue: number;
     valuationDate: string;
+    valuationUpdatedAt: string;
     currency: Currency;
   }>) => void;
   onSaveStockQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
@@ -4753,6 +4759,26 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const isAssetItemVisible = (asset: AssetRecord) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0
     ? getVisibleNpsSchemes(asset).length > 0
     : asset.type === "Stock" || !isItemHidden(asset.type, asset.id);
+  const assetValueDate = (asset: AssetRecord) => {
+    if (asset.type === "Home loan") return asset.lastStatementDate || asset.valuationDate || "";
+    if (asset.type === "Mutual fund") return asset.latestNavDate || asset.valuationDate || "";
+    if (asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) {
+      const schemes = getVisibleNpsSchemes(asset);
+      if (schemes.some((scheme) => scheme.currentValue === null)) return "";
+      const dates = schemes.map((scheme) => scheme.navDate || asset.valuationDate || "");
+      if (dates.some((date) => !date)) return "";
+      return [...dates].sort()[0] ?? "";
+    }
+    return asset.valuationDate ?? "";
+  };
+  function renderValueFreshness(valueDate: string | null | undefined, updatedAt?: string) {
+    const date = reportDateKey(valueDate) ?? reportDateKey(updatedAt);
+    const validTimestamp = updatedAt && !Number.isNaN(Date.parse(updatedAt)) ? updatedAt : "";
+    return <small className="asset-value-freshness">
+      {validTimestamp ? `Quote updated ${new Date(validTimestamp).toLocaleString()}` : date ? `As of ${dateLabel(date)}` : "Date not recorded"}
+      {isAssetValuationStale(date) && <Badge tone="amber" className="asset-value-stale">Stale</Badge>}
+    </small>;
+  }
   const currentAssetValue = (asset: AssetRecord) => {
     if (asset.type === "Home loan") return asset.principalOutstanding ?? asset.currentValue;
     if (asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) {
@@ -5478,7 +5504,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         !("prices" in payload) || !Array.isArray(payload.prices) ||
         !("errors" in payload) || !Array.isArray(payload.errors)) throw new Error(providerError);
 
-      const prices = new Map<Currency, { pricePerGram: number; priceDate: string }>();
+      const prices = new Map<Currency, { pricePerGram: number; priceDate: string; updatedAt: string }>();
       for (const result of payload.prices) {
         if (typeof result !== "object" || result === null ||
           !("currency" in result) || typeof result.currency !== "string" ||
@@ -5486,10 +5512,13 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           !("pricePerGram" in result) || typeof result.pricePerGram !== "number" ||
           !Number.isFinite(result.pricePerGram) || result.pricePerGram <= 0 ||
           !("priceDate" in result) || typeof result.priceDate !== "string" ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(result.priceDate)) continue;
+          !/^\d{4}-\d{2}-\d{2}$/.test(result.priceDate) ||
+          !("updatedAt" in result) || typeof result.updatedAt !== "string" ||
+          Number.isNaN(Date.parse(result.updatedAt))) continue;
         prices.set(result.currency as Currency, {
           pricePerGram: result.pricePerGram,
           priceDate: result.priceDate,
+          updatedAt: result.updatedAt,
         });
       }
 
@@ -5507,6 +5536,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         id: string;
         currentValue: number;
         valuationDate: string;
+        valuationUpdatedAt: string;
         currency: Currency;
       }> = [];
       for (const asset of goldAssets) {
@@ -5523,6 +5553,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           id: asset.id,
           currentValue: Math.round(asset.quantity * quote.pricePerGram * 100) / 100,
           valuationDate: quote.priceDate,
+          valuationUpdatedAt: quote.updatedAt,
           currency: asset.currency,
         });
       }
@@ -5588,7 +5619,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
     </div>} />
     {managerTabs}
-    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
+    <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Values without a valuation date or older than 365 days are marked stale. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {stockQuoteMessage && <div className="alert alert-success" role="status">{stockQuoteMessage}</div>}
     {stockQuoteErrors.length > 0 && <div className="alert alert-error" role="alert"><div><strong>Some stock prices could not be refreshed:</strong><ul>{stockQuoteErrors.map((failure) => <li key={failure}>{failure}</li>)}</ul></div></div>}
     {mutualFundNavMessage && <div className="alert alert-success" role="status">{mutualFundNavMessage}</div>}
@@ -5750,8 +5781,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div className="asset-card-head"><div className="asset-card-title"><div className="asset-icon"><Car size={17} /></div><div><h2>{vehicle.name}</h2><p>{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}{vehicle.registration ? ` · ${vehicle.registration}` : ""}</p></div></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${vehicle.name} details`} title="Edit vehicle details and values" onClick={() => setVehicleEditor(vehicle)}><Pencil size={14} /></button></div></div>
         <div className="asset-details">
           {purchaseValue != null && <div><span>Purchase value</span><strong>{formatAmount(purchaseValue, "INR")}</strong></div>}
-          <div><span>Current estimated value</span><strong className={profitClass(vehicleProfit)}>{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</strong></div>
-          {(vehicle.valuationDate || latest?.date) && <div><span>Latest valuation</span><strong>{dateLabel(vehicle.valuationDate ?? latest?.date ?? "")}</strong></div>}
+          <div><span>Current estimated value</span><strong className={profitClass(vehicleProfit)}>{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</strong>{currentValue !== null && renderValueFreshness(vehicle.valuationDate ?? latest?.date)}</div>
           {vehicle.fuelType && <div><span>Fuel type</span><strong>{vehicle.fuelType}</strong></div>}
         </div>
         {valuations.length > 0 && <div className="nps-scheme-list"><strong>Value history</strong>{valuations.map((valuation) => <div className="nps-scheme-row" key={valuation.id}><span>{dateLabel(valuation.date)}</span><span>{valuation.purchaseValue != null ? `Purchase ${formatAmount(valuation.purchaseValue, "INR")}` : ""}</span><strong>{formatAmount(valuation.currentValue, "INR")}</strong></div>)}</div>}
@@ -5791,10 +5821,9 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           <div><span>Quantity</span><strong>{quantity.toLocaleString()}</strong></div>
           <div><span>Average buy price</span><strong>{stock.averageBuyPrice != null ? formatAmount(stock.averageBuyPrice, quote?.currency ?? "INR") : "Not recorded"}</strong></div>
           <div><span>Latest saved price</span><strong className={profitClass(profitLoss)}>{quote ? formatAmount(quote.price, quote.currency) : "No saved quote"}</strong></div>
-          <div><span>Current value</span><strong className={profitClass(profitLoss)}>{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</strong></div>
+          <div><span>Current value</span><strong className={profitClass(profitLoss)}>{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</strong>{quote && renderValueFreshness(quote.timestamp, quote.timestamp)}</div>
           {investedValue !== null && quote && <div><span>Invested value</span><strong>{formatAmount(investedValue, quote.currency)}</strong></div>}
           {profitLoss !== null && quote && <div><span>Unrealized P/L</span><strong className={profitLoss >= 0 ? "positive" : "negative"}>{profitLoss >= 0 ? "+" : ""}{formatAmount(profitLoss, quote.currency)}</strong></div>}
-          {quote && <div><span>Quote saved</span><strong>{new Date(quote.timestamp).toLocaleString()}</strong></div>}
         </div>
       </Card>;
       })}</div>
@@ -5810,9 +5839,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div className="asset-details">
           <div><span>Account</span><strong>{accountLabel}</strong></div>
           {account.currentBalance != null
-            ? <div><span>Available balance</span><strong>{formatAmount(account.currentBalance, "INR")}</strong></div>
+            ? <div><span>Available balance</span><strong>{formatAmount(account.currentBalance, "INR")}</strong>{renderValueFreshness(account.balanceAsOfDate)}</div>
             : <div><span>Available balance</span><strong>Not recorded</strong></div>}
-          {account.balanceAsOfDate && <div><span>Balance as of</span><strong>{dateLabel(account.balanceAsOfDate)}</strong></div>}
         </div>
       </Card>;
       })}</div>
@@ -5915,8 +5943,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           {isHomeLoan && asset.sanctionedAmount != null && <div><span>Sanctioned amount</span><strong>{formatAmount(asset.sanctionedAmount, asset.currency)}</strong></div>}
           {asset.investedValue !== null && <div><span>{isFixedDeposit ? "Deposit principal" : isHomeLoan ? "Amount disbursed" : isLoan ? "Original amount" : isNps ? "Total account contributions" : isGoldScheme ? "Amount shown / contributed" : isBond ? "Investment amount" : isInsurance ? "Premiums paid to date" : "Invested / purchase amount"}</span><strong>{formatAmount(asset.investedValue, asset.currency)}</strong></div>}
           {isHomeLoan
-            ? <div><span>Principal outstanding</span><strong>{asset.principalOutstanding != null ? formatAmount(asset.principalOutstanding, asset.currency) : "Not shown in provided statement"}</strong></div>
-            : currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? partialNpsSelection ? "Selected schemes' current value" : "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong className={profitClass(assetProfit(asset))}>{formatAmount(currentValue, asset.currency)}</strong></div>}
+            ? <div><span>Principal outstanding</span><strong>{currentValue !== null ? formatAmount(currentValue, asset.currency) : "Not shown in provided statement"}</strong>{currentValue !== null && renderValueFreshness(assetValueDate(asset))}</div>
+            : currentValue !== null && <div><span>{isFixedDeposit ? "Principal balance" : isLoan ? "Outstanding balance" : isNps ? partialNpsSelection ? "Selected schemes' current value" : "Current market value" : isBond ? "Principal balance (certificate)" : isInsurance ? "Current fund / surrender value" : "Current value"}</span><strong className={profitClass(assetProfit(asset))}>{formatAmount(currentValue, asset.currency)}</strong>{renderValueFreshness(assetValueDate(asset), asset.valuationUpdatedAt)}</div>}
           {isFixedDeposit && asset.maturityAmount != null && <div><span>Maturity amount on advice</span><strong>{formatAmount(asset.maturityAmount, asset.currency)}</strong></div>}
           {isFixedDeposit && asset.depositTerm && <div><span>Deposit term</span><strong>{asset.depositTerm}</strong></div>}
           {isFixedDeposit && asset.depositScheme && <div><span>Deposit scheme</span><strong>{asset.depositScheme}</strong></div>}
@@ -5944,12 +5972,12 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           {isGoldScheme && asset.installmentsPaid != null && <div><span>Installments paid</span><strong>{asset.installmentsPaid}</strong></div>}
           {!isHomeLoan && asset.interestRate !== null && <div><span>{isFixedDeposit ? "Interest rate (% p.a.)" : isBond ? "Current coupon rate (%)" : "Interest / coupon"}</span><strong>{asset.interestRate}%</strong></div>}
           {asset.reference && <div><span>Account / reference</span><strong>{asset.reference}</strong></div>}
-          {asset.latestNavDate && isMutualFund && <div><span>NAV date · AMFI</span><strong>{dateLabel(asset.latestNavDate)}</strong></div>}
-          {asset.valuationDate && !(isMutualFund && asset.latestNavDate) && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
+          {currentValue === null && asset.latestNavDate && isMutualFund && <div><span>NAV date · AMFI</span><strong>{dateLabel(asset.latestNavDate)}</strong></div>}
+          {currentValue === null && asset.valuationDate && !(isMutualFund && asset.latestNavDate) && <div><span>Valuation date</span><strong>{dateLabel(asset.valuationDate)}</strong></div>}
           {isNps && asset.lastWithdrawalDate && <div><span>Most recent withdrawal</span><strong>{dateLabel(asset.lastWithdrawalDate)}</strong></div>}
           {asset.startDate && <div><span>{isFixedDeposit ? "Deposit start date" : isHomeLoan ? "Loan sanction / open date" : isLoan ? "Start date" : isBond ? "Investment date" : "Purchase / start date"}</span><strong>{dateLabel(asset.startDate)}</strong></div>}
           {isHomeLoan && asset.firstEmiDate && <div><span>First EMI date</span><strong>{dateLabel(asset.firstEmiDate)}</strong></div>}
-          {isHomeLoan && asset.lastStatementDate && <div><span>Statement date</span><strong>{dateLabel(asset.lastStatementDate)}</strong></div>}
+          {isHomeLoan && currentValue === null && asset.lastStatementDate && <div><span>Statement date</span><strong>{dateLabel(asset.lastStatementDate)}</strong></div>}
           {isHomeLoan && asset.lenderLoanType && <div><span>Loan product / terms</span><strong>{asset.lenderLoanType}</strong></div>}
           {asset.maturityDate && <div><span>{isBond ? "Repayment / maturity date" : isFixedDeposit ? "Maturity date" : "Maturity / renewal"}</span><strong>{dateLabel(asset.maturityDate)}</strong></div>}
           {performance !== null && !isLoan && <div><span>{isNps ? "Gain / loss after withdrawals" : asset.type === "Mutual fund" || isGold ? "Gain / loss" : "Change since invested"}</span><strong className={performance >= 0 ? "positive" : "negative"}>{performance >= 0 ? "+" : ""}{formatAmount(performance, asset.currency)}{performancePercent !== null ? ` (${performancePercent >= 0 ? "+" : ""}${performancePercent.toFixed(2)}%)` : ""}</strong></div>}
@@ -5969,8 +5997,8 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           <strong>Current scheme holdings</strong>
           {getVisibleNpsSchemes(asset).map((scheme) => <div className="nps-scheme-row" key={scheme.schemeName}>
             <span>{scheme.schemeName}{scheme.allocationPercent !== null ? ` · ${scheme.allocationPercent}% allocation` : ""}</span>
-            <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}{scheme.navDate ? ` · ${dateLabel(scheme.navDate)} · NPS Trust` : ""}{scheme.schemeId ? ` · ${scheme.schemeId}` : ""}</span>
-            <strong>{scheme.currentValue !== null ? formatAmount(scheme.currentValue, asset.currency) : "—"}</strong>
+            <span>{scheme.units !== null ? `${scheme.units.toLocaleString(undefined, { maximumFractionDigits: 4 })} units` : ""}{scheme.nav !== null ? ` · NAV ${scheme.nav.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}{scheme.navDate ? " · NPS Trust" : ""}{scheme.schemeId ? ` · ${scheme.schemeId}` : ""}</span>
+            <strong>{scheme.currentValue !== null ? formatAmount(scheme.currentValue, asset.currency) : "—"}{scheme.currentValue !== null && renderValueFreshness(scheme.navDate || asset.valuationDate)}</strong>
           </div>)}
         </div>}
         {isNps && (asset.npsSchemes?.length ?? 0) > 0 && <details className="stock-history mutual-fund-nav-history">
@@ -16138,6 +16166,7 @@ export default function App() {
             ...asset,
             currentValue: goldUpdate.currentValue,
             valuationDate: goldUpdate.valuationDate,
+            valuationUpdatedAt: goldUpdate.valuationUpdatedAt,
             currency: goldUpdate.currency,
           };
         }),

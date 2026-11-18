@@ -277,6 +277,7 @@ export interface AssetRecord {
   startDate: string;
   maturityDate: string;
   valuationDate?: string;
+  valuationUpdatedAt?: string;
   latestNav?: number;
   latestNavDate?: string;
   navHistory?: MutualFundNavSnapshot[];

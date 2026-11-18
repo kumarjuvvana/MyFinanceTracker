@@ -1,3 +1,4 @@
+import { reportDateKey } from "./reportAnalytics";
 import type { AssetPriceHistoryRecord, AssetRecord, TrackerData, TrackedStock } from "../types.js";
 
 export interface InvestmentPosition {
@@ -29,6 +30,13 @@ export interface AssetHistoryPoint {
 
 export interface AssetManagerRecord extends InvestmentPosition {
   isLiability: boolean;
+}
+
+export function isAssetValuationStale(valueDate: string | null | undefined, now = new Date()): boolean {
+  const date = reportDateKey(valueDate);
+  if (!date) return true;
+  const ageDays = (now.getTime() - Date.parse(`${date}T00:00:00`)) / 86400000;
+  return ageDays > 365;
 }
 
 function validAmount(value: number | null | undefined): number | null {

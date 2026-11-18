@@ -387,6 +387,8 @@ export function validateData(value: unknown): value is TrackerData {
     typeof asset.maturityDate === "string" && (asset.maturityDate === "" || !Number.isNaN(Date.parse(asset.maturityDate))) &&
     (asset.valuationDate === undefined || (typeof asset.valuationDate === "string" &&
       (asset.valuationDate === "" || !Number.isNaN(Date.parse(asset.valuationDate))))) &&
+    (asset.valuationUpdatedAt === undefined || (typeof asset.valuationUpdatedAt === "string" &&
+      !Number.isNaN(Date.parse(asset.valuationUpdatedAt)))) &&
     (asset.latestNav === undefined || (typeof asset.latestNav === "number" &&
       Number.isFinite(asset.latestNav) && asset.latestNav > 0)) &&
     (asset.latestNavDate === undefined || (typeof asset.latestNavDate === "string" &&

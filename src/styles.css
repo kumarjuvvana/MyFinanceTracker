@@ -927,6 +927,8 @@ body{background:#f3f5ef}
 .asset-details>div{display:grid;gap:4px;min-width:0;padding:10px;border:1px solid #eef0ec;border-radius:9px}
 .asset-details span{font-size:9px;color:#92998f}
 .asset-details strong{font-size:11px;color:#414a42;overflow-wrap:anywhere;word-break:break-word}
+.asset-value-freshness{display:flex;align-items:center;gap:6px;flex-wrap:wrap;white-space:normal;font-size:9px;font-weight:400;color:#92998f}
+.asset-value-stale{padding:2px 6px;font-size:8px}
 .asset-details strong.positive,.asset-total-card strong.positive{color:#40834e}
 .asset-details strong.negative,.asset-total-card strong.negative{color:#b3483d}
 .app-shell.dark .asset-icon{background:#2b3d30;color:#a6c1a8}
@@ -934,6 +936,7 @@ body{background:#f3f5ef}
 .app-shell.dark .asset-details strong.positive,.app-shell.dark .asset-total-card strong.positive{color:#a8d1ad}
 .app-shell.dark .asset-details strong.negative,.app-shell.dark .asset-total-card strong.negative{color:#f0aaa0}
 .app-shell.dark .asset-card-title p,.app-shell.dark .asset-details span,.app-shell.dark .asset-total-card span{color:#a7b0a7}
+.app-shell.dark .asset-value-freshness{color:#a7b0a7}
 .app-shell.dark .asset-details>div{border-color:#343d35}
 .electricity-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px;margin-bottom:14px}
 .electricity-summary .card{display:grid;gap:6px;padding:14px}
