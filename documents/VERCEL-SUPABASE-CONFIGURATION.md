@@ -40,6 +40,8 @@ Configure these under **Vercel → Project → Settings → Environment Variable
 | `GMAIL_TOKEN_ENCRYPTION_KEY` | Required for scheduled Gmail email | Base64-encoded random 32-byte key used to encrypt the Gmail refresh token before storing it in Supabase. | Secret; server-only. Back it up securely; changing it makes the saved Gmail connection unreadable. |
 | `GMAIL_OAUTH_REDIRECT_URI` | Required for scheduled Gmail email | `https://myfinance-tracker-lac.vercel.app/api/gmail-oauth-callback` | Server-side callback URL. Register this exact URL as an Authorized redirect URI in Google Cloud. |
 | `TWELVE_DATA_API_KEY` | Optional | Twelve Data API key for stock-price requests. | Secret; server-only. |
+| `GOLDAPI_IO_API_KEY` | Required for gold refresh | GoldAPI.io API key used to fetch the 24K INR gold price. | Secret; server-only. Never prefix with `VITE_` or expose it to the browser. |
+| `SAFEGOLD_SELL_RATE_MULTIPLIER` | Optional | Estimated SafeGold sell-rate adjustment over GoldAPI.io's 24K spot quote; defaults to `1.045` and must be between `1` and `1.15`. | Server-side estimate configuration, not an official SafeGold rate. Adjust only using a verified SafeGold quote. |
 
 Do not configure the following local-development variables in Vercel:
 

@@ -5505,23 +5505,37 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         !("prices" in payload) || !Array.isArray(payload.prices) ||
         !("errors" in payload) || !Array.isArray(payload.errors)) throw new Error(providerError);
 
-      const prices = new Map<Currency, { pricePerGram: number; priceDate: string; updatedAt: string }>();
+      const prices = new Map<Currency, {
+        pricePerGram: number;
+        safeGoldSellPricePerGram: number;
+        priceDate: string;
+        updatedAt: string;
+      }>();
       for (const result of payload.prices) {
         if (typeof result !== "object" || result === null ||
           !("currency" in result) || typeof result.currency !== "string" ||
           !CURRENCIES.includes(result.currency as Currency) ||
           !("pricePerGram" in result) || typeof result.pricePerGram !== "number" ||
           !Number.isFinite(result.pricePerGram) || result.pricePerGram <= 0 ||
+          !("safeGoldSellPricePerGram" in result) || typeof result.safeGoldSellPricePerGram !== "number" ||
+          !Number.isFinite(result.safeGoldSellPricePerGram) || result.safeGoldSellPricePerGram <= 0 ||
           !("priceDate" in result) || typeof result.priceDate !== "string" ||
           !/^\d{4}-\d{2}-\d{2}$/.test(result.priceDate) ||
           !("updatedAt" in result) || typeof result.updatedAt !== "string" ||
           Number.isNaN(Date.parse(result.updatedAt))) continue;
         prices.set(result.currency as Currency, {
           pricePerGram: result.pricePerGram,
+          safeGoldSellPricePerGram: result.safeGoldSellPricePerGram,
           priceDate: result.priceDate,
           updatedAt: result.updatedAt,
         });
       }
+      const safeGoldSellRateMultiplier =
+        "safeGoldSellRateMultiplier" in payload && typeof payload.safeGoldSellRateMultiplier === "number" &&
+        Number.isFinite(payload.safeGoldSellRateMultiplier) && payload.safeGoldSellRateMultiplier >= 1
+          ? payload.safeGoldSellRateMultiplier
+          : null;
+      if (safeGoldSellRateMultiplier === null) throw new Error("The SafeGold sell-rate adjustment was missing or invalid.");
 
       const providerErrors = new Map<string, string>();
       for (const result of payload.errors) {
@@ -5550,9 +5564,15 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           errors.push(`${asset.name}: add a positive gold weight in grams before refreshing its value.`);
           continue;
         }
+        const isSafeGold = asset.institution.trim().toLocaleLowerCase() === "safegold";
+        if (isSafeGold && asset.currency !== "INR") {
+          errors.push(`${asset.name}: the SafeGold sell estimate is only available in INR.`);
+          continue;
+        }
+        const pricePerGram = isSafeGold ? quote.safeGoldSellPricePerGram : quote.pricePerGram;
         updates.push({
           id: asset.id,
-          currentValue: Math.round(asset.quantity * quote.pricePerGram * 100) / 100,
+          currentValue: Math.round(asset.quantity * pricePerGram * 100) / 100,
           valuationDate: quote.priceDate,
           valuationUpdatedAt: quote.updatedAt,
           currency: asset.currency,
@@ -5563,11 +5583,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         onRefreshGoldValues(updates);
         const quoteSummary = [...prices.entries()]
           .filter(([currency]) => currencies.includes(currency))
-          .map(([currency, quote]) => `${formatAmount(quote.pricePerGram, currency)}/g (${dateLabel(quote.priceDate)})`)
+          .map(([currency, quote]) => currency === "INR"
+            ? `${formatAmount(quote.pricePerGram, currency)}/g 24K spot; ` +
+              `${formatAmount(quote.safeGoldSellPricePerGram, currency)}/g SafeGold sell estimate (${dateLabel(quote.priceDate)})`
+            : `${formatAmount(quote.pricePerGram, currency)}/g 24K spot (${dateLabel(quote.priceDate)})`)
           .join(", ");
         setGoldPriceMessage(
-          `Updated ${updates.length} of ${goldAssets.length} gold holdings using the latest 24K spot price: ${quoteSummary}. ` +
-          "Estimates exclude taxes, fees, and provider buy/sell spreads.",
+          `Updated ${updates.length} of ${goldAssets.length} gold holdings using GoldAPI.io: ${quoteSummary}. ` +
+          `SafeGold uses an estimated ${((safeGoldSellRateMultiplier - 1) * 100).toFixed(2)}% sell-rate adjustment, not an official SafeGold quote; other holdings use unadjusted spot.`,
         );
       }
       setGoldPriceErrors(errors);
@@ -5904,7 +5927,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
         <div><span>Gain / loss · {currency}</span><strong className={gain >= 0 ? "positive" : "negative"}>{gain >= 0 ? "+" : ""}{formatAmount(gain, currency)}{returnPercent !== null ? ` (${returnPercent >= 0 ? "+" : ""}${returnPercent.toFixed(2)}%)` : ""}</strong></div>
       </Card>;
     })}</div>}
-    {activeType === "Digital gold" && <div className="alert">Refresh 24K gold values to estimate holdings from the latest XAU spot price and recorded grams. Estimates exclude taxes, fees, and provider buy/sell spreads; actual wallet redemption values may differ.</div>}
+    {activeType === "Digital gold" && <div className="alert">Refresh 24K gold values from GoldAPI.io. SafeGold holdings use a configurable estimated sell-rate adjustment over spot; this is not an official SafeGold wallet quote. Other digital-gold holdings use unadjusted spot, and actual redemption values may differ.</div>}
     {activeType === "Gold savings scheme" && <div className="alert">Jeweller savings plans are kept separate from digital-wallet gold. Refresh 24K gold values to estimate the recorded gold weight; scheme-specific installments, bonuses, fees, or maturity terms are not included.</div>}
     {activeType === "Real estate" && realEstateTotals.size > 0 && <div className="asset-total-list">{[...realEstateTotals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([currency, total]) => <Card className="asset-total-card" key={currency}>
       <div><span>Current market value · {currency}</span><strong className={total.comparableProperties === total.properties ? profitClass(total.estimatedChange) : ""}>{total.currentCount ? formatAmount(total.current, currency) : "Not recorded"}{total.currentCount < total.properties ? ` · ${total.currentCount} of ${total.properties} properties` : ""}</strong></div>

@@ -14,11 +14,12 @@ interface GoldPriceResponse {
 interface GoldPriceQuote {
   currency: Currency;
   pricePerGram: number;
+  safeGoldSellPricePerGram: number;
   priceDate: string;
   updatedAt: string;
 }
 
-const TROY_OUNCE_GRAMS = 31.1034768;
+const DEFAULT_SAFEGOLD_SELL_RATE_MULTIPLIER = 1.045;
 
 function respond(response: GoldPriceResponse, status: number, body: Record<string, unknown>) {
   response.statusCode = status;
@@ -45,29 +46,54 @@ function priceDateInIndia(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
-async function fetchGoldPrice(currency: Currency): Promise<GoldPriceQuote> {
+function readQuoteTimestamp(value: unknown): string {
+  const timestamp = typeof value === "number" && Number.isFinite(value)
+    ? new Date(value < 1_000_000_000_000 ? value * 1000 : value)
+    : typeof value === "string" ? new Date(value) : null;
+  if (!timestamp || Number.isNaN(timestamp.getTime())) {
+    throw new Error("GoldAPI.io returned an invalid quote timestamp.");
+  }
+  return timestamp.toISOString();
+}
+
+function getSafeGoldSellRateMultiplier(): number {
+  const configured = process.env.SAFEGOLD_SELL_RATE_MULTIPLIER;
+  if (configured === undefined || configured.trim() === "") return DEFAULT_SAFEGOLD_SELL_RATE_MULTIPLIER;
+  const multiplier = Number(configured);
+  if (!Number.isFinite(multiplier) || multiplier < 1 || multiplier > 1.15) {
+    throw new Error("SAFEGOLD_SELL_RATE_MULTIPLIER must be between 1 and 1.15.");
+  }
+  return multiplier;
+}
+
+async function fetchGoldPrice(currency: Currency, apiKey: string, safeGoldSellRateMultiplier: number): Promise<GoldPriceQuote> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(`https://api.gold-api.com/price/XAU/${currency}`, {
-      headers: { Accept: "application/json" },
+    const response = await fetch(`https://www.goldapi.io/api/price/XAU/${currency}`, {
+      headers: { Accept: "application/json", "x-access-token": apiKey },
       signal: controller.signal,
       cache: "no-store",
     });
-    if (!response.ok) throw new Error(`Gold-API returned HTTP ${response.status}.`);
+    if (!response.ok) throw new Error(`GoldAPI.io returned HTTP ${response.status}.`);
 
     const payload: unknown = await response.json();
-    if (!isRecord(payload) || payload.symbol !== "XAU" || payload.currency !== currency ||
-      typeof payload.price !== "number" || !Number.isFinite(payload.price) || payload.price <= 0 ||
-      typeof payload.updatedAt !== "string" || Number.isNaN(Date.parse(payload.updatedAt))) {
-      throw new Error("Gold-API returned an invalid 24K gold quote.");
+    if (!isRecord(payload) || payload.metal !== "XAU" || payload.currency !== currency ||
+      typeof payload.price_gram_24k !== "number" || !Number.isFinite(payload.price_gram_24k) ||
+      payload.price_gram_24k <= 0) {
+      throw new Error("GoldAPI.io returned an invalid 24K gold quote.");
     }
 
+    const updatedAt = readQuoteTimestamp(payload.timestamp);
+    const pricePerGram = payload.price_gram_24k;
     return {
       currency,
-      pricePerGram: payload.price / TROY_OUNCE_GRAMS,
-      priceDate: priceDateInIndia(payload.updatedAt),
-      updatedAt: payload.updatedAt,
+      pricePerGram,
+      safeGoldSellPricePerGram: currency === "INR"
+        ? pricePerGram * safeGoldSellRateMultiplier
+        : pricePerGram,
+      priceDate: priceDateInIndia(updatedAt),
+      updatedAt,
     };
   } finally {
     clearTimeout(timeout);
@@ -92,13 +118,29 @@ export default async function goldPriceHandler(request: GoldPriceRequest, respon
     return;
   }
 
+  const apiKey = process.env.GOLDAPI_IO_API_KEY?.trim();
+  if (!apiKey) {
+    respond(response, 503, { error: "Gold refresh is not configured. Set the server-only GOLDAPI_IO_API_KEY." });
+    return;
+  }
+
+  let safeGoldSellRateMultiplier: number;
+  try {
+    safeGoldSellRateMultiplier = getSafeGoldSellRateMultiplier();
+  } catch (caught) {
+    respond(response, 500, {
+      error: caught instanceof Error ? caught.message : "SafeGold sell-rate configuration is invalid.",
+    });
+    return;
+  }
+
   const currencies = [...new Set(requestedCurrencies)] as Currency[];
   const results = await Promise.all(currencies.map(async (currency) => {
     try {
-      return { quote: await fetchGoldPrice(currency) };
+      return { quote: await fetchGoldPrice(currency, apiKey, safeGoldSellRateMultiplier) };
     } catch (caught) {
       const error = caught instanceof Error && caught.name === "AbortError"
-        ? "Gold-API timed out."
+        ? "GoldAPI.io timed out."
         : caught instanceof Error ? caught.message : "Could not load a gold price.";
       return { currency, error };
     }
@@ -112,5 +154,10 @@ export default async function goldPriceHandler(request: GoldPriceRequest, respon
     respond(response, 502, { error: errors.map((entry) => `${entry.currency}: ${entry.error}`).join(" ") });
     return;
   }
-  respond(response, 200, { prices, errors, provider: "Gold-API.com" });
+  respond(response, 200, {
+    prices,
+    errors,
+    provider: "GoldAPI.io",
+    safeGoldSellRateMultiplier,
+  });
 }
