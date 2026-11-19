@@ -13657,6 +13657,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
         <span className="design-theme-save-message" role="status">{themeSaveMessage || "Unapplied selections do not change the app theme."}</span>
         <Button type="button" size="sm" variant="outline" onClick={() => { setDesignThemeDraft(designTheme); setThemeSaveMessage(""); }}>Cancel</Button>
         <Button type="button" size="sm" variant="outline" onClick={() => { setDesignThemeDraft("premium-light"); setThemeSaveMessage(""); }}>Reset</Button>
+        <Button type="button" size="sm" onClick={() => void saveDesignTheme()} disabled={syncStatus === "saving"}>{syncStatus === "saving" ? "Saving…" : "Save theme"}</Button>
       </div>
       <div className="theme-picker" role="group" aria-label="Visual theme">
         {VISUAL_THEMES.map((theme) => <button key={theme} type="button" className={`theme-option ${visualTheme === theme ? "selected" : ""}`} aria-pressed={visualTheme === theme} onClick={() => onVisualThemeChange(theme)}>
