@@ -20,6 +20,7 @@ import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialV
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { DESIGN_THEMES, type DesignTheme } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
 import type { CookingPlan } from "./types";
@@ -13570,7 +13571,19 @@ function SettingsDisclosure({ title, description, icon, children }: { title: str
   </details>;
 }
 
-function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, favoritePages, favoriteSavePending, showScreenDescriptions, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onToggleFavoritePage, onShowScreenDescriptionsChange, onGroupMenusChange, onMenuSortOrderChange, onPreviewImport, onRestore, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; favoritePages: Page[]; favoriteSavePending: boolean; showScreenDescriptions: boolean; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onToggleFavoritePage: (page: Page) => void; onShowScreenDescriptionsChange: (show: boolean) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onPreviewImport: (file: File) => Promise<TrackerData | null>; onRestore: (backup: TrackerData) => void; onClear: () => void; onExport: () => void; onSaveNow: () => void; onRefresh: () => void; onSignOut: () => void }) {
+function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme, visualTheme, dashboardWidgets, favoritePages, favoriteSavePending, showScreenDescriptions, groupMenus, menuSortOrder, syncStatus, syncMessage, refreshing, onCurrencyChange, onToggleDarkMode, onFontSizeChange, onFontStyleChange, onFontFamilyChange, onAccentChange, onDarkThemeChange, onVisualThemeChange, onToggleDashboardWidget, onToggleFavoritePage, onShowScreenDescriptionsChange, onGroupMenusChange, onMenuSortOrderChange, onPreviewImport, onRestore, onClear, onExport, onSaveNow, onRefresh, onSignOut }: { data: TrackerData; currency: Currency; darkMode: boolean; fontSize: FontSize; fontStyle: FontStyle; fontFamily: FontFamily; accentColor: AccentColor; darkTheme: DarkTheme; visualTheme: VisualTheme; dashboardWidgets: DashboardWidget[]; favoritePages: Page[]; favoriteSavePending: boolean; showScreenDescriptions: boolean; groupMenus: boolean; menuSortOrder: MenuSortOrder; syncStatus: "saved" | "saving" | "error"; syncMessage: string; refreshing: boolean; onCurrencyChange: (currency: Currency) => void; onToggleDarkMode: () => void; onFontSizeChange: (size: FontSize) => void; onFontStyleChange: (style: FontStyle) => void; onFontFamilyChange: (family: FontFamily) => void; onAccentChange: (color: AccentColor) => void; onDarkThemeChange: (theme: DarkTheme) => void; onVisualThemeChange: (theme: VisualTheme) => void; onToggleDashboardWidget: (widget: DashboardWidget) => void; onToggleFavoritePage: (page: Page) => void; onShowScreenDescriptionsChange: (show: boolean) => void; onGroupMenusChange: (groupMenus: boolean) => void; onMenuSortOrderChange: (order: MenuSortOrder) => void; onPreviewImport: (file: File) => Promise<TrackerData | null>; onRestore: (backup: TrackerData) => void; onClear: () => void; onExport: () => void; onSaveNow: (theme: DesignTheme) => Promise<void>; onRefresh: () => void; onSignOut: () => void }) {
+  const designTheme = data.preferences?.designTheme ?? (darkMode ? "modern-dark" : "premium-light");
+  const [designThemeDraft, setDesignThemeDraft] = useState(designTheme);
+  const [themeSaveMessage, setThemeSaveMessage] = useState("");
+  useEffect(() => setDesignThemeDraft(designTheme), [designTheme]);
+  async function saveDesignTheme() {
+    try {
+      await onSaveNow(designThemeDraft);
+      setThemeSaveMessage("Theme saved successfully.");
+    } catch (caught) {
+      setThemeSaveMessage(caught instanceof Error ? caught.message : "Could not save the selected theme.");
+    }
+  }
   const inputRef = useRef<HTMLInputElement>(null);
   const [restorePreview, setRestorePreview] = useState<{ backup: TrackerData; fileName: string } | null>(null);
   const restoreCounts = restorePreview ? [...new Set([...Object.keys(data), ...Object.keys(restorePreview.backup)])]
@@ -13626,6 +13639,25 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     <SettingsDisclosure title="Visual theme" description="Choose colors and appearance" icon={<Palette size={17} />}>
     <Card className="settings-card theme-picker-card">
       <div className="card-head"><div><h2 className="section-title">Choose your look</h2><p className="section-description">Preview a visual style across every page. Your choice is saved with shared Daybook data.</p></div><Palette size={18} /></div>
+      <div className="design-theme-heading"><strong>Application-wide design</strong><span>Select a preset, then use the existing Save now option in Appearance & currency below to apply it.</span></div>
+      <div className="design-theme-picker" role="group" aria-label="Application-wide design theme">
+        {DESIGN_THEMES.map((theme) => {
+          const label = theme === "modern-dark" ? "Modern Dark" : theme === "premium-light" ? "Premium Light" : "Premium Fintech";
+          const description = theme === "modern-dark" ? "Charcoal surfaces with emerald accents." : theme === "premium-light" ? "Bright, readable surfaces with dark green accents." : "Navy surfaces with refined green and teal accents.";
+          return <button key={theme} type="button" className={`design-theme-option${designThemeDraft === theme ? " selected" : ""}`} aria-pressed={designThemeDraft === theme} onClick={() => { setDesignThemeDraft(theme); setThemeSaveMessage(""); }}>
+            <span className={`design-theme-preview design-theme-preview-${theme}`} aria-hidden="true"><span className="design-theme-preview-rail" /><span className="design-theme-preview-content"><i /><i /><i /></span><span className="design-theme-preview-accent" /></span>
+            <span className="design-theme-option-label">{label}</span>
+            <span className="design-theme-option-description">{description}</span>
+            {designTheme === theme && <span className="design-theme-applied">Applied</span>}
+            {designThemeDraft === theme && <Check size={15} className="design-theme-check" aria-label="Selected" />}
+          </button>;
+        })}
+      </div>
+      <div className="design-theme-actions">
+        <span className="design-theme-save-message" role="status">{themeSaveMessage || "Unapplied selections do not change the app theme."}</span>
+        <Button type="button" size="sm" variant="outline" onClick={() => { setDesignThemeDraft(designTheme); setThemeSaveMessage(""); }}>Cancel</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => { setDesignThemeDraft("premium-light"); setThemeSaveMessage(""); }}>Reset</Button>
+      </div>
       <div className="theme-picker" role="group" aria-label="Visual theme">
         {VISUAL_THEMES.map((theme) => <button key={theme} type="button" className={`theme-option ${visualTheme === theme ? "selected" : ""}`} aria-pressed={visualTheme === theme} onClick={() => onVisualThemeChange(theme)}>
           <span className={`theme-preview theme-preview-${theme}`} aria-hidden="true"><span className="theme-preview-rail" /><span className="theme-preview-content"><i /><i /><i /></span><span className="theme-preview-accent" /></span>
@@ -13641,7 +13673,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved with shared Daybook data.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Screen descriptions" description="Show or hide helper text under screen titles" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies across screens that display a title description and syncs across devices.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={onSaveNow} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={() => void saveDesignTheme()} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a full backup</h3><p>Save all Daybook records, including archive and encrypted credential-vault data, as versioned JSON. Uploaded document files are stored separately and are not included; protect the downloaded backup because it contains your personal records.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download full JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
         const blob = new Blob([exportCsv(data.purchases)], { type: "text/csv;charset=utf-8" });
@@ -14378,6 +14410,9 @@ function isDarkTheme(value: unknown): value is DarkTheme {
 function isVisualTheme(value: unknown): value is VisualTheme {
   return VISUAL_THEMES.some((theme) => theme === value);
 }
+function isDesignTheme(value: unknown): value is DesignTheme {
+  return DESIGN_THEMES.some((theme) => theme === value);
+}
 function isDashboardWidget(value: unknown): value is DashboardWidget {
   return DASHBOARD_WIDGET_OPTIONS.some((option) => option.id === value);
 }
@@ -14396,6 +14431,7 @@ function readLegacyBrowserPreferences(): TrackerPreferences | null {
     ("accentColor" in parsed && !isAccentColor(parsed.accentColor)) ||
     ("darkTheme" in parsed && !isDarkTheme(parsed.darkTheme)) ||
     ("visualTheme" in parsed && !isVisualTheme(parsed.visualTheme)) ||
+    ("designTheme" in parsed && !isDesignTheme(parsed.designTheme)) ||
     ("dashboardWidgets" in parsed && !isDashboardWidgetList(parsed.dashboardWidgets)) ||
     ("showScreenDescriptions" in parsed && typeof parsed.showScreenDescriptions !== "boolean") ||
     ("groupMenus" in parsed && typeof parsed.groupMenus !== "boolean") ||
@@ -14412,6 +14448,7 @@ function readLegacyBrowserPreferences(): TrackerPreferences | null {
     accentColor: "accentColor" in parsed && isAccentColor(parsed.accentColor) ? parsed.accentColor : DEFAULT_TRACKER_PREFERENCES.accentColor,
     darkTheme: "darkTheme" in parsed && isDarkTheme(parsed.darkTheme) ? parsed.darkTheme : DEFAULT_TRACKER_PREFERENCES.darkTheme,
     visualTheme: "visualTheme" in parsed && isVisualTheme(parsed.visualTheme) ? parsed.visualTheme : DEFAULT_TRACKER_PREFERENCES.visualTheme,
+    designTheme: "designTheme" in parsed && isDesignTheme(parsed.designTheme) ? parsed.designTheme : undefined,
     dashboardWidgets: "dashboardWidgets" in parsed && isDashboardWidgetList(parsed.dashboardWidgets) ? [...new Set(parsed.dashboardWidgets)] : [...DEFAULT_TRACKER_PREFERENCES.dashboardWidgets],
     showScreenDescriptions: "showScreenDescriptions" in parsed && typeof parsed.showScreenDescriptions === "boolean" ? parsed.showScreenDescriptions : DEFAULT_TRACKER_PREFERENCES.showScreenDescriptions,
     groupMenus: "groupMenus" in parsed && typeof parsed.groupMenus === "boolean" ? parsed.groupMenus : DEFAULT_TRACKER_PREFERENCES.groupMenus,
@@ -14540,9 +14577,10 @@ export default function App() {
 
   const preferences = data?.preferences ?? DEFAULT_TRACKER_PREFERENCES;
   const {
-    currency, darkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme,
-    visualTheme, dashboardWidgets, showScreenDescriptions, groupMenus, menuSortOrder,
+    currency, darkMode: savedDarkMode, fontSize, fontStyle, fontFamily, accentColor, darkTheme,
+    visualTheme, designTheme, dashboardWidgets, showScreenDescriptions, groupMenus, menuSortOrder,
   } = preferences;
+  const darkMode = designTheme ? designTheme !== "premium-light" : savedDarkMode;
   latestDataRef.current = data;
   revisionRef.current = revision;
   authenticatedRef.current = authenticated;
@@ -14773,14 +14811,26 @@ export default function App() {
     }
   }
 
-  async function saveNow() {
-    const currentData = latestDataRef.current;
-    if (!currentData) return;
+  async function saveNow(theme: DesignTheme) {
+    await persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        designTheme: theme,
+        darkMode: theme !== "premium-light",
+      },
+    }));
     if (saveTimer.current !== null) {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    queueSave(currentData);
+    const currentData = latestDataRef.current;
+    if (!currentData) return;
+    const saveError = await queueSave(currentData);
+    if (saveError) throw new Error(saveError);
+    const themeLabel = theme === "modern-dark" ? "Modern Dark" : theme === "premium-light" ? "Premium Light" : "Premium Fintech";
+    setNotice(`${themeLabel} theme saved successfully.`);
   }
 
   async function refreshSharedData(manual = true) {
@@ -14961,13 +15011,34 @@ export default function App() {
   function updatePreferences(mutator: (previous: TrackerPreferences) => TrackerPreferences) {
     void persistPreferenceUpdate((previous) => ({
       ...previous,
-      preferences: mutator({
+      preferences: (() => {
+        const current = {
         ...DEFAULT_TRACKER_PREFERENCES,
         ...previous.preferences,
         dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
-      }),
+        };
+        const next = mutator(current);
+        return next.darkMode === current.darkMode ? next : {
+          ...next,
+          designTheme: current.designTheme === undefined ? undefined : next.darkMode
+            ? current.designTheme === "premium-fintech" ? "premium-fintech" : "modern-dark"
+            : "premium-light",
+        };
+      })(),
     })).catch((caught: unknown) => {
       setError(caught instanceof Error ? caught.message : "Could not save preferences to Supabase.");
+    });
+  }
+  function toggleDarkMode() {
+    updatePreferences((current) => {
+      const nextDarkMode = !current.darkMode;
+      return {
+        ...current,
+        darkMode: nextDarkMode,
+        designTheme: current.designTheme === undefined ? undefined : nextDarkMode
+          ? current.designTheme === "premium-fintech" ? "premium-fintech" : "modern-dark"
+          : "premium-light",
+      };
     });
   }
   function saveShoppingBudget(amount: number | undefined): Promise<void> {
@@ -16266,7 +16337,7 @@ export default function App() {
         credentialRecords: [...credentials, ...(previous.credentialRecords ?? []).filter((entry) => !credentials.some((record) => record.id === entry.id))],
         bankAccounts: [...banks, ...(previous.bankAccounts ?? []).filter((entry) => !banks.some((account) => account.id === entry.id))],
       }))} />,
-    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={() => void saveNow()} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
+    "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={toggleDarkMode} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={saveNow} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors
       accounts={data.bankAccounts ?? []}
       onImport={(updatedAccounts) => persistUpdate((previous) => {
@@ -16278,7 +16349,7 @@ export default function App() {
       })}
     />,
   };
-  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
+  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} design-${designTheme ?? "legacy"} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
     <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
       <div className="nav-label">YOUR SPACE</div><nav className={`nav-list ${groupMenus ? "nav-list-grouped" : ""}`} aria-label="Main navigation">{menuGroups.map(({ group, entries }) => {

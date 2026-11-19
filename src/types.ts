@@ -1200,6 +1200,7 @@ export interface TrackerPreferences {
   accentColor: AccentColor;
   darkTheme: DarkTheme;
   visualTheme: VisualTheme;
+  designTheme?: DesignTheme;
   dashboardWidgets: DashboardWidget[];
   showScreenDescriptions: boolean;
   groupMenus: boolean;
@@ -1246,6 +1247,8 @@ export const DARK_THEMES = ["forest", "slate", "midnight"] as const;
 export type DarkTheme = (typeof DARK_THEMES)[number];
 export const VISUAL_THEMES = ["sage", "cloud", "sand", "pink"] as const;
 export type VisualTheme = (typeof VISUAL_THEMES)[number];
+export const DESIGN_THEMES = ["modern-dark", "premium-light", "premium-fintech"] as const;
+export type DesignTheme = (typeof DESIGN_THEMES)[number];
 export type FontSize = "extra-small" | "small" | "medium" | "large" | "extra-large" | "xx-large";
 export type FontStyle = "modern" | "editorial" | "rounded";
 export const FONT_FAMILIES = ["system", "inter", "arial", "roboto", "segoe", "georgia", "times", "trebuchet", "verdana", "tahoma", "courier"] as const;

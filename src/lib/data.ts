@@ -1,4 +1,5 @@
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { DESIGN_THEMES } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
@@ -296,6 +297,7 @@ export function validateData(value: unknown): value is TrackerData {
       ACCENT_COLORS.includes(preferences.accentColor as (typeof ACCENT_COLORS)[number]) &&
       DARK_THEMES.includes(preferences.darkTheme as (typeof DARK_THEMES)[number]) &&
       VISUAL_THEMES.includes(preferences.visualTheme as (typeof VISUAL_THEMES)[number]) &&
+      (preferences.designTheme === undefined || DESIGN_THEMES.includes(preferences.designTheme as (typeof DESIGN_THEMES)[number])) &&
       Array.isArray(preferences.dashboardWidgets) &&
       preferences.dashboardWidgets.every((widget) => DASHBOARD_WIDGETS.includes(widget as (typeof DASHBOARD_WIDGETS)[number])) &&
       new Set(preferences.dashboardWidgets).size === preferences.dashboardWidgets.length &&
