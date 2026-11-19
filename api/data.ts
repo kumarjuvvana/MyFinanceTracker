@@ -1,7 +1,7 @@
 import seedFile from "../data/daybook.json" with { type: "json" };
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { normalizeTrackerData, validateData } from "../src/lib/data.js";
-import type { TrackerData } from "../src/types";
+import type { TrackerData } from "../src/types.js";
 
 const MAX_DATA_BYTES = 2 * 1024 * 1024;
 const seedData = seedFile as TrackerData;
@@ -313,6 +313,7 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
       return;
     }
 
+    const submittedRevision = typeof body.revision === "string" ? body.revision : null;
     const data = normalizeTrackerData(body.data);
     if (new TextEncoder().encode(JSON.stringify(data)).byteLength > MAX_DATA_BYTES) {
       respond(response, 413, { error: "Daybook data is larger than the 2 MB limit. Export a backup and remove old stock price snapshots." });
@@ -322,7 +323,7 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
     const recordData = { ...data };
     delete recordData.favoritePages;
     delete recordData.preferences;
-    const revision = await saveData(recordData, body.revision);
+    const revision = await saveData(recordData, submittedRevision);
     if (revision === null) {
       respond(response, 409, { error: "The shared data changed on another device. Refresh before saving to avoid overwriting it." });
       return;

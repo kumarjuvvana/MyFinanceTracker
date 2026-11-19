@@ -56,6 +56,12 @@ function readQuoteTimestamp(value: unknown): string {
   return timestamp.toISOString();
 }
 
+function positiveNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value
+    : typeof value === "string" && value.trim() ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function getSafeGoldSellRateMultiplier(): number {
   const configured = process.env.SAFEGOLD_SELL_RATE_MULTIPLIER;
   if (configured === undefined || configured.trim() === "") return DEFAULT_SAFEGOLD_SELL_RATE_MULTIPLIER;
@@ -78,14 +84,30 @@ async function fetchGoldPrice(currency: Currency, apiKey: string, safeGoldSellRa
     if (!response.ok) throw new Error(`GoldAPI.io returned HTTP ${response.status}.`);
 
     const payload: unknown = await response.json();
-    if (!isRecord(payload) || payload.metal !== "XAU" || payload.currency !== currency ||
-      typeof payload.price_gram_24k !== "number" || !Number.isFinite(payload.price_gram_24k) ||
-      payload.price_gram_24k <= 0) {
-      throw new Error("GoldAPI.io returned an invalid 24K gold quote.");
+    if (!isRecord(payload)) {
+      throw new Error("GoldAPI.io returned a non-object quote response.");
     }
 
-    const updatedAt = readQuoteTimestamp(payload.timestamp);
-    const pricePerGram = payload.price_gram_24k;
+    const providerMessage = [payload.error, payload.message]
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    if (providerMessage) throw new Error(`GoldAPI.io: ${providerMessage.slice(0, 240)}`);
+
+    const metal = payload.metal ?? payload.symbol;
+    if (typeof metal === "string" && !metal.toUpperCase().includes("XAU")) {
+      throw new Error(`GoldAPI.io returned ${metal} instead of XAU.`);
+    }
+    if (typeof payload.currency === "string" && payload.currency.toUpperCase() !== currency) {
+      throw new Error(`GoldAPI.io returned ${payload.currency} instead of ${currency}.`);
+    }
+
+    const gramQuote = positiveNumber(payload.price_gram_24k);
+    const troyOunceQuote = positiveNumber(payload.price);
+    const pricePerGram = gramQuote ?? (troyOunceQuote === null ? null : troyOunceQuote / 31.1034768);
+    if (pricePerGram === null) {
+      throw new Error("GoldAPI.io returned no usable 24K gram price or troy-ounce price.");
+    }
+
+    const updatedAt = readQuoteTimestamp(payload.timestamp ?? payload.updatedAt ?? payload.open_time);
     return {
       currency,
       pricePerGram,

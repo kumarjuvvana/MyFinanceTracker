@@ -1,5 +1,5 @@
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
-import type { CookingInventoryItem, CookingInventoryUsage } from "../src/types";
+import type { CookingInventoryItem, CookingInventoryUsage } from "../src/types.js";
 
 interface ApiRequest {
   method?: string;
