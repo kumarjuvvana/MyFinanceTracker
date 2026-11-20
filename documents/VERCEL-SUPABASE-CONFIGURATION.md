@@ -83,6 +83,7 @@ Changing the database password in Supabase is different from putting that passwo
 - Vercel deployments do **not** run Supabase migrations automatically.
 - Apply only the repository migration(s) needed for the features being deployed. Back up data and review a migration before running it in the Supabase SQL Editor.
 - The core normalized-storage setup is in `supabase/migrations/20261105010000_normalize_daybook_storage.sql`.
+- Apply `supabase/migrations/20261120100000_add_devotional_songs.sql` in the Supabase SQL Editor before deploying code that saves devotional songs. This stores songs in their own protected collection and prevents older Daybook clients that omit the collection from deleting them.
 - Private document object storage is configured by `supabase/migrations/20261106130000_add_private_document_storage.sql`; the bucket is private and named `daybook-documents`.
 - Other feature migrations are listed under `supabase/migrations/`. A migration existing in Git does not prove it has been applied to the live Supabase project.
 - The app stores records in the Supabase database and document files in Supabase Storage. Vercel's deployment filesystem is not the persistent data store.
