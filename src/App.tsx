@@ -10408,8 +10408,9 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-function DevotionalSongModal({ initial, onClose, onSave }: {
+function DevotionalSongModal({ initial, languages, onClose, onSave }: {
   initial: DevotionalSong | null;
+  languages: string[];
   onClose: () => void;
   onSave: (song: Omit<DevotionalSong, "id">) => void;
 }) {
@@ -10448,7 +10449,7 @@ function DevotionalSongModal({ initial, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="Song title" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date"><DateInput required value={date} onValueChange={setDate} /></Field>
-      <Field label="Language (optional)"><Input list="devotional-song-languages" maxLength={60} placeholder="e.g. Telugu" value={language} onChange={(event) => setLanguage(event.target.value)} /><datalist id="devotional-song-languages">{["Telugu", "English", "Hindi", "Tamil", "Kannada", "Malayalam", "Other"].map((item) => <option key={item} value={item} />)}</datalist></Field>
+      <Field label="Language (optional)"><Input list="devotional-song-languages" maxLength={60} placeholder="Type or choose a language" value={language} onChange={(event) => setLanguage(event.target.value)} /><datalist id="devotional-song-languages">{languages.map((item) => <option key={item} value={item} />)}</datalist></Field>
       <Field label="Bible reference (optional)"><Input maxLength={160} placeholder="e.g. Psalm 23:1" value={bibleReference} onChange={(event) => setBibleReference(event.target.value)} /></Field>
       <Field label="Author (optional)"><Input maxLength={160} placeholder="Lyricist or composer" value={author} onChange={(event) => setAuthor(event.target.value)} /></Field>
       <Field className="full" label="Lyrics (optional)"><textarea className="field textarea devotional-song-lyrics-input" rows={16} maxLength={50000} placeholder="Enter or paste the song lyrics" value={lyrics} onChange={(event) => setLyrics(event.target.value)} /></Field>
@@ -10534,6 +10535,11 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   const sortedSongs = sortDevotionalRecords(visibleSongs, (song) => song.date, (song) => song.title, sortOrder);
   const sortedResources = sortDevotionalRecords(visibleResources, (resource) => resource.dateAdded, (resource) => resource.title, sortOrder);
   const sortedPrayerLogs = sortDevotionalRecords(visibleDailyPrayerLogs, (log) => log.date, (log) => `${log.period} ${log.prayerType}`, sortOrder);
+  const songLanguages = [...new Map([
+    "Telugu", "English", "Hindi", "Tamil", "Kannada", "Malayalam", "Sanskrit", "Urdu", "Bengali",
+    "Marathi", "Punjabi", "Gujarati", "Odia", "Assamese",
+    ...songs.map((song) => song.language ?? ""),
+  ].filter(Boolean).map((language) => [language.toLocaleLowerCase(), language])).values()];
   if (sortOrder !== "title") {
     sortedPrayerLogs.sort((a, b) =>
       (sortOrder === "newest" ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)) ||
@@ -10849,7 +10855,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} initialDate={readingEditorDate} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
     {dailyPrayerEditor !== undefined && <DailyPrayerLogModal key={dailyPrayerEditor?.id ?? "new-daily-prayer"} initial={dailyPrayerEditor} initialDate={dailyPrayerEditorDate} onClose={() => setDailyPrayerEditor(undefined)} onSave={(log) => { onSaveDailyPrayerLog(log, dailyPrayerEditor?.id); setDailyPrayerEditor(undefined); }} />}
     {resourceEditor !== undefined && <DevotionalResourceModal key={resourceEditor?.id ?? "new-devotional-resource"} initial={resourceEditor} onClose={() => setResourceEditor(undefined)} onSave={(resource) => { onSaveResource(resource, resourceEditor?.id); setResourceEditor(undefined); }} />}
-    {songEditor !== undefined && <DevotionalSongModal key={songEditor?.id ?? "new-devotional-song"} initial={songEditor} onClose={() => setSongEditor(undefined)} onSave={(song) => { onSaveSong(song, songEditor?.id); setSongEditor(undefined); }} />}
+    {songEditor !== undefined && <DevotionalSongModal key={songEditor?.id ?? "new-devotional-song"} initial={songEditor} languages={songLanguages} onClose={() => setSongEditor(undefined)} onSave={(song) => { onSaveSong(song, songEditor?.id); setSongEditor(undefined); }} />}
     {requestEditor !== undefined && <PrayerRequestModal key={requestEditor?.id ?? "new-prayer-request"} initial={requestEditor} initialDate={requestEditorDate} onClose={() => setRequestEditor(undefined)} onSave={(request) => { onSaveRequest(request, requestEditor?.id); setRequestEditor(undefined); }} />}
   </>;
 }
