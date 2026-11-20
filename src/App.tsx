@@ -5626,22 +5626,24 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   return <>
     <PageHeading eyebrow="Your financial overview" title="Asset manager" subtitle="Organize investments, property, deposits, and loans in one place." action={<div className="asset-heading-actions">
       {stocks.length > 0 && <label className="stock-history-toggle"><input type="checkbox" checked={trackStockPriceHistory} disabled={stockQuoteBusy} onChange={(event) => setTrackStockPriceHistory(event.target.checked)} />Track stock price history</label>}
+      {assets.some((asset) => asset.type === "Mutual fund") && <label className="stock-history-toggle"><input type="checkbox" checked={trackMutualFundNavHistory} disabled={mutualFundNavBusy} onChange={(event) => setTrackMutualFundNavHistory(event.target.checked)} />Track NAV history</label>}
+      {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <label className="stock-history-toggle"><input type="checkbox" checked={trackNpsNavHistory} disabled={npsNavBusy} onChange={(event) => setTrackNpsNavHistory(event.target.checked)} />Track NPS NAV history</label>}
+      {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
+    </div>} />
+    <div className="asset-refresh-actions" aria-label="Refresh asset prices">
       {stocks.length > 0 && <Button type="button" variant="outline" onClick={() => void refreshStockPrices()} disabled={stockQuoteBusy}>
         <RefreshCw size={14} className={stockQuoteBusy ? "spin" : ""} />{stockQuoteBusy ? "Refreshing stock prices..." : "Refresh stock prices"}
       </Button>}
-      {assets.some((asset) => asset.type === "Mutual fund") && <label className="stock-history-toggle"><input type="checkbox" checked={trackMutualFundNavHistory} disabled={mutualFundNavBusy} onChange={(event) => setTrackMutualFundNavHistory(event.target.checked)} />Track NAV history</label>}
       {assets.some((asset) => asset.type === "Mutual fund") && <Button type="button" variant="outline" onClick={() => void refreshMutualFundNavs()} disabled={mutualFundNavBusy}>
         <RefreshCw size={14} className={mutualFundNavBusy ? "spin" : ""} />{mutualFundNavBusy ? "Refreshing NAVs..." : "Refresh mutual fund NAVs"}
       </Button>}
-      {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <label className="stock-history-toggle"><input type="checkbox" checked={trackNpsNavHistory} disabled={npsNavBusy} onChange={(event) => setTrackNpsNavHistory(event.target.checked)} />Track NPS NAV history</label>}
       {assets.some((asset) => asset.type === "NPS" && (asset.npsSchemes?.length ?? 0) > 0) && <Button type="button" variant="outline" onClick={() => void refreshNpsNavs()} disabled={npsNavBusy}>
         <RefreshCw size={14} className={npsNavBusy ? "spin" : ""} />{npsNavBusy ? "Refreshing NPS NAVs..." : "Refresh NPS NAVs"}
       </Button>}
       {assets.some((asset) => asset.type === "Digital gold" || asset.type === "Gold savings scheme") && <Button type="button" variant="outline" onClick={() => void refreshGoldValues()} disabled={goldPriceBusy}>
         <RefreshCw size={14} className={goldPriceBusy ? "spin" : ""} />{goldPriceBusy ? "Refreshing gold values..." : "Refresh 24K gold values"}
       </Button>}
-      {activeType === "Stocks" ? <Button onClick={onOpenStocks}><TrendingUp size={15} /> Manage stocks</Button> : activeType === "Bank accounts" ? <Button onClick={onOpenBankAccounts}><Landmark size={15} /> Manage bank accounts</Button> : activeType === "Vehicle" ? <Button onClick={() => { setNewAssetType("Vehicle"); setEditor(null); }}><Plus size={15} /> Add vehicle value</Button> : activeType === "Insurance" ? <Button onClick={() => { setNewAssetType("Insurance"); setEditor(null); }}><Plus size={15} /> Add policy</Button> : <Button onClick={() => { setNewAssetType("Other"); setEditor(null); }}><Plus size={15} /> Add asset</Button>}
-    </div>} />
+    </div>
     {managerTabs}
     <div className="alert"><Wallet size={15} style={{ flex: "none", marginTop: 1 }} /><span>Track investments, property, deposits, and loans. Values without a valuation date or older than 365 days are marked stale. Stocks and bank accounts are shown from their existing screens without duplicate records. Bank balances count toward assets only when a balance snapshot is reported; update bank records in the Bank accounts screen. Loan balances count as liabilities. Asset details are stored in the private Supabase project; do not enter full account numbers or other secrets.</span></div>
     {stockQuoteMessage && <div className="alert alert-success" role="status">{stockQuoteMessage}</div>}
