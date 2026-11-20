@@ -2171,6 +2171,9 @@ body{background:#f3f5ef}
   .shopping-quick-filters>.field-wrap{min-width:0}
   .shopping-quick-filters>.field-wrap:last-child:nth-child(odd){grid-column:1/-1}
 }
+@media(max-width:760px){
+  .main-content{padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+}
 .reports-hub-tabs{display:flex;gap:7px;overflow-x:auto;margin:0 0 18px;padding:2px 1px 8px;scrollbar-width:thin}
 .reports-hub-tab{flex:none;min-height:36px;padding:0 13px;border:1px solid var(--panel-line,var(--line,#e3e8e1));border-radius:20px;background:var(--panel,var(--surface,#fff));color:var(--text-muted,var(--muted,#747d73));font:600 11px "DM Sans",sans-serif;cursor:pointer}
 .reports-hub-tab:hover{border-color:var(--user-accent,#729777);color:var(--text-main,var(--ink,#29322a))}
