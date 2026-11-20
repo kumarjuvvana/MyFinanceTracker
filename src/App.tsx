@@ -10508,7 +10508,8 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   const [requestFilter, setRequestFilter] = useState("Ongoing");
   const [search, setSearch] = useState("");
   function changeDevotionalTab(tab: typeof activeTab) {
-    if (activeTab === "songs" && tab !== "songs" && groupBy === "title") setGroupBy("date");
+    if (tab === "songs") setGroupBy("title");
+    else if (activeTab === "songs" && groupBy === "title") setGroupBy("date");
     setActiveTab(tab);
   }
   const query = search.trim().toLocaleLowerCase();
