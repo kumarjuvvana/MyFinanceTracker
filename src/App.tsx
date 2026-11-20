@@ -10485,7 +10485,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   const [selectedProgressDate, setSelectedProgressDate] = useState("");
   const [showReadingStreak, setShowReadingStreak] = useState(false);
   const [sortOrder, setSortOrder] = useState<DevotionalSortOrder>("newest");
-  const [groupBy, setGroupBy] = useState<"date" | "none" | "type">("date");
+  const [groupBy, setGroupBy] = useState<"date" | "none" | "type" | "title">("date");
   const [calendarGroupBy, setCalendarGroupBy] = useState<"date" | "type">("date");
   const [expandAllGroups, setExpandAllGroups] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
@@ -10507,6 +10507,10 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
   const [requestFilter, setRequestFilter] = useState("Ongoing");
   const [search, setSearch] = useState("");
+  function changeDevotionalTab(tab: typeof activeTab) {
+    if (activeTab === "songs" && tab !== "songs" && groupBy === "title") setGroupBy("date");
+    setActiveTab(tab);
+  }
   const query = search.trim().toLocaleLowerCase();
   const matchesDateFilter = (date: string | undefined) =>
     (!dateFrom && !dateTo) || Boolean(date && (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo));
@@ -10546,13 +10550,15 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
       ["Morning", "Afternoon", "Evening", "Night"].indexOf(a.period) - ["Morning", "Afternoon", "Evening", "Night"].indexOf(b.period));
   }
   const dateGroups = <T,>(items: readonly T[], getDate: (item: T) => string | undefined, getType?: (item: T) => string) => {
-    if (groupBy === "type" && getType) {
+    if ((groupBy === "type" || (activeTab === "songs" && groupBy === "title")) && getType) {
       const groups = new Map<string, T[]>();
       items.forEach((item) => {
         const type = getType(item) || "Uncategorized";
         groups.set(type, [...(groups.get(type) ?? []), item]);
       });
-      return [...groups].map(([date, records]) => ({ date, records }));
+      const entries = [...groups];
+      if (groupBy === "title") entries.sort(([left], [right]) => left.localeCompare(right));
+      return entries.map(([date, records]) => ({ date, records }));
     }
     if (groupBy !== "date") return [{ date: "", records: [...items] }];
     const groups = groupByDate(items, getDate);
@@ -10703,13 +10709,13 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     <PageHeading eyebrow="Christian faith" title="Devotional" subtitle="Keep daily Bible readings, Scripture reflections, and prayer requests together in your personal faith journal." action={activeSectionAction} />
     <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Record Bible references and your own reflections, not full copyrighted passage text. Devotional notes and prayer requests are private shared Daybook data.</span></div>
     <nav className="student-profile-tabs devotional-tabs" aria-label="Devotional sections">
-      <Button variant={activeTab === "readings" ? "primary" : "outline"} aria-pressed={activeTab === "readings"} onClick={() => setActiveTab("readings")}><BookOpen size={14} />Daily Bible reading<Badge>{readings.length}</Badge></Button>
-      <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => setActiveTab("reflections")}><BookOpen size={14} />Bible reflections<Badge>{entries.length}</Badge></Button>
-      <Button variant={activeTab === "prayers" ? "primary" : "outline"} aria-pressed={activeTab === "prayers"} onClick={() => setActiveTab("prayers")}><Heart size={14} />Prayer requests<Badge>{requests.length}</Badge></Button>
-      <Button variant={activeTab === "resources" ? "primary" : "outline"} aria-pressed={activeTab === "resources"} onClick={() => setActiveTab("resources")}><PlayCircle size={14} />Music & resources<Badge>{resources.length}</Badge></Button>
-      <Button variant={activeTab === "songs" ? "primary" : "outline"} aria-pressed={activeTab === "songs"} onClick={() => setActiveTab("songs")}><Music2 size={14} />Songs<Badge>{songs.length}</Badge></Button>
-      <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => setActiveTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
-      <Button variant={activeTab === "calendar" ? "primary" : "outline"} aria-pressed={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}><CalendarDays size={14} />Calendar</Button>
+      <Button variant={activeTab === "readings" ? "primary" : "outline"} aria-pressed={activeTab === "readings"} onClick={() => changeDevotionalTab("readings")}><BookOpen size={14} />Daily Bible reading<Badge>{readings.length}</Badge></Button>
+      <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => changeDevotionalTab("reflections")}><BookOpen size={14} />Bible reflections<Badge>{entries.length}</Badge></Button>
+      <Button variant={activeTab === "prayers" ? "primary" : "outline"} aria-pressed={activeTab === "prayers"} onClick={() => changeDevotionalTab("prayers")}><Heart size={14} />Prayer requests<Badge>{requests.length}</Badge></Button>
+      <Button variant={activeTab === "resources" ? "primary" : "outline"} aria-pressed={activeTab === "resources"} onClick={() => changeDevotionalTab("resources")}><PlayCircle size={14} />Music & resources<Badge>{resources.length}</Badge></Button>
+      <Button variant={activeTab === "songs" ? "primary" : "outline"} aria-pressed={activeTab === "songs"} onClick={() => changeDevotionalTab("songs")}><Music2 size={14} />Songs<Badge>{songs.length}</Badge></Button>
+      <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => changeDevotionalTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
+      <Button variant={activeTab === "calendar" ? "primary" : "outline"} aria-pressed={activeTab === "calendar"} onClick={() => changeDevotionalTab("calendar")}><CalendarDays size={14} />Calendar</Button>
     </nav>
     <div className="toolbar filter-toolbar devotional-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, songs, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
@@ -10721,7 +10727,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
         (activeTab === "prayers" && requestFilter !== "Ongoing" ? 1 : 0) + (sortOrder !== "newest" ? 1 : 0)}>
         {activeTab === "calendar"
           ? <Field label="Group calendar records by"><Select aria-label="Group calendar records by" value={calendarGroupBy} onChange={(event) => setCalendarGroupBy(event.target.value as "date" | "type")}><option value="date">Date</option><option value="type">Record type (tab)</option></Select></Field>
-          : <Field label="Group records by"><Select aria-label="Group devotional records by" value={groupBy} onChange={(event) => setGroupBy(event.target.value as "date" | "none" | "type")}><option value="date">Date</option><option value="type">{activeTab === "readings" ? "Book" : activeTab === "prayers" ? "Status" : activeTab === "resources" ? "Source" : activeTab === "songs" ? "Language" : activeTab === "daily-prayers" ? "Period" : "Scripture reference"}</option><option value="none">No grouping</option></Select></Field>}
+          : <Field label="Group records by"><Select aria-label="Group devotional records by" value={groupBy} onChange={(event) => setGroupBy(event.target.value as "date" | "none" | "type" | "title")}><option value="date">Date</option><option value="type">{activeTab === "readings" ? "Book" : activeTab === "prayers" ? "Status" : activeTab === "resources" ? "Source" : activeTab === "songs" ? "Language" : activeTab === "daily-prayers" ? "Period" : "Scripture reference"}</option>{activeTab === "songs" && <option value="title">Title</option>}<option value="none">No grouping</option></Select></Field>}
         <Field label="Sort by"><Select aria-label="Sort devotional records" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as DevotionalSortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></Select></Field>
         <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
@@ -10769,7 +10775,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     </section>}
     {activeTab === "songs" && <section className="devotional-section devotional-tab-panel">
       <div className="devotional-section-head"><div><h2><Music2 size={15} /> Song lyrics</h2><p>{visibleSongs.length} {visibleSongs.length === 1 ? "song" : "songs"} saved</p></div></div>
-      {visibleSongs.length ? <div className="devotional-date-groups">{dateGroups(sortedSongs, (song) => song.date, (song) => song.language || "Language not set").map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} songs` : date ? `Songs · ${dateLabel(date)}` : "All songs"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((song) => <Card className="devotional-card devotional-song-card" key={song.id}>
+      {visibleSongs.length ? <div className="devotional-date-groups">{dateGroups(sortedSongs, (song) => song.date, (song) => groupBy === "title" ? song.title : song.language || "Language not set").map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "title" ? date : groupBy === "type" ? `${date} songs` : date ? dateLabel(date) : "All songs"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((song) => <Card className="devotional-card devotional-song-card" key={song.id}>
         <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{dateLabel(song.date)}</span>}<h3>{song.title}</h3><span className="devotional-date">{[song.language, song.author && `Author: ${song.author}`, song.bibleReference && `Bible: ${song.bibleReference}`].filter(Boolean).join(" · ") || "Song details not provided"}</span></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${song.title}`} onClick={() => setSongEditor(song)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${song.title}`} onClick={() => onSaveSong({ ...song, title: copyLabel(song.title, 160) })}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${song.title}`} onClick={() => confirmDeleteSong(song)}><Archive size={13} /></button></div></div>
         {song.lyrics && <p className="devotional-song-lyrics">{song.lyrics}</p>}
         {song.link && <a className="devotional-resource-link" href={song.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open song link</a>}
