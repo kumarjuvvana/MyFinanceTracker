@@ -774,6 +774,17 @@ export interface DevotionalResource {
   source: string;
 }
 
+export interface DevotionalSong {
+  id: string;
+  title: string;
+  date: string;
+  language?: string;
+  bibleReference?: string;
+  author?: string;
+  lyrics?: string;
+  link?: string;
+}
+
 export type PrayerRequestStatus = "Ongoing" | "Answered";
 
 export interface PrayerRequest {
@@ -1110,6 +1121,7 @@ export interface TrackerData {
   dailyBibleReadings?: DailyBibleReading[];
   dailyPrayerLogs?: DailyPrayerLog[];
   devotionalResources?: DevotionalResource[];
+  devotionalSongs?: DevotionalSong[];
   prayerRequests?: PrayerRequest[];
   cookingRecipes?: CookingRecipe[];
   cookingLogs?: CookingLog[];

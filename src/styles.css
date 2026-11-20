@@ -2404,3 +2404,5 @@ body{background:#f3f5ef}
   .design-theme-option-description{min-height:0}
 }
 @media(max-width:430px){.design-theme-actions{flex-wrap:wrap}.design-theme-save-message{flex-basis:100%}}
+.devotional-song-lyrics{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;max-height:520px;overflow:auto}
+.devotional-song-lyrics-input{min-height:320px!important}

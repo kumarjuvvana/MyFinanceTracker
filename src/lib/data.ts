@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DESIGN_THEMES } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
@@ -746,6 +746,16 @@ export function validateData(value: unknown): value is TrackerData {
       typeof entry.link === "string" && entry.link.length <= 2048 && isSafeExternalLink(entry.link) && entry.link.length > 0 &&
       typeof entry.description === "string" && entry.description.length <= 5000 &&
       typeof entry.source === "string" && entry.source.length <= 120));
+  const devotionalSongsOk = value.devotionalSongs === undefined ||
+    (Array.isArray(value.devotionalSongs) && value.devotionalSongs.every((entry) =>
+      isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
+      typeof entry.title === "string" && entry.title.trim().length > 0 && entry.title.length <= 160 &&
+      typeof entry.date === "string" && !Number.isNaN(Date.parse(entry.date)) &&
+      (entry.language === undefined || typeof entry.language === "string" && entry.language.length <= 60) &&
+      (entry.bibleReference === undefined || typeof entry.bibleReference === "string" && entry.bibleReference.length <= 160) &&
+      (entry.author === undefined || typeof entry.author === "string" && entry.author.length <= 160) &&
+      (entry.lyrics === undefined || typeof entry.lyrics === "string" && entry.lyrics.length <= 50000) &&
+      (entry.link === undefined || typeof entry.link === "string" && entry.link.length <= 2048 && isSafeExternalLink(entry.link))));
   const prayerRequestsOk = value.prayerRequests === undefined ||
     (Array.isArray(value.prayerRequests) && value.prayerRequests.every((entry) =>
       isRecord(entry) && typeof entry.id === "string" && entry.id.length > 0 &&
@@ -1017,7 +1027,7 @@ export function validateData(value: unknown): value is TrackerData {
     "items", "purchases", "trips", "stores", "products", "reminders", "reminderCategories",
     "brokers", "stocks", "stockQuotes", "assets", "learningRecords", "trainingSessions", "educationRecords",
     "vehicles", "vehicleJourneys", "vehicleMaintenance", "electricityReadings", "subscriptions",
-    "devotionalEntries", "dailyBibleReadings", "dailyPrayerLogs", "devotionalResources", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
+    "devotionalEntries", "dailyBibleReadings", "dailyPrayerLogs", "devotionalResources", "devotionalSongs", "prayerRequests", "cookingRecipes", "cookingLogs", "cookingPlans", "issueRecords",
     "personalEducation", "professionalQualifications", "workExperiences", "professionalSkills",
     "familyMembers", "educationPlans", "personalRecords", "documents", "promptRecords", "mindfulHabits", "mindfulnessLogs",
     "morningExerciseLogs", "bankAccounts", "credentialRecords",
@@ -1064,7 +1074,7 @@ export function validateData(value: unknown): value is TrackerData {
     !brokersOk || !stocksOk || !stockQuotesOk || !stockSeedVersionOk ||
     !assetsOk || !educationRecordsOk || !educationRecordDetailsOk || !studentProfilesOk || !educationPlansOk || !learningRecordsOk || !trainingSessionsOk ||
     !vehiclesOk || !vehicleJourneysOk || !vehicleMaintenanceOk || !electricityReadingsOk || !subscriptionsOk ||
-    !devotionalEntriesOk || !dailyBibleReadingsOk || !dailyPrayerLogsOk || !devotionalResourcesOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
+    !devotionalEntriesOk || !dailyBibleReadingsOk || !dailyPrayerLogsOk || !devotionalResourcesOk || !devotionalSongsOk || !prayerRequestsOk || !cookingRecipesOk || !cookingLogsOk || !cookingPlansOk || !issueRecordsOk ||
     !personalEducationOk || !professionalQualificationsOk || !workExperiencesOk || !professionalSkillsOk || !familyMembersOk || !personalRecordsOk || !documentsOk || !promptRecordsOk || !mindfulHabitsOk || !mindfulnessLogsOk || !morningExerciseLogsOk || !morningExerciseActivitiesOk ||
     !archivedRecordsOk || !bankAccountsOk || !credentialRecordsOk ||
     !credentialVaultOk) return false;
@@ -1141,6 +1151,8 @@ export function validateData(value: unknown): value is TrackerData {
     new Set((value.dailyPrayerLogs as DailyPrayerLog[]).map((entry) => entry.id)).size !== value.dailyPrayerLogs.length) return false;
   if (Array.isArray(value.devotionalResources) &&
     new Set((value.devotionalResources as DevotionalResource[]).map((entry) => entry.id)).size !== value.devotionalResources.length) return false;
+  if (Array.isArray(value.devotionalSongs) &&
+    new Set((value.devotionalSongs as DevotionalSong[]).map((entry) => entry.id)).size !== value.devotionalSongs.length) return false;
   if (Array.isArray(value.prayerRequests) &&
     new Set((value.prayerRequests as PrayerRequest[]).map((entry) => entry.id)).size !== value.prayerRequests.length) return false;
   if (Array.isArray(value.cookingRecipes) &&
@@ -1253,6 +1265,7 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
     dailyBibleReadings: (data.dailyBibleReadings ?? []).map((reading) => ({ ...reading, people: reading.people ?? "" })),
     dailyPrayerLogs: (data.dailyPrayerLogs ?? []).map((log) => ({ ...log, time: log.time ?? "" })),
     devotionalResources: data.devotionalResources ?? [],
+    devotionalSongs: data.devotionalSongs ?? [],
     prayerRequests: data.prayerRequests ?? [],
     cookingRecipes: data.cookingRecipes ?? [],
     cookingLogs: data.cookingLogs ?? [],
