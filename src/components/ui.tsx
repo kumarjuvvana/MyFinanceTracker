@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 import { Filter, X } from "lucide-react";
+import { activityLinkHref, isSafeActivityLink } from "../lib/data";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost" | "danger"; size?: "sm" | "md" };
 
@@ -18,21 +19,20 @@ export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInpu
 type ExternalLinkInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value"> & { value: string };
 
 export function ExternalLinkInput({ value, ...props }: ExternalLinkInputProps) {
-  let safeLink = false;
-  try {
-    safeLink = new URL(value).protocol === "https:";
-  } catch {
-    safeLink = false;
-  }
-
+  const safeLink = isSafeActivityLink(value);
   return <>
-    <Input {...props} type="url" value={value} />
-    {safeLink && <a className="external-link-preview" href={value} target="_blank" rel="noopener noreferrer">Open link in new tab</a>}
+    <Input {...props} type="text" inputMode="url" value={value} />
+    {safeLink && <a className="external-link-preview" href={activityLinkHref(value)} target="_blank" rel="noopener noreferrer">Open link in new tab</a>}
   </>;
 }
 
 export function LinkifiedText({ children }: { children: string }) {
-  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+  const completeValue = children.trim();
+  if (/^(?:[a-z]:[\\/]|\\\\|\/\/|file:\/\/)/i.test(completeValue) && isSafeActivityLink(completeValue)) {
+    return <a className="linkified-text-link" href={activityLinkHref(completeValue)} target="_blank" rel="noopener noreferrer">{children}</a>;
+  }
+
+  const urlPattern = /(?:https?|ftp):\/\/[^\s<>"']+|file:\/\/\/[a-z]:\/[^\s<>"']+|[a-z]:[\\/][^\s<>"'<>|?*]+|\\\\\\\\[^\\/\s<>:"|?*]+[\\/][^\s<>:"|?*]+/gi;
   const parts: ReactNode[] = [];
   let lastIndex = 0;
 
@@ -40,11 +40,11 @@ export function LinkifiedText({ children }: { children: string }) {
     const rawUrl = match[0];
     const trailingPunctuation = rawUrl.match(/[),.!?;:]+$/)?.[0] ?? "";
     const url = rawUrl.slice(0, rawUrl.length - trailingPunctuation.length);
-    if (!url) continue;
+    if (!url || !isSafeActivityLink(url)) continue;
 
     const start = match.index ?? 0;
     if (start > lastIndex) parts.push(children.slice(lastIndex, start));
-    parts.push(<a className="linkified-text-link" href={url} target="_blank" rel="noopener noreferrer" key={`${start}-${url}`}>{url}</a>);
+    parts.push(<a className="linkified-text-link" href={activityLinkHref(url)} target="_blank" rel="noopener noreferrer" key={`${start}-${url}`}>{url}</a>);
     if (trailingPunctuation) parts.push(trailingPunctuation);
     lastIndex = start + rawUrl.length;
   }

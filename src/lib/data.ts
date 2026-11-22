@@ -1301,13 +1301,8 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
 }
 
 export function isSafeExternalLink(value: string): boolean {
-  if (!value) return true;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:";
-  } catch {
-    return false;
-  }
+  if (!value.trim()) return true;
+  return isSafeActivityLink(value);
 }
 
 export function isSafeActivityLink(value: string): boolean {
@@ -1318,8 +1313,9 @@ export function isSafeActivityLink(value: string): boolean {
   }
   try {
     const url = new URL(link);
-    if (url.protocol === "http:" || url.protocol === "https:") return Boolean(url.hostname);
-    return url.protocol === "file:" && !url.search && !url.hash;
+    if (url.username || url.password) return false;
+    if (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "ftp:") return Boolean(url.hostname);
+    return url.protocol === "file:" && !url.search && !url.hash && (url.hostname === "" || Boolean(url.pathname));
   } catch {
     return false;
   }

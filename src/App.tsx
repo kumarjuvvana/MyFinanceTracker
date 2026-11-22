@@ -310,13 +310,6 @@ const marketStateLabel = (state: string) => {
 const monthYearLabel = (date: string) => /^\d{4}-\d{2}$/.test(date)
   ? new Date(`${date}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
   : date ? dateLabel(date) : "";
-function isHttpsLink(value: string) {
-  try {
-    return new URL(value).protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 const dateAfterDays = (days: number) => {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -462,7 +455,7 @@ function ActivitiesPage({ sessions, completedItemIds, onSave, onToggleItem, onSe
     }
     const invalidLink = links.find((link) => !isSafeActivityLink(link.url));
     if (invalidLink) {
-      setLinkErrors((current) => ({ ...current, [item.id]: "Use an HTTP/HTTPS URL, a file URL, or a Windows drive/shared-folder path." }));
+      setLinkErrors((current) => ({ ...current, [item.id]: "Use an HTTP, HTTPS, FTP, file URL, or a Windows drive/shared-folder path." }));
       return;
     }
     if (links.some((link) => !link.label.trim())) {
@@ -734,7 +727,7 @@ function DashboardModuleCard({ title, page, entries, emptyMessage, onPage }: {
 }) {
   return <Card className="dashboard-module-card">
     <div className="card-head"><div><h2 className="section-title">{title}</h2><p className="section-description">{entries.length ? "Recent records" : emptyMessage}</p></div><button className="text-link" type="button" onClick={() => onPage(page)}>View <ChevronRight size={12} /></button></div>
-    {entries.length ? <div className="dashboard-module-list">{entries.slice(0, 4).map((entry, index) => <div className="dashboard-module-entry" key={`${entry.title}-${index}`}><div className="recent-name">{entry.title}</div>{entry.detail && <div className="recent-meta">{entry.detail}</div>}</div>)}</div> : <p className="dashboard-module-empty">{emptyMessage}</p>}
+    {entries.length ? <div className="dashboard-module-list">{entries.slice(0, 4).map((entry, index) => <div className="dashboard-module-entry" key={`${entry.title}-${index}`}><div className="recent-name"><LinkifiedText>{entry.title}</LinkifiedText></div>{entry.detail && <div className="recent-meta"><LinkifiedText>{entry.detail}</LinkifiedText></div>}</div>)}</div> : <p className="dashboard-module-empty">{emptyMessage}</p>}
   </Card>;
 }
 
@@ -930,15 +923,8 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
       setError("Enter a title and date, and choose a category.");
       return;
     }
-    let safeLink = false;
-    try {
-      const url = new URL(entry.link.trim());
-      safeLink = url.protocol === "https:" || url.protocol === "http:";
-    } catch {
-      safeLink = !entry.link.trim();
-    }
-    if (!safeLink) {
-      setError("Enter a valid HTTP or HTTPS link.");
+    if (entry.link.trim() && !isSafeExternalLink(entry.link.trim())) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
     onSave({ ...entry, title: entry.title.trim(), person: entry.person.trim(), note: entry.note.trim(), link: entry.link.trim() });
@@ -952,7 +938,7 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
       <Field label="How did it feel?"><Select value={entry.feelingId} onChange={(event) => setEntry((current) => ({ ...current, feelingId: event.target.value }))}><option value="">Not set</option>{feelings.map((feeling) => <option key={feeling.id} value={feeling.id}>{feeling.name}</option>)}</Select></Field>
       <Field label="Person (optional)"><Input maxLength={120} placeholder="Who does this date belong to?" value={entry.person} onChange={(event) => setEntry((current) => ({ ...current, person: event.target.value }))} /></Field>
       <Field className="full" label="Note (optional)"><textarea className="field textarea" rows={2} maxLength={500} placeholder="Add a short note" value={entry.note} onChange={(event) => setEntry((current) => ({ ...current, note: event.target.value }))} /></Field>
-      <Field label="Link (optional)"><Input type="url" maxLength={2048} placeholder="https://..." value={entry.link} onChange={(event) => setEntry((current) => ({ ...current, link: event.target.value }))} /></Field>
+      <Field label="Link (optional)"><ExternalLinkInput maxLength={2048} placeholder="https://, ftp://, or C:\\folder" value={entry.link} onChange={(event) => setEntry((current) => ({ ...current, link: event.target.value }))} /></Field>
       <label className="important-date-reminder-toggle"><input type="checkbox" checked={entry.reminder} onChange={(event) => setEntry((current) => ({ ...current, reminder: event.target.checked }))} /><span>Show a dashboard reminder for this exact date</span></label>
     </div>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -1166,7 +1152,7 @@ function ImportantDatesPage() {
   function renderImportantDateCards(entries: ImportantDate[]) {
     return <div className={`important-date-list${recordLayout === "grid" ? " is-grid" : ""}`}>{entries.map((entry) => {
       const feeling = feelingById.get(entry.feelingId);
-      return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note">{entry.note}</span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={entry.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
+      return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note"><LinkifiedText>{entry.note}</LinkifiedText></span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={activityLinkHref(entry.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
     })}</div>;
   }
 
@@ -4942,13 +4928,9 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
       setError("Enter an asset name.");
       return;
     }
-    if (asset.link) {
-      try {
-        if (new URL(asset.link).protocol !== "https:") throw new Error();
-      } catch {
-        setError("Enter a valid HTTPS link, or leave it blank.");
-        return;
-      }
+    if (asset.link && !isSafeExternalLink(asset.link)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link, or leave it blank.");
+      return;
     }
     const parsedInvested = parseOptionalNumber(investedValue);
     const parsedCurrent = parseOptionalNumber(currentValue);
@@ -5117,7 +5099,7 @@ function AssetModal({ initial, defaultType, vehicles, onClose, onSave, onSaveVeh
       {isHomeLoan && <><Field label="First EMI date"><DateInput value={firstEmiDate} onValueChange={setFirstEmiDate} /></Field><Field label="Latest statement date"><DateInput value={lastStatementDate} onValueChange={setLastStatementDate} /></Field><Field className="full" label="Loan product / terms"><Input maxLength={200} placeholder="Optional, e.g. variable rate, monthly rest" value={lenderLoanType} onChange={(event) => setLenderLoanType(event.target.value)} /></Field></>}
       {isNps && <Field label="Most recent withdrawal date"><DateInput value={lastWithdrawalDate} onValueChange={setLastWithdrawalDate} /></Field>}
       <Field className="full" label="Property location / asset description"><Input maxLength={250} placeholder="Optional" value={asset.location} onChange={(event) => setAsset((current) => ({ ...current, location: event.target.value }))} /></Field>
-      <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
+      <Field className="full" label="Account / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional URL or local path" value={asset.link} onChange={(event) => setAsset((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Tags (comma-separated)"><Input maxLength={500} placeholder="long-term, family, investment" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional details, terms, or reminders" value={asset.notes} onChange={(event) => setAsset((current) => ({ ...current, notes: event.target.value }))} /></Field>
       {isVehicleAsset && <div className="full"><p className="section-description">Vehicle details stay in the Vehicles menu. This adds a dated value record to that vehicle without creating a duplicate asset.</p><Button type="button" variant="outline" onClick={() => { onClose(); onOpenVehicles(); }}><Car size={14} /> Add or manage vehicles</Button></div>}
@@ -6851,7 +6833,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
             </div>)}
           {!((asset.npsSchemes ?? []).some((scheme) => (scheme.navHistory?.length ?? 0) > 0)) && <p className="section-description">No manual NPS NAV snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track NPS NAV history to record manual refreshes here.</p>}
         </details>}
-        {asset.link && <a className="personal-document-link" href={asset.link} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
+        {asset.link && <a className="personal-document-link" href={activityLinkHref(asset.link)} target="_blank" rel="noopener noreferrer">Open account / document link</a>}
         {asset.tags.length > 0 && <div className="credential-tags">{asset.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}</div>}
         {asset.notes && <p className="personal-record-notes"><LinkifiedText>{asset.notes}</LinkifiedText></p>}
       </Card>;
@@ -6940,13 +6922,9 @@ function EducationRecordModal({ initial, initialStudentName = "", initialStudent
       setError("Enter the student's name and school or college name.");
       return;
     }
-    if (record.link) {
-      try {
-        if (new URL(record.link).protocol !== "https:") throw new Error();
-      } catch {
-        setError("Enter a valid HTTPS link, or leave it blank.");
-        return;
-      }
+    if (record.link && !isSafeExternalLink(record.link)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link, or leave it blank.");
+      return;
     }
     const parseFee = (value: string): number | null => {
       if (!value.trim()) return null;
@@ -7061,7 +7039,7 @@ function EducationRecordModal({ initial, initialStudentName = "", initialStudent
       <Field label="Rank"><Input maxLength={40} value={summaryRank} onChange={(event) => setSummaryRank(event.target.value)} /></Field>
       <Field label="Result / promotion"><Input maxLength={80} placeholder="e.g. Promoted" value={summaryResult} onChange={(event) => setSummaryResult(event.target.value)} /></Field>
       <Field className="full" label="Teacher remark"><Input maxLength={5000} value={summaryRemark} onChange={(event) => setSummaryRemark(event.target.value)} /></Field>
-      <Field className="full" label="Portal / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={record.link} onChange={(event) => setRecord((current) => ({ ...current, link: event.target.value }))} /></Field>
+      <Field className="full" label="Portal / document link"><ExternalLinkInput maxLength={2000} placeholder="Optional URL or local path" value={record.link} onChange={(event) => setRecord((current) => ({ ...current, link: event.target.value }))} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Optional academic notes, achievements, or reminders" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
     <p className="section-description" style={{ marginTop: 12 }}>Enter tuition, admission, school van / transport, and other charges separately. For older records whose tuition amount included admission or transport, adjust it to tuition-only before adding separate charges. Payments are checked against combined fees. Only student name and school/college are required.</p>
@@ -7795,8 +7773,8 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
         </div>
         <div id={`education-attendance-panel-${record.id}`} className="education-result-panel" role="tabpanel">
           {attendanceView === "list" ? <>
-            {monthlyAttendance.length > 0 && <div className="education-entry-list">{[...monthlyAttendance].sort((a, b) => b.month.localeCompare(a.month)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>{entry.daysPresent} / {entry.workingDays} days present{entry.workingDays ? ` · ${(entry.daysPresent / entry.workingDays * 100).toFixed(1)}%` : ""}</span>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit monthly attendance" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive monthly attendance" onClick={() => { if (window.confirm(`Move the ${entry.month} attendance summary to the archive?`)) onUpdate({ ...record, monthlyAttendance: monthlyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
-            {dailyAttendance.length > 0 && <div className="education-entry-list">{[...dailyAttendance].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{dateLabel(entry.date)} · {entry.status}</strong>{entry.notes && <small>{entry.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit daily attendance" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive daily attendance" onClick={() => { if (window.confirm(`Move ${dateLabel(entry.date)} attendance to the archive?`)) onUpdate({ ...record, dailyAttendance: dailyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
+            {monthlyAttendance.length > 0 && <div className="education-entry-list">{[...monthlyAttendance].sort((a, b) => b.month.localeCompare(a.month)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{new Date(`${entry.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><span>{entry.daysPresent} / {entry.workingDays} days present{entry.workingDays ? ` · ${(entry.daysPresent / entry.workingDays * 100).toFixed(1)}%` : ""}</span>{entry.notes && <small><LinkifiedText>{entry.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit monthly attendance" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive monthly attendance" onClick={() => { if (window.confirm(`Move the ${entry.month} attendance summary to the archive?`)) onUpdate({ ...record, monthlyAttendance: monthlyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
+            {dailyAttendance.length > 0 && <div className="education-entry-list">{[...dailyAttendance].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => <div className="education-entry" key={entry.id}><div><strong>{dateLabel(entry.date)} · {entry.status}</strong>{entry.notes && <small><LinkifiedText>{entry.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label="Edit daily attendance" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label="Archive daily attendance" onClick={() => { if (window.confirm(`Move ${dateLabel(entry.date)} attendance to the archive?`)) onUpdate({ ...record, dailyAttendance: dailyAttendance.filter((item) => item.id !== entry.id) }); }}><Archive size={13} /></button></div></div>)}</div>}
           </> : attendanceView === "calendar-days" ? <>
             <p className="education-calendar-note">Uses the monthly report-card count when available; otherwise, it counts day-wise entries. If both are recorded, the report-card count is primary and day-wise details are shown separately to avoid double-counting. Months without either type of attendance data are not shown.</p>
             <div className="education-calendar-grid education-calendar-count-grid">
@@ -7876,7 +7854,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       {holidaysExpanded && <div className="education-compact-record-list">
         {schoolHolidays.length ? <DateGroupedRecords items={schoolHolidays} getDate={(holiday) => holiday.startDate} title={(date) => `Holidays · ${dateLabel(date)}`} groupOrder="oldest">{(dateHolidays) => dateHolidays.map((holiday) => <details className="education-compact-record" key={holiday.id}>
           <summary><span><strong>{holiday.name}</strong><small>{holiday.type} · {dateLabel(holiday.startDate)}{holiday.endDate !== holiday.startDate ? ` – ${dateLabel(holiday.endDate)}` : ""}</small></span><ChevronRight size={14} /></summary>
-          <div className="education-compact-record-details">{holiday.notes && <p>{holiday.notes}</p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "holiday", initial: holiday })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${holiday.name}`} onClick={() => removeHoliday(holiday)}><Archive size={13} /></button></div></div>
+          <div className="education-compact-record-details">{holiday.notes && <p><LinkifiedText>{holiday.notes}</LinkifiedText></p>}<div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "holiday", initial: holiday })}><Pencil size={12} />Edit</Button><button className="icon-button" aria-label={`Archive ${holiday.name}`} onClick={() => removeHoliday(holiday)}><Archive size={13} /></button></div></div>
         </details>)}</DateGroupedRecords> : <p className="education-empty">Add single-day holidays or seasonal breaks for this academic year.</p>}
       </div>}
     </section>
@@ -7914,7 +7892,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       {feeCharges.length > 0 && <p className="section-description">Itemized charges replace legacy annual fee totals in the balance calculation. Enter the complete fee schedule here to avoid double counting or understating the balance.</p>}
       {feeCharges.length ? <DateGroupedRecords items={feeCharges} getDate={(charge) => charge.dueDate} title={(date) => `Fee charges · ${dateLabel(date)}`}>{(dateCharges) => <div className="education-entry-list">{dateCharges.map((charge) => {
         const allocated = allocatedToCharge(charge.id);
-        return <div className="education-entry" key={charge.id}><div><strong>{charge.feeType} · {charge.description} · {formatAmount(charge.amount)}</strong><span>{[charge.period, charge.dueDate ? `Due ${dateLabel(charge.dueDate)}` : "", `Paid ${formatAmount(allocated)}`, `Balance ${formatAmount(Math.max(0, charge.amount - allocated))}`].filter(Boolean).join(" · ")}</span>{charge.notes && <small>{charge.notes}</small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${charge.description}`} onClick={() => setEditor({ kind: "charge", initial: charge })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${charge.description}`} onClick={() => removeFeeCharge(charge)}><Archive size={13} /></button></div></div>;
+        return <div className="education-entry" key={charge.id}><div><strong>{charge.feeType} · {charge.description} · {formatAmount(charge.amount)}</strong><span>{[charge.period, charge.dueDate ? `Due ${dateLabel(charge.dueDate)}` : "", `Paid ${formatAmount(allocated)}`, `Balance ${formatAmount(Math.max(0, charge.amount - allocated))}`].filter(Boolean).join(" · ")}</span>{charge.notes && <small><LinkifiedText>{charge.notes}</LinkifiedText></small>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${charge.description}`} onClick={() => setEditor({ kind: "charge", initial: charge })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Archive ${charge.description}`} onClick={() => removeFeeCharge(charge)}><Archive size={13} /></button></div></div>;
       })}</div>}</DateGroupedRecords> : <p className="education-empty">Add itemized tuition, transport, admission, or other charges. Older annual totals remain supported.</p>}</>}
     </section>
     <section className="education-section">
@@ -7930,7 +7908,7 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       <p className="section-description">Fee payments affect the outstanding school-fee balance. Outside purchases are tracked here as spending and do not reduce that balance.</p>
       </>}
     </section>
-    {record.link && <a className="personal-document-link" href={record.link} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
+    {record.link && <a className="personal-document-link" href={activityLinkHref(record.link)} target="_blank" rel="noopener noreferrer">Open portal / document link</a>}
     {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
     </div>
     {editor?.kind === "subject" && <EducationSubjectModal key={editor.initial?.id ?? "new-subject"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(subject) => {
@@ -9032,11 +9010,8 @@ function LearningRecordModal({ initial, onClose, onSave }: {
       return;
     }
     for (const [label, value] of [["Learning resource link", record.resourceLink], ["AI tool / resource link", record.aiLink]]) {
-      if (!value) continue;
-      try {
-        if (new URL(value).protocol !== "https:") throw new Error();
-      } catch {
-        setError(`${label} must be a valid HTTPS link, or left blank.`);
+      if (value && !isSafeExternalLink(value)) {
+        setError(`${label} must be a valid HTTP, HTTPS, FTP, or local path link, or left blank.`);
         return;
       }
     }
@@ -9064,8 +9039,8 @@ function LearningRecordModal({ initial, onClose, onSave }: {
       <Field label="Course / source"><Input maxLength={120} placeholder="e.g. provider, book, mentor" value={record.provider} onChange={(event) => setRecord((current) => ({ ...current, provider: event.target.value }))} /></Field>
       <Field label="Start date"><DateInput value={record.startedDate} onValueChange={(startedDate) => setRecord((current) => ({ ...current, startedDate }))} /></Field>
       <Field label="Completion date"><DateInput value={record.completedDate} onValueChange={(completedDate) => setRecord((current) => ({ ...current, completedDate }))} /></Field>
-      <Field className="full" label="Course / learning resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link" value={record.resourceLink} onChange={(event) => setRecord((current) => ({ ...current, resourceLink: event.target.value }))} /></Field>
-      <Field className="full" label="AI tool / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link to an AI tutor, tool, or learning resource" value={record.aiLink} onChange={(event) => setRecord((current) => ({ ...current, aiLink: event.target.value }))} /></Field>
+      <Field className="full" label="Course / learning resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional URL or local path" value={record.resourceLink} onChange={(event) => setRecord((current) => ({ ...current, resourceLink: event.target.value }))} /></Field>
+      <Field className="full" label="AI tool / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional URL or local path" value={record.aiLink} onChange={(event) => setRecord((current) => ({ ...current, aiLink: event.target.value }))} /></Field>
       <Field className="full" label="Notes / next steps"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Key ideas, practice tasks, or what to learn next" value={record.notes} onChange={(event) => setRecord((current) => ({ ...current, notes: event.target.value }))} /></Field>
     </div>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -9117,7 +9092,7 @@ function LearningPage({ records, onSave, onDelete }: {
     return <Card className="learning-card" key={record.id}>
       <div className="learning-card-head"><div className="learning-icon"><BookOpen size={17} /></div><div className="learning-card-title"><h2>{record.title}</h2><p>{[record.topic, record.provider].filter(Boolean).join(" · ") || "Personal learning"}</p></div><div className="learning-card-actions"><Badge tone={record.status === "Completed" ? "green" : "neutral"}>{record.status}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></div>
       <div className="learning-card-meta"><Badge>{record.level}</Badge>{record.startedDate && <span>Started {dateLabel(record.startedDate)}</span>}{record.completedDate && <span>Completed {dateLabel(record.completedDate)}</span>}</div>
-      {(record.resourceLink || record.aiLink) && <div className="learning-links">{record.resourceLink && <a className="personal-document-link" href={record.resourceLink} target="_blank" rel="noopener noreferrer">Open learning resource</a>}{record.aiLink && <a className="personal-document-link" href={record.aiLink} target="_blank" rel="noopener noreferrer">Open AI resource</a>}</div>}
+      {(record.resourceLink || record.aiLink) && <div className="learning-links">{record.resourceLink && <a className="personal-document-link" href={activityLinkHref(record.resourceLink)} target="_blank" rel="noopener noreferrer">Open learning resource</a>}{record.aiLink && <a className="personal-document-link" href={activityLinkHref(record.aiLink)} target="_blank" rel="noopener noreferrer">Open AI resource</a>}</div>}
       {record.notes && <p className="learning-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
     </Card>;
   }
@@ -9831,7 +9806,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
           <td data-label="Activity"><span className="table-primary">{log.activity}</span></td>
           <td data-label="Duration / count">{[log.durationMinutes !== null ? `${log.durationMinutes} min` : "", log.count != null ? `${log.count} reps / count` : ""].filter(Boolean).join(" · ")}</td>
           <td data-label="Intensity">{log.intensity}</td>
-          <td data-label="Notes">{log.notes}</td>
+          <td data-label="Notes"><LinkifiedText>{log.notes}</LinkifiedText></td>
           <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Archive ${log.activity} exercise on ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
         </tr>)}</tbody>
       </table></div>
@@ -10189,8 +10164,8 @@ function TrainingSessionModal({ initial, onClose, onSave }: {
       setError("The end time cannot be earlier than the start time.");
       return;
     }
-    if (resourceLink && !isHttpsLink(resourceLink)) {
-      setError("Enter a valid HTTPS resource link, or leave it blank.");
+    if (resourceLink && !isSafeExternalLink(resourceLink)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path resource link, or leave it blank.");
       return;
     }
     onSave({
@@ -10219,7 +10194,7 @@ function TrainingSessionModal({ initial, onClose, onSave }: {
       <Field label="End time"><Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></Field>
       <Field className="full" label="Class topic"><Input maxLength={180} placeholder="e.g. Docker images and containers" value={topic} onChange={(event) => setTopic(event.target.value)} /></Field>
       <Field className="full" label="What did you learn? (required)"><textarea className="field textarea" rows={4} required maxLength={5000} placeholder="Capture the key concepts, commands, exercises, or takeaways from this date..." value={learned} onChange={(event) => setLearned(event.target.value)} /></Field>
-      <Field className="full" label="Class materials / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional HTTPS link to class notes, slides, or recording" value={resourceLink} onChange={(event) => setResourceLink(event.target.value)} /></Field>
+      <Field className="full" label="Class materials / resource link"><ExternalLinkInput maxLength={2000} placeholder="Optional URL or local path" value={resourceLink} onChange={(event) => setResourceLink(event.target.value)} /></Field>
       <Field className="full" label="Additional notes"><textarea className="field textarea" rows={2} maxLength={5000} placeholder="Questions to revisit, homework, or next steps" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>
     {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -10267,7 +10242,7 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
       <div className="training-session-meta"><span>{dateLabel(session.date)}{session.startTime ? ` · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}` : ""}</span>{session.instructor && <span>Instructor: {session.instructor}</span>}</div>
       <div className="training-session-learning"><strong>What I learned</strong><p><LinkifiedText>{session.learned}</LinkifiedText></p></div>
       {session.notes && <p className="training-session-notes"><LinkifiedText>{session.notes}</LinkifiedText></p>}
-      {session.resourceLink && <a className="personal-document-link" href={session.resourceLink} target="_blank" rel="noopener noreferrer">Open class materials</a>}
+      {session.resourceLink && <a className="personal-document-link" href={activityLinkHref(session.resourceLink)} target="_blank" rel="noopener noreferrer">Open class materials</a>}
     </Card>)}</div>;
   }
 
@@ -10896,7 +10871,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       const nextDue = sorted.filter((entry) => !entry.paid && entry.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
       return <details className="subscription-card compact-details" key={account.id}>
         <summary className="subscription-card-summary compact-summary"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="subscription-card-due">{nextDue ? <><span>{nextDue.dueDate < currentDate ? "Overdue" : "Next due"}</span><strong>{dateLabel(nextDue.dueDate)}</strong></> : <span>{sorted.length ? `${sorted.length} transactions` : "No transactions"}</span>}</div><div className="table-actions"><Button variant="outline" onClick={(event) => { event.preventDefault(); setTransactionEditor({ account, transaction: null }); }}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={(event) => { event.preventDefault(); setAccountEditor(account); }}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={(event) => { event.preventDefault(); onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={(event) => { event.preventDefault(); archiveAccount(account); }}><Archive size={13} /></button></div></summary>
-        <div className="compact-details-body">{account.notes && <p className="subscription-card-notes">{account.notes}</p>}
+        <div className="compact-details-body">{account.notes && <p className="subscription-card-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
         {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel([...sorted].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0].transactionDate)}</span></summary>
           {transactionGroupBy === "date"
             ? <DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`} groupOrder={transactionSort === "oldest" ? "oldest" : "newest"}>{(dateEntries) => renderTransactionRows(account, dateEntries)}</DateGroupedRecords>
@@ -11194,10 +11169,8 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
   function submit(event: FormEvent) {
     event.preventDefault();
     const normalizedLink = link.trim();
-    try {
-      if (new URL(normalizedLink).protocol !== "https:") throw new Error();
-    } catch {
-      setError("Enter a valid HTTPS link.");
+    if (!normalizedLink || !isSafeExternalLink(normalizedLink)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
     if (!title.trim()) {
@@ -11211,7 +11184,7 @@ function DevotionalResourceModal({ initial, onClose, onSave }: {
     <form onSubmit={submit}><div className="form-grid">
       <Field className="full" label="Title"><Input autoFocus required maxLength={160} placeholder="Song, sermon, video, audio, Scripture study..." value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field label="Date added"><DateInput required value={dateAdded} onValueChange={setDateAdded} /></Field>
-      <Field className="full" label="Link (HTTPS)"><Input type="url" required maxLength={2048} placeholder="https://..." value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Link"><ExternalLinkInput required maxLength={2048} placeholder="https://, ftp://, or C:\\folder" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
       <Field className="full" label="Description"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="What is this resource or why did you save it?" value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
       <Field label="Source (optional)"><Input maxLength={120} placeholder="Church, artist, channel, website..." value={source} onChange={(event) => setSource(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
@@ -11239,7 +11212,7 @@ function DevotionalSongModal({ initial, languages, onClose, onSave }: {
     event.preventDefault();
     const normalizedLink = link.trim();
     if (normalizedLink && !isSafeExternalLink(normalizedLink)) {
-      setError("Enter a valid HTTPS link.");
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
     if (!title.trim() || !date) {
@@ -11265,7 +11238,7 @@ function DevotionalSongModal({ initial, languages, onClose, onSave }: {
       <Field label="Bible reference (optional)"><Input maxLength={160} placeholder="e.g. Psalm 23:1" value={bibleReference} onChange={(event) => setBibleReference(event.target.value)} /></Field>
       <Field label="Author (optional)"><Input maxLength={160} placeholder="Lyricist or composer" value={author} onChange={(event) => setAuthor(event.target.value)} /></Field>
       <Field className="full" label="Lyrics (optional)"><textarea className="field textarea devotional-song-lyrics-input" rows={16} maxLength={50000} placeholder="Enter or paste the song lyrics" value={lyrics} onChange={(event) => setLyrics(event.target.value)} /></Field>
-      <Field className="full" label="Song link (optional)"><Input type="url" maxLength={2048} placeholder="https://..." value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Song link (optional)"><ExternalLinkInput maxLength={2048} placeholder="https://, ftp://, or C:\\folder" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save song"}</Button></div>
     </form>
@@ -11583,7 +11556,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
       {visibleResources.length ? <div className="devotional-date-groups">{dateGroups(sortedResources, (resource) => resource.dateAdded, (resource) => resource.source).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} resources` : groupBy === "date" ? (date ? `Resources · ${dateLabel(date)}` : "Date not recorded") : "All resources"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-resource-list">{records.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
       <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{resource.dateAdded ? dateLabel(resource.dateAdded) : "Date not recorded"}</span>}<h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, dateAdded: resource.dateAdded ?? today(), title: copyLabel(resource.title, 160) })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
         {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
-        <a className="devotional-resource-link" href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
+        <a className="devotional-resource-link" href={activityLinkHref(resource.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
       </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<PlayCircle size={18} />} title={resources.length ? "No matching resources" : "No saved resources yet"} description={resources.length ? "Try another search." : "Save a link to a song, video, sermon, audio, or any other faith resource."} /></Card>}
     </section>}
     {activeTab === "songs" && <section className="devotional-section devotional-tab-panel">
@@ -11591,7 +11564,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
       {visibleSongs.length ? <div className="devotional-date-groups">{dateGroups(sortedSongs, (song) => song.date, (song) => groupBy === "title" ? song.title : song.language || "Language not set").map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "title" ? date : groupBy === "type" ? `${date} songs` : date ? dateLabel(date) : "All songs"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((song) => <Card className="devotional-card devotional-song-card" key={song.id}>
         <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{dateLabel(song.date)}</span>}<h3>{song.title}</h3><span className="devotional-date">{[song.language, song.author && `Author: ${song.author}`, song.bibleReference && `Bible: ${song.bibleReference}`].filter(Boolean).join(" · ") || "Song details not provided"}</span></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${song.title}`} onClick={() => setSongEditor(song)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${song.title}`} onClick={() => onSaveSong({ ...song, title: copyLabel(song.title, 160) })}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${song.title}`} onClick={() => confirmDeleteSong(song)}><Archive size={13} /></button></div></div>
         {song.lyrics && <p className="devotional-song-lyrics">{song.lyrics}</p>}
-        {song.link && <a className="devotional-resource-link" href={song.link} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open song link</a>}
+        {song.link && <a className="devotional-resource-link" href={activityLinkHref(song.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open song link</a>}
       </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<Music2 size={18} />} title={songs.length ? "No matching songs" : "No songs saved yet"} description={songs.length ? "Try another search or date filter." : "Save lyrics with a title and date; language, Bible reference, author, and link are optional."} /></Card>}
     </section>}
     {activeTab === "daily-prayers" && <section className="devotional-section devotional-tab-panel">
@@ -13116,8 +13089,8 @@ function PersonalEducationModal({ initial, onClose, onSave }: {
       setError("The end date cannot be before the start date.");
       return;
     }
-    if (link && !isHttpsLink(link)) {
-      setError("Use a complete HTTPS link.");
+    if (link && !isSafeExternalLink(link)) {
+      setError("Use a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
     onSave({ institution: institution.trim(), qualification: qualification.trim(), fieldOfStudy: fieldOfStudy.trim(), location: location.trim(), startDate, endDate, status, grade: grade.trim(), link: link.trim(), notes: notes.trim() });
@@ -13133,7 +13106,7 @@ function PersonalEducationModal({ initial, onClose, onSave }: {
       <Field label="End date"><Input type="month" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></Field>
       <Field label="Status"><Select value={status} onChange={(event) => setStatus(event.target.value as PersonalEducationRecord["status"])}><option>Completed</option><option>In progress</option><option>On hold</option></Select></Field>
       <Field label="Grade / result"><Input maxLength={80} placeholder="Optional" value={grade} onChange={(event) => setGrade(event.target.value)} /></Field>
-      <Field className="full" label="Certificate / institution link (HTTPS)"><ExternalLinkInput maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Certificate / institution link"><ExternalLinkInput maxLength={500} placeholder="URL or local path" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add education"}</Button></div></form>
   </Modal>;
@@ -13163,8 +13136,8 @@ function ProfessionalQualificationModal({ initial, onClose, onSave }: {
       setError("The expiry date cannot be before the issue date.");
       return;
     }
-    if (link && !isHttpsLink(link)) {
-      setError("Use a complete HTTPS link.");
+    if (link && !isSafeExternalLink(link)) {
+      setError("Use a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
     onSave({ name: name.trim(), issuer: issuer.trim(), credentialId: credentialId.trim(), issueDate, expiryDate, link: link.trim(), notes: notes.trim() });
@@ -13177,7 +13150,7 @@ function ProfessionalQualificationModal({ initial, onClose, onSave }: {
       <Field label="Credential ID (optional)"><Input maxLength={120} value={credentialId} onChange={(event) => setCredentialId(event.target.value)} /></Field>
       <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
       <Field label="Expiry date (optional)"><DateInput value={expiryDate} onValueChange={setExpiryDate} /></Field>
-      <Field className="full" label="Credential / verification link (HTTPS)"><ExternalLinkInput maxLength={500} placeholder="https://" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
+      <Field className="full" label="Credential / verification link"><ExternalLinkInput maxLength={500} placeholder="URL or local path" value={link} onChange={(event) => setLink(event.target.value)} /></Field>
       <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Add qualification"}</Button></div></form>
   </Modal>;
@@ -13292,7 +13265,7 @@ function CareerEntry({ title, subtitle, details, summaryDetails = [], descriptio
   </div></summary><div className="compact-details-body">
     {details.filter(Boolean).length > 0 && <div className="career-card-details">{details.filter(Boolean).map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}</div>}
     {description && <p className="career-card-description"><LinkifiedText>{description}</LinkifiedText></p>}
-    {link && <a className="career-card-link" href={link} target="_blank" rel="noopener noreferrer">Open link</a>}
+    {link && <a className="career-card-link" href={activityLinkHref(link)} target="_blank" rel="noopener noreferrer">Open link</a>}
   </div></details>;
 }
 
@@ -13548,14 +13521,9 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
     event.preventDefault();
     const link = documentLink.trim();
     if (!title.trim()) { setError("Enter a title for this record."); return; }
-    if (link) {
-      try {
-        const url = new URL(link);
-        if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error();
-      } catch {
-        setError("Enter a valid shared link starting with https://.");
-        return;
-      }
+    if (link && !isSafeExternalLink(link)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link.");
+      return;
     }
     onSave({
       title: title.trim(),
@@ -13583,7 +13551,7 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
     <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
     <Field label="Expiry / renewal date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
     <Field label="Remind me"><Select value={reminderDays} onChange={(event) => setReminderDays(Number(event.target.value))}><option value={0}>On the due date</option><option value={7}>7 days before</option><option value={30}>30 days before</option><option value={60}>60 days before</option><option value={90}>90 days before</option></Select></Field>
-    <Field className="full" label="Shared document link"><ExternalLinkInput maxLength={2000} placeholder="https://... (use a private link with appropriate sharing access)" value={documentLink} onChange={(event) => setDocumentLink(event.target.value)} /></Field>
+    <Field className="full" label="Shared document link"><ExternalLinkInput maxLength={2000} placeholder="URL or local path" value={documentLink} onChange={(event) => setDocumentLink(event.target.value)} /></Field>
     <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Additional information, renewal instructions, contacts..." value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     <div className="personal-fields full"><div className="personal-fields-head"><div><span className="field-label">Additional details</span><p className="section-description">Add any extra label and value for this record.</p></div><Button type="button" variant="outline" onClick={() => setAdditionalFields((fields) => [...fields, { label: "", value: "" }])}><Plus size={13} />Add field</Button></div>
       {additionalFields.map((field, index) => <div className="personal-field-row" key={index}><Input aria-label={`Additional field ${index + 1} name`} maxLength={80} placeholder="Field name" value={field.label} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, label: event.target.value } : entry))} /><Input aria-label={`Additional field ${index + 1} value`} maxLength={500} placeholder="Value" value={field.value} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, value: event.target.value } : entry))} /><button type="button" className="icon-button" aria-label="Remove additional field" onClick={() => setAdditionalFields((fields) => fields.filter((_, fieldIndex) => fieldIndex !== index))}><Trash2 size={14} /></button></div>)}
@@ -13648,7 +13616,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
           {record.additionalFields.map((field, index) => field.label || field.value ? <div key={index}><span>{field.label || "Additional detail"}</span><strong>{field.value || "—"}</strong></div> : null)}
         </div>
         {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
-        {record.documentLink && <a className="personal-document-link" href={record.documentLink} target="_blank" rel="noopener noreferrer"><FileText size={14} /> Open shared document link</a>}
+        {record.documentLink && <a className="personal-document-link" href={activityLinkHref(record.documentLink)} target="_blank" rel="noopener noreferrer"><FileText size={14} /> Open shared document link</a>}
       </Card>;
     })}</div>;
   }
@@ -13696,7 +13664,7 @@ function DocumentModal({ initial, onClose, onSave }: {
       return;
     }
     if (externalLink.trim() && (externalLink.trim().length > 2048 || !isSafeExternalLink(externalLink.trim()))) {
-      setError("Enter a valid HTTPS link to the document.");
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path link to the document.");
       return;
     }
     if (file && !getDocumentFileType(file.name)) {
@@ -13729,7 +13697,7 @@ function DocumentModal({ initial, onClose, onSave }: {
       <Field className="full" label="Belongs to (person's name)"><Input maxLength={120} placeholder="Optional" value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>
       <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 10 MB per file."}</span></Field>
       {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
-      <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="https://…" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">Use a direct HTTPS link. You can add a link, upload a file, or include both.</span></Field>
+      <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
   </Modal>;
@@ -13791,7 +13759,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
       return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
         {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
         {hasFile && <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>}
-        {document.externalLink && <a className="button button-outline document-download" href={document.externalLink} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
+        {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
         {hasFile && <button className="icon-button" aria-label={`Remove uploaded file from ${document.title}`} title="Remove uploaded file" onClick={() => onRemoveFile(document)}><Trash2 size={14} /></button>}
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => onCopy(document)}><Copy size={14} /></button>
@@ -13801,7 +13769,7 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
   }
 
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External HTTPS links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
     <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan bucket; each upload can be up to 10 MB. The estimate tracks document records only; student photos and ID-card images also use this bucket but are not included.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
     <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Document filters" activeCount={(personFilter === "All people" ? 0 : 1) + (typeFilter === "All file types" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}><Field label="Person"><Select aria-label="Filter documents by person" value={personFilter} onChange={(event) => setPersonFilter(event.target.value)}><option>All people</option>{[...new Set(documents.map((document) => document.personName.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((person) => <option key={person}>{person}</option>)}</Select></Field><Field label="File type"><Select aria-label="Filter documents by file type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All file types</option>{documentTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field><Field label="Added from"><DateInput aria-label="Documents added from" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Added to"><DateInput aria-label="Documents added to" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setDateFrom(""); setDateTo(""); setSortBy("newest"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group documents" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Added date</option><option value="month">Added month</option><option value="person">Person</option><option value="type">File type</option><option value="none">No grouping</option></Select></Field><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
     {visible.length ? groupBy === "person" || groupBy === "type"
@@ -13860,13 +13828,9 @@ function CredentialModal({ initial, onClose, onSave }: {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    if (record.website) {
-      try {
-        if (new URL(record.website).protocol !== "https:") throw new Error();
-      } catch {
-        setError("Enter a valid HTTPS sign-in link, or leave it blank.");
-        return;
-      }
+    if (record.website && !isSafeExternalLink(record.website)) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path sign-in link, or leave it blank.");
+      return;
     }
     setSaving(true);
     try {
@@ -13935,13 +13899,9 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
       setError("Enter the bank name, account holder, and account number.");
       return;
     }
-    if (website.trim()) {
-      try {
-        if (new URL(website.trim()).protocol !== "https:") throw new Error();
-      } catch {
-        setError("Enter a valid HTTPS bank website, or leave it blank.");
-        return;
-      }
+    if (website.trim() && !isSafeExternalLink(website.trim())) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path bank link, or leave it blank.");
+      return;
     }
     const parsedBalance = currentBalance.trim() ? Number(currentBalance) : null;
     if (currentBalance.trim() && (!Number.isFinite(parsedBalance) || parsedBalance === null)) {
@@ -13985,7 +13945,7 @@ function DirectBankAccountModal({ initial, onClose, onSave }: {
         <Field label="Branch"><Input maxLength={160} value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
         <Field label="Current available balance"><Input type="number" step="0.01" placeholder="Optional" value={currentBalance} onChange={(event) => setCurrentBalance(event.target.value)} /></Field>
         <Field label="Balance as of"><DateInput value={balanceAsOfDate} onValueChange={setBalanceAsOfDate} /></Field>
-        <Field className="full" label="Bank website (HTTPS)"><ExternalLinkInput maxLength={2000} placeholder="https://..." value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
+        <Field className="full" label="Bank website or local path"><ExternalLinkInput maxLength={2000} placeholder="URL or local path" value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
         <Field className="full" label="Customer-service contact"><Input maxLength={500} placeholder="Phone number or email" autoComplete="off" value={customerService} onChange={(event) => setCustomerService(event.target.value)} /></Field>
         <Field className="full" label="Quick-reference notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details such as account purpose or where to find statements" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
       </div>
@@ -14090,7 +14050,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
             </strong>
           </div>)}
       </div>}
-      {account.website && <a className="personal-document-link" href={account.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
+      {account.website && <a className="personal-document-link" href={activityLinkHref(account.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
       {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
       </div>
     </details>)}</div>
@@ -14173,7 +14133,7 @@ function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLeg
       <div className="compact-details-body">
         <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password || "Not saved" : record.password ? "••••••••••••" : "Not saved"}</code><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
         <div className="credential-secondary">
-          {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open sign-in page</a>}
+          {record.website && <a className="personal-document-link" href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open sign-in page</a>}
           {record.recoveryInfo && <p><strong>Recovery:</strong> {record.recoveryInfo}</p>}
           {record.tags.length > 0 && <p><strong>Tags:</strong> {record.tags.join(", ")}</p>}
           {record.additionalFields.map((field, index) => <p key={`${record.id}-${index}`}><strong>{field.label}:</strong> {field.value}</p>)}
@@ -14220,13 +14180,9 @@ function BankAccountModal({ initial, onClose, onSave }: {
       setError("Enter the bank name, account holder, and account number.");
       return;
     }
-    if (website.trim()) {
-      try {
-        if (new URL(website.trim()).protocol !== "https:") throw new Error();
-      } catch {
-        setError("Enter a valid HTTPS bank website, or leave it blank.");
-        return;
-      }
+    if (website.trim() && !isSafeExternalLink(website.trim())) {
+      setError("Enter a valid HTTP, HTTPS, FTP, or local path bank link, or leave it blank.");
+      return;
     }
     setSaving(true);
     try {
@@ -14266,7 +14222,7 @@ function BankAccountModal({ initial, onClose, onSave }: {
         <div className="field-wrap"><label className="field-label" htmlFor="bank-account-number">Account number</label><div className="credential-secret-field"><Input id="bank-account-number" required maxLength={100} autoComplete="off" type={showAccountNumber ? "text" : "password"} value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} /><button className="icon-button" type="button" aria-label={showAccountNumber ? "Hide account number" : "Show account number"} onClick={() => setShowAccountNumber((visible) => !visible)}>{showAccountNumber ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></div>
         <Field label="IFSC / routing code"><Input maxLength={80} autoComplete="off" value={routingCode} onChange={(event) => setRoutingCode(event.target.value)} /></Field>
         <Field label="Branch"><Input maxLength={160} value={branch} onChange={(event) => setBranch(event.target.value)} /></Field>
-        <Field className="full" label="Bank website (HTTPS)"><ExternalLinkInput maxLength={2000} placeholder="https://..." value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
+        <Field className="full" label="Bank website or local path"><ExternalLinkInput maxLength={2000} placeholder="URL or local path" value={website} onChange={(event) => setWebsite(event.target.value)} /></Field>
         <Field className="full" label="Customer-service contact"><Input maxLength={500} placeholder="Phone number or email" autoComplete="off" value={customerService} onChange={(event) => setCustomerService(event.target.value)} /></Field>
         <Field className="full" label="Quick-reference notes"><textarea className="field textarea" rows={3} maxLength={3000} placeholder="Optional details such as account purpose or where to find statements" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
       </div>
@@ -14460,11 +14416,11 @@ export function CredentialVaultPage({ vault, section, onNavigate, onSave, onDele
         {record.branch && <div><span>Branch</span><strong>{record.branch}</strong></div>}
         {record.customerService && <div><span>Customer service</span><strong>{record.customerService}</strong></div>}
       </div>
-      {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open bank website</a>}
+      {record.website && <a className="personal-document-link" href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Open bank website</a>}
       {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
     </Card>)}</div> : <div className="credential-list">{records.map((record) => <Card className="credential-card" key={record.id}>
       <div className="credential-card-head"><div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p>{record.category}{record.username ? ` · ${record.username}` : ""}</p></div></div><div className="personal-record-actions"><button className="icon-button" aria-label={`Edit ${record.provider}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.provider} credential`} title="Duplicate encrypted credential" onClick={() => { if (window.confirm(`Create a second encrypted copy of the ${record.provider} credential?`)) void saveRecords([{ ...record, id: createId(), provider: copyLabel(record.provider, 120), tags: [...record.tags], additionalFields: record.additionalFields.map((field) => ({ ...field })) }, ...unlocked.records]).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not duplicate the credential.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Delete ${record.provider}`} onClick={() => { if (window.confirm(`Delete the ${record.provider} account from the vault?`)) void saveRecords(unlocked.records.filter((entry) => entry.id !== record.id)).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not update the vault.")); }}><Trash2 size={14} /></button></div></div>
-      {record.website && <a className="personal-document-link" href={record.website} target="_blank" rel="noopener noreferrer">{record.website}</a>}
+      {record.website && <a className="personal-document-link" href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer">{record.website}</a>}
       {record.password && <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password : "••••••••••••"}</code><button className="icon-button" type="button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>}
       {record.recoveryInfo && <p className="credential-secondary"><strong>Recovery:</strong> {record.recoveryInfo}</p>}
       {record.additionalFields.map((field, index) => field.label || field.value ? <p className="credential-secondary" key={index}><strong>{field.label || "Additional detail"}:</strong> {field.value}</p> : null)}

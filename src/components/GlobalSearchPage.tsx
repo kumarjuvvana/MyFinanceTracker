@@ -1,6 +1,6 @@
 import { useMemo, useState, type MouseEvent } from "react";
 import { ArrowUpRight, Search, X } from "lucide-react";
-import { Button, Card, EmptyState, FilterDrawer, Input, Select } from "./ui";
+import { Button, Card, EmptyState, FilterDrawer, Input, LinkifiedText, Select } from "./ui";
 import { searchTrackerData, type GlobalSearchResult } from "../lib/globalSearch";
 import type { Page, TrackerData } from "../types";
 
@@ -29,7 +29,7 @@ function ResultDetails({ result, onClose, onGoToPage }: {
     <section className="modal modal-wide global-search-detail" role="dialog" aria-modal="true" aria-labelledby="global-search-detail-title">
       <div className="modal-head"><div><p className="eyebrow">{result.collection}</p><h2 id="global-search-detail-title">{result.title}</h2></div><button className="icon-button" type="button" aria-label="Close record details" onClick={onClose}><X size={16} /></button></div>
       <div className="global-search-fields">{result.fields.map((field, index) =>
-        <div className="global-search-field" key={`${field.label}-${index}`}><span>{field.label}</span><p>{field.value}</p></div>)}</div>
+        <div className="global-search-field" key={`${field.label}-${index}`}><span>{field.label}</span><p><LinkifiedText>{field.value}</LinkifiedText></p></div>)}</div>
       <div className="modal-actions"><Button variant="outline" type="button" onClick={onClose}>Close</Button><Button type="button" onClick={() => onGoToPage(result.page)}>Open {result.page}<ArrowUpRight size={14} /></Button></div>
     </section>
   </div>;
