@@ -8,8 +8,6 @@
 - Record-level invested/current values, date, source, and recorded difference.
 - Automated price history loaded from the existing `/api/asset-prices` endpoint; the report reads at most its latest 100 history rows and reports the cap/error state.
 - Saved quote and NAV history with search, type, currency, and date filters, pagination, and filtered CSV export.
-- A separate **Asset analytics** report submenu with Stocks, Mutual funds, and NPS sections, selectable line/area/column charts, instrument selection, and date filters.
-- Asset analytics fetches all pages of the selected automation-history asset type and plots one instrument/currency series at a time.
 
 ## Data boundaries
 
@@ -17,5 +15,4 @@
 - Stock lots/trades are incomplete. Missing quantities, cost basis, currency, and price dates remain missing.
 - No value is converted across currencies. A missing currency is labeled instead of inferred.
 - Automated history is separate from `TrackerData`, so an unavailable endpoint is surfaced while stored in-app snapshots remain visible.
-- The Investment & portfolio and Assets & portfolio reports continue to use at most the latest 100 automated records. The Asset analytics submenu pages through the full history for the selected asset type.
-- Asset analytics shows per-share/per-unit prices and NAVs from automation history; it does not calculate portfolio-value charts, fill missing dates, or convert currencies.
+- The automated-history report reads the latest 100 records; the Price automation screen remains the paginated source for longer history.

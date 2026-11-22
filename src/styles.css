@@ -2222,6 +2222,10 @@ body{background:#f3f5ef}
 .asset-analytics-filters>.field-wrap{min-width:145px}
 .asset-analytics-filters>.field-wrap:first-child{flex:1 1 260px}
 .asset-analytics-card{margin-top:4px}
+.asset-analytics-type-section{margin-top:18px}
+.asset-analytics-type-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.asset-analytics-series-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px}
+.asset-analytics-empty{margin-top:4px}
 .asset-analytics-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}
 .asset-analytics-chart-wrap{width:100%;overflow-x:auto}
 .asset-analytics-chart{display:block;width:100%;min-width:520px;height:auto;overflow:visible}

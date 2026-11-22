@@ -32,7 +32,7 @@ export function buildAssetAnalyticsSeries(
       !Number.isFinite(record.price) || record.price <= 0 ||
       !record.currency || !record.asset_id || !record.instrument_id) continue;
 
-    const id = `${record.asset_id}:${record.instrument_id}:${record.currency}`;
+    const id = `${assetType}:${record.asset_id}:${record.instrument_id}:${record.currency}`;
     let entry = series.get(id);
     if (!entry) {
       entry = {
