@@ -1,11 +1,12 @@
 # Reports & Analytics — Module and Visualization Roadmap
 
-This document catalogs report candidates and chart guidance for phased work. It does not add report screens or change existing chart behavior. Asset Analytics remains a separate, unchanged report.
+This document catalogs report candidates and chart guidance for phased work. Asset Analytics remains a separate report; its implementation and behavior are unchanged by the Investment & portfolio additions described below.
 
 ## Initial priority: investments and assets
 
-- **Portfolio snapshot:** show current recorded value, invested/cost basis, profit/loss, holdings coverage, and valuation freshness as clearly labeled summary cards.
-- **Allocation:** use a horizontal bar or donut for asset type, institution, and currency allocation. Never add amounts in different currencies into one total unless an explicit, documented conversion source is introduced.
+- **Portfolio snapshot (remaining):** show total recorded current value, invested/cost basis, and profit/loss as clearly labeled summary cards; data-readiness coverage checks are now available in Investment & portfolio.
+- **Allocation (delivered in Investment & portfolio):** a horizontal bar chart groups recorded current values by holding type or institution and shows one currency at a time; the exact-value allocation table is retained. Never add amounts in different currencies into one total unless an explicit, documented conversion source is introduced.
+- **Data readiness (delivered in Investment & portfolio):** surface missing units, cost basis, current values, and undated or older-than-one-year valuations. The summary follows type, currency, and search filters but is independent of date filters; these checks describe data coverage, not verified returns.
 - **Cost versus current value:** use paired bars or a diverging profit/loss bar to compare recorded cost basis and current valuation. State which positions lack either value.
 - **Portfolio history:** use a line chart only when dated portfolio/holdings snapshots support the metric. Applying current units to old prices is not a historical holdings ledger or a true historical portfolio return.
 - **Assets and liabilities:** show values and coverage separately; only present a net-worth trend when reliable dated values exist for both assets and liabilities.

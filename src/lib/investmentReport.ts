@@ -15,6 +15,29 @@ export interface InvestmentPosition {
   recordedDifference: number | null;
 }
 
+export interface InvestmentAllocationRow {
+  type: string;
+  currency: string;
+  count: number;
+  current: number;
+  invested: number;
+  currentCount: number;
+  investedCount: number;
+}
+
+export interface InvestmentDataReadiness {
+  positionCount: number;
+  unitBasedPositionCount: number;
+  missingUnits: number;
+  missingStockUnits: number;
+  missingAssetUnits: number;
+  missingCostBasis: number;
+  missingCurrentValue: number;
+  staleOrUndated: number;
+  stockPositionsNeedingAttention: number;
+  assetPositionsNeedingAttention: number;
+}
+
 export interface AssetHistoryPoint {
   id: string;
   seriesId: string;
@@ -37,6 +60,98 @@ export function isAssetValuationStale(valueDate: string | null | undefined, now 
   if (!date) return true;
   const ageDays = (now.getTime() - Date.parse(`${date}T00:00:00`)) / 86400000;
   return ageDays > 365;
+}
+
+export function buildInvestmentAllocationRows(
+  positions: readonly InvestmentPosition[],
+  groupBy: "type" | "institution",
+): InvestmentAllocationRow[] {
+  const groups = new Map<string, InvestmentAllocationRow>();
+  for (const position of positions) {
+    const type = groupBy === "institution" ? position.institution : position.assetType;
+    const key = `${type}\u0000${position.currency}`;
+    const group = groups.get(key) ?? {
+      type,
+      currency: position.currency,
+      count: 0,
+      current: 0,
+      invested: 0,
+      currentCount: 0,
+      investedCount: 0,
+    };
+    group.count += 1;
+    if (position.currentValue !== null) {
+      group.current += position.currentValue;
+      group.currentCount += 1;
+    }
+    if (position.investedValue !== null) {
+      group.invested += position.investedValue;
+      group.investedCount += 1;
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((left, right) =>
+    left.currency.localeCompare(right.currency) || left.type.localeCompare(right.type));
+}
+
+export function summarizeInvestmentDataReadiness(
+  positions: readonly InvestmentPosition[],
+  data: TrackerData,
+): InvestmentDataReadiness {
+  let unitBasedPositionCount = 0;
+  let missingUnits = 0;
+  let missingStockUnits = 0;
+  let missingAssetUnits = 0;
+  let missingCostBasis = 0;
+  let missingCurrentValue = 0;
+  let staleOrUndated = 0;
+  let stockPositionsNeedingAttention = 0;
+  let assetPositionsNeedingAttention = 0;
+  for (const position of positions) {
+    let positionMissingUnits = false;
+    if (position.assetType === "Stock" || position.assetType === "Mutual fund") {
+      unitBasedPositionCount += 1;
+      if (position.quantity === null || !Number.isFinite(position.quantity) || position.quantity <= 0) {
+        positionMissingUnits = true;
+      }
+    } else if (position.assetType === "NPS") {
+      unitBasedPositionCount += 1;
+      const assetId = position.id.startsWith("asset:") ? position.id.slice("asset:".length) : "";
+      const schemes = data.assets?.find((asset) => asset.id === assetId)?.npsSchemes ?? [];
+      if (!schemes.length || schemes.some((scheme) =>
+        scheme.units === null || !Number.isFinite(scheme.units) || scheme.units <= 0)) {
+        positionMissingUnits = true;
+      }
+    }
+    if (positionMissingUnits) {
+      missingUnits += 1;
+      if (position.assetType === "Stock") missingStockUnits += 1;
+      else missingAssetUnits += 1;
+    }
+
+    const positionMissingCostBasis = position.investedValue === null;
+    const positionMissingValue = position.currentValue === null;
+    const positionStale = isAssetValuationStale(position.valueDate);
+    if (positionMissingCostBasis) missingCostBasis += 1;
+    if (positionMissingValue) missingCurrentValue += 1;
+    if (positionStale) staleOrUndated += 1;
+    if (positionMissingUnits || positionMissingCostBasis || positionMissingValue || positionStale) {
+      if (position.assetType === "Stock") stockPositionsNeedingAttention += 1;
+      else assetPositionsNeedingAttention += 1;
+    }
+  }
+  return {
+    positionCount: positions.length,
+    unitBasedPositionCount,
+    missingUnits,
+    missingStockUnits,
+    missingAssetUnits,
+    missingCostBasis,
+    missingCurrentValue,
+    staleOrUndated,
+    stockPositionsNeedingAttention,
+    assetPositionsNeedingAttention,
+  };
 }
 
 function validAmount(value: number | null | undefined): number | null {

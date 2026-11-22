@@ -32,7 +32,16 @@ import { BIBLE_BOOK_CATALOG, getBibleBook } from "./lib/bibleReferenceCatalog";
 import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRange } from "./lib/reportAnalytics";
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
-import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, isAssetValuationStale, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
+import {
+  buildAssetHistory,
+  buildAssetManagerRecords,
+  buildInvestmentAllocationRows,
+  buildInvestmentPositions,
+  isAssetValuationStale,
+  summarizeInvestmentDataReadiness,
+  type AssetHistoryPoint,
+  type InvestmentPosition,
+} from "./lib/investmentReport";
 import {
   buildAssetAnalyticsSeries,
   buildAssetPortfolioProfitLoss,
@@ -2197,10 +2206,11 @@ function pageRecords<T>(records: readonly T[], page: number): T[] {
   return records.slice(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE);
 }
 
-function InvestmentReports({ data, initialFilters, onSaveView }: {
+function InvestmentReports({ data, initialFilters, onSaveView, onOpenPage }: {
   data: TrackerData;
   initialFilters?: Record<string, string>;
   onSaveView?: SaveReportView;
+  onOpenPage?: (page: Page) => void;
 }) {
   const automatedHistory = useAutomatedAssetPriceHistory();
   const positions = buildInvestmentPositions(data, automatedHistory.records);
@@ -2210,48 +2220,38 @@ function InvestmentReports({ data, initialFilters, onSaveView }: {
   const [search, setSearch] = useState(() => initialFilters?.search ?? "");
   const [from, setFrom] = useState(() => initialFilters?.from ?? "");
   const [to, setTo] = useState(() => initialFilters?.to ?? "");
-  const [groupBy, setGroupBy] = useState(() => initialFilters?.groupBy ?? "type");
+  const [groupBy, setGroupBy] = useState<"type" | "institution">(() =>
+    initialFilters?.groupBy === "institution" ? "institution" : "type");
+  const [allocationCurrency, setAllocationCurrency] = useState(() => initialFilters?.allocationCurrency ?? "");
   const [positionPage, setPositionPage] = useState(0);
   const [historyPage, setHistoryPage] = useState(0);
+  const preferredCurrency = useContext(CurrencyContext);
   const typeOptions = [...new Set(positions.map((position) => position.assetType))].sort();
   const currencyOptions = [...new Set(positions.map((position) => position.currency))].sort();
-  const matchesPosition = (position: InvestmentPosition) =>
+  const matchesPositionFilters = (position: InvestmentPosition) =>
     (assetType === "All types" || position.assetType === assetType) &&
     (currency === "All currencies" || position.currency === currency) &&
-    (!search || `${position.name} ${position.institution} ${position.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
-    (!from && !to || isWithinReportDateRange(position.valueDate, from, to));
-  const filteredPositions = positions.filter(matchesPosition);
+    (!search || `${position.name} ${position.institution} ${position.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+  const filteredPositions = positions.filter((position) =>
+    matchesPositionFilters(position) && (!from && !to || isWithinReportDateRange(position.valueDate, from, to)));
+  const readinessPositions = positions.filter(matchesPositionFilters);
+  const readiness = summarizeInvestmentDataReadiness(readinessPositions, data);
   const filteredHistory = allHistory.filter((point) =>
     (assetType === "All types" || point.assetType === assetType) &&
     (currency === "All currencies" || point.currency === currency) &&
     (!search || `${point.name} ${point.assetType}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
     (!from && !to || isWithinReportDateRange(point.date, from, to)));
-  const groups = new Map<string, { type: string; currency: string; count: number; current: number; invested: number; currentCount: number; investedCount: number }>();
-  for (const position of filteredPositions) {
-    const key = `${groupBy === "institution" ? position.institution : position.assetType}\u0000${position.currency}`;
-    const group = groups.get(key) ?? {
-      type: groupBy === "institution" ? position.institution : position.assetType,
-      currency: position.currency,
-      count: 0,
-      current: 0,
-      invested: 0,
-      currentCount: 0,
-      investedCount: 0,
-    };
-    group.count += 1;
-    if (position.currentValue !== null) {
-      group.current += position.currentValue;
-      group.currentCount += 1;
-    }
-    if (position.investedValue !== null) {
-      group.invested += position.investedValue;
-      group.investedCount += 1;
-    }
-    groups.set(key, group);
-  }
-  const groupedRows = [...groups.values()].sort((left, right) =>
-    left.currency.localeCompare(right.currency) || left.type.localeCompare(right.type));
-  const savedFilters = { assetType, currency, search, from, to, groupBy };
+  const groupedRows = buildInvestmentAllocationRows(filteredPositions, groupBy);
+  const allocationCurrencyOptions = [...new Set(groupedRows
+    .filter((group) => group.currentCount > 0)
+    .map((group) => group.currency))].sort();
+  const selectedAllocationCurrency = allocationCurrencyOptions.includes(allocationCurrency)
+    ? allocationCurrency
+    : allocationCurrencyOptions.includes(preferredCurrency) ? preferredCurrency : allocationCurrencyOptions[0] ?? "";
+  const allocationRows = groupedRows.filter((group) =>
+    group.currency === selectedAllocationCurrency && group.current > 0);
+  const allocationTotal = allocationRows.reduce((total, group) => total + group.current, 0);
+  const savedFilters = { assetType, currency, search, from, to, groupBy, allocationCurrency: selectedAllocationCurrency };
   const exportRows = filteredPositions.map((position) => ({
     type: position.assetType,
     holding: position.name,
@@ -2284,7 +2284,7 @@ function InvestmentReports({ data, initialFilters, onSaveView }: {
       <div className="shopping-quick-filters report-quick-filters">
         <Field label="Holding type"><Select value={assetType} onChange={(event) => { setAssetType(event.target.value); setPositionPage(0); setHistoryPage(0); }}><option>All types</option>{typeOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
         <Field label="Currency"><Select value={currency} onChange={(event) => { setCurrency(event.target.value); setPositionPage(0); setHistoryPage(0); }}><option>All currencies</option>{currencyOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
-        <Field label="Group totals by"><Select value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="type">Holding type</option><option value="institution">Institution</option></Select></Field>
+        <Field label="Group totals by"><Select value={groupBy} onChange={(event) => setGroupBy(event.target.value === "institution" ? "institution" : "type")}><option value="type">Holding type</option><option value="institution">Institution</option></Select></Field>
         <Field label="Search holdings"><Input value={search} onChange={(event) => { setSearch(event.target.value); setPositionPage(0); setHistoryPage(0); }} placeholder="Name or institution" /></Field>
       </div>
       <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
@@ -2302,7 +2302,46 @@ function InvestmentReports({ data, initialFilters, onSaveView }: {
     {automatedHistory.loading && <p className="section-description" role="status">Loading automated price history…</p>}
     {!automatedHistory.loading && automatedHistory.total > automatedHistory.records.length &&
       <p className="shopping-report-budget-note">Showing the latest {automatedHistory.records.length} of {automatedHistory.total} automated price-history records. Use the Price automation page for paginated history.</p>}
-    <Card><div className="card-head"><div><h2 className="section-title">Recorded allocation</h2><p className="section-description">Totals include only positions with recorded values. Each currency and grouping remains separate.</p></div></div>{groupedRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>{groupBy === "institution" ? "Institution" : "Holding type"}</th><th>Currency</th><th>Positions</th><th>Recorded current value</th><th>Recorded invested value</th></tr></thead><tbody>{groupedRows.map((group) => <tr key={`${group.type}:${group.currency}`}><td data-label={groupBy === "institution" ? "Institution" : "Holding type"}>{group.type}</td><td data-label="Currency">{group.currency}</td><td data-label="Positions">{group.count}</td><td data-label="Recorded current value">{group.currentCount ? reportCurrencyAmount(group.current, group.currency) : "Not recorded"}</td><td data-label="Recorded invested value">{group.investedCount ? reportCurrencyAmount(group.invested, group.currency) : "Not recorded"}</td></tr>)}</tbody></table></div> : <EmptyState icon={<TrendingUp size={18} />} title="No positions match these filters" description={positions.length ? "Try changing the filters or date range." : "Tracked stock and asset positions will appear when recorded."} />}</Card>
+    <div className="report-grid investment-allocation-grid">
+      <Card>
+        <div className="card-head">
+          <div><h2 className="section-title">Current allocation</h2><p className="section-description">Recorded current values by {groupBy === "institution" ? "institution" : "holding type"} · one currency at a time.</p></div>
+          <Field label="Chart currency"><Select aria-label="Allocation chart currency" value={selectedAllocationCurrency} disabled={!allocationCurrencyOptions.length} onChange={(event) => setAllocationCurrency(event.target.value)}>
+            {allocationCurrencyOptions.map((option) => <option key={option}>{option}</option>)}
+          </Select></Field>
+        </div>
+        {allocationRows.length && allocationTotal > 0
+          ? <div className="investment-allocation-list" role="list" aria-label={`Current allocation by ${groupBy === "institution" ? "institution" : "holding type"} in ${selectedAllocationCurrency}`}>
+            {allocationRows.map((group) => {
+              const share = group.current / allocationTotal * 100;
+              return <div className="investment-allocation-item" role="listitem" key={`${group.type}:${group.currency}`}>
+                <div className="investment-allocation-label"><span>{group.type}</span><strong>{reportCurrencyAmount(group.current, selectedAllocationCurrency)}</strong></div>
+                <div className="investment-allocation-track" aria-hidden="true"><span style={{ width: `${share}%` }} /></div>
+                <small>{share.toFixed(1)}% · {group.currentCount} of {group.count} positions valued</small>
+              </div>;
+            })}
+            <p className="shopping-report-budget-note">Allocation total: {reportCurrencyAmount(allocationTotal, selectedAllocationCurrency)}. Only groups with a positive recorded total are charted; missing values are excluded.</p>
+          </div>
+          : <EmptyState icon={<BarChart3 size={18} />} title="No positive allocation values available" description="Positive recorded current totals in the selected report filters are needed to draw this chart." />}
+      </Card>
+      <Card>
+        <div className="card-head"><div><h2 className="section-title">Recorded allocation</h2><p className="section-description">Exact current and invested values stay separated by currency and grouping.</p></div></div>
+        {groupedRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>{groupBy === "institution" ? "Institution" : "Holding type"}</th><th>Currency</th><th>Positions</th><th>Recorded current value</th><th>Recorded invested value</th></tr></thead><tbody>{groupedRows.map((group) => <tr key={`${group.type}:${group.currency}`}><td data-label={groupBy === "institution" ? "Institution" : "Holding type"}>{group.type}</td><td data-label="Currency">{group.currency}</td><td data-label="Positions">{group.count}</td><td data-label="Recorded current value">{group.currentCount ? reportCurrencyAmount(group.current, group.currency) : "Not recorded"}</td><td data-label="Recorded invested value">{group.investedCount ? reportCurrencyAmount(group.invested, group.currency) : "Not recorded"}</td></tr>)}</tbody></table></div> : <EmptyState icon={<TrendingUp size={18} />} title="No positions match these filters" description={positions.length ? "Try changing the filters or date range." : "Tracked stock and asset positions will appear when recorded."} />}
+      </Card>
+    </div>
+    <Card className="investment-readiness-card" style={{ marginTop: 16 }}>
+      <div className="card-head"><div><h2 className="section-title">Investment data readiness</h2><p className="section-description">Current checks follow holding type, currency, and search filters; date filters do not hide current data gaps.</p></div><Badge>{readiness.positionCount} positions checked</Badge></div>
+      <div className="investment-readiness-grid">
+        <div className="reports-hub-source"><strong>{readiness.missingUnits} / {readiness.unitBasedPositionCount}</strong><span>unit-based positions missing quantity or units</span></div>
+        <div className="reports-hub-source"><strong>{readiness.missingCostBasis} / {readiness.positionCount}</strong><span>positions missing recorded cost basis</span></div>
+        <div className="reports-hub-source"><strong>{readiness.missingCurrentValue} / {readiness.positionCount}</strong><span>positions missing current value</span></div>
+        <div className="reports-hub-source"><strong>{readiness.staleOrUndated} / {readiness.positionCount}</strong><span>valuations undated or older than one year</span></div>
+      </div>
+      {(readiness.stockPositionsNeedingAttention > 0 || readiness.assetPositionsNeedingAttention > 0) && <div className="investment-readiness-actions">
+        {readiness.stockPositionsNeedingAttention > 0 && onOpenPage && <Button type="button" size="sm" variant="outline" onClick={() => onOpenPage("Stocks")}>Review stock records ({readiness.stockPositionsNeedingAttention})</Button>}
+        {readiness.assetPositionsNeedingAttention > 0 && onOpenPage && <Button type="button" size="sm" variant="outline" onClick={() => onOpenPage("Asset manager")}>Review asset records ({readiness.assetPositionsNeedingAttention})</Button>}
+      </div>}
+    </Card>
     <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Holdings and recorded value differences</h2><p className="section-description">No value is inferred when required quantity, price, or valuation data is missing.</p></div></div>{filteredPositions.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Holding</th><th>Type</th><th>Currency</th><th>Units</th><th>Invested value</th><th>Current value</th><th>Difference</th><th>Value date</th></tr></thead><tbody>{visiblePositions.map((position) => <tr key={position.id}><td data-label="Holding"><div className="table-primary">{position.name}</div><div className="table-secondary">{position.institution} · {position.source}</div></td><td data-label="Type">{position.assetType}</td><td data-label="Currency">{position.currency}</td><td data-label="Units">{position.quantity ?? "Not recorded"}</td><td data-label="Invested value">{reportCurrencyAmount(position.investedValue, position.currency)}</td><td data-label="Current value">{reportCurrencyAmount(position.currentValue, position.currency)}</td><td data-label="Difference">{reportCurrencyAmount(position.recordedDifference, position.currency)}</td><td data-label="Value date">{position.valueDate || "Not recorded"}</td></tr>)}</tbody></table></div><ReportPagination count={filteredPositions.length} page={positionPage} onPageChange={setPositionPage} /></> : <p className="report-empty">No matching recorded holdings.</p>}</Card>
     <Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">Recorded price and NAV history</h2><p className="section-description">Per-unit quotes and NAVs are displayed as recorded, not treated as total portfolio value.</p></div><Badge>{filteredHistory.length} points</Badge></div>{filteredHistory.length ? <><div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Holding</th><th>Type</th><th>Recorded price / NAV</th><th>Currency</th><th>Units recorded</th><th>Source</th></tr></thead><tbody>{visibleHistory.map((point) => <tr key={point.id}><td data-label="Date">{point.date}</td><td data-label="Holding">{point.name}</td><td data-label="Type">{point.assetType}</td><td data-label="Price / NAV">{reportCurrencyAmount(point.value, point.currency)} / {point.unit}</td><td data-label="Currency">{point.currency}</td><td data-label="Units">{point.units ?? "Not recorded"}</td><td data-label="Source">{point.source}</td></tr>)}</tbody></table></div><ReportPagination count={filteredHistory.length} page={historyPage} onPageChange={setHistoryPage} /></> : <EmptyState icon={<History size={18} />} title="No dated market history matches these filters" description="Only saved quote and NAV snapshots with recorded dates are included." />}</Card>
   </>;
@@ -2700,10 +2739,11 @@ function SavedReports({ views, onApply, onDelete }: {
   </>;
 }
 
-function FinanceAndInvestmentReports({ data, initialFilters, onSaveView, initialSubreport = "cashflow", showSubnav = true }: {
+function FinanceAndInvestmentReports({ data, initialFilters, onSaveView, onOpenPage, initialSubreport = "cashflow", showSubnav = true }: {
   data: TrackerData;
   initialFilters?: Record<string, string>;
   onSaveView?: SaveReportView;
+  onOpenPage?: (page: Page) => void;
   initialSubreport?: "cashflow" | "investment";
   showSubnav?: boolean;
 }) {
@@ -2724,7 +2764,7 @@ function FinanceAndInvestmentReports({ data, initialFilters, onSaveView, initial
     </div>}
     {subreport === "cashflow"
       ? <FinanceCashflowReports key="cashflow" data={data} initialFilters={childFilters} onSaveView={saveChildView("cashflow")} />
-      : <InvestmentReports key="investment" data={data} initialFilters={childFilters} onSaveView={saveChildView("investment")} />}
+      : <InvestmentReports key="investment" data={data} initialFilters={childFilters} onSaveView={saveChildView("investment")} onOpenPage={onOpenPage} />}
   </>;
 }
 
@@ -3025,10 +3065,11 @@ function AssetAnalyticsReports({ data }: { data: TrackerData }) {
   </>;
 }
 
-function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences }: {
+function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences, onOpenPage }: {
   data: TrackerData;
   onSaveShoppingBudget: (amount: number | undefined) => Promise<void>;
   onSaveReportPreferences: (mutator: (previous: TrackerPreferences) => TrackerPreferences) => Promise<void>;
+  onOpenPage: (page: Page) => void;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
@@ -3206,6 +3247,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
         initialSubreport={section === "investment" ? "investment" : "cashflow"}
         showSubnav={false}
         onSaveView={(name, filters) => saveView(name, "finance", filters)}
+        onOpenPage={onOpenPage}
       />
       : section === "assets" ? <AssetManagerReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "assets", filters)} />
       : section === "assetAnalytics" ? <AssetAnalyticsReports data={data} />
@@ -16716,8 +16758,8 @@ export default function App() {
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
-    Reports: <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} />,
-    "Reports & Analytics": <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} />,
+    Reports: <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
+    "Reports & Analytics": <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
     "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {
