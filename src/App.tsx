@@ -33,6 +33,7 @@ import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRan
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
 import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, isAssetValuationStale, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
+import { buildAssetAnalyticsSeries, type AssetAnalyticsPoint } from "./lib/assetAnalytics";
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -1994,19 +1995,20 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "assets" | "subscriptions" | "forecasts" | "saved";
+type ReportHubSection = "overview" | "shopping" | "finance" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
 
 const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "shopping", label: "Shopping" },
   { id: "finance", label: "Finance & investments" },
   { id: "assets", label: "Assets & portfolio" },
+  { id: "assetAnalytics", label: "Asset analytics" },
   { id: "subscriptions", label: "Subscriptions & bills" },
   { id: "forecasts", label: "Forecasts" },
   { id: "saved", label: "Saved reports" },
 ];
 
-function useAutomatedAssetPriceHistory() {
+function useAutomatedAssetPriceHistory(assetType?: AssetPriceHistoryRecord["asset_type"]) {
   const [records, setRecords] = useState<AssetPriceHistoryRecord[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -2014,32 +2016,58 @@ function useAutomatedAssetPriceHistory() {
 
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setRecords([]);
+    setTotal(0);
     async function load() {
       try {
-        const response = await fetch("/api/asset-prices?historyPage=0&historyPageSize=100", {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        let payload: unknown;
-        try {
-          payload = await response.json();
-        } catch {
-          throw new Error("The automated price history endpoint returned invalid JSON.");
+        async function loadPage(page: number) {
+          const query = new URLSearchParams({
+            historyPage: String(page),
+            historyPageSize: "100",
+            ...(assetType ? { historyAssetType: assetType } : {}),
+          });
+          const response = await fetch(`/api/asset-prices?${query}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          });
+          let payload: unknown;
+          try {
+            payload = await response.json();
+          } catch {
+            throw new Error("The automated price history endpoint returned invalid JSON.");
+          }
+          if (!response.ok) {
+            const message = isRecord(payload) && typeof payload.error === "string"
+              ? payload.error
+              : `Could not load automated price history (${response.status}).`;
+            throw new Error(message);
+          }
+          if (!isRecord(payload) || !Array.isArray(payload.history) ||
+            typeof payload.historyTotal !== "number" || !Number.isSafeInteger(payload.historyTotal) ||
+            payload.historyTotal < 0) {
+            throw new Error("The automated price history response is incomplete.");
+          }
+          return {
+            records: payload.history.filter(isAssetPriceHistoryRecord),
+            total: payload.historyTotal,
+          };
         }
-        if (!response.ok) {
-          const message = isRecord(payload) && typeof payload.error === "string"
-            ? payload.error
-            : `Could not load automated price history (${response.status}).`;
-          throw new Error(message);
-        }
-        if (!isRecord(payload) || !Array.isArray(payload.history) ||
-          typeof payload.historyTotal !== "number" || !Number.isSafeInteger(payload.historyTotal) ||
-          payload.historyTotal < 0) {
-          throw new Error("The automated price history response is incomplete.");
+
+        const firstPage = await loadPage(0);
+        const allRecords = [...firstPage.records];
+        if (assetType) {
+          const pageCount = Math.ceil(firstPage.total / 100);
+          for (let start = 1; start < pageCount; start += 4) {
+            const pages = Array.from({ length: Math.min(4, pageCount - start) }, (_, index) => start + index);
+            const pageResults = await Promise.all(pages.map(loadPage));
+            allRecords.push(...pageResults.flatMap((page) => page.records));
+          }
         }
         if (!controller.signal.aborted) {
-          setRecords(payload.history.filter(isAssetPriceHistoryRecord));
-          setTotal(payload.historyTotal);
+          setRecords(allRecords);
+          setTotal(firstPage.total);
           setError("");
         }
       } catch (caught) {
@@ -2052,7 +2080,7 @@ function useAutomatedAssetPriceHistory() {
     }
     void load();
     return () => controller.abort();
-  }, []);
+  }, [assetType]);
 
   return { records, error, loading, total };
 }
@@ -2662,6 +2690,149 @@ function FinanceAndInvestmentReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
+type AssetAnalyticsChartType = "line" | "area" | "column";
+
+const ASSET_ANALYTICS_TYPES: { id: AssetPriceHistoryRecord["asset_type"]; label: string }[] = [
+  { id: "Stocks", label: "Stocks" },
+  { id: "Mutual fund", label: "Mutual funds" },
+  { id: "NPS", label: "NPS" },
+];
+
+function AssetAnalyticsChart({ points, chartType, label }: {
+  points: AssetAnalyticsPoint[];
+  chartType: AssetAnalyticsChartType;
+  label: string;
+}) {
+  const width = 760;
+  const height = 280;
+  const left = 54;
+  const right = 18;
+  const top = 20;
+  const bottom = 44;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const prices = points.map((point) => point.price);
+  const actualMin = Math.min(...prices);
+  const actualMax = Math.max(...prices);
+  const spread = actualMax - actualMin || Math.max(actualMax * 0.1, 1);
+  const min = actualMin - spread * 0.08;
+  const max = actualMax + spread * 0.08;
+  const coordinates = points.map((point, index) => ({
+    ...point,
+    x: left + (points.length <= 1 ? plotWidth / 2 : index * plotWidth / (points.length - 1)),
+    y: top + (max - point.price) * plotHeight / (max - min),
+  }));
+  const line = coordinates.map((point, index) => `${index ? "L" : "M"}${point.x},${point.y}`).join(" ");
+  const area = `${line} L${coordinates[coordinates.length - 1]?.x ?? left},${top + plotHeight} L${coordinates[0]?.x ?? left},${top + plotHeight} Z`;
+  const barWidth = Math.max(3, Math.min(22, plotWidth / points.length * 0.62));
+  const labels = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
+  const axisValues = [max, (max + min) / 2, min];
+  const formatPrice = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+
+  return <div className="asset-analytics-chart-wrap">
+    <svg className="asset-analytics-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label} historical ${chartType} chart`}>
+      <title>{label} historical price chart</title>
+      {axisValues.map((value, index) => {
+        const y = top + index * plotHeight / 2;
+        return <g key={index}>
+          <line x1={left} x2={width - right} y1={y} y2={y} className="asset-analytics-gridline" />
+          <text x={left - 8} y={y + 4} textAnchor="end" className="asset-analytics-axis-label">{formatPrice(value)}</text>
+        </g>;
+      })}
+      {chartType === "column" ? coordinates.map((point) => <rect
+        key={point.id}
+        x={point.x - barWidth / 2}
+        y={point.y}
+        width={barWidth}
+        height={Math.max(1, top + plotHeight - point.y)}
+        rx="2"
+        className="asset-analytics-bar"
+      />) : <>
+        {chartType === "area" && <path d={area} className="asset-analytics-area" />}
+        <path d={line} className="asset-analytics-line" />
+        {points.length < 36 && coordinates.map((point) => <circle key={point.id} cx={point.x} cy={point.y} r="3" className="asset-analytics-point" />)}
+      </>}
+      {coordinates.map((point, index) => labels.has(index) && <text
+        key={`date:${point.id}`}
+        x={point.x}
+        y={height - 13}
+        textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}
+        className="asset-analytics-axis-label"
+      >{point.date}</text>)}
+    </svg>
+  </div>;
+}
+
+function AssetAnalyticsReports() {
+  const [assetType, setAssetType] = useState<AssetPriceHistoryRecord["asset_type"]>("Stocks");
+  const [chartType, setChartType] = useState<AssetAnalyticsChartType>("line");
+  const [selectedSeriesId, setSelectedSeriesId] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const automatedHistory = useAutomatedAssetPriceHistory(assetType);
+  const series = buildAssetAnalyticsSeries(automatedHistory.records, assetType);
+  const selectedSeries = series.find((entry) => entry.id === selectedSeriesId) ?? series[0];
+  const points = selectedSeries?.points.filter((point) =>
+    (!from || point.date >= from) && (!to || point.date <= to)) ?? [];
+  const firstPoint = points[0];
+  const latestPoint = points[points.length - 1];
+  const change = firstPoint && latestPoint ? latestPoint.price - firstPoint.price : null;
+  const changePercent = change !== null && firstPoint && firstPoint.price !== 0
+    ? change / firstPoint.price * 100
+    : null;
+  const label = selectedSeries
+    ? selectedSeries.assetName === selectedSeries.instrumentName
+      ? selectedSeries.assetName
+      : `${selectedSeries.assetName} · ${selectedSeries.instrumentName}`
+    : "";
+
+  return <>
+    <PageHeading eyebrow="Automated price history" title="Asset analytics" subtitle="Explore historical stock prices and fund/NPS NAVs recorded by price automation." />
+    <p className="reports-hub-caveat">Charts use saved automation-job observations only. Prices and NAVs are per share/unit, are not total portfolio values, and are not converted across currencies. Missing dates are not interpolated; historical change is descriptive, not a forecast or investment recommendation.</p>
+    <div className="report-subnav" role="group" aria-label="Asset type analytics">
+      {ASSET_ANALYTICS_TYPES.map((entry) => <button
+        key={entry.id}
+        type="button"
+        className={`reports-hub-tab${assetType === entry.id ? " active" : ""}`}
+        aria-pressed={assetType === entry.id}
+        onClick={() => { setAssetType(entry.id); setSelectedSeriesId(""); }}
+      >{entry.label}</button>)}
+    </div>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar asset-analytics-filters">
+      <Field label="Asset / instrument"><Select
+        aria-label="Choose asset or instrument"
+        value={selectedSeries?.id ?? ""}
+        onChange={(event) => setSelectedSeriesId(event.target.value)}
+        disabled={!series.length}
+      >{series.map((entry) => <option key={entry.id} value={entry.id}>
+        {entry.assetName === entry.instrumentName ? entry.assetName : `${entry.assetName} · ${entry.instrumentName}`} ({entry.currency})
+      </option>)}</Select></Field>
+      <Field label="Chart type"><Select aria-label="Choose chart type" value={chartType} onChange={(event) => {
+        const selected = event.target.value;
+        if (selected === "line" || selected === "area" || selected === "column") setChartType(selected);
+      }}>
+        <option value="line">Line</option><option value="area">Area</option><option value="column">Column</option>
+      </Select></Field>
+      <Field label="From date"><DateInput className="filter-date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+      <Field label="To date"><DateInput className="filter-date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
+      <Badge>{automatedHistory.records.length.toLocaleString()} of {automatedHistory.total.toLocaleString()} {assetType} observations loaded</Badge>
+    </div>
+    {automatedHistory.error && <p className="alert alert-error" role="alert">Automated price history could not be loaded: {automatedHistory.error}</p>}
+    {automatedHistory.loading && <p className="section-description" role="status">Loading complete {assetType.toLowerCase()} automation history…</p>}
+    {!automatedHistory.loading && !automatedHistory.error && <Card className="asset-analytics-card">
+      <div className="card-head"><div><h2 className="section-title">{label || `${assetType} history`}</h2><p className="section-description">Historical {assetType === "Stocks" ? "share price" : "NAV"} · {selectedSeries?.currency ?? "currency unavailable"} · {selectedSeries?.unit ?? "per unit"}</p></div><Badge>{points.length} observations</Badge></div>
+      {points.length > 0 && selectedSeries ? <>
+        <div className="asset-analytics-summary">
+          <div className="reports-hub-source"><strong>{reportCurrencyAmount(latestPoint?.price ?? null, selectedSeries.currency)}</strong><span>latest recorded · {latestPoint?.date}</span></div>
+          <div className="reports-hub-source"><strong className={change !== null && change < 0 ? "asset-analytics-negative" : "asset-analytics-positive"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${reportCurrencyAmount(change, selectedSeries.currency)}${changePercent === null ? "" : ` (${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%)`}`}</strong><span>change across the selected date range</span></div>
+        </div>
+        <AssetAnalyticsChart points={points} chartType={chartType} label={label} />
+        <p className="shopping-report-budget-note">Source: automation history ({[...new Set(points.map((point) => point.provider))].join(", ")}). Change compares the first and last observations in the filtered range.</p>
+      </> : <EmptyState icon={<History size={18} />} title={series.length ? "No history in this date range" : `No automated ${assetType.toLowerCase()} history yet`} description={series.length ? "Try widening the date range or choosing another instrument." : "Enable this asset type in Asset manager → Price automation and run a price update to record historical observations."} />}
+    </Card>}
+  </>;
+}
+
 function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences }: {
   data: TrackerData;
   onSaveShoppingBudget: (amount: number | undefined) => Promise<void>;
@@ -2758,7 +2929,13 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
           <div className="reports-hub-card-icon icon-purple"><BarChart3 size={18} /></div>
           <h2 className="section-title">Assets & portfolio</h2>
           <p className="section-description">Review valuation coverage, assets, liabilities, and dated history without claiming complete net worth.</p>
-          <Button type="button" variant="outline" onClick={() => openSection("assets")}>Open asset analytics <ChevronRight size={14} /></Button>
+          <Button type="button" variant="outline" onClick={() => openSection("assets")}>Open assets & portfolio <ChevronRight size={14} /></Button>
+        </Card>
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-purple"><History size={18} /></div>
+          <h2 className="section-title">Asset analytics</h2>
+          <p className="section-description">Explore automation-job stock, mutual-fund, and NPS price/NAV history with interactive chart choices.</p>
+          <Button type="button" variant="outline" onClick={() => openSection("assetAnalytics")}>Open asset analytics <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-peach"><CalendarDays size={18} /></div>
@@ -2773,6 +2950,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
       </div>
     </> : section === "finance" ? <FinanceAndInvestmentReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "finance", filters)} />
       : section === "assets" ? <AssetManagerReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "assets", filters)} />
+      : section === "assetAnalytics" ? <AssetAnalyticsReports />
       : section === "subscriptions" ? <SubscriptionSpendingReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "subscriptions", filters)} />
       : section === "forecasts" ? <ForecastReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "forecasts", filters)} onSavePreferences={onSaveReportPreferences} />
       : section === "saved" ? <SavedReports views={savedViews} onApply={(view) => { setActiveSavedView(view); setSection(view.section); }} onDelete={deleteSavedView} />
