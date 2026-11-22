@@ -33,7 +33,13 @@ import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRan
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
 import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, isAssetValuationStale, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
-import { buildAssetAnalyticsSeries, type AssetAnalyticsPoint, type AssetAnalyticsSeries } from "./lib/assetAnalytics";
+import {
+  buildAssetAnalyticsSeries,
+  buildAssetPortfolioValueSeries,
+  type AssetAnalyticsPoint,
+  type AssetAnalyticsSeries,
+  type AssetPortfolioValuePoint,
+} from "./lib/assetAnalytics";
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
@@ -2799,12 +2805,53 @@ function AssetAnalyticsSeriesCard({ series, points, chartType }: {
   </Card>;
 }
 
-function AssetAnalyticsReports() {
+function AssetAnalyticsPortfolioCard({ points, currency, chartType, scopeLabel }: {
+  points: AssetPortfolioValuePoint[];
+  currency: string;
+  chartType: AssetAnalyticsChartType;
+  scopeLabel: string;
+}) {
+  const firstPoint = points[0];
+  const latestPoint = points[points.length - 1];
+  const change = firstPoint && latestPoint ? latestPoint.value - firstPoint.value : null;
+  const changePercent = change !== null && firstPoint && firstPoint.value !== 0
+    ? change / firstPoint.value * 100
+    : null;
+  const chartPoints: AssetAnalyticsPoint[] = points.map((point) => ({
+    id: point.id,
+    date: point.date,
+    price: point.value,
+    currency,
+    provider: `${point.pricedInstruments} of ${point.eligibleInstruments} eligible holdings priced`,
+  }));
+
+  return <Card className="asset-analytics-card">
+    <div className="card-head"><div><h2 className="section-title">{scopeLabel} total value</h2><p className="section-description">Automated historical prices × currently recorded units · {currency}</p></div><Badge>{points.length} dates</Badge></div>
+    {points.length ? <>
+      <div className="asset-analytics-summary">
+        <div className="reports-hub-source"><strong>{reportCurrencyAmount(latestPoint?.value ?? null, currency)}</strong><span>latest calculated total · {latestPoint?.date}</span></div>
+        <div className="reports-hub-source"><strong className={change !== null && change < 0 ? "asset-analytics-negative" : "asset-analytics-positive"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${reportCurrencyAmount(change, currency)}${changePercent === null ? "" : ` (${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%)`}`}</strong><span>change across the selected date range</span></div>
+        <div className="reports-hub-source"><strong>{latestPoint?.pricedInstruments} / {latestPoint?.eligibleInstruments}</strong><span>tracked instruments with an available price at the latest date</span></div>
+      </div>
+      <AssetAnalyticsChart points={chartPoints} chartType={chartType} label={`${scopeLabel} total value`} />
+    </> : <EmptyState
+      icon={<History size={18} />}
+      title="No aggregate value history available"
+      description="Recorded units are needed to calculate totals. Add quantities for stocks/funds or units for NPS schemes, and ensure automation history is available."
+    />}
+    <p className="shopping-report-budget-note">This estimate applies today’s recorded units to each holding’s latest available automated price on or before each date. It is not a historical holdings ledger; positions without recorded units or automated history are excluded. Currencies are not combined or converted.</p>
+  </Card>;
+}
+
+function AssetAnalyticsReports({ data }: { data: TrackerData }) {
   const [assetType, setAssetType] = useState<AssetAnalyticsType>("all");
   const [chartType, setChartType] = useState<AssetAnalyticsChartType>("line");
   const [selectedSeriesId, setSelectedSeriesId] = useState("all");
+  const [portfolioCurrency, setPortfolioCurrency] = useState("");
+  const [showIndividualCharts, setShowIndividualCharts] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const displayCurrency = useContext(CurrencyContext);
   const automatedHistory = useAutomatedAssetPriceHistory(
     assetType === "all" ? undefined : assetType,
     true,
@@ -2818,12 +2865,24 @@ function AssetAnalyticsReports() {
     ? undefined
     : visibleSeries.find((entry) => entry.id === selectedSeriesId);
   const displayedSeries = selectedSeries ? [selectedSeries] : visibleSeries;
+  const portfolioSeries = buildAssetPortfolioValueSeries(
+    assetType === "all" ? allSeries : visibleSeries,
+    data,
+  );
+  const currencyOptions = portfolioSeries.map((entry) => entry.currency);
+  const selectedPortfolioCurrency = currencyOptions.includes(portfolioCurrency)
+    ? portfolioCurrency
+    : currencyOptions.includes(displayCurrency) ? displayCurrency : currencyOptions[0] ?? "";
+  const portfolioPoints = portfolioSeries.find((entry) => entry.currency === selectedPortfolioCurrency)
+    ?.points.filter((point) => (!from || point.date >= from) && (!to || point.date <= to)) ?? [];
   const chartEntries = displayedSeries.map((series) => ({
     series,
     points: series.points.filter((point) =>
       (!from || point.date >= from) && (!to || point.date <= to)),
   })).filter((entry) => entry.points.length > 0);
-  const visibleTypes = assetType === "all" ? ASSET_ANALYTICS_ASSET_TYPES : [assetType];
+  const visibleTypes = selectedSeries
+    ? [selectedSeries.assetType]
+    : assetType === "all" ? ASSET_ANALYTICS_ASSET_TYPES : [assetType];
   const assetSections = visibleTypes.map((type) => ({
     type,
     entries: chartEntries.filter((entry) => entry.series.assetType === type),
@@ -2833,14 +2892,14 @@ function AssetAnalyticsReports() {
 
   return <>
     <PageHeading eyebrow="Automated price history" title="Asset analytics" subtitle="See automation history across asset types or focus on an individual instrument." />
-    <p className="reports-hub-caveat">Charts use saved automation-job observations only. Prices and NAVs are per share/unit, are not total portfolio values, and are not converted across currencies. Missing dates are not interpolated; historical change is descriptive, not a forecast or investment recommendation.</p>
+    <p className="reports-hub-caveat">The default total applies currently recorded units to automated historical prices/NAVs; it is an estimate, not a historical holdings ledger. Individual charts show per-share/unit prices. The aggregate carries each holding’s last recorded price forward until its next observation, keeps currencies separate, and is not investment advice.</p>
     <div className="report-subnav" role="group" aria-label="Asset type analytics">
       {ASSET_ANALYTICS_TYPES.map((entry) => <button
         key={entry.id}
         type="button"
         className={`reports-hub-tab${assetType === entry.id ? " active" : ""}`}
         aria-pressed={assetType === entry.id}
-        onClick={() => { setAssetType(entry.id); setSelectedSeriesId("all"); }}
+        onClick={() => { setAssetType(entry.id); setSelectedSeriesId("all"); setShowIndividualCharts(false); }}
       >{entry.label}</button>)}
     </div>
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar asset-analytics-filters">
@@ -2858,13 +2917,34 @@ function AssetAnalyticsReports() {
       }}>
         <option value="line">Line</option><option value="area">Area</option><option value="column">Column</option>
       </Select></Field>
+      {selectedSeriesId === "all" && <Field label="Portfolio currency"><Select
+        aria-label="Choose portfolio currency"
+        value={selectedPortfolioCurrency}
+        onChange={(event) => setPortfolioCurrency(event.target.value)}
+        disabled={!currencyOptions.length}
+      >{currencyOptions.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>}
       <Field label="From date"><DateInput className="filter-date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
       <Field label="To date"><DateInput className="filter-date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
       <Badge>{automatedHistory.records.length.toLocaleString()} of {automatedHistory.total.toLocaleString()} observations loaded</Badge>
     </div>
     {automatedHistory.error && <p className="alert alert-error" role="alert">Automated price history could not be loaded: {automatedHistory.error}</p>}
     {automatedHistory.loading && <p className="section-description" role="status">Loading complete {assetType === "all" ? "all asset types" : assetAnalyticsTypeLabel(assetType)} automation history…</p>}
-    {!automatedHistory.loading && !automatedHistory.error && assetSections.map((section) => <section className="asset-analytics-type-section" key={section.type}>
+    {!automatedHistory.loading && !automatedHistory.error && selectedSeriesId === "all" && <>
+      <AssetAnalyticsPortfolioCard
+        points={portfolioPoints}
+        currency={selectedPortfolioCurrency}
+        chartType={chartType}
+        scopeLabel={assetType === "all" ? "All asset types" : assetAnalyticsTypeLabel(assetType)}
+      />
+      <div className="asset-analytics-display-controls">
+        <p className="section-description">The total chart is the default view. Per-instrument price/NAV charts can be displayed below.</p>
+        <Button type="button" size="sm" variant="outline" aria-expanded={showIndividualCharts} onClick={() => setShowIndividualCharts((visible) => !visible)}>
+          {showIndividualCharts ? "Hide individual charts" : "Show individual charts"}
+        </Button>
+      </div>
+    </>}
+    {!automatedHistory.loading && !automatedHistory.error &&
+      (selectedSeries !== undefined || showIndividualCharts) && assetSections.map((section) => <section className="asset-analytics-type-section" key={section.type}>
       <div className="asset-analytics-type-heading"><h2 className="section-title">{assetAnalyticsTypeLabel(section.type)}</h2><Badge>{section.entries.length} instruments shown</Badge></div>
       {section.entries.length ? <div className="asset-analytics-series-grid">{section.entries.map((entry) => <AssetAnalyticsSeriesCard
         key={entry.series.id}
@@ -3003,7 +3083,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
       </div>
     </> : section === "finance" ? <FinanceAndInvestmentReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "finance", filters)} />
       : section === "assets" ? <AssetManagerReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "assets", filters)} />
-      : section === "assetAnalytics" ? <AssetAnalyticsReports />
+      : section === "assetAnalytics" ? <AssetAnalyticsReports data={data} />
       : section === "subscriptions" ? <SubscriptionSpendingReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "subscriptions", filters)} />
       : section === "forecasts" ? <ForecastReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "forecasts", filters)} onSavePreferences={onSaveReportPreferences} />
       : section === "saved" ? <SavedReports views={savedViews} onApply={(view) => { setActiveSavedView(view); setSection(view.section); }} onDelete={deleteSavedView} />

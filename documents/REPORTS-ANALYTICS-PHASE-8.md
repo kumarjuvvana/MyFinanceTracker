@@ -17,7 +17,9 @@
 
 ## Automated asset analytics report
 
-- **Reports & Analytics → Asset analytics** defaults to **All asset types** and displays separate Stocks, Mutual funds, and NPS sections, with one chart per instrument.
-- Line, area, and column charts share date filters; the instrument selector can show all instruments or focus on an individual instrument across asset types.
+- **Reports & Analytics → Asset analytics** defaults to **All asset types → All instruments**, showing a single portfolio-total chart. Portfolio currency is selectable and currencies are never combined.
+- **Show individual charts** expands the separate Stocks, Mutual funds, and NPS sections, with one price/NAV chart per instrument. Selecting a single instrument shows its chart across asset types.
+- Line, area, and column charts share date filters; the instrument selector can show the aggregate or focus on an individual instrument across asset types.
 - The report loads every page of automated price history and presents values as recorded per share/unit, keeping each instrument and currency separate.
-- This report does not interpolate missing dates, convert currencies, or treat a per-unit price/NAV as total portfolio value. Investment & portfolio summaries retain their existing latest-100-record limit.
+- Aggregate value uses the current recorded stock quantity, mutual-fund units, and NPS scheme units against the last available automated price/NAV as of each date. It is not a historical holdings ledger; instruments without units are excluded.
+- The report does not convert currencies or imply an investment recommendation. Investment & portfolio summaries retain their existing latest-100-record limit.
