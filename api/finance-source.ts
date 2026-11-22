@@ -4,7 +4,6 @@ import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 const { Pool } = pg;
 const PAGE_SIZE = 500;
 const MAX_OFFSET = 50000;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface ApiRequest {
   method?: string;
@@ -27,7 +26,6 @@ interface Query {
 
 interface DatasetQuery {
   from: string;
-  userId: string;
   date: string;
   select: string;
   order: string;
@@ -36,7 +34,6 @@ interface DatasetQuery {
 const DATASETS = {
   payments: {
     from: "public.payments p",
-    userId: "p.user_id",
     date: "p.date",
     select: `p.id::text as id, p.user_id::text as "userId", p.date::text as date,
              p.amount::text as amount, p.currency, p.category, p.payee, p.trader_name as "traderName",
@@ -45,7 +42,6 @@ const DATASETS = {
   },
   incomes: {
     from: "public.incomes i",
-    userId: "i.user_id",
     date: "i.date",
     select: `i.id::text as id, i.user_id::text as "userId", i.date::text as date,
              i.amount::text as amount, i.currency, i.category, i.payer, i.source_name as "sourceName",
@@ -54,7 +50,6 @@ const DATASETS = {
   },
   recurring_transactions: {
     from: "public.recurring_transactions r",
-    userId: "r.user_id",
     date: "r.next_due_date",
     select: `r.id::text as id, r.user_id::text as "userId", r.next_due_date::text as date,
              r.title, r.amount::text as amount, r.category, r.method, r.frequency, r.active`,
@@ -62,7 +57,6 @@ const DATASETS = {
   },
   budget_targets: {
     from: "public.budget_targets b",
-    userId: "b.user_id",
     date: "b.month",
     select: `b.id::text as id, b.user_id::text as "userId", b.month::text as date,
              b.name, b.category, b.amount::text as amount, b.warning_pct as "warningPct",
@@ -71,7 +65,6 @@ const DATASETS = {
   },
   debt_loans: {
     from: "public.debt_loans d",
-    userId: "d.user_id",
     date: "d.opening_date",
     select: `d.id::text as id, d.user_id::text as "userId", d.opening_date::text as date,
              d.name, d.lender, d.currency, d.opening_principal::text as "openingPrincipal",
@@ -80,14 +73,12 @@ const DATASETS = {
   },
   balancer_months: {
     from: "public.balancer_months m",
-    userId: "m.user_id",
     date: "m.month",
     select: `m.id::text as id, m.user_id::text as "userId", m.month::text as date, m.data::text as data`,
     order: "m.month desc, m.id",
   },
   shopping_lists: {
     from: "public.shopping_lists l",
-    userId: "l.user_id",
     date: "l.planned_date",
     select: `l.id::text as id, l.user_id::text as "userId", l.planned_date::text as date,
              l.title, l.tentative_amount::text as "tentativeAmount"`,
@@ -96,7 +87,6 @@ const DATASETS = {
   shopping_items: {
     from: `public.shopping_items i
            join public.shopping_lists l on l.id = i.list_id and l.user_id = i.user_id`,
-    userId: "i.user_id",
     date: "l.planned_date",
     select: `i.id::text as id, i.user_id::text as "userId", i.list_id::text as "listId",
              l.planned_date::text as date, i.name, i.quantity::text as quantity, i.unit,
@@ -145,14 +135,6 @@ function databaseFailureHint(code: string): string {
     return "A requested column is missing from the source schema. Check the source table columns against the configured reports.";
   }
   return "Could not load the external finance data. Check the source database connection and reader role.";
-}
-
-function sourceUserId(): string {
-  const userId = process.env.FINANCE_SOURCE_USER_ID;
-  if (!userId || !UUID_PATTERN.test(userId)) {
-    throw new Error("Set FINANCE_SOURCE_USER_ID to the source project's user UUID.");
-  }
-  return userId;
 }
 
 function sourcePool(): pg.Pool {
@@ -237,16 +219,14 @@ export default async function financeSourceHandler(request: ApiRequest, response
   let client: pg.PoolClient | undefined;
   let transactionOpen = false;
   try {
-    const userId = sourceUserId();
     const query = requestQuery(request, header(request, "x-forwarded-host").split(",")[0]?.trim() || header(request, "host"));
     const dataset = DATASETS[query.dataset];
     client = await sourcePool().connect();
     await client.query("begin read only");
     transactionOpen = true;
-    const filterValues = [userId, query.from, query.to];
-    const where = `where ${dataset.userId} = $1::uuid
-                   and ($2::date is null or ${dataset.date} >= $2::date)
-                   and ($3::date is null or ${dataset.date} <= $3::date)`;
+    const filterValues = [query.from, query.to];
+    const where = `where ($1::date is null or ${dataset.date} >= $1::date)
+                   and ($2::date is null or ${dataset.date} <= $2::date)`;
     const countResult = await client.query<{ count: string }>(
       `select count(*)::text as count from ${dataset.from} ${where}`,
       filterValues,
@@ -258,7 +238,7 @@ export default async function financeSourceHandler(request: ApiRequest, response
        from ${dataset.from}
        ${where}
        order by ${dataset.order}
-       limit $4 offset $5`,
+       limit $3 offset $4`,
       [...filterValues, PAGE_SIZE, query.offset],
     );
     await client.query("commit");
