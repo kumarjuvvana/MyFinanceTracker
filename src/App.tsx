@@ -35,9 +35,11 @@ import { shoppingPurchaseReport } from "./lib/shoppingReport";
 import { buildAssetHistory, buildAssetManagerRecords, buildInvestmentPositions, isAssetValuationStale, type AssetHistoryPoint, type InvestmentPosition } from "./lib/investmentReport";
 import {
   buildAssetAnalyticsSeries,
+  buildAssetPortfolioProfitLoss,
   buildAssetPortfolioValueSeries,
   type AssetAnalyticsPoint,
   type AssetAnalyticsSeries,
+  type AssetPortfolioProfitLoss,
   type AssetPortfolioValuePoint,
 } from "./lib/assetAnalytics";
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
@@ -2813,7 +2815,7 @@ function AssetAnalyticsPortfolioCard({ points, currency, chartType, scopeLabel }
 }) {
   const firstPoint = points[0];
   const latestPoint = points[points.length - 1];
-  const change = firstPoint && latestPoint ? latestPoint.value - firstPoint.value : null;
+  const change = firstPoint && latestPoint && points.length > 1 ? latestPoint.value - firstPoint.value : null;
   const changePercent = change !== null && firstPoint && firstPoint.value !== 0
     ? change / firstPoint.value * 100
     : null;
@@ -2829,17 +2831,36 @@ function AssetAnalyticsPortfolioCard({ points, currency, chartType, scopeLabel }
     <div className="card-head"><div><h2 className="section-title">{scopeLabel} total value</h2><p className="section-description">Automated historical prices × currently recorded units · {currency}</p></div><Badge>{points.length} dates</Badge></div>
     {points.length ? <>
       <div className="asset-analytics-summary">
-        <div className="reports-hub-source"><strong>{reportCurrencyAmount(latestPoint?.value ?? null, currency)}</strong><span>latest calculated total · {latestPoint?.date}</span></div>
-        <div className="reports-hub-source"><strong className={change !== null && change < 0 ? "asset-analytics-negative" : "asset-analytics-positive"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${reportCurrencyAmount(change, currency)}${changePercent === null ? "" : ` (${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%)`}`}</strong><span>change across the selected date range</span></div>
-        <div className="reports-hub-source"><strong>{latestPoint?.pricedInstruments} / {latestPoint?.eligibleInstruments}</strong><span>tracked instruments with an available price at the latest date</span></div>
+        <div className="reports-hub-source"><strong>{reportCurrencyAmount(latestPoint?.value ?? null, currency)}</strong><span>latest value of comparable holdings · {latestPoint?.date}</span></div>
+        <div className="reports-hub-source"><strong className={change !== null && change < 0 ? "asset-analytics-negative" : "asset-analytics-positive"}>{change === null ? "—" : `${change > 0 ? "+" : ""}${reportCurrencyAmount(change, currency)}${changePercent === null ? "" : ` (${changePercent > 0 ? "+" : ""}${changePercent.toFixed(2)}%)`}`}</strong><span>price/value change · {firstPoint?.date} to {latestPoint?.date} · not since purchase</span></div>
+        <div className="reports-hub-source"><strong>{firstPoint?.pricedInstruments} / {firstPoint?.eligibleInstruments}</strong><span>holdings with history at range start (matched for comparison)</span></div>
       </div>
       <AssetAnalyticsChart points={chartPoints} chartType={chartType} label={`${scopeLabel} total value`} />
     </> : <EmptyState
       icon={<History size={18} />}
       title="No aggregate value history available"
-      description="Recorded units are needed to calculate totals. Add quantities for stocks/funds or units for NPS schemes, and ensure automation history is available."
+      description="Choose a range where holdings have both recorded units and a price on or before the start date. Without a From date, comparison begins once all eligible holdings in this currency have price history."
     />}
-    <p className="shopping-report-budget-note">This estimate applies today’s recorded units to each holding’s latest available automated price on or before each date. It is not a historical holdings ledger; positions without recorded units or automated history are excluded. Currencies are not combined or converted.</p>
+    <p className="shopping-report-budget-note">The chart compares the same holdings throughout the selected range. Without a From date, comparison starts on the first date when every eligible holding in this currency has a recorded price; with a From date, holdings without a price on or before that date are excluded from the comparison. Current units are applied throughout, so this is not a historical holdings ledger. Currencies are not combined or converted.</p>
+  </Card>;
+}
+
+function AssetAnalyticsProfitCard({ summary }: { summary?: AssetPortfolioProfitLoss }) {
+  if (!summary || summary.pricedHoldings === 0) return <Card className="asset-analytics-card">
+    <h2 className="section-title">Profit / loss since invested</h2>
+    <p className="section-description">No current holdings with both a recorded invested amount and current valuation are available in this currency.</p>
+  </Card>;
+
+  const profitPercent = summary.investedValue > 0 ? summary.profitLoss / summary.investedValue * 100 : null;
+  return <Card className="asset-analytics-card">
+    <div className="card-head"><div><h2 className="section-title">Profit / loss since invested</h2><p className="section-description">Current valuation against recorded cost basis · {summary.currency}</p></div></div>
+    <div className="asset-analytics-summary">
+      <div className="reports-hub-source"><strong className={summary.profitLoss < 0 ? "asset-analytics-negative" : "asset-analytics-positive"}>{summary.profitLoss > 0 ? "+" : ""}{reportCurrencyAmount(summary.profitLoss, summary.currency)}{profitPercent === null ? "" : ` (${profitPercent > 0 ? "+" : ""}${profitPercent.toFixed(2)}%)`}</strong><span>estimated total profit / loss</span></div>
+      <div className="reports-hub-source"><strong>{reportCurrencyAmount(summary.investedValue, summary.currency)}</strong><span>cost basis of priced holdings</span></div>
+      <div className="reports-hub-source"><strong>{reportCurrencyAmount(summary.currentValue, summary.currency)}</strong><span>current value of priced holdings</span></div>
+      <div className="reports-hub-source"><strong>{summary.pricedHoldings} / {summary.eligibleHoldings}</strong><span>holdings with current value / recorded cost basis</span></div>
+    </div>
+    <p className="shopping-report-budget-note">Uses average buy price × current stock quantity, or recorded invested/contribution amounts for funds and NPS. Recorded NPS withdrawals are included. Holdings without a cost basis or current value are excluded; this is not a date-range change.</p>
   </Card>;
 }
 
@@ -2868,13 +2889,23 @@ function AssetAnalyticsReports({ data }: { data: TrackerData }) {
   const portfolioSeries = buildAssetPortfolioValueSeries(
     assetType === "all" ? allSeries : visibleSeries,
     data,
+    from,
+    to,
   );
-  const currencyOptions = portfolioSeries.map((entry) => entry.currency);
+  const profitLossSeries = buildAssetPortfolioProfitLoss(
+    buildInvestmentPositions(data, automatedHistory.records),
+    data,
+    assetType,
+  );
+  const currencyOptions = [...new Set([
+    ...portfolioSeries.map((entry) => entry.currency),
+    ...profitLossSeries.map((entry) => entry.currency),
+  ])].sort((left, right) => left.localeCompare(right));
   const selectedPortfolioCurrency = currencyOptions.includes(portfolioCurrency)
     ? portfolioCurrency
     : currencyOptions.includes(displayCurrency) ? displayCurrency : currencyOptions[0] ?? "";
-  const portfolioPoints = portfolioSeries.find((entry) => entry.currency === selectedPortfolioCurrency)
-    ?.points.filter((point) => (!from || point.date >= from) && (!to || point.date <= to)) ?? [];
+  const portfolioPoints = portfolioSeries.find((entry) => entry.currency === selectedPortfolioCurrency)?.points ?? [];
+  const portfolioProfitLoss = profitLossSeries.find((entry) => entry.currency === selectedPortfolioCurrency);
   const chartEntries = displayedSeries.map((series) => ({
     series,
     points: series.points.filter((point) =>
@@ -2936,6 +2967,7 @@ function AssetAnalyticsReports({ data }: { data: TrackerData }) {
         chartType={chartType}
         scopeLabel={assetType === "all" ? "All asset types" : assetAnalyticsTypeLabel(assetType)}
       />
+      <AssetAnalyticsProfitCard summary={portfolioProfitLoss} />
       <div className="asset-analytics-display-controls">
         <p className="section-description">The total chart is the default view. Per-instrument price/NAV charts can be displayed below.</p>
         <Button type="button" size="sm" variant="outline" aria-expanded={showIndividualCharts} onClick={() => setShowIndividualCharts((visible) => !visible)}>
