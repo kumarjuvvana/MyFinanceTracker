@@ -2266,6 +2266,22 @@ body{background:#f3f5ef}
 .saved-view-controls>.field-wrap{min-width:190px}
 .report-quick-filters{grid-template-columns:repeat(4,minmax(140px,1fr))}
 .report-pagination{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 0 2px;color:var(--text-muted,var(--muted,#747d73));font-size:10px}
+.external-finance-records-card{min-width:0}
+.external-finance-records-card .report-pagination{display:flex}
+.external-cashflow-chart-card{min-width:0}
+.external-cashflow-chart-grid{display:grid;gap:18px}
+.external-cashflow-chart-series{min-width:0}
+.external-cashflow-chart-series h3{margin:0 0 8px;font-size:11px;color:var(--text-main,var(--ink,#303830))}
+.external-cashflow-chart-series .report-bars{overflow:hidden;gap:clamp(3px,1vw,10px)}
+.external-cashflow-chart-series .report-bar-item{min-width:0;gap:5px}
+.external-cashflow-chart-series .report-bar-value{max-width:100%;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.external-cashflow-chart-series .report-bar-label{font-variant-numeric:tabular-nums}
+.external-cashflow-monthly-details{margin-top:14px;border-top:1px solid var(--panel-line,var(--line,#e3e8e1));padding-top:10px}
+.external-cashflow-monthly-details>summary{cursor:pointer;color:var(--text-muted,var(--muted,#747d73));font-size:10px;font-weight:600}
+.external-cashflow-monthly-details .shopping-report-table-wrap{margin-top:8px}
+.external-cashflow-monthly-details .data-table{min-width:0}
+.app-shell.dark .external-cashflow-chart-series h3{color:#e3e8e2}
+.app-shell.dark .external-cashflow-monthly-details{border-color:#394239}
 .saved-report-list{display:grid;gap:10px}
 .saved-report-card{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .saved-report-card .section-title{margin:0 0 4px}

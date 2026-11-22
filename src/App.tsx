@@ -1904,10 +1904,15 @@ function ExternalFinanceReports({
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
   const [currency, setCurrency] = useState("all");
+  const [dimensionFilters, setDimensionFilters] = useState<Record<string, string>>({});
+  const [counterpartySearch, setCounterpartySearch] = useState("");
+  const [sortBy, setSortBy] = useState("date-newest");
+  const [recordsPage, setRecordsPage] = useState(0);
   const [records, setRecords] = useState<FinanceSourceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const definition = financeSourceDataset(dataset);
+  const isCashflowDataset = dataset === "payments" || dataset === "incomes";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1928,19 +1933,65 @@ function ExternalFinanceReports({
     return () => controller.abort();
   }, [dataset, from, to]);
 
+  useEffect(() => {
+    setRecordsPage(0);
+  }, [dataset, from, to, search, currency, dimensionFilters, counterpartySearch, sortBy]);
+
+  const dimensionFilterDefinitions = [
+    { id: "category", label: "Category" },
+    { id: "status", label: "Status" },
+    { id: "method", label: "Method" },
+    { id: "type", label: dataset === "incomes" ? "Income type" : "Payment type" },
+    { id: "account", label: "Account" },
+  ].filter((filter) => definition.fields.includes(filter.id));
+  const dimensionFilterOptions = dimensionFilterDefinitions.map((filter) => ({
+    ...filter,
+    values: [...new Set(records
+      .map((record) => String(record[filter.id] ?? "").trim())
+      .filter(Boolean))].sort((left, right) => left.localeCompare(right)),
+  }));
+  const counterpartyFields = dataset === "incomes"
+    ? ["payer", "sourceName"]
+    : dataset === "payments" ? ["payee", "traderName"] : [];
+  const counterpartyLabel = dataset === "incomes" ? "Payer or source" : "Payee or trader";
   const availableCurrencies = [...new Set(records
     .map((record) => record[definition.currencyField ?? "currency"])
     .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
     .map((value) => value.toUpperCase()))].sort();
   const selectedCurrency = availableCurrencies.includes(currency) ? currency : "all";
   const query = search.trim().toLocaleLowerCase();
+  const counterpartyQuery = counterpartySearch.trim().toLocaleLowerCase();
   const filteredRecords = records.filter((record) => {
     if (selectedCurrency !== "all" && definition.currencyField &&
       String(record[definition.currencyField] ?? "").toUpperCase() !== selectedCurrency) return false;
+    if (dimensionFilterDefinitions.some((filter) => {
+      const selected = dimensionFilters[filter.id];
+      return selected && selected !== "all" && String(record[filter.id] ?? "").trim() !== selected;
+    })) return false;
+    if (counterpartyQuery && !counterpartyFields.some((field) =>
+      String(record[field] ?? "").toLocaleLowerCase().includes(counterpartyQuery))) return false;
     if (!query) return true;
     return definition.fields.some((field) => String(record[field] ?? "").toLocaleLowerCase().includes(query));
   });
-  const isCashflowDataset = dataset === "payments" || dataset === "incomes";
+  const sortedRecords = [...filteredRecords].sort((left, right) => {
+    if (sortBy === "amount-desc" || sortBy === "amount-asc") {
+      const amountField = definition.amountField;
+      if (amountField) {
+        const leftAmount = Number(left[amountField]) || 0;
+        const rightAmount = Number(right[amountField]) || 0;
+        return sortBy === "amount-desc" ? rightAmount - leftAmount : leftAmount - rightAmount;
+      }
+    }
+    const leftDate = String(left.date ?? "");
+    const rightDate = String(right.date ?? "");
+    return sortBy === "date-oldest" ? leftDate.localeCompare(rightDate) : rightDate.localeCompare(leftDate);
+  });
+  const pageCount = Math.ceil(sortedRecords.length / REPORT_PAGE_SIZE);
+  const currentRecordsPage = Math.min(recordsPage, Math.max(0, pageCount - 1));
+  const visibleRecords = pageRecords(sortedRecords, currentRecordsPage);
+  const activeDimensionFilterCount = Object.values(dimensionFilters).filter((value) => value && value !== "all").length;
+  const activeMoreFilterCount = activeDimensionFilterCount +
+    Number(Boolean(counterpartySearch.trim())) + Number(sortBy !== "date-newest");
   const settledStatus = dataset === "payments" ? "paid" : "received";
   const settledRecords = isCashflowDataset
     ? filteredRecords.filter((record) => String(record.status ?? "").toLocaleLowerCase() === settledStatus)
@@ -1964,13 +2015,19 @@ function ExternalFinanceReports({
       }
     }
   }
-  const monthlyRows = [...monthlyTotals.entries()]
+  const allMonthlyRows = [...monthlyTotals.entries()]
     .map(([key, total]) => {
       const [currencyCode, month] = key.split(":");
       return { currency: currencyCode, month, total };
     })
-    .sort((left, right) => left.month.localeCompare(right.month) || left.currency.localeCompare(right.currency))
-    .slice(-12);
+    .sort((left, right) => left.month.localeCompare(right.month) || left.currency.localeCompare(right.currency));
+  const monthlyRowsByCurrency = [...new Set(allMonthlyRows.map((row) => row.currency))]
+    .sort((left, right) => left.localeCompare(right))
+    .map((currencyCode) => ({
+      currency: currencyCode,
+      rows: allMonthlyRows.filter((row) => row.currency === currencyCode).slice(-12),
+    }));
+  const monthlyRows = monthlyRowsByCurrency.flatMap((series) => series.rows);
 
   function fieldLabel(field: string) {
     return field.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
@@ -1982,17 +2039,21 @@ function ExternalFinanceReports({
     return typeof value === "object" ? JSON.stringify(value) : String(value);
   }
 
-  const exportRows = filteredRecords.map((record) => Object.fromEntries(
+  const exportRows = sortedRecords.map((record) => Object.fromEntries(
     definition.fields.map((field) => [fieldLabel(field), valueText(record[field])]),
   ));
   const selectedDatasetLabel = definition.label.toLocaleLowerCase();
+  const settledLabel = dataset === "incomes" ? "received income" : "paid payments";
+  const compactAmount = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
   return <>
     <PageHeading
       eyebrow="Read-only source database"
-      title={fixedDataset ? "Income reports" : "External finance data"}
+      title={fixedDataset ? (dataset === "incomes" ? "Income reports" : "Payment reports") : "External finance data"}
       subtitle={fixedDataset
-        ? "Review received income from the external finance source without copying records into Daybook."
+        ? dataset === "incomes"
+          ? "Review received income from the external finance source without copying records into Daybook."
+          : "Review paid transactions from the external finance source without copying records into Daybook."
         : "Browse the selected source-project tables without copying records into Daybook."}
     />
     <p className="reports-hub-caveat">This view reads only approved tables and rows permitted by source-database RLS. It never writes to the source database. Payments and incomes are summarized only for paid/received records and remain separated by currency. Other amounts are shown as source values; no currency is inferred or converted.</p>
@@ -2002,15 +2063,41 @@ function ExternalFinanceReports({
           setDataset(event.target.value as FinanceSourceDataset);
           setCurrency("all");
           setSearch("");
+          setDimensionFilters({});
+          setCounterpartySearch("");
+          setSortBy("date-newest");
         }}>{FINANCE_SOURCE_DATASETS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</Select></Field>}
         {definition.currencyField && <Field label="Currency"><Select aria-label="Filter external finance records by currency" value={selectedCurrency} onChange={(event) => setCurrency(event.target.value)}><option value="all">All currencies</option>{availableCurrencies.map((code) => <option key={code} value={code}>{code}</option>)}</Select></Field>}
         <Field label="Search records"><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visible fields" /></Field>
       </div>
+      {dimensionFilterOptions.length > 0 && <FilterDrawer label="More filters" activeCount={activeMoreFilterCount} closeOnChange={false} closeOnButtonClick={false}>
+        {dimensionFilterOptions.map((filter) => <Field label={filter.label} key={filter.id}><Select
+          aria-label={`Filter by ${filter.label.toLowerCase()}`}
+          value={dimensionFilters[filter.id] ?? "all"}
+          onChange={(event) => setDimensionFilters((current) => ({ ...current, [filter.id]: event.target.value }))}
+        ><option value="all">All {filter.label.toLowerCase()}s</option>{filter.values.map((value) => <option key={value} value={value}>{value}</option>)}</Select></Field>)}
+        {counterpartyFields.length > 0 && <Field label={counterpartyLabel}><Input
+          aria-label={`Filter by ${counterpartyLabel.toLowerCase()}`}
+          value={counterpartySearch}
+          onChange={(event) => setCounterpartySearch(event.target.value)}
+          placeholder={`Search ${counterpartyLabel.toLowerCase()}`}
+        /></Field>}
+        <Field label="Sort by"><Select aria-label="Sort external finance records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+          <option value="date-newest">Date (newest first)</option>
+          <option value="date-oldest">Date (oldest first)</option>
+          {definition.amountField && <><option value="amount-desc">Amount (high to low)</option><option value="amount-asc">Amount (low to high)</option></>}
+        </Select></Field>
+        <Button type="button" size="sm" variant="outline" onClick={() => {
+          setDimensionFilters({});
+          setCounterpartySearch("");
+          setSortBy("date-newest");
+        }}>Clear filters</Button>
+      </FilterDrawer>}
       <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
         <Field label={`From ${definition.dateLabel.toLowerCase()}`}><DateInput className="filter-date" aria-label="External data from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
         <Field label={`To ${definition.dateLabel.toLowerCase()}`}><DateInput className="filter-date" aria-label="External data to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
       </FilterDrawer>
-      <Badge>{filteredRecords.length} of {records.length} records</Badge>
+      <Badge>{sortedRecords.length} of {records.length} records</Badge>
     </div>
     {loading && <p className="section-description" role="status">Loading {selectedDatasetLabel} from the read-only source…</p>}
     {error && <p className="alert alert-error" role="alert">External finance data could not be loaded: {error}</p>}
@@ -2018,17 +2105,40 @@ function ExternalFinanceReports({
       <ReportExportActions
         label={`external-${dataset}`}
         rows={exportRows}
-        summary={`${filteredRecords.length} ${selectedDatasetLabel} records; date range ${from || "any"} to ${to || "any"}; currency ${selectedCurrency}. Read-only source data; amounts are not converted.`}
+        summary={`${sortedRecords.length} ${selectedDatasetLabel} records; date range ${from || "any"} to ${to || "any"}; currency ${selectedCurrency}. Read-only source data; amounts are not converted.`}
       />
       {isCashflowDataset && <span className="section-description">{settledRecords.length} {settledStatus} records counted as completed cash flow.</span>}
     </div>}
     {isCashflowDataset && !loading && !error && <div className="report-grid">
       <Card><div className="card-head"><div><h2 className="section-title">{dataset === "payments" ? "Paid totals" : "Received totals"}</h2><p className="section-description">Totals remain separated by source currency.</p></div></div>{totalsByCurrency.size ? <div className="recent-list">{[...totalsByCurrency.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([code, value]) => <div className="recent-row" key={code}><div className="recent-info"><div className="recent-name">{code}</div><div className="recent-meta">{value.count} records</div></div><div className="recent-price">{reportCurrencyAmount(value.total, code)}</div></div>)}</div> : <p className="report-empty">No {settledStatus} records with valid amounts match these filters.</p>}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Monthly completed cash flow</h2><p className="section-description">By currency; select one currency to view only its monthly trend.</p></div></div>{monthlyRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Currency</th><th>Total</th></tr></thead><tbody>{monthlyRows.map((row) => <tr key={`${row.currency}:${row.month}`}><td data-label="Month">{new Date(`${row.month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</td><td data-label="Currency">{row.currency}</td><td data-label="Total" className="table-total">{reportCurrencyAmount(row.total, row.currency)}</td></tr>)}</tbody></table></div> : <p className="report-empty">No dated completed cash-flow records match these filters.</p>}</Card>
+      <Card className="external-cashflow-chart-card">
+        <div className="card-head"><div><h2 className="section-title">Monthly {settledLabel} trend</h2><p className="section-description">Latest 12 months per currency; currencies are never combined.</p></div></div>
+        {monthlyRowsByCurrency.length ? <div className="external-cashflow-chart-grid">{monthlyRowsByCurrency.map((series) => {
+          const maximum = Math.max(1, ...series.rows.map((row) => row.total));
+          return <section className="external-cashflow-chart-series" key={series.currency} aria-label={`${settledLabel} in ${series.currency}`}>
+            <h3>{series.currency}</h3>
+            <div className="report-bars" role="img" aria-label={`Monthly ${settledLabel} in ${series.currency}: ${series.rows.map((row) => `${new Date(`${row.month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })} ${reportCurrencyAmount(row.total, row.currency)}`).join("; ")}`}>
+              {series.rows.map((row) => {
+                const label = new Date(`${row.month}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+                return <div className="report-bar-item" key={`${row.currency}:${row.month}`} title={`${label}: ${reportCurrencyAmount(row.total, row.currency)}`}>
+                  <span className="report-bar-value">{compactAmount.format(row.total)}</span>
+                  <div className="report-bar" style={{ height: `${Math.max(3, row.total / maximum * 100)}%` }} />
+                  <span className="report-bar-label">{label}</span>
+                </div>;
+              })}
+            </div>
+          </section>;
+        })}</div> : <p className="report-empty">No dated completed cash-flow records match these filters.</p>}
+        {monthlyRows.length > 0 && <details className="external-cashflow-monthly-details">
+          <summary>Show monthly totals table ({monthlyRows.length})</summary>
+          <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Currency</th><th>Total</th></tr></thead><tbody>{monthlyRows.map((row) => <tr key={`${row.currency}:${row.month}`}><td data-label="Month">{new Date(`${row.month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</td><td data-label="Currency">{row.currency}</td><td data-label="Total" className="table-total">{reportCurrencyAmount(row.total, row.currency)}</td></tr>)}</tbody></table></div>
+        </details>}
+      </Card>
     </div>}
-    {!loading && !error && (filteredRecords.length ? <Card className="shopping-report-budget">
-      <div className="card-head"><div><h2 className="section-title">{definition.label} records</h2><p className="section-description">Showing {filteredRecords.length} matching records; source data is not copied.</p></div></div>
-      <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr>{definition.fields.map((field) => <th key={field}>{fieldLabel(field)}</th>)}</tr></thead><tbody>{filteredRecords.map((record, index) => <tr key={String(record.id ?? index)}>{definition.fields.map((field) => <td data-label={fieldLabel(field)} key={field}>{valueText(record[field])}</td>)}</tr>)}</tbody></table></div>
+    {!loading && !error && (sortedRecords.length ? <Card className="shopping-report-budget external-finance-records-card">
+      <div className="card-head"><div><h2 className="section-title">{definition.label} records</h2><p className="section-description">Showing {visibleRecords.length} of {sortedRecords.length} matching records; source data is not copied.</p></div></div>
+      <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr>{definition.fields.map((field) => <th key={field}>{fieldLabel(field)}</th>)}</tr></thead><tbody>{visibleRecords.map((record, index) => <tr key={String(record.id ?? index)}>{definition.fields.map((field) => <td data-label={fieldLabel(field)} key={field}>{valueText(record[field])}</td>)}</tr>)}</tbody></table></div>
+      <ReportPagination count={sortedRecords.length} page={currentRecordsPage} onPageChange={setRecordsPage} />
     </Card> : <EmptyState icon={<Database size={18} />} title={records.length ? "No records match these filters" : `No ${selectedDatasetLabel} records in this range`} description={records.length ? "Try changing the search or filters." : "Choose another source table or widen the date range."} />)}
   </>;
 }
@@ -2233,7 +2343,7 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "income" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubSection = "overview" | "shopping" | "finance" | "payments" | "income" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
 type ReportHubGroupId = "investments-assets" | "spending-cashflow";
 
 const REPORT_HUB_GROUPS: {
@@ -2255,6 +2365,7 @@ const REPORT_HUB_GROUPS: {
     label: "Spending & Cash Flow",
     sections: [
       { id: "shopping", label: "Shopping" },
+      { id: "payments", label: "Payment reports" },
       { id: "income", label: "Income reports" },
       { id: "finance", label: "Finance & cashflow" },
       { id: "externalFinance", label: "External finance data" },
@@ -3407,7 +3518,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
         onClick={() => openSection(entry.id)}
       >{entry.label}</button>)}
     </nav>
-    {section === "externalFinance" ? <ExternalFinanceReports key="externalFinance" /> : section === "income" ? <ExternalFinanceReports key="income" initialDataset="incomes" fixedDataset /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
+    {section === "externalFinance" ? <ExternalFinanceReports key="externalFinance" /> : section === "payments" ? <ExternalFinanceReports key="payments" initialDataset="payments" fixedDataset /> : section === "income" ? <ExternalFinanceReports key="income" initialDataset="incomes" fixedDataset /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Local shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} local purchases · {currency}</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Local purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">External payments appear in Shopping reports</div></Card>
