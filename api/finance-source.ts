@@ -122,6 +122,31 @@ function respond(response: ApiResponse, status: number, body: Record<string, unk
   response.end(JSON.stringify(body));
 }
 
+function databaseFailureHint(code: string): string {
+  if (code === "28P01" || code === "28000" || code === "28001") {
+    return "The source database rejected the reader login. Check the rotated password and Transaction Pooler username.";
+  }
+  if (code === "42501") {
+    return "The reader role lacks access to a requested table or row. Check its SELECT grants and user-scoped policies.";
+  }
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+    return "The source database host could not be resolved. Check the pooler host in FINANCE_SOURCE_DB_URL.";
+  }
+  if (code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ETIMEDOUT") {
+    return "The source database could not be reached. Check the pooler host, port, and network availability.";
+  }
+  if (code.includes("TLS") || code.includes("CERT") || code.includes("SSL") || code.includes("VERIFY")) {
+    return "The source database TLS certificate could not be verified. Check the pooler host and CA certificate setting.";
+  }
+  if (code === "42P01") {
+    return "A requested table is missing from the connected source database. Check that FINANCE_SOURCE_DB_URL points to the source project.";
+  }
+  if (code === "42703") {
+    return "A requested column is missing from the source schema. Check the source table columns against the configured reports.";
+  }
+  return "Could not load the external finance data. Check the source database connection and reader role.";
+}
+
 function sourceUserId(): string {
   const userId = process.env.FINANCE_SOURCE_USER_ID;
   if (!userId || !UUID_PATTERN.test(userId)) {
@@ -271,7 +296,8 @@ export default async function financeSourceHandler(request: ApiRequest, response
     const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
       ? caught.code : "unknown";
     console.error("External finance source query failed:", code);
-    respond(response, 503, { error: "Could not load the external finance data. Check the source database connection and reader role." });
+    const safeCode = /^[A-Z0-9_]+$/.test(code) ? code : "unknown";
+    respond(response, 503, { error: `${databaseFailureHint(safeCode)} (code: ${safeCode})` });
   } finally {
     client?.release();
   }
