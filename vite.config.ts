@@ -10,6 +10,7 @@ import dataHandler from "./api/data";
 import documentsHandler from "./api/documents";
 import databaseHandler from "./api/database";
 import usageHandler from "./api/usage";
+import financeSourceHandler from "./api/finance-source";
 import gmailOAuthHandler, { gmailOAuthCallbackHandler } from "./server/gmail-oauth";
 import gmailSchedulesHandler from "./server/gmail-schedules";
 import dataAuthHandler from "./src/lib/dataAuth";
@@ -60,7 +61,7 @@ function hostingUsagePlugin() {
 export default defineConfig(({ command, mode }) => {
   if (command === "serve") {
     const env = loadEnv(mode, process.cwd(), "");
-    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "SUPABASE_DB_CA_CERT_BASE64", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS", "TWELVE_DATA_API_KEY", "VITE_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_TOKEN_ENCRYPTION_KEY", "GMAIL_OAUTH_REDIRECT_URI", "CRON_SECRET"]) {
+    for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_DB_URL", "SUPABASE_DB_CA_CERT_BASE64", "FINANCE_SOURCE_DB_URL", "FINANCE_SOURCE_DB_CA_CERT_BASE64", "FINANCE_SOURCE_USER_ID", "DATA_ACCESS_PASSWORD", "LOCAL_AUTH_BYPASS", "TWELVE_DATA_API_KEY", "VITE_GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_TOKEN_ENCRYPTION_KEY", "GMAIL_OAUTH_REDIRECT_URI", "CRON_SECRET"]) {
       if (!process.env[key] && env[key]) process.env[key] = env[key];
     }
   }
@@ -77,6 +78,7 @@ export default defineConfig(({ command, mode }) => {
           ["/api/documents", documentsHandler],
           ["/api/database", databaseHandler],
           ["/api/usage", usageHandler],
+          ["/api/finance-source", financeSourceHandler],
           ["/api/gmail-oauth", gmailOAuthHandler],
           ["/api/gmail-oauth-callback", gmailOAuthCallbackHandler],
           ["/api/gmail-schedules", gmailSchedulesHandler],

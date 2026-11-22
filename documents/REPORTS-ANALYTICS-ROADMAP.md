@@ -16,7 +16,7 @@ This document catalogs report candidates and chart guidance for phased work. Ass
 | Area | Candidate visualizations | Display boundaries |
 | --- | --- | --- |
 | Finance & cashflow | Monthly income and expense columns, with a separate net-cash-flow line | Keep accounts and currencies separate; do not infer missing transactions |
-| Shopping | Monthly spend columns, category/store breakdowns, and budget-versus-actual progress | Purchase records may not store currency; state the selected display-currency limitation |
+| Shopping | Monthly spend columns and category/payee breakdowns combine local purchases with paid rows from the optional external finance source | Keep currencies separate; mark local currency as the app display setting, retain source provenance, and do not infer item/trip detail or deduplicate without a shared stable key |
 | Subscriptions & bills | Paid-cost trend and an upcoming-due timeline or calendar | Keep paid transactions separate from unpaid dues and hypothetical future recurring charges |
 | Forecasts | Historical series followed by a visually distinct projection and scenario range | Show data coverage and assumptions; do not describe estimates as guarantees |
 

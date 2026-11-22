@@ -33,6 +33,23 @@ import { buildReport, reportDateKey, reportDimensionValues, resolveReportDateRan
 import { bankActivityRecords, bankActivityReport, subscriptionActivityRecords, subscriptionDueReport, subscriptionPaymentReport } from "./lib/financeReport";
 import { shoppingPurchaseReport } from "./lib/shoppingReport";
 import {
+  FINANCE_SOURCE_DATASETS,
+  financeSourceDataset,
+  loadFinanceSourceDataset,
+  type FinanceSourceDataset,
+  type FinanceSourceRecord,
+} from "./lib/externalFinanceSource";
+import {
+  ALL_SHOPPING_SOURCES,
+  EXTERNAL_SHOPPING_SOURCE,
+  LOCAL_SHOPPING_SOURCE,
+  externalShoppingCashflowRecords,
+  loadExternalShoppingPayments,
+  localShoppingCashflowRecords,
+  shoppingCashflowReport,
+  type ExternalShoppingPayment,
+} from "./lib/shoppingCashflow";
+import {
   buildAssetHistory,
   buildAssetManagerRecords,
   buildInvestmentAllocationRows,
@@ -678,14 +695,21 @@ function SpendingChart({ purchases }: { purchases: Purchase[] }) {
     </div>)}</div>;
 }
 
-function CategoryBreakdown({ purchases }: { purchases: Purchase[] }) {
+function CategoryBreakdown({ purchases, currency }: {
+  purchases: readonly { category: string; price: number }[];
+  currency?: string;
+}) {
   const formatCurrency = useCurrencyFormatter();
-  const totals = CATEGORIES.map((category) => ({ category, total: purchases.filter((purchase) => purchase.category === category).reduce((sum, purchase) => sum + purchase.price, 0) }));
+  const totals = [...new Set(purchases.map((purchase) => purchase.category))].map((category) => ({
+    category,
+    total: purchases.filter((purchase) => purchase.category === category)
+      .reduce((sum, purchase) => sum + purchase.price, 0),
+  }));
   const max = Math.max(1, ...totals.map((entry) => entry.total));
   const active = totals.filter((entry) => entry.total > 0);
   if (!active.length) return <EmptyState icon={<BarChart3 size={18} />} title="Nothing to break down yet" description="Your category spending will show up here after your first purchase." />;
   return <div className="category-list">{active.sort((a, b) => b.total - a.total).map(({ category, total }) =>
-    <div className="category-line" key={category}><span className="category-name">{category}</span><div className="progress-track"><div className="progress-fill" style={{ width: `${(total / max) * 100}%`, background: categoryColors[category] }} /></div><span className="category-amount">{formatCurrency(total)}</span></div>)}</div>;
+    <div className="category-line" key={category}><span className="category-name">{category}</span><div className="progress-track"><div className="progress-fill" style={{ width: `${(total / max) * 100}%`, background: categoryColors[category as Category] ?? "#729777" }} /></div><span className="category-amount">{currency ? reportCurrencyAmount(total, currency) : formatCurrency(total)}</span></div>)}</div>;
 }
 
 function RecentPurchases({ purchases, onViewAll }: { purchases: Purchase[]; onViewAll: () => void }) {
@@ -1663,42 +1687,82 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
   initialFilters?: Record<string, string>;
   onSaveView?: SaveReportView;
 }) {
-  const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
   const [store, setStore] = useState(() => initialFilters?.store ?? "All stores");
   const [category, setCategory] = useState(() => initialFilters?.category ?? "All categories");
   const [from, setFrom] = useState(() => initialFilters?.from ?? "");
   const [to, setTo] = useState(() => initialFilters?.to ?? "");
-  const [groupBy, setGroupBy] = useState(() => initialFilters?.groupBy ?? "month");
+  const [groupBy, setGroupBy] = useState<"month" | "category" | "store" | "source">(() => {
+    const savedGroupBy = initialFilters?.groupBy;
+    return savedGroupBy === "category" || savedGroupBy === "store" || savedGroupBy === "source"
+      ? savedGroupBy : "month";
+  });
+  const [sourceFilter, setSourceFilter] = useState(() => initialFilters?.source ?? ALL_SHOPPING_SOURCES);
+  const [paymentType, setPaymentType] = useState(() => initialFilters?.paymentType ?? "All types");
+  const [reportCurrency, setReportCurrency] = useState(() => initialFilters?.currency ?? currency);
+  const [externalPayments, setExternalPayments] = useState<ExternalShoppingPayment[]>([]);
+  const [externalLoading, setExternalLoading] = useState(true);
+  const [externalError, setExternalError] = useState("");
   const [budgetDraft, setBudgetDraft] = useState(() => data.preferences?.monthlyShoppingBudget?.toString() ?? "");
   const [budgetSaving, setBudgetSaving] = useState(false);
   const [budgetMessage, setBudgetMessage] = useState("");
   useEffect(() => {
+    const controller = new AbortController();
+    setExternalLoading(true);
+    setExternalError("");
+    setExternalPayments([]);
+    void loadExternalShoppingPayments(from, to, controller.signal)
+      .then(setExternalPayments)
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setExternalPayments([]);
+          setExternalError(caught instanceof Error ? caught.message : "Could not load external shopping payments.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setExternalLoading(false);
+      });
+    return () => controller.abort();
+  }, [from, to]);
+  useEffect(() => {
     setBudgetDraft(data.preferences?.monthlyShoppingBudget?.toString() ?? "");
   }, [data.preferences?.monthlyShoppingBudget]);
-  const stores = reportDimensionValues(data.purchases, shoppingPurchaseReport, "store");
-  const categories = reportDimensionValues(data.purchases, shoppingPurchaseReport, "category");
-  const filters = {
+  const localRecords = localShoppingCashflowRecords(data.purchases, currency);
+  const externalSummary = externalShoppingCashflowRecords(externalPayments);
+  const allRecords = [...localRecords, ...externalSummary.records];
+  const currencyOptions = [...new Set([currency, ...allRecords.map((record) => record.currency)])].sort();
+  const selectedCurrency = currencyOptions.includes(reportCurrency)
+    ? reportCurrency
+    : currencyOptions.includes(currency) ? currency : currencyOptions[0] ?? currency;
+  const currencyRecords = allRecords.filter((record) => record.currency === selectedCurrency);
+  const stores = reportDimensionValues(currencyRecords, shoppingCashflowReport, "store");
+  const categories = reportDimensionValues(currencyRecords, shoppingCashflowReport, "category");
+  const paymentTypes = reportDimensionValues(currencyRecords, shoppingCashflowReport, "paymentType");
+  const filters: Record<string, string> = {
     ...(store === "All stores" ? {} : { store }),
     ...(category === "All categories" ? {} : { category }),
+    ...(sourceFilter === ALL_SHOPPING_SOURCES ? {} : { source: sourceFilter }),
+    ...(paymentType === "All types" ? {} : { paymentType }),
   };
   const dateRange = from || to ? { ...(from ? { from } : {}), ...(to ? { to } : {}) } : undefined;
   const groupByOption = groupBy === "month"
     ? { type: "time" as const, unit: "month" as const }
     : { type: "dimension" as const, id: groupBy };
-  const report = buildReport(data.purchases, shoppingPurchaseReport, {
+  const report = buildReport(currencyRecords, shoppingCashflowReport, {
     dateRange,
     filters,
     groupBy: groupByOption,
     measureId: "spend",
   });
-  const monthlyReport = buildReport(data.purchases, shoppingPurchaseReport, {
+  const monthlyReport = buildReport(currencyRecords, shoppingCashflowReport, {
     dateRange,
     filters,
     groupBy: { type: "time", unit: "month" },
     measureId: "spend",
   });
-  const purchases = report.records;
+  const formatReportCurrency = (amount: number) => reportCurrencyAmount(amount, selectedCurrency);
+  const localPurchases = report.records.map((record) => record.localPurchase)
+    .filter((purchase): purchase is Purchase => purchase !== undefined);
   const monthlyGroups = monthlyReport.groups.filter((group) => group.key !== "undated").slice(-6);
   const months = monthlyGroups.map((group) => {
     const key = group.key;
@@ -1713,18 +1777,18 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
   const max = Math.max(1, ...months.map((month) => month.total));
   const reportGroups = groupBy === "month" ? [...report.groups].reverse() : report.groups;
   const latestMonthKey = months[months.length - 1]?.key;
-  const categoryTrendGroups = months.map((month) => buildReport(month.records, shoppingPurchaseReport, {
+  const categoryTrendGroups = months.map((month) => buildReport(month.records, shoppingCashflowReport, {
     groupBy: { type: "dimension", id: "category" },
     measureId: "spend",
   }).groups);
-  const categoryTrendRows = reportDimensionValues(purchases, shoppingPurchaseReport, "category").map((name) => ({
+  const categoryTrendRows = reportDimensionValues(report.records, shoppingCashflowReport, "category").map((name) => ({
     name,
     totals: categoryTrendGroups.map((groups) => groups.find((group) => group.key === name)?.total ?? 0),
   }));
-  const tripRows = summarizeShoppingTrips(purchases, data.trips);
-  const itemRows = summarizeShoppingItems(purchases);
+  const tripRows = summarizeShoppingTrips(localPurchases, data.trips);
+  const itemRows = summarizeShoppingItems(localPurchases);
   const monthlyBudget = data.preferences?.monthlyShoppingBudget;
-  const currentMonthActual = buildReport(data.purchases, shoppingPurchaseReport, {
+  const currentMonthActual = buildReport(localRecords, shoppingCashflowReport, {
     dateRange: resolveReportDateRange("month-to-date"),
     groupBy: { type: "time", unit: "month" },
     measureId: "spend",
@@ -1732,16 +1796,22 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
   const budgetUsedPercent = monthlyBudget && monthlyBudget > 0
     ? Math.min(100, currentMonthActual / monthlyBudget * 100)
     : currentMonthActual > 0 ? 100 : 0;
-  const exportRows = purchases.map((purchase) => ({
-    date: purchase.date,
-    item: purchase.itemName,
-    category: purchase.category,
-    quantity: purchase.quantity,
-    unit: purchase.unit,
-    price: purchase.price,
-    store: purchase.store,
+  const exportRows = report.records.map((record) => ({
+    date: record.date,
+    item: record.itemName,
+    category: record.category,
+    quantity: record.quantity || "",
+    unit: record.unit,
+    amount: record.price,
+    currency: record.currency,
+    storeOrPayee: record.store,
+    source: record.source,
+    paymentType: record.paymentType,
+    status: record.paymentStatus,
   }));
-  const savedFilters = { store, category, from, to, groupBy };
+  const savedFilters = { store, category, from, to, groupBy, source: sourceFilter, paymentType, currency: selectedCurrency };
+  const localRecordCount = report.records.filter((record) => record.source === LOCAL_SHOPPING_SOURCE).length;
+  const externalRecordCount = report.records.filter((record) => record.source === EXTERNAL_SHOPPING_SOURCE).length;
 
   async function persistMonthlyBudget(amount: number | undefined) {
     setBudgetSaving(true);
@@ -1767,39 +1837,49 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
     await persistMonthlyBudget(amount);
   }
 
-  return <><PageHeading eyebrow="The bigger picture" title="Shopping reports" subtitle="Explore spending trends, stores, trips, and item purchase patterns." />
+  return <><PageHeading eyebrow="The bigger picture" title="Shopping reports" subtitle="Explore local purchases and paid external transactions together, one currency at a time." />
+    <p className="reports-hub-caveat">MyFinanceTracker purchases and paid payments from the separate MyFinanceTracker database are read for reporting only; records are not copied or written back. The external source has no shopping-only flag, so select relevant categories or payment types. Local records have no stored currency and use your display-currency setting. External payments keep their recorded currency. No currency conversion or automatic duplicate removal is performed.</p>
+    {externalLoading && <p className="section-description" role="status">Loading external payment data; totals currently include local purchases only.</p>}
+    {externalError && <p className="alert alert-error" role="alert">External payment data could not be loaded: {externalError} The report is local-only and incomplete until the external source is available.</p>}
+    {!externalLoading && !externalError && externalPayments.length === 0 &&
+      <p className="section-description" role="status">No external payment rows were returned for this date range; current totals use local purchases only.</p>}
+    {!externalLoading && !externalError && externalSummary.excludedStatusCount > 0 &&
+      <p className="shopping-report-budget-note">{externalSummary.excludedStatusCount} external payment{externalSummary.excludedStatusCount === 1 ? " has" : "s have"} a status other than paid and are excluded from spending totals.</p>}
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
       <div className="shopping-quick-filters">
-        <Field label="Store"><Select aria-label="Filter reports by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Store / payee"><Select aria-label="Filter reports by store or payee" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
         <Field label="Category"><Select aria-label="Filter reports by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Group by"><Select aria-label="Group report summary" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="month">Month</option><option value="category">Category</option><option value="store">Store</option></Select></Field>
+        <Field label="Payment type"><Select aria-label="Filter reports by payment type" value={paymentType} onChange={(event) => setPaymentType(event.target.value)}><option>All types</option>{paymentTypes.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Data source"><Select aria-label="Filter reports by data source" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}><option>{ALL_SHOPPING_SOURCES}</option><option>{LOCAL_SHOPPING_SOURCE}</option><option>{EXTERNAL_SHOPPING_SOURCE}</option></Select></Field>
+        <Field label="Currency"><Select aria-label="Filter reports by currency" value={selectedCurrency} onChange={(event) => setReportCurrency(event.target.value)}>{currencyOptions.map((option) => <option key={option}>{option}</option>)}</Select></Field>
+        <Field label="Group by"><Select aria-label="Group report summary" value={groupBy} onChange={(event) => setGroupBy(event.target.value === "category" || event.target.value === "store" || event.target.value === "source" ? event.target.value : "month")}><option value="month">Month</option><option value="category">Category</option><option value="store">Store / payee</option><option value="source">Data source</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
         <Field label="From date"><DateInput className="filter-date" aria-label="Report from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
         <Field label="To date"><DateInput className="filter-date" aria-label="Report to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
       </FilterDrawer>
-      <Badge>{report.recordCount} purchases · {formatCurrency(report.total)}</Badge>
+      <Badge>{report.recordCount} records · {formatReportCurrency(report.total)}</Badge>
     </div>
     <div className="report-actions-row">
-      <ReportExportActions label="shopping-report" rows={exportRows} summary={`${report.recordCount} recorded purchases; total ${formatCurrency(report.total)}; filters: ${store}, ${category}, ${from || "any date"} to ${to || "any date"}.`} />
+      <ReportExportActions label="shopping-report" rows={exportRows} summary={`${report.recordCount} records (${localRecordCount} local, ${externalRecordCount} external); total ${formatReportCurrency(report.total)}; currency ${selectedCurrency}; filters: ${store}, ${category}, ${sourceFilter}, ${from || "any date"} to ${to || "any date"}.`} />
       <SavedViewControls filters={savedFilters} onSave={onSaveView} />
     </div>
     <div className="report-grid">
-      <Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters</p></div><Badge tone="green"><BarChart3 size={11} /> {currency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatCurrency(month.total)}`}><span className="report-bar-value">{formatCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store and category." />}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Category trend</h2><p className="section-description">Monthly category spending within the selected filters</p></div></div>{categoryTrendRows.length && months.length ? <div className="shopping-report-table-wrap"><table className="data-table"><thead><tr><th>Category</th>{months.map((month) => <th key={month.key}>{month.label}</th>)}</tr></thead><tbody>{categoryTrendRows.map((row) => <tr key={row.name}><td><div className="table-primary">{row.name}</div></td>{row.totals.map((total, index) => <td key={`${row.name}:${months[index].key}`}>{formatCurrency(total)}</td>)}</tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No category trends yet" description="Try widening the date range or changing the store and category." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Monthly spending</h2><p className="section-description">Latest six months matching your filters · {selectedCurrency}</p></div><Badge tone="green"><BarChart3 size={11} /> {selectedCurrency}</Badge></div>{months.length ? <div className="report-bars">{months.map((month) => <div className="report-bar-item" key={month.key} title={`${month.label}: ${formatReportCurrency(month.total)}`}><span className="report-bar-value">{formatReportCurrency(month.total)}</span><div className="report-bar" style={{ height: `${Math.max(3, month.total / max * 100)}%`, opacity: month.key === latestMonthKey ? 1 : .65 }} /><span className="report-bar-label">{month.label}</span></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title="No spending in this range" description="Try widening the date range or changing the store, category, source, or currency." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Category trend</h2><p className="section-description">Monthly recorded payments within the selected filters · {selectedCurrency}</p></div></div>{categoryTrendRows.length && months.length ? <div className="shopping-report-table-wrap"><table className="data-table"><thead><tr><th>Category</th>{months.map((month) => <th key={month.key}>{month.label}</th>)}</tr></thead><tbody>{categoryTrendRows.map((row) => <tr key={row.name}><td><div className="table-primary">{row.name}</div></td>{row.totals.map((total, index) => <td key={`${row.name}:${months[index].key}`}>{formatReportCurrency(total)}</td>)}</tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No category trends yet" description="Try widening the date range or changing the store, category, source, or currency." />}</Card>
     </div>
     <div className="report-grid" style={{ marginTop: 16 }}>
-      <Card><div className="card-head"><div><h2 className="section-title">Category breakdown</h2><p className="section-description">Share of recorded spend in the selected range</p></div></div>{purchases.length ? <CategoryBreakdown purchases={purchases} /> : <p className="report-empty">No matching purchases.</p>}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : "Store comparison"}</h2><p className="section-description">Grouped totals for matching purchases</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} purchases · {new Set(group.records.map((purchase) => purchase.store)).size} stores</div></div><div className="recent-price">{formatCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={data.purchases.length ? "No purchases match these filters" : "No data to report yet"} description={data.purchases.length ? "Try widening the date range or changing the store and category." : "Your summaries will appear once you start tracking purchases."} />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Category breakdown</h2><p className="section-description">Share of recorded spend in the selected range · {selectedCurrency}</p></div></div>{report.records.length ? <CategoryBreakdown purchases={report.records} currency={selectedCurrency} /> : <p className="report-empty">No matching payments.</p>}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">{groupBy === "month" ? "Monthly summary" : groupBy === "category" ? "Category summary" : groupBy === "store" ? "Store / payee comparison" : "Source comparison"}</h2><p className="section-description">Grouped totals for matching records · {selectedCurrency}</p></div></div>{reportGroups.length ? <div className="recent-list">{reportGroups.map((group) => <div className="recent-row" key={group.key}><div className="item-dot">{groupBy === "month" ? <CalendarDays size={15} /> : groupBy === "store" ? <ShoppingBag size={15} /> : groupBy === "source" ? <Database size={15} /> : <ShoppingBasket size={15} />}</div><div className="recent-info"><div className="recent-name">{groupBy === "month" && group.key !== "undated" ? new Date(`${group.key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" }) : group.label}</div><div className="recent-meta">{group.recordCount} records · {new Set(group.records.map((record) => record.source)).size} sources</div></div><div className="recent-price">{formatReportCurrency(group.total)}</div></div>)}</div> : <EmptyState icon={<BarChart3 size={18} />} title={allRecords.length ? "No records match these filters" : "No data to report yet"} description={allRecords.length ? "Try widening the date range or changing the store, category, source, or currency." : "No local purchases or paid external payments were returned."} />}</Card>
     </div>
     <div className="report-grid" style={{ marginTop: 16 }}>
-      <Card><div className="card-head"><div><h2 className="section-title">Trip spending</h2><p className="section-description">Totals from purchases matching the selected filters</p></div><Badge>{tripRows.length} trips</Badge></div>{tripRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Store</th><th>Purchases</th><th>Total</th></tr></thead><tbody>{tripRows.map((trip) => <tr key={trip.id}><td data-label="Date">{dateLabel(trip.date)}</td><td data-label="Store">{trip.store}</td><td data-label="Purchases">{trip.purchaseCount}</td><td data-label="Total" className="table-total">{formatCurrency(trip.total)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBag size={18} />} title="No trip-linked purchases" description="Purchases without a saved trip are not included in trip totals." />}</Card>
-      <Card><div className="card-head"><div><h2 className="section-title">Item purchase patterns</h2><p className="section-description">Repeat frequency and average paid amount for matching purchases</p></div><Badge>{itemRows.length} items</Badge></div>{itemRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Purchases</th><th>Average paid</th><th>Total</th></tr></thead><tbody>{itemRows.slice(0, 10).map((item) => <tr key={item.id}><td data-label="Item"><div className="table-primary">{item.name}</div><div className="table-secondary">Last purchased {dateLabel(item.latestDate)}</div></td><td data-label="Category">{item.category}</td><td data-label="Purchases">{item.purchaseCount}</td><td data-label="Average paid">{formatCurrency(item.averagePurchase)}</td><td data-label="Total" className="table-total">{formatCurrency(item.total)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No item patterns yet" description="Matching purchases will appear here after they are recorded." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Trip spending</h2><p className="section-description">Local MyFinanceTracker purchases with a saved trip · {currency}</p></div><Badge>{tripRows.length} trips</Badge></div>{tripRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Store</th><th>Purchases</th><th>Total</th></tr></thead><tbody>{tripRows.map((trip) => <tr key={trip.id}><td data-label="Date">{dateLabel(trip.date)}</td><td data-label="Store">{trip.store}</td><td data-label="Purchases">{trip.purchaseCount}</td><td data-label="Total" className="table-total">{reportCurrencyAmount(trip.total, currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBag size={18} />} title="No local trip-linked purchases" description="The external payment source has no shopping-trip links; only local purchases appear here." />}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Item purchase patterns</h2><p className="section-description">Local purchase items only · {currency}</p></div><Badge>{itemRows.length} items</Badge></div>{itemRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Purchases</th><th>Average paid</th><th>Total</th></tr></thead><tbody>{itemRows.slice(0, 10).map((item) => <tr key={item.id}><td data-label="Item"><div className="table-primary">{item.name}</div><div className="table-secondary">Last purchased {dateLabel(item.latestDate)}</div></td><td data-label="Category">{item.category}</td><td data-label="Purchases">{item.purchaseCount}</td><td data-label="Average paid">{reportCurrencyAmount(item.averagePurchase, currency)}</td><td data-label="Total" className="table-total">{reportCurrencyAmount(item.total, currency)}</td></tr>)}</tbody></table></div> : <EmptyState icon={<ShoppingBasket size={18} />} title="No local item patterns" description="External payments do not include purchased-item detail." />}</Card>
     </div>
     <Card className="shopping-report-budget">
-      <div className="card-head"><div><h2 className="section-title">Monthly budget vs actual</h2><p className="section-description">Overall shopping budget compared with recorded spending this calendar month. This comparison is independent of the report filters.</p></div><Badge tone={monthlyBudget === undefined ? "neutral" : currentMonthActual > monthlyBudget ? "amber" : "green"}>{monthlyBudget === undefined ? "Budget not set" : `${currency} monthly budget`}</Badge></div>
+      <div className="card-head"><div><h2 className="section-title">Monthly budget vs actual</h2><p className="section-description">Local MyFinanceTracker purchase records compared with the current app budget; independent of report filters and external payments.</p></div><Badge tone={monthlyBudget === undefined ? "neutral" : currentMonthActual > monthlyBudget ? "amber" : "green"}>{monthlyBudget === undefined ? "Budget not set" : `${currency} monthly budget`}</Badge></div>
       {monthlyBudget === undefined ? <p className="section-description">Set a monthly budget to compare it with this month’s recorded purchases.</p> : <>
-        <div className="shopping-report-budget-summary"><strong>{formatCurrency(currentMonthActual)}</strong><span>of {formatCurrency(monthlyBudget)} budget · {currentMonthActual > monthlyBudget ? `${formatCurrency(currentMonthActual - monthlyBudget)} over budget` : `${formatCurrency(monthlyBudget - currentMonthActual)} remaining`}</span></div>
+        <div className="shopping-report-budget-summary"><strong>{reportCurrencyAmount(currentMonthActual, currency)}</strong><span>of {reportCurrencyAmount(monthlyBudget, currency)} budget · {currentMonthActual > monthlyBudget ? `${reportCurrencyAmount(currentMonthActual - monthlyBudget, currency)} over budget` : `${reportCurrencyAmount(monthlyBudget - currentMonthActual, currency)} remaining`}</span></div>
         <div className="shopping-report-budget-meter" role="progressbar" aria-label="Monthly shopping budget used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetUsedPercent}><span style={{ width: `${budgetUsedPercent}%` }} /></div>
       </>}
       <form className="shopping-report-budget-form" onSubmit={(event) => void saveMonthlyBudget(event)}>
@@ -1807,8 +1887,137 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
         <div className="shopping-report-budget-actions"><Button type="submit" disabled={budgetSaving}>{budgetSaving ? "Saving..." : "Save budget"}</Button>{monthlyBudget !== undefined && <Button type="button" variant="outline" disabled={budgetSaving} onClick={() => { setBudgetDraft(""); void persistMonthlyBudget(undefined); }}>Clear</Button>}</div>
       </form>
       {budgetMessage && <p className="section-description" role="status">{budgetMessage}</p>}
-      <p className="shopping-report-budget-note">Purchase records have no per-record currency, so the selected currency only formats amounts; it does not convert them. Budget settings are saved with your Daybook preferences.</p>
+      <p className="shopping-report-budget-note">Local purchase records have no per-record currency and use the app display currency. External payments retain their source currency in the combined report; no conversion is performed. Budget settings are saved with your Daybook preferences.</p>
     </Card>
+  </>;
+}
+
+function ExternalFinanceReports() {
+  const [dataset, setDataset] = useState<FinanceSourceDataset>("payments");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [currency, setCurrency] = useState("all");
+  const [records, setRecords] = useState<FinanceSourceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const definition = financeSourceDataset(dataset);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setRecords([]);
+    void loadFinanceSourceDataset(dataset, from, to, controller.signal)
+      .then(setRecords)
+      .catch((caught: unknown) => {
+        if (!controller.signal.aborted) {
+          setRecords([]);
+          setError(caught instanceof Error ? caught.message : "Could not load external finance data.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [dataset, from, to]);
+
+  const availableCurrencies = [...new Set(records
+    .map((record) => record[definition.currencyField ?? "currency"])
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .map((value) => value.toUpperCase()))].sort();
+  const selectedCurrency = availableCurrencies.includes(currency) ? currency : "all";
+  const query = search.trim().toLocaleLowerCase();
+  const filteredRecords = records.filter((record) => {
+    if (selectedCurrency !== "all" && definition.currencyField &&
+      String(record[definition.currencyField] ?? "").toUpperCase() !== selectedCurrency) return false;
+    if (!query) return true;
+    return definition.fields.some((field) => String(record[field] ?? "").toLocaleLowerCase().includes(query));
+  });
+  const isCashflowDataset = dataset === "payments" || dataset === "incomes";
+  const settledStatus = dataset === "payments" ? "paid" : "received";
+  const settledRecords = isCashflowDataset
+    ? filteredRecords.filter((record) => String(record.status ?? "").toLocaleLowerCase() === settledStatus)
+    : [];
+  const totalsByCurrency = new Map<string, { total: number; count: number }>();
+  const monthlyTotals = new Map<string, number>();
+  if (definition.amountField && definition.currencyField && isCashflowDataset) {
+    for (const record of settledRecords) {
+      const amount = Number(record[definition.amountField]);
+      if (!Number.isFinite(amount)) continue;
+      const recordCurrency = String(record[definition.currencyField] ?? "Not recorded").toUpperCase();
+      const total = totalsByCurrency.get(recordCurrency) ?? { total: 0, count: 0 };
+      total.total += amount;
+      total.count += 1;
+      totalsByCurrency.set(recordCurrency, total);
+      const date = typeof record.date === "string" ? record.date : "";
+      const month = /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : "";
+      if (month && (selectedCurrency === "all" || selectedCurrency === recordCurrency)) {
+        const key = `${recordCurrency}:${month}`;
+        monthlyTotals.set(key, (monthlyTotals.get(key) ?? 0) + amount);
+      }
+    }
+  }
+  const monthlyRows = [...monthlyTotals.entries()]
+    .map(([key, total]) => {
+      const [currencyCode, month] = key.split(":");
+      return { currency: currencyCode, month, total };
+    })
+    .sort((left, right) => left.month.localeCompare(right.month) || left.currency.localeCompare(right.currency))
+    .slice(-12);
+
+  function fieldLabel(field: string) {
+    return field.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
+  }
+
+  function valueText(value: unknown) {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    return typeof value === "object" ? JSON.stringify(value) : String(value);
+  }
+
+  const exportRows = filteredRecords.map((record) => Object.fromEntries(
+    definition.fields.map((field) => [fieldLabel(field), valueText(record[field])]),
+  ));
+  const selectedDatasetLabel = definition.label.toLocaleLowerCase();
+
+  return <>
+    <PageHeading eyebrow="Read-only source database" title="External finance data" subtitle="Browse the selected source-project tables without copying records into Daybook." />
+    <p className="reports-hub-caveat">This view reads only the approved tables and the configured user’s rows. It never writes to the source database. Payments and incomes are summarized only for paid/received records and remain separated by currency. Other amounts are shown as source values; no currency is inferred or converted.</p>
+    <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
+      <div className="shopping-quick-filters">
+        <Field label="Source table"><Select aria-label="Choose external finance dataset" value={dataset} onChange={(event) => {
+          setDataset(event.target.value as FinanceSourceDataset);
+          setCurrency("all");
+          setSearch("");
+        }}>{FINANCE_SOURCE_DATASETS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</Select></Field>
+        {definition.currencyField && <Field label="Currency"><Select aria-label="Filter external finance records by currency" value={selectedCurrency} onChange={(event) => setCurrency(event.target.value)}><option value="all">All currencies</option>{availableCurrencies.map((code) => <option key={code} value={code}>{code}</option>)}</Select></Field>}
+        <Field label="Search records"><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visible fields" /></Field>
+      </div>
+      <FilterDrawer label="Apply date filters" activeCount={[Boolean(from), Boolean(to)].filter(Boolean).length}>
+        <Field label={`From ${definition.dateLabel.toLowerCase()}`}><DateInput className="filter-date" aria-label="External data from date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
+        <Field label={`To ${definition.dateLabel.toLowerCase()}`}><DateInput className="filter-date" aria-label="External data to date" value={to} onValueChange={setTo} min={from || undefined} /></Field>
+      </FilterDrawer>
+      <Badge>{filteredRecords.length} of {records.length} records</Badge>
+    </div>
+    {loading && <p className="section-description" role="status">Loading {selectedDatasetLabel} from the read-only source…</p>}
+    {error && <p className="alert alert-error" role="alert">External finance data could not be loaded: {error}</p>}
+    {!loading && !error && <div className="report-actions-row">
+      <ReportExportActions
+        label={`external-${dataset}`}
+        rows={exportRows}
+        summary={`${filteredRecords.length} ${selectedDatasetLabel} records; date range ${from || "any"} to ${to || "any"}; currency ${selectedCurrency}. Read-only source data; amounts are not converted.`}
+      />
+      {isCashflowDataset && <span className="section-description">{settledRecords.length} {settledStatus} records counted as completed cash flow.</span>}
+    </div>}
+    {isCashflowDataset && !loading && !error && <div className="report-grid">
+      <Card><div className="card-head"><div><h2 className="section-title">{dataset === "payments" ? "Paid totals" : "Received totals"}</h2><p className="section-description">Totals remain separated by source currency.</p></div></div>{totalsByCurrency.size ? <div className="recent-list">{[...totalsByCurrency.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([code, value]) => <div className="recent-row" key={code}><div className="recent-info"><div className="recent-name">{code}</div><div className="recent-meta">{value.count} records</div></div><div className="recent-price">{reportCurrencyAmount(value.total, code)}</div></div>)}</div> : <p className="report-empty">No {settledStatus} records with valid amounts match these filters.</p>}</Card>
+      <Card><div className="card-head"><div><h2 className="section-title">Monthly completed cash flow</h2><p className="section-description">By currency; select one currency to view only its monthly trend.</p></div></div>{monthlyRows.length ? <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr><th>Month</th><th>Currency</th><th>Total</th></tr></thead><tbody>{monthlyRows.map((row) => <tr key={`${row.currency}:${row.month}`}><td data-label="Month">{new Date(`${row.month}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}</td><td data-label="Currency">{row.currency}</td><td data-label="Total" className="table-total">{reportCurrencyAmount(row.total, row.currency)}</td></tr>)}</tbody></table></div> : <p className="report-empty">No dated completed cash-flow records match these filters.</p>}</Card>
+    </div>}
+    {!loading && !error && (filteredRecords.length ? <Card className="shopping-report-budget">
+      <div className="card-head"><div><h2 className="section-title">{definition.label} records</h2><p className="section-description">Showing {filteredRecords.length} matching records; source data is not copied.</p></div></div>
+      <div className="shopping-report-table-wrap"><table className="data-table mobile-card-table"><thead><tr>{definition.fields.map((field) => <th key={field}>{fieldLabel(field)}</th>)}</tr></thead><tbody>{filteredRecords.map((record, index) => <tr key={String(record.id ?? index)}>{definition.fields.map((field) => <td data-label={fieldLabel(field)} key={field}>{valueText(record[field])}</td>)}</tr>)}</tbody></table></div>
+    </Card> : <EmptyState icon={<Database size={18} />} title={records.length ? "No records match these filters" : `No ${selectedDatasetLabel} records in this range`} description={records.length ? "Try changing the search or filters." : "Choose another source table or widen the date range."} />)}
   </>;
 }
 
@@ -2012,7 +2221,7 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubSection = "overview" | "shopping" | "finance" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
 type ReportHubGroupId = "investments-assets" | "spending-cashflow";
 
 const REPORT_HUB_GROUPS: {
@@ -2035,6 +2244,7 @@ const REPORT_HUB_GROUPS: {
     sections: [
       { id: "shopping", label: "Shopping" },
       { id: "finance", label: "Finance & cashflow" },
+      { id: "externalFinance", label: "External finance data" },
       { id: "subscriptions", label: "Subscriptions & bills" },
     ],
   },
@@ -3184,20 +3394,20 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
         onClick={() => openSection(entry.id)}
       >{entry.label}</button>)}
     </nav>
-    {section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
+    {section === "externalFinance" ? <ExternalFinanceReports /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
-        <Card className="stat-card"><div className="stat-top"><span>Shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} recorded purchases · {currency}</div></Card>
-        <Card className="stat-card"><div className="stat-top"><span>Purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">Available for Shopping reports</div></Card>
+        <Card className="stat-card"><div className="stat-top"><span>Local shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} local purchases · {currency}</div></Card>
+        <Card className="stat-card"><div className="stat-top"><span>Local purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">External payments appear in Shopping reports</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Investment source records</span><span className="stat-icon icon-blue"><TrendingUp size={16} /></span></div><p className="stat-value">{(assets.length + stocks.length).toLocaleString()}</p><div className="stat-foot">Holdings recorded; not a net-worth total</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Subscription accounts</span><span className="stat-icon icon-purple"><CalendarDays size={16} /></span></div><p className="stat-value">{subscriptions.length.toLocaleString()}</p><div className="stat-foot">Amounts and billing history may be incomplete</div></Card>
       </div>
-      <p className="reports-hub-caveat">Currency is a display preference; recorded amounts are not converted. Other summaries count saved records and do not imply complete financial coverage.</p>
+      <p className="reports-hub-caveat">This overview uses local purchase records only; the Shopping report can also read paid payments from the configured external source. Currency is a display preference for local records, not a conversion. Other summaries count saved records and do not imply complete financial coverage.</p>
       <div className="report-actions-row"><ReportExportActions label="reports-overview" rows={[
         { metric: "Shopping spend this month", value: monthPurchases.total, currency },
         { metric: "Purchase records", value: data.purchases.length, currency: "Not applicable" },
         { metric: "Investment source records", value: assets.length + stocks.length, currency: "Not applicable" },
         { metric: "Subscription accounts", value: subscriptions.length, currency: "Not applicable" },
-      ]} summary={`Overview: ${monthPurchases.recordCount} recorded purchases this month; ${assets.length + stocks.length} asset and stock records; ${subscriptions.length} subscription accounts. Amounts are not converted.`} /></div>
+      ]} summary={`Overview: ${monthPurchases.recordCount} local purchases this month; external payments are shown in the Shopping report; ${assets.length + stocks.length} asset and stock records; ${subscriptions.length} subscription accounts. Amounts are not converted.`} /></div>
       <div className="reports-hub-grid">
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-green"><ShoppingBasket size={18} /></div>
