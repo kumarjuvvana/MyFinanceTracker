@@ -1892,8 +1892,14 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
   </>;
 }
 
-function ExternalFinanceReports() {
-  const [dataset, setDataset] = useState<FinanceSourceDataset>("payments");
+function ExternalFinanceReports({
+  initialDataset = "payments",
+  fixedDataset = false,
+}: {
+  initialDataset?: FinanceSourceDataset;
+  fixedDataset?: boolean;
+}) {
+  const [dataset, setDataset] = useState<FinanceSourceDataset>(initialDataset);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [search, setSearch] = useState("");
@@ -1982,15 +1988,21 @@ function ExternalFinanceReports() {
   const selectedDatasetLabel = definition.label.toLocaleLowerCase();
 
   return <>
-    <PageHeading eyebrow="Read-only source database" title="External finance data" subtitle="Browse the selected source-project tables without copying records into Daybook." />
-    <p className="reports-hub-caveat">This view reads only the approved tables and the configured user’s rows. It never writes to the source database. Payments and incomes are summarized only for paid/received records and remain separated by currency. Other amounts are shown as source values; no currency is inferred or converted.</p>
+    <PageHeading
+      eyebrow="Read-only source database"
+      title={fixedDataset ? "Income reports" : "External finance data"}
+      subtitle={fixedDataset
+        ? "Review received income from the external finance source without copying records into Daybook."
+        : "Browse the selected source-project tables without copying records into Daybook."}
+    />
+    <p className="reports-hub-caveat">This view reads only approved tables and rows permitted by source-database RLS. It never writes to the source database. Payments and incomes are summarized only for paid/received records and remain separated by currency. Other amounts are shown as source values; no currency is inferred or converted.</p>
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
       <div className="shopping-quick-filters">
-        <Field label="Source table"><Select aria-label="Choose external finance dataset" value={dataset} onChange={(event) => {
+        {!fixedDataset && <Field label="Source table"><Select aria-label="Choose external finance dataset" value={dataset} onChange={(event) => {
           setDataset(event.target.value as FinanceSourceDataset);
           setCurrency("all");
           setSearch("");
-        }}>{FINANCE_SOURCE_DATASETS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</Select></Field>
+        }}>{FINANCE_SOURCE_DATASETS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</Select></Field>}
         {definition.currencyField && <Field label="Currency"><Select aria-label="Filter external finance records by currency" value={selectedCurrency} onChange={(event) => setCurrency(event.target.value)}><option value="all">All currencies</option>{availableCurrencies.map((code) => <option key={code} value={code}>{code}</option>)}</Select></Field>}
         <Field label="Search records"><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search visible fields" /></Field>
       </div>
@@ -2221,7 +2233,7 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubSection = "overview" | "shopping" | "finance" | "income" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
 type ReportHubGroupId = "investments-assets" | "spending-cashflow";
 
 const REPORT_HUB_GROUPS: {
@@ -2243,6 +2255,7 @@ const REPORT_HUB_GROUPS: {
     label: "Spending & Cash Flow",
     sections: [
       { id: "shopping", label: "Shopping" },
+      { id: "income", label: "Income reports" },
       { id: "finance", label: "Finance & cashflow" },
       { id: "externalFinance", label: "External finance data" },
       { id: "subscriptions", label: "Subscriptions & bills" },
@@ -3394,7 +3407,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
         onClick={() => openSection(entry.id)}
       >{entry.label}</button>)}
     </nav>
-    {section === "externalFinance" ? <ExternalFinanceReports /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
+    {section === "externalFinance" ? <ExternalFinanceReports key="externalFinance" /> : section === "income" ? <ExternalFinanceReports key="income" initialDataset="incomes" fixedDataset /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Local shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} local purchases · {currency}</div></Card>
         <Card className="stat-card"><div className="stat-top"><span>Local purchase records</span><span className="stat-icon icon-peach"><ShoppingBag size={16} /></span></div><p className="stat-value">{data.purchases.length.toLocaleString()}</p><div className="stat-foot">External payments appear in Shopping reports</div></Card>
