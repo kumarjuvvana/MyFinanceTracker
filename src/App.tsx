@@ -2003,18 +2003,43 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubSection = "overview" | "shopping" | "finance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubGroupId = "investments-assets" | "spending-cashflow";
 
-const REPORT_HUB_SECTIONS: { id: ReportHubSection; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "shopping", label: "Shopping" },
-  { id: "finance", label: "Finance & investments" },
-  { id: "assets", label: "Assets & portfolio" },
-  { id: "assetAnalytics", label: "Asset analytics" },
-  { id: "subscriptions", label: "Subscriptions & bills" },
-  { id: "forecasts", label: "Forecasts" },
-  { id: "saved", label: "Saved reports" },
+const REPORT_HUB_GROUPS: {
+  id: ReportHubGroupId;
+  label: string;
+  sections: { id: ReportHubSection; label: string }[];
+}[] = [
+  {
+    id: "investments-assets",
+    label: "Investments & Assets",
+    sections: [
+      { id: "assets", label: "Assets & portfolio" },
+      { id: "investment", label: "Investment & portfolio" },
+      { id: "assetAnalytics", label: "Asset Analytics" },
+    ],
+  },
+  {
+    id: "spending-cashflow",
+    label: "Spending & Cash Flow",
+    sections: [
+      { id: "shopping", label: "Shopping" },
+      { id: "finance", label: "Finance & cashflow" },
+      { id: "subscriptions", label: "Subscriptions & bills" },
+    ],
+  },
 ];
+
+const REPORT_HUB_STANDALONE_SECTIONS: { id: ReportHubSection; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "forecasts", label: "Forecasts" },
+  { id: "saved", label: "Saved Reports" },
+];
+
+function reportHubGroupForSection(section: ReportHubSection): ReportHubGroupId | undefined {
+  return REPORT_HUB_GROUPS.find((group) => group.sections.some((entry) => entry.id === section))?.id;
+}
 
 function useAutomatedAssetPriceHistory(
   assetType?: AssetPriceHistoryRecord["asset_type"],
@@ -2675,13 +2700,15 @@ function SavedReports({ views, onApply, onDelete }: {
   </>;
 }
 
-function FinanceAndInvestmentReports({ data, initialFilters, onSaveView }: {
+function FinanceAndInvestmentReports({ data, initialFilters, onSaveView, initialSubreport = "cashflow", showSubnav = true }: {
   data: TrackerData;
   initialFilters?: Record<string, string>;
   onSaveView?: SaveReportView;
+  initialSubreport?: "cashflow" | "investment";
+  showSubnav?: boolean;
 }) {
   const [subreport, setSubreport] = useState(() =>
-    initialFilters?.reportKind === "investment" ? "investment" : "cashflow");
+    initialFilters?.reportKind === "investment" ? "investment" : initialSubreport);
   const savedKind = initialFilters?.reportKind;
   const childFilters = savedKind === subreport && initialFilters
     ? Object.fromEntries(Object.entries(initialFilters).filter(([key]) => key !== "reportKind"))
@@ -2691,10 +2718,10 @@ function FinanceAndInvestmentReports({ data, initialFilters, onSaveView }: {
   };
 
   return <>
-    <div className="report-subnav" role="group" aria-label="Finance and investment reports">
+    {showSubnav && <div className="report-subnav" role="group" aria-label="Finance and investment reports">
       <button type="button" className={`reports-hub-tab${subreport === "cashflow" ? " active" : ""}`} aria-pressed={subreport === "cashflow"} onClick={() => setSubreport("cashflow")}>Finance & cashflow</button>
       <button type="button" className={`reports-hub-tab${subreport === "investment" ? " active" : ""}`} aria-pressed={subreport === "investment"} onClick={() => setSubreport("investment")}>Investment & portfolio</button>
-    </div>
+    </div>}
     {subreport === "cashflow"
       ? <FinanceCashflowReports key="cashflow" data={data} initialFilters={childFilters} onSaveView={saveChildView("cashflow")} />
       : <InvestmentReports key="investment" data={data} initialFilters={childFilters} onSaveView={saveChildView("investment")} />}
@@ -3007,6 +3034,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
   const currency = useContext(CurrencyContext);
   const [section, setSection] = useState<ReportHubSection>("overview");
   const [activeSavedView, setActiveSavedView] = useState<SavedReportView | null>(null);
+  const [expandedReportGroups, setExpandedReportGroups] = useState<Set<ReportHubGroupId>>(() => new Set());
   const monthRange = resolveReportDateRange("month-to-date");
   const monthPurchases = buildReport(data.purchases, shoppingPurchaseReport, {
     dateRange: monthRange,
@@ -3017,11 +3045,34 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
   const stocks = data.stocks ?? [];
   const subscriptions = data.subscriptions ?? [];
   const savedViews = data.preferences?.savedReportViews ?? [];
-  const activeFilters = activeSavedView?.section === section ? activeSavedView.filters : undefined;
+  const activeFilters = activeSavedView &&
+    (activeSavedView.section === section || (activeSavedView.section === "finance" && section === "investment"))
+    ? activeSavedView.filters
+    : undefined;
+
+  function setReportSection(next: ReportHubSection) {
+    setSection(next);
+    const group = reportHubGroupForSection(next);
+    if (group) setExpandedReportGroups((current) => new Set(current).add(group));
+  }
 
   function openSection(next: ReportHubSection) {
-    setSection(next);
+    setReportSection(next);
     setActiveSavedView(null);
+  }
+
+  function openSavedView(view: SavedReportView) {
+    setActiveSavedView(view);
+    setReportSection(view.section === "finance" && view.filters.reportKind === "investment" ? "investment" : view.section);
+  }
+
+  function toggleReportGroup(group: ReportHubGroupId) {
+    setExpandedReportGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
   }
 
   async function saveView(name: string, viewSection: SavedReportSection, filters: Record<string, string>) {
@@ -3054,15 +3105,44 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
 
   return <>
     <PageHeading eyebrow="Reports hub" title="Reports & Analytics" subtitle="Explore recorded activity and see which report areas are ready." />
-    <div className="reports-hub-tabs" role="group" aria-label="Report categories">
-      {REPORT_HUB_SECTIONS.map((entry) => <button
+    <nav className="reports-hub-navigation" aria-label="Reports & Analytics sections">
+      {REPORT_HUB_STANDALONE_SECTIONS.slice(0, 1).map((entry) => <button
         key={entry.id}
         type="button"
-        aria-pressed={section === entry.id}
-        className={`reports-hub-tab${section === entry.id ? " active" : ""}`}
+        aria-current={section === entry.id ? "page" : undefined}
+        className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
         onClick={() => openSection(entry.id)}
       >{entry.label}</button>)}
-    </div>
+      {REPORT_HUB_GROUPS.map((group) => {
+        const expanded = expandedReportGroups.has(group.id);
+        const active = group.sections.some((entry) => entry.id === section);
+        return <div className={`reports-hub-nav-group${active ? " active" : ""}`} key={group.id}>
+          <button
+            type="button"
+            className="reports-hub-group-toggle"
+            aria-expanded={expanded}
+            aria-controls={`report-group-${group.id}`}
+            onClick={() => toggleReportGroup(group.id)}
+          ><ChevronRight size={14} className={expanded ? "expanded" : ""} /><span>{group.label}</span><small>{group.sections.length}</small></button>
+          <div className="reports-hub-nav-items" id={`report-group-${group.id}`} hidden={!expanded}>
+            {group.sections.map((entry) => <button
+              key={entry.id}
+              type="button"
+              aria-current={section === entry.id ? "page" : undefined}
+              className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
+              onClick={() => openSection(entry.id)}
+            >{entry.label}</button>)}
+          </div>
+        </div>;
+      })}
+      {REPORT_HUB_STANDALONE_SECTIONS.slice(1).map((entry) => <button
+        key={entry.id}
+        type="button"
+        aria-current={section === entry.id ? "page" : undefined}
+        className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
+        onClick={() => openSection(entry.id)}
+      >{entry.label}</button>)}
+    </nav>
     {section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} recorded purchases · {currency}</div></Card>
@@ -3082,13 +3162,19 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
           <div className="reports-hub-card-icon icon-green"><ShoppingBasket size={18} /></div>
           <h2 className="section-title">Shopping</h2>
           <p className="section-description">Review spending by month, category, or store with date and store filters.</p>
-          <Button type="button" onClick={() => setSection("shopping")}>Open shopping reports <ChevronRight size={14} /></Button>
+          <Button type="button" onClick={() => openSection("shopping")}>Open shopping reports <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-blue"><Wallet size={18} /></div>
-          <h2 className="section-title">Finance & investments</h2>
-          <p className="section-description">Review recorded bank movement, investment holdings, and market/NAV history without implying completeness.</p>
-          <Button type="button" onClick={() => openSection("finance")}>Open finance reports <ChevronRight size={14} /></Button>
+          <h2 className="section-title">Finance & cashflow</h2>
+          <p className="section-description">Review recorded bank movement and cashflow without implying completeness.</p>
+          <Button type="button" onClick={() => openSection("finance")}>Open cashflow reports <ChevronRight size={14} /></Button>
+        </Card>
+        <Card className="reports-hub-card">
+          <div className="reports-hub-card-icon icon-blue"><TrendingUp size={18} /></div>
+          <h2 className="section-title">Investment & portfolio</h2>
+          <p className="section-description">Review recorded investment positions, cost basis, and available market values.</p>
+          <Button type="button" variant="outline" onClick={() => openSection("investment")}>Open investment report <ChevronRight size={14} /></Button>
         </Card>
         <Card className="reports-hub-card">
           <div className="reports-hub-card-icon icon-purple"><BarChart3 size={18} /></div>
@@ -3113,12 +3199,19 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences 
         <Card className="reports-hub-note"><div><TrendingUp size={17} /><strong>Forecasts</strong></div><p>History-based scenarios show their coverage and assumptions; no investment advice is generated.</p><Button type="button" size="sm" variant="outline" onClick={() => openSection("forecasts")}>Open forecasts</Button></Card>
         <Card className="reports-hub-note"><div><Star size={17} /><strong>Saved reports</strong></div><p>Save and reopen report filters from the existing preferences store.</p><Button type="button" size="sm" variant="outline" onClick={() => openSection("saved")}>Open saved reports</Button></Card>
       </div>
-    </> : section === "finance" ? <FinanceAndInvestmentReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "finance", filters)} />
+    </> : section === "finance" || section === "investment" ? <FinanceAndInvestmentReports
+        key={`${activeSavedView?.id ?? "navigation"}:${section}`}
+        data={data}
+        initialFilters={activeFilters}
+        initialSubreport={section === "investment" ? "investment" : "cashflow"}
+        showSubnav={false}
+        onSaveView={(name, filters) => saveView(name, "finance", filters)}
+      />
       : section === "assets" ? <AssetManagerReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "assets", filters)} />
       : section === "assetAnalytics" ? <AssetAnalyticsReports data={data} />
       : section === "subscriptions" ? <SubscriptionSpendingReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "subscriptions", filters)} />
       : section === "forecasts" ? <ForecastReports key={activeSavedView?.id ?? section} data={data} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "forecasts", filters)} onSavePreferences={onSaveReportPreferences} />
-      : section === "saved" ? <SavedReports views={savedViews} onApply={(view) => { setActiveSavedView(view); setSection(view.section); }} onDelete={deleteSavedView} />
+      : section === "saved" ? <SavedReports views={savedViews} onApply={openSavedView} onDelete={deleteSavedView} />
       : null}
   </>;
 }
