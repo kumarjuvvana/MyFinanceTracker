@@ -1,7 +1,7 @@
 import { parse, type Statement } from "pgsql-ast-parser";
 
 const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/i;
-const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault"]);
+const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault", "database_connection_vault"]);
 const MAX_SQL_LENGTH = 16_000;
 const MAX_SELECT_ROWS = 100;
 const MAX_INSERT_ROWS = 100;

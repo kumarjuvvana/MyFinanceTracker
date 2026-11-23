@@ -24,6 +24,8 @@ export interface DatabaseCatalog {
   triggers: DatabaseTrigger[];
 }
 
+export type ProfileDatabaseCatalog = DatabaseCatalog;
+
 export interface DatabaseColumn {
   column_name: string;
   data_type: string;
@@ -113,4 +115,60 @@ export async function testSupabaseConnection(connectionString: string, caCertifi
     throw new Error("The server returned an invalid Supabase connection test result.");
   }
   return { connected: true, database: payload.database };
+}
+
+export async function loadSavedProfileDatabaseCatalog(
+  profileId: string,
+  passphrase: string,
+): Promise<ProfileDatabaseCatalog> {
+  return await (await request("/api/database", {
+    action: "profile-catalog",
+    profileId,
+    passphrase,
+  })).json() as ProfileDatabaseCatalog;
+}
+
+export async function loadSavedProfileDatabaseRows(
+  profileId: string,
+  passphrase: string,
+  table: string,
+  offset: number,
+): Promise<DatabaseRows> {
+  return await (await request("/api/database", {
+    action: "profile-rows",
+    profileId,
+    passphrase,
+    table,
+    offset,
+  })).json() as DatabaseRows;
+}
+
+export async function reviewSavedProfileDatabaseSql(
+  profileId: string,
+  passphrase: string,
+  sql: string,
+): Promise<SqlReview> {
+  return await (await request("/api/database", {
+    action: "profile-review-sql",
+    profileId,
+    passphrase,
+    sql,
+  })).json() as SqlReview;
+}
+
+export async function executeSavedProfileDatabaseSql(
+  profileId: string,
+  passphrase: string,
+  sql: string,
+  confirmation: string,
+  statementHash: string,
+): Promise<SqlExecutionResult> {
+  return await (await request("/api/database", {
+    action: "profile-execute-sql",
+    profileId,
+    passphrase,
+    sql,
+    confirmation,
+    statementHash,
+  })).json() as SqlExecutionResult;
 }

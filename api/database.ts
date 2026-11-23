@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import pg from "pg";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
+import { loadUnlockedDatabaseConnectionProfile } from "../server/databaseConnections.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
 
 const { Client, Pool } = pg;
@@ -181,7 +182,7 @@ export function getPool(): pg.Pool {
   return pool;
 }
 
-async function publicTableExists(client: pg.PoolClient, table: string): Promise<boolean> {
+async function publicTableExists(client: pg.PoolClient | pg.Client, table: string): Promise<boolean> {
   if (!IDENTIFIER_PATTERN.test(table)) return false;
   const result = await client.query(
     "select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = $1 and c.relkind in ('r', 'p')",
@@ -249,10 +250,218 @@ function validateTableName(value: string | null): value is string {
   return typeof value === "string" && IDENTIFIER_PATTERN.test(value) && !PROTECTED_TABLES.has(value);
 }
 
-async function validateSqlTables(client: pg.PoolClient, tables: string[]) {
+async function validateSqlTables(client: pg.PoolClient | pg.Client, tables: string[]) {
   for (const table of tables) {
     if (!validateTableName(table)) throw new Error("SQL may target eligible public tables only.");
     if (!(await publicTableExists(client, table))) throw new Error(`Public table "${table}" does not exist.`);
+  }
+}
+
+async function getSavedProfileClient(profileId: string, passphrase: string): Promise<pg.Client> {
+  const profile = await loadUnlockedDatabaseConnectionProfile(profileId, passphrase);
+  const connectionString = parseSupabaseConnectionString(profile.connectionString);
+  const caCertificate = parseSupabaseCaCertificate(profile.caCertificate);
+  if (!connectionString || caCertificate === null) {
+    throw new Error("The saved database connection profile is invalid.");
+  }
+  const profileClient = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: true, ...(caCertificate ? { ca: caCertificate } : {}) },
+    connectionTimeoutMillis: 10000,
+    query_timeout: 10000,
+    statement_timeout: 15000,
+  });
+  await profileClient.connect();
+  return profileClient;
+}
+
+async function readSavedProfileDatabase(
+  body: Record<string, unknown>,
+  response: ApiResponse,
+) {
+  if (typeof body.profileId !== "string" || body.profileId.length > 100 ||
+    typeof body.passphrase !== "string" || body.passphrase.length > 256) {
+    respond(response, 400, { error: "Select a saved profile and unlock the connection vault first." });
+    return;
+  }
+
+  const profileClient = await getSavedProfileClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    await profileClient.query("begin read only");
+    transactionOpen = true;
+    if (body.action === "profile-catalog") {
+      const [tables, routines, triggers] = await Promise.all([
+        profileClient.query(
+        `select c.relname as name,
+                (select count(*)::integer from pg_catalog.pg_attribute a where a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped) as column_count,
+                coalesce(s.n_live_tup, 0)::bigint as estimated_rows
+         from pg_catalog.pg_class c
+         join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+         left join pg_catalog.pg_stat_user_tables s on s.relid = c.oid
+         where n.nspname = 'public' and c.relkind in ('r', 'p')
+           and c.relname <> all (array['daybook_data', 'daybook_state', 'credential_vault', 'database_connection_vault'])
+         order by c.relname`,
+        ),
+        profileClient.query(
+          `select p.oid::text as id,
+                  p.proname as name,
+                  pg_catalog.pg_get_function_identity_arguments(p.oid) as arguments,
+                  case p.prokind when 'p' then 'procedure' when 'a' then 'aggregate' else 'function' end as kind,
+                  pg_catalog.pg_get_functiondef(p.oid) as definition
+           from pg_catalog.pg_proc p
+           join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+           where n.nspname = 'public' and p.prokind in ('f', 'p')
+           order by p.proname`,
+        ),
+        profileClient.query(
+          `select t.tgname as name, c.relname as table_name,
+                  pg_catalog.pg_get_triggerdef(t.oid, true) as definition
+           from pg_catalog.pg_trigger t
+           join pg_catalog.pg_class c on c.oid = t.tgrelid
+           join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public' and not t.tgisinternal
+           order by c.relname, t.tgname`,
+        ),
+      ]);
+      await profileClient.query("commit");
+      transactionOpen = false;
+      respond(response, 200, {
+        tables: tables.rows,
+        routines: routines.rows,
+        triggers: triggers.rows,
+      });
+      return;
+    }
+
+    if (typeof body.table !== "string" || !validateTableName(body.table)) {
+      respond(response, 400, { error: "Choose a valid public table." });
+      return;
+    }
+    const table = body.table;
+    const exists = await profileClient.query(
+      "select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = $1 and c.relkind in ('r', 'p')",
+      [table],
+    );
+    if (exists.rowCount !== 1) {
+      respond(response, 404, { error: "That public table does not exist." });
+      return;
+    }
+
+    const requestedOffset = typeof body.offset === "number" ? body.offset : 0;
+    const offset = Number.isInteger(requestedOffset) ? Math.min(1000000, Math.max(0, requestedOffset)) : 0;
+    const primaryKeyResult = await profileClient.query(
+      `select a.attname as name
+       from pg_catalog.pg_constraint con
+       cross join lateral unnest(con.conkey) with ordinality as key_column(attnum, position)
+       join pg_catalog.pg_attribute a on a.attrelid = con.conrelid and a.attnum = key_column.attnum
+       where con.contype = 'p'
+         and con.conrelid = (select c.oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace where n.nspname = 'public' and c.relname = $1)
+       order by key_column.position`,
+      [table],
+    );
+    const primaryKey = primaryKeyResult.rows.map((row: { name: string }) => row.name);
+    const columns = await profileClient.query(
+      "select column_name, data_type, is_nullable from information_schema.columns where table_schema = 'public' and table_name = $1 order by ordinal_position",
+      [table],
+    );
+    const orderBy = primaryKey.length ? ` order by ${primaryKey.map(quoteIdentifier).join(", ")}` : "";
+    const result = await profileClient.query(
+      `select * from public.${quoteIdentifier(table)}${orderBy} limit $1 offset $2`,
+      [MAX_PAGE_SIZE + 1, offset],
+    );
+    await profileClient.query("commit");
+    transactionOpen = false;
+    respond(response, 200, {
+      table,
+      columns: columns.rows,
+      primaryKey,
+      rows: result.rows.slice(0, MAX_PAGE_SIZE),
+      hasMore: result.rows.length > MAX_PAGE_SIZE,
+      offset,
+    });
+  } finally {
+    if (transactionOpen) {
+      try {
+        await profileClient.query("rollback");
+      } catch {
+        console.error("Saved-profile read-only transaction rollback failed.");
+      }
+    }
+    try {
+      await profileClient.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Saved-profile database connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
+  }
+}
+
+async function runSavedProfileSql(body: Record<string, unknown>, response: ApiResponse) {
+  if (typeof body.profileId !== "string" || body.profileId.length > 100 ||
+    typeof body.passphrase !== "string" || body.passphrase.length > 256 ||
+    typeof body.sql !== "string") {
+    respond(response, 400, { error: "Select a saved profile, unlock the connection vault, and enter SQL." });
+    return;
+  }
+  const action = body.action;
+  if (action !== "profile-review-sql" && action !== "profile-execute-sql") {
+    respond(response, 400, { error: "Choose a supported saved-profile SQL action." });
+    return;
+  }
+
+  const sql = body.sql;
+  const statementHash = createHash("sha256").update(sql).digest("hex");
+  const inspection = inspectSqlStatement(sql);
+  const profileClient = await getSavedProfileClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    await validateSqlTables(profileClient, inspection.tables);
+    if (action === "profile-review-sql") {
+      respond(response, 200, {
+        command: inspection.command,
+        tables: inspection.tables,
+        requiresConfirmation: inspection.requiresConfirmation,
+        confirmationPhrase: inspection.requiresConfirmation ? sqlConfirmationPhrase(inspection.command) : "",
+        statementHash,
+      });
+      return;
+    }
+    if (body.statementHash !== statementHash) {
+      respond(response, 409, { error: "This SQL differs from the reviewed statement. Review it again before execution." });
+      return;
+    }
+    if (inspection.requiresConfirmation && body.confirmation !== sqlConfirmationPhrase(inspection.command)) {
+      respond(response, 400, { error: `Type "${sqlConfirmationPhrase(inspection.command)}" to confirm this database change.` });
+      return;
+    }
+    await profileClient.query(inspection.requiresConfirmation ? "begin" : "begin read only");
+    transactionOpen = true;
+    const result = await profileClient.query(sql);
+    await profileClient.query("commit");
+    transactionOpen = false;
+    respond(response, 200, {
+      command: inspection.command,
+      rowCount: result.rowCount ?? result.rows.length,
+      fields: result.fields.map((field) => field.name),
+      rows: result.rows.slice(0, 100),
+    });
+  } finally {
+    if (transactionOpen) {
+      try {
+        await profileClient.query("rollback");
+      } catch {
+        console.error("Saved-profile SQL transaction rollback failed.");
+      }
+    }
+    try {
+      await profileClient.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Saved-profile SQL connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
   }
 }
 
@@ -276,8 +485,18 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
     if (request.method === "POST") {
       const body = requestBody(request);
       if (!isRecord(body) ||
-        (body.action !== "review-sql" && body.action !== "execute-sql" && body.action !== "test-connection")) {
-        respond(response, 400, { error: "Choose a supported SQL console action." });
+        (body.action !== "review-sql" && body.action !== "execute-sql" && body.action !== "test-connection" &&
+          body.action !== "profile-catalog" && body.action !== "profile-rows" &&
+          body.action !== "profile-review-sql" && body.action !== "profile-execute-sql")) {
+        respond(response, 400, { error: "Choose a supported database action." });
+        return;
+      }
+      if (body.action === "profile-catalog" || body.action === "profile-rows") {
+        await readSavedProfileDatabase(body, response);
+        return;
+      }
+      if (body.action === "profile-review-sql" || body.action === "profile-execute-sql") {
+        await runSavedProfileSql(body, response);
         return;
       }
       if (body.action === "test-connection") {

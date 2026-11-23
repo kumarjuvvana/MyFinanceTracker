@@ -1,8 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Database, Eye, EyeOff, KeyRound, LockKeyhole, Pencil, Trash2 } from "lucide-react";
-import { Badge, Button, Card, EmptyState, Field, Input } from "./ui";
+import { Badge, Button, Card, EmptyState, Field, Input, Select } from "./ui";
 import { createId } from "../lib/data";
-import { testSupabaseConnection } from "../lib/databaseApi";
+import {
+  loadSavedProfileDatabaseCatalog,
+  loadSavedProfileDatabaseRows,
+  testSupabaseConnection,
+  type DatabaseRows,
+  type DatabaseTable,
+} from "../lib/databaseApi";
 import { loadDatabaseConnectionVault, saveDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import {
   decryptDatabaseConnectionProfiles,
@@ -14,6 +20,14 @@ import type { EncryptedVault } from "../types";
 
 function moduleNames(value: string): string[] {
   return [...new Set(value.split(",").map((module) => module.trim()).filter(Boolean))];
+}
+
+function formatDatabaseValue(value: unknown): string {
+  if (value === null) return "null";
+  if (typeof value === "undefined") return "undefined";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return JSON.stringify(value, null, 2) ?? String(value);
+  return String(value);
 }
 
 export function DatabaseConnectionsPage() {
@@ -33,6 +47,12 @@ export function DatabaseConnectionsPage() {
   const [caCertificate, setCaCertificate] = useState("");
   const [showConnectionString, setShowConnectionString] = useState(true);
   const [testedFingerprint, setTestedFingerprint] = useState("");
+  const [browsingProfileId, setBrowsingProfileId] = useState("");
+  const [profileTables, setProfileTables] = useState<DatabaseTable[]>([]);
+  const [selectedProfileTable, setSelectedProfileTable] = useState("");
+  const [profileRows, setProfileRows] = useState<DatabaseRows | null>(null);
+  const [profileBrowseBusy, setProfileBrowseBusy] = useState(false);
+  const [profileBrowseError, setProfileBrowseError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -158,6 +178,11 @@ export function DatabaseConnectionsPage() {
     try {
       const nextProfiles = profiles.filter((entry) => entry.id !== profile.id);
       await persistProfiles(nextProfiles, `Removed "${profile.name}" from the shared vault. No database records were changed. Download the encrypted local config if you need an updated local copy.`);
+      if (browsingProfileId === profile.id) {
+        setBrowsingProfileId("");
+        setProfileTables([]);
+        setProfileRows(null);
+      }
       if (profileId === profile.id) resetEditor();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not remove the connection profile.");
@@ -182,9 +207,49 @@ export function DatabaseConnectionsPage() {
     setProfiles(null);
     setPassphrase("");
     setConfirmPassphrase("");
+    setBrowsingProfileId("");
+    setProfileTables([]);
+    setProfileRows(null);
     resetEditor();
     setError("");
     setNotice("");
+  }
+
+  async function browseProfile(profile: DatabaseConnectionProfile) {
+    setBrowsingProfileId(profile.id);
+    setProfileTables([]);
+    setSelectedProfileTable("");
+    setProfileRows(null);
+    setProfileBrowseError("");
+    setProfileBrowseBusy(true);
+    try {
+      const catalog = await loadSavedProfileDatabaseCatalog(profile.id, passphrase);
+      setProfileTables(catalog.tables);
+      const firstTable = catalog.tables[0]?.name ?? "";
+      setSelectedProfileTable(firstTable);
+      if (firstTable) {
+        setProfileRows(await loadSavedProfileDatabaseRows(profile.id, passphrase, firstTable, 0));
+      }
+    } catch (caught) {
+      setProfileBrowseError(caught instanceof Error ? caught.message : "Could not read tables from this profile.");
+    } finally {
+      setProfileBrowseBusy(false);
+    }
+  }
+
+  async function readProfileTable(table: string, offset: number) {
+    if (!browsingProfileId) return;
+    setSelectedProfileTable(table);
+    setProfileRows(null);
+    setProfileBrowseError("");
+    setProfileBrowseBusy(true);
+    try {
+      setProfileRows(await loadSavedProfileDatabaseRows(browsingProfileId, passphrase, table, offset));
+    } catch (caught) {
+      setProfileBrowseError(caught instanceof Error ? caught.message : "Could not read this database table.");
+    } finally {
+      setProfileBrowseBusy(false);
+    }
   }
 
   function downloadLocalConfig() {
@@ -204,7 +269,7 @@ export function DatabaseConnectionsPage() {
 
   return <>
     <div className="page-head"><div><p className="eyebrow">Data & tools</p><h1 className="page-title">Database connections</h1><p className="page-subtitle">Save encrypted connection profiles and map them to modules for later integration.</p></div></div>
-    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>Connections and module assignments configured here do not change which database existing modules use. No module data is moved, overwritten, or deleted. To enable a module mapping later, implement that integration separately. The app still needs its existing server settings to access this profile store.</span></div>
+    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>These assignments do not change existing modules or move, overwrite, or delete their data. Database manager can connect to a saved profile directly; other modules need their own integration before using a profile. The app still needs its existing server settings to access this shared profile store.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     {loading
@@ -230,14 +295,29 @@ export function DatabaseConnectionsPage() {
               <div className="full connector-actions"><Button type="submit" disabled={busy}>{busy ? "Testing..." : "Test connection"}</Button><Button type="button" variant="outline" disabled={busy || testedFingerprint !== currentFingerprint} onClick={() => void saveProfile()}>{busy ? "Saving..." : profileId ? "Save profile changes" : "Save encrypted profile"}</Button>{profileId && <Button type="button" variant="ghost" disabled={busy} onClick={resetEditor}>Cancel edit</Button>}</div>
             </form>
           </Card>
-          <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Saved connection profiles</h2><p className="section-description">Assignments are labels for future integration; this screen does not route module data.</p></div><Badge>{profiles.length}</Badge></div>
+          <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Saved connection profiles</h2><p className="section-description">Assignments remain labels for other modules. Use Read tables to browse this database without changing any data.</p></div><Badge>{profiles.length}</Badge></div>
             {profiles.length
               ? <div className="database-connection-list">{profiles.map((profile) => <div className="database-connection-row" key={profile.id}>
                 <div><strong>{profile.name}</strong><p>{profile.modules.length ? profile.modules.join(" · ") : "No modules assigned"}</p></div>
-                <div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${profile.name}`} title="Edit profile" disabled={busy} onClick={() => editProfile(profile)}><Pencil size={14} /></button><button type="button" className="icon-button" aria-label={`Remove ${profile.name}`} title="Remove profile without deleting database records" disabled={busy} onClick={() => void removeProfile(profile)}><Trash2 size={14} /></button></div>
+                <div className="table-actions"><Button type="button" size="sm" variant="outline" disabled={busy || profileBrowseBusy} onClick={() => void browseProfile(profile)}>{profileBrowseBusy && browsingProfileId === profile.id ? "Reading..." : "Read tables"}</Button><button type="button" className="icon-button" aria-label={`Edit ${profile.name}`} title="Edit profile" disabled={busy || profileBrowseBusy} onClick={() => editProfile(profile)}><Pencil size={14} /></button><button type="button" className="icon-button" aria-label={`Remove ${profile.name}`} title="Remove profile without deleting database records" disabled={busy || profileBrowseBusy} onClick={() => void removeProfile(profile)}><Trash2 size={14} /></button></div>
               </div>)}</div>
               : <EmptyState icon={<KeyRound size={18} />} title="No saved profiles" description="Test a connection above, assign module names, and save the first encrypted profile." />}
           </Card>
+          {browsingProfileId && <Card className="database-browser"><div className="card-head"><div><h2 className="section-title">Read-only database browser</h2><p className="section-description">{profiles.find((profile) => profile.id === browsingProfileId)?.name ?? "Saved profile"} · public tables · up to 50 rows per page · passphrase is used only for this authenticated request</p></div><Badge tone="blue">Read only</Badge></div>
+            {profileBrowseError && <div className="alert alert-error" role="alert">{profileBrowseError}</div>}
+            {profileBrowseBusy && !profileTables.length && <p className="section-description">Connecting and loading tables...</p>}
+            {!profileBrowseBusy && profileTables.length === 0 && !profileBrowseError && <EmptyState icon={<Database size={18} />} title="No public tables found" description="The connection succeeded, but this database has no public tables to display." />}
+            {profileTables.length > 0 && <>
+              <div className="database-table-select"><Field label="Public table"><Select value={selectedProfileTable} onChange={(event) => void readProfileTable(event.target.value, 0)}>{profileTables.map((table) => <option value={table.name} key={table.name}>{table.name} · ~{table.estimated_rows} rows · {table.column_count} columns</option>)}</Select></Field><Badge>{profileTables.length} tables</Badge></div>
+              {profileRows && <><div className="database-column-list"><strong>Columns</strong>{profileRows.columns.map((column) => <Badge key={column.column_name}>{column.column_name} · {column.data_type}{profileRows.primaryKey.includes(column.column_name) ? " · PK" : ""}</Badge>)}</div>
+                <div className="database-row-list">{profileRows.rows.map((row, index) => {
+                  const key = JSON.stringify(profileRows.primaryKey.map((column) => row[column]));
+                  return <article className="database-row" key={key || index}><div className="database-row-head"><strong>{profileRows.primaryKey.map((column) => `${column}=${formatDatabaseValue(row[column])}`).join(", ") || `Row ${profileRows.offset + index + 1}`}</strong></div><div className="database-fields">{profileRows.columns.map((column) => <div key={column.column_name}><span>{column.column_name}</span><pre>{formatDatabaseValue(row[column.column_name])}</pre></div>)}</div></article>;
+                })}{!profileRows.rows.length && <EmptyState icon={<Database size={18} />} title="No rows in this table" description="This table is currently empty." />}</div>
+                <div className="database-pagination"><span>Rows {profileRows.offset + 1}–{profileRows.offset + profileRows.rows.length}</span><div><Button type="button" variant="outline" size="sm" disabled={profileBrowseBusy || profileRows.offset === 0} onClick={() => void readProfileTable(profileRows.table, Math.max(0, profileRows.offset - 50))}>Previous</Button><Button type="button" variant="outline" size="sm" disabled={profileBrowseBusy || !profileRows.hasMore} onClick={() => void readProfileTable(profileRows.table, profileRows.offset + 50)}>Next</Button></div></div>
+              </>}
+            </>}
+          </Card>}
         </div>}
   </>;
 }

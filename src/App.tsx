@@ -14,12 +14,15 @@ import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInvento
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
-import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
+import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
+import { loadDatabaseConnectionVault } from "./lib/databaseConnectionsApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
+import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "./lib/databaseConnectionProfiles";
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
+import type { EncryptedVault } from "./types";
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { DESIGN_THEMES, type DesignTheme } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
@@ -9935,7 +9938,7 @@ function HostingStoragePage() {
   const [deploymentUsage, setDeploymentUsage] = useState<DeploymentUsage | null>(null);
   const [cloudError, setCloudError] = useState("");
   const [deploymentError, setDeploymentError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function refreshUsage() {
     setLoading(true);
@@ -9991,10 +9994,17 @@ function DatabaseManagerPage() {
   const [rows, setRows] = useState<DatabaseRows | null>(null);
   const [selectedTable, setSelectedTable] = useState("");
   const [view, setView] = useState<"tables" | "routines" | "triggers" | "sql">("tables");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [vaultLoading, setVaultLoading] = useState(true);
+  const [savedVault, setSavedVault] = useState<EncryptedVault | null>(null);
+  const [savedProfiles, setSavedProfiles] = useState<DatabaseConnectionProfile[] | null>(null);
+  const [vaultPassphrase, setVaultPassphrase] = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [connectedProfileId, setConnectedProfileId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [vaultError, setVaultError] = useState("");
   const [sqlStatement, setSqlStatement] = useState("");
   const [sqlReview, setSqlReview] = useState<SqlReview | null>(null);
   const [sqlReviewedText, setSqlReviewedText] = useState("");
@@ -10002,13 +10012,20 @@ function DatabaseManagerPage() {
   const [sqlWriteAcknowledged, setSqlWriteAcknowledged] = useState(false);
   const [sqlResult, setSqlResult] = useState<SqlExecutionResult | null>(null);
 
-  async function refreshCatalog() {
+  async function refreshCatalog(profileId = connectedProfileId, passphrase = vaultPassphrase) {
     setLoading(true);
     setError("");
     try {
-      const next = await loadDatabaseCatalog();
+      const next = profileId
+        ? await loadSavedProfileDatabaseCatalog(profileId, passphrase)
+        : await loadDatabaseCatalog();
       setCatalog(next);
-      if (!selectedTable && next.tables.length) setSelectedTable(next.tables[0].name);
+      setConnectedProfileId(profileId);
+      setRows(null);
+      setSelectedTable(next.tables[0]?.name ?? "");
+      setNotice(profileId
+        ? `Connected to ${savedProfiles?.find((profile) => profile.id === profileId)?.name ?? "the saved database"} using its saved profile.`
+        : "Connected using the configured database settings.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load database objects.");
     } finally {
@@ -10020,7 +10037,9 @@ function DatabaseManagerPage() {
     setBusy(true);
     setError("");
     try {
-      setRows(await loadDatabaseRows(table, offset));
+      setRows(connectedProfileId
+        ? await loadSavedProfileDatabaseRows(connectedProfileId, vaultPassphrase, table, offset)
+        : await loadDatabaseRows(table, offset));
       setSelectedTable(table);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load table records.");
@@ -10035,7 +10054,9 @@ function DatabaseManagerPage() {
     setNotice("");
     setSqlResult(null);
     try {
-      const review = await reviewDatabaseSql(sqlStatement);
+      const review = connectedProfileId
+        ? await reviewSavedProfileDatabaseSql(connectedProfileId, vaultPassphrase, sqlStatement)
+        : await reviewDatabaseSql(sqlStatement);
       setSqlReview(review);
       setSqlReviewedText(sqlStatement);
       setSqlConfirmation("");
@@ -10057,11 +10078,19 @@ function DatabaseManagerPage() {
     setBusy(true);
     setError("");
     try {
-      const result = await executeDatabaseSql(
-        sqlReviewedText,
-        sqlReview.requiresConfirmation ? sqlConfirmation : "",
-        sqlReview.statementHash,
-      );
+      const result = connectedProfileId
+        ? await executeSavedProfileDatabaseSql(
+          connectedProfileId,
+          vaultPassphrase,
+          sqlReviewedText,
+          sqlReview.requiresConfirmation ? sqlConfirmation : "",
+          sqlReview.statementHash,
+        )
+        : await executeDatabaseSql(
+          sqlReviewedText,
+          sqlReview.requiresConfirmation ? sqlConfirmation : "",
+          sqlReview.statementHash,
+        );
       setSqlResult(result);
       setSqlReview(null);
       setSqlReviewedText("");
@@ -10082,22 +10111,83 @@ function DatabaseManagerPage() {
   }
 
   useEffect(() => {
-    void refreshCatalog();
+    let active = true;
+    void loadDatabaseConnectionVault()
+      .then((vault) => {
+        if (active) setSavedVault(vault);
+      })
+      .catch((caught: unknown) => {
+        if (active) setVaultError(caught instanceof Error ? caught.message : "Could not load saved database connections.");
+      })
+      .finally(() => {
+        if (active) setVaultLoading(false);
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
     if (selectedTable && view === "tables" && !rows) void refreshRows(selectedTable);
   }, [selectedTable, view, rows]);
 
+  async function unlockSavedProfiles() {
+    setVaultError("");
+    setError("");
+    if (!savedVault) {
+      setVaultError("No saved connection vault was found. Create and save a profile in Database connections first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const profiles = await decryptDatabaseConnectionProfiles(savedVault, vaultPassphrase);
+      setSavedProfiles(profiles);
+      setSelectedProfileId(profiles[0]?.id ?? "");
+      setNotice(profiles.length ? "Connection vault unlocked for this database manager session." : "The connection vault has no saved profiles yet.");
+    } catch (caught) {
+      setVaultError(caught instanceof Error ? caught.message : "Could not unlock saved database profiles.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function lockSavedProfiles() {
+    setSavedProfiles(null);
+    setVaultPassphrase("");
+    setSelectedProfileId("");
+    setConnectedProfileId("");
+    setCatalog(null);
+    setRows(null);
+    setSelectedTable("");
+    setError("");
+    setNotice("Saved database profiles are locked.");
+  }
+
   return <>
-    <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Inspect database objects and run reviewed SQL against eligible public tables." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy}><RefreshCw size={14} />Refresh</Button>} />
+    <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Inspect a saved database profile or the configured database. Reads and reviewed SQL writes connect at request time." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy || !catalog}><RefreshCw size={14} />Refresh</Button>} />
     <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>SQL console accepts one SELECT, INSERT, UPDATE, or DELETE statement. DDL, transactions, protected core tables, functions, subqueries, multi-statement scripts, and unbounded SELECTs are blocked. Every write needs a typed confirmation; writes are permanent, bypass the archive, and database triggers or foreign-key cascades may affect linked data. The confirmation helps prevent mistakes; it is not separate authorization. Anyone with the shared Daybook password can use this screen.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Database connection source</h2><p className="section-description">A saved profile connects without setting SUPABASE_DB_URL in Vercel. The passphrase is sent only with authenticated database requests and is not stored by the app.</p></div><Database size={16} /></div>
+      {vaultLoading
+        ? <p className="section-description">Loading shared connection vault...</p>
+        : savedProfiles === null
+          ? <form className="connector-form" onSubmit={(event) => { event.preventDefault(); void unlockSavedProfiles(); }}>
+            <Field className="full" label="Connection vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={vaultPassphrase} onChange={(event) => setVaultPassphrase(event.target.value)} /></Field>
+            <div className="full connector-actions"><Button type="submit" disabled={busy || !savedVault}>{busy ? "Unlocking..." : "Unlock saved profiles"}</Button><Button type="button" variant="outline" disabled={loading || busy} onClick={() => void refreshCatalog("", "")}>Use configured database settings</Button></div>
+            {vaultError && <div className="alert alert-error full" role="alert">{vaultError}</div>}
+            {!savedVault && !vaultError && <p className="section-description full">No shared connection vault is saved yet. You can still use the existing configured database.</p>}
+          </form>
+          : <div className="connector-form">
+            {savedProfiles.length
+              ? <Field className="full" label="Saved database profile"><Select value={selectedProfileId} onChange={(event) => setSelectedProfileId(event.target.value)}>{savedProfiles.map((profile) => <option value={profile.id} key={profile.id}>{profile.name}{profile.modules.length ? ` · ${profile.modules.join(", ")}` : ""}</option>)}</Select></Field>
+              : <p className="section-description full">No profiles are saved in this vault yet.</p>}
+            <div className="full connector-actions"><Button type="button" disabled={busy || loading || !selectedProfileId} onClick={() => void refreshCatalog(selectedProfileId, vaultPassphrase)}>{loading ? "Connecting..." : "Connect selected profile"}</Button><Button type="button" variant="outline" disabled={busy || loading} onClick={() => void refreshCatalog("", "")}>Use configured database settings</Button><Button type="button" variant="ghost" disabled={busy || loading} onClick={lockSavedProfiles}><LockKeyhole size={14} />Lock vault</Button></div>
+            {vaultError && <div className="alert alert-error full" role="alert">{vaultError}</div>}
+          </div>}
+    </Card>
     <div className="database-tabs" role="tablist" aria-label="Database tools">
       {(["tables", "routines", "triggers", "sql"] as const).map((tab) => <Button key={tab} variant={view === tab ? "primary" : "outline"} role="tab" aria-selected={view === tab} onClick={() => setView(tab)}>{tab === "tables" ? "Tables & rows" : tab === "routines" ? "Functions & procedures" : tab === "triggers" ? "Triggers" : "SQL console"}</Button>)}
     </div>
-    {loading && !catalog ? <Card><p className="section-description">Loading database objects...</p></Card> : catalog && view === "tables" && <>
+    {loading && !catalog ? <Card><p className="section-description">Connecting and loading database objects...</p></Card> : !catalog && !loading ? <Card><EmptyState icon={<Database size={18} />} title="Connect a database to begin" description="Unlock the saved connection vault, choose a profile, and connect. Alternatively, use the existing configured database settings." /></Card> : catalog && view === "tables" && <>
       <Card className="database-browser"><div className="database-table-select"><Field label="Public table"><Select value={selectedTable} onChange={(event) => { setRows(null); setSelectedTable(event.target.value); }}>{catalog.tables.map((table) => <option value={table.name} key={table.name}>{table.name} · ~{table.estimated_rows} rows · {table.column_count} columns</option>)}</Select></Field><Badge>{catalog.tables.length} tables</Badge></div>
         {rows && <><div className="database-column-list"><strong>Columns</strong>{rows.columns.map((column) => <Badge key={column.column_name}>{column.column_name} · {column.data_type}{rows.primaryKey.includes(column.column_name) ? " · PK" : ""}</Badge>)}</div>
           <div className="database-row-list">{rows.rows.map((row, index) => {
