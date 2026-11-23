@@ -102,8 +102,12 @@ export async function executeDatabaseSql(sql: string, confirmation: string, stat
   return await (await request("/api/database", { action: "execute-sql", sql, confirmation, statementHash })).json() as SqlExecutionResult;
 }
 
-export async function testSupabaseConnection(connectionString: string): Promise<DatabaseConnectionTestResult> {
-  const payload: unknown = await (await request("/api/database", { action: "test-connection", connectionString })).json();
+export async function testSupabaseConnection(connectionString: string, caCertificate?: string): Promise<DatabaseConnectionTestResult> {
+  const payload: unknown = await (await request("/api/database", {
+    action: "test-connection",
+    connectionString,
+    ...(caCertificate ? { caCertificate } : {}),
+  })).json();
   if (typeof payload !== "object" || payload === null || !("connected" in payload) ||
     payload.connected !== true || !("database" in payload) || typeof payload.database !== "string") {
     throw new Error("The server returned an invalid Supabase connection test result.");

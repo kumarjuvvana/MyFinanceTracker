@@ -63,6 +63,16 @@ function parseSupabaseConnectionString(value: unknown): string | null {
   }
 }
 
+function parseSupabaseCaCertificate(value: unknown): string | null | undefined {
+  if (value === undefined || (typeof value === "string" && !value.trim())) return undefined;
+  if (typeof value !== "string" || value.length > 20000) return null;
+  const certificate = value.trim();
+  return certificate.startsWith("-----BEGIN CERTIFICATE-----") &&
+    certificate.endsWith("-----END CERTIFICATE-----")
+    ? certificate
+    : null;
+}
+
 function connectionTestFailureMessage(error: unknown): string {
   const code = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
     ? error.code
@@ -76,15 +86,17 @@ function connectionTestFailureMessage(error: unknown): string {
         ? "The Supabase database host could not be resolved."
         : safeCode === "ETIMEDOUT" || safeCode === "ECONNREFUSED"
           ? "Could not reach the Supabase database endpoint."
+          : safeCode === "SELF_SIGNED_CERT_IN_CHAIN" || safeCode === "UNABLE_TO_VERIFY_LEAF_SIGNATURE"
+            ? "The database certificate is not trusted. Add the CA certificate downloaded from this Supabase project's SSL settings and try again."
           : "The connection could not be completed. Check the Supabase connection details.";
   console.error("Supabase connection test failed:", safeCode);
   return `${hint} (code: ${safeCode})`;
 }
 
-async function testSupabaseConnection(connectionString: string, response: ApiResponse) {
+async function testSupabaseConnection(connectionString: string, caCertificate: string | undefined, response: ApiResponse) {
   const client = new Client({
     connectionString,
-    ssl: { rejectUnauthorized: true },
+    ssl: { rejectUnauthorized: true, ...(caCertificate ? { ca: caCertificate } : {}) },
     connectionTimeoutMillis: 10000,
     query_timeout: 10000,
   });
@@ -270,13 +282,18 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       }
       if (body.action === "test-connection") {
         const connectionString = parseSupabaseConnectionString(body.connectionString);
+        const caCertificate = parseSupabaseCaCertificate(body.caCertificate);
         if (!connectionString) {
           respond(response, 400, {
             error: "Enter a valid Supabase PostgreSQL connection URI using a Supabase direct or pooler host.",
           });
           return;
         }
-        await testSupabaseConnection(connectionString, response);
+        if (caCertificate === null) {
+          respond(response, 400, { error: "The optional CA certificate must be a PEM certificate." });
+          return;
+        }
+        await testSupabaseConnection(connectionString, caCertificate, response);
         return;
       }
       if (typeof body.sql !== "string") {

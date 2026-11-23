@@ -14807,6 +14807,8 @@ function TestConnectors({ accounts, onImport }: {
   const [passwordError, setPasswordError] = useState("");
   const [passwordValid, setPasswordValid] = useState(false);
   const [supabaseConnectionString, setSupabaseConnectionString] = useState("");
+  const [showSupabaseConnectionString, setShowSupabaseConnectionString] = useState(false);
+  const [supabaseCaCertificate, setSupabaseCaCertificate] = useState("");
   const [connectionTestBusy, setConnectionTestBusy] = useState(false);
   const [connectionTestError, setConnectionTestError] = useState("");
   const [connectionTestNotice, setConnectionTestNotice] = useState("");
@@ -15149,12 +15151,14 @@ function TestConnectors({ accounts, onImport }: {
     setConnectionTestError("");
     setConnectionTestNotice("");
     try {
-      const result = await testSupabaseConnection(supabaseConnectionString.trim());
+      const result = await testSupabaseConnection(supabaseConnectionString.trim(), supabaseCaCertificate.trim());
       setConnectionTestNotice(`Connected successfully to the "${result.database}" database. The connection string was not saved.`);
     } catch (caught) {
       setConnectionTestError(caught instanceof Error ? caught.message : "Could not test the Supabase connection.");
     } finally {
       setSupabaseConnectionString("");
+      setSupabaseCaCertificate("");
+      setShowSupabaseConnectionString(false);
       setConnectionTestBusy(false);
     }
   }
@@ -15213,7 +15217,8 @@ function TestConnectors({ accounts, onImport }: {
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Supabase database connection test</h2><p className="section-description">Test a Supabase PostgreSQL connection without changing the app’s current database settings.</p></div><Badge tone="neutral">Test only · not saved</Badge></div>
       <div className="alert"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>Paste the PostgreSQL URI from Supabase’s Connect dialog. It is sent to the authenticated server API for one connection test, is not saved or returned, and is cleared from this form afterward. Use this screen only on a trusted device.</span></div>
       <form className="connector-form" onSubmit={(event) => void testSupabaseDatabaseConnection(event)}>
-        <Field className="full" label="Supabase PostgreSQL connection URI"><Input type="password" autoComplete="new-password" maxLength={2000} required placeholder="postgresql://user:password@host:5432/database" value={supabaseConnectionString} onChange={(event) => { setSupabaseConnectionString(event.target.value); setConnectionTestError(""); setConnectionTestNotice(""); }} /></Field>
+        <Field className="full" label="Supabase PostgreSQL connection URI"><div className="credential-secret-field"><Input type={showSupabaseConnectionString ? "text" : "password"} autoComplete="new-password" maxLength={2000} required placeholder="postgresql://user:password@host:5432/database" value={supabaseConnectionString} onChange={(event) => { setSupabaseConnectionString(event.target.value); setConnectionTestError(""); setConnectionTestNotice(""); }} /><button type="button" className="icon-button" aria-label={showSupabaseConnectionString ? "Hide connection URI" : "Show connection URI"} title={showSupabaseConnectionString ? "Hide connection URI" : "Show connection URI"} onClick={() => setShowSupabaseConnectionString((visible) => !visible)}>{showSupabaseConnectionString ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></Field>
+        <Field className="full" label="Optional Supabase database CA certificate (PEM)"><textarea className="field textarea" rows={3} maxLength={20000} autoComplete="off" placeholder="Paste the certificate from Supabase → Database → Settings → SSL Configuration only if certificate verification fails." value={supabaseCaCertificate} onChange={(event) => { setSupabaseCaCertificate(event.target.value); setConnectionTestError(""); setConnectionTestNotice(""); }} /></Field>
         {connectionTestError && <div className="alert alert-error full" role="alert">{connectionTestError}</div>}
         {connectionTestNotice && <div className="alert alert-success full" role="status">{connectionTestNotice}</div>}
         <div className="full"><Button type="submit" disabled={connectionTestBusy}>{connectionTestBusy ? "Testing connection..." : "Test Supabase connection"}</Button></div>
