@@ -54,6 +54,11 @@ export interface SqlExecutionResult {
   rows: Record<string, unknown>[];
 }
 
+export interface DatabaseConnectionTestResult {
+  connected: true;
+  database: string;
+}
+
 async function request(path: string, body?: Record<string, unknown>): Promise<Response> {
   const response = await fetch(path, {
     method: body ? "POST" : "GET",
@@ -95,4 +100,27 @@ export async function reviewDatabaseSql(sql: string): Promise<SqlReview> {
 
 export async function executeDatabaseSql(sql: string, confirmation: string, statementHash: string): Promise<SqlExecutionResult> {
   return await (await request("/api/database", { action: "execute-sql", sql, confirmation, statementHash })).json() as SqlExecutionResult;
+}
+
+export async function testSupabaseConnection(connectionString: string): Promise<DatabaseConnectionTestResult> {
+  const response = await fetch("/api/database-connection-test", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionString }),
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  const payload: unknown = await response.json();
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload !== null && "error" in payload &&
+      typeof payload.error === "string"
+      ? payload.error
+      : `Supabase connection test failed (${response.status}).`;
+    throw new Error(message);
+  }
+  if (typeof payload !== "object" || payload === null || !("connected" in payload) ||
+    payload.connected !== true || !("database" in payload) || typeof payload.database !== "string") {
+    throw new Error("The server returned an invalid Supabase connection test result.");
+  }
+  return { connected: true, database: payload.database };
 }

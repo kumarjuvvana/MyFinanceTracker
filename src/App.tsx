@@ -14,7 +14,7 @@ import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInvento
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
-import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
+import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
@@ -14806,6 +14806,10 @@ function TestConnectors({ accounts, onImport }: {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordValid, setPasswordValid] = useState(false);
+  const [supabaseConnectionString, setSupabaseConnectionString] = useState("");
+  const [connectionTestBusy, setConnectionTestBusy] = useState(false);
+  const [connectionTestError, setConnectionTestError] = useState("");
+  const [connectionTestNotice, setConnectionTestNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -15139,6 +15143,22 @@ function TestConnectors({ accounts, onImport }: {
     }
   }
 
+  async function testSupabaseDatabaseConnection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setConnectionTestBusy(true);
+    setConnectionTestError("");
+    setConnectionTestNotice("");
+    try {
+      const result = await testSupabaseConnection(supabaseConnectionString.trim());
+      setConnectionTestNotice(`Connected successfully to the "${result.database}" database. The connection string was not saved.`);
+    } catch (caught) {
+      setConnectionTestError(caught instanceof Error ? caught.message : "Could not test the Supabase connection.");
+    } finally {
+      setSupabaseConnectionString("");
+      setConnectionTestBusy(false);
+    }
+  }
+
   async function sendTestEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSendError("");
@@ -15188,6 +15208,15 @@ function TestConnectors({ accounts, onImport }: {
         {passwordError && <div className="alert alert-error full" role="alert">{passwordError}</div>}
         {passwordValid && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No new session was created and no Daybook data was accessed.</div>}
         <div className="full"><Button type="submit" disabled={passwordBusy}>{passwordBusy ? "Checking..." : "Validate password"}</Button></div>
+      </form>
+    </Card>
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Supabase database connection test</h2><p className="section-description">Test a Supabase PostgreSQL connection without changing the app’s current database settings.</p></div><Badge tone="neutral">Test only · not saved</Badge></div>
+      <div className="alert"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>Paste the PostgreSQL URI from Supabase’s Connect dialog. It is sent to the authenticated server API for one connection test, is not saved or returned, and is cleared from this form afterward. Use this screen only on a trusted device.</span></div>
+      <form className="connector-form" onSubmit={(event) => void testSupabaseDatabaseConnection(event)}>
+        <Field className="full" label="Supabase PostgreSQL connection URI"><Input type="password" autoComplete="new-password" maxLength={2000} required placeholder="postgresql://user:password@host:5432/database" value={supabaseConnectionString} onChange={(event) => { setSupabaseConnectionString(event.target.value); setConnectionTestError(""); setConnectionTestNotice(""); }} /></Field>
+        {connectionTestError && <div className="alert alert-error full" role="alert">{connectionTestError}</div>}
+        {connectionTestNotice && <div className="alert alert-success full" role="status">{connectionTestNotice}</div>}
+        <div className="full"><Button type="submit" disabled={connectionTestBusy}>{connectionTestBusy ? "Testing connection..." : "Test Supabase connection"}</Button></div>
       </form>
     </Card>
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Gmail connection</h2><p className="section-description">Connect Gmail to send a test email or search for bank transaction alerts.</p></div><Badge tone={session ? "green" : "neutral"}>{session ? `Connected: ${session.email}` : "Not connected"}</Badge></div>
