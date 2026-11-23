@@ -6,6 +6,19 @@ import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
 
 const { Client, Pool } = pg;
 const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault", "database_connection_vault"]);
+const VEHICLE_PROFILE_TABLES = [
+  "vehicles",
+  "alerts",
+  "certificates",
+  "expenses",
+  "fuel_consumptions",
+  "insurance_policies",
+  "monthly_targets",
+  "odometer_logs",
+  "services",
+  "travel_logs",
+] as const;
+const MAX_VEHICLE_PROFILE_ROWS = 1000;
 const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/i;
 const MAX_PAGE_SIZE = 50;
 
@@ -191,7 +204,7 @@ async function publicTableExists(client: pg.PoolClient | pg.Client, table: strin
   return result.rowCount === 1;
 }
 
-async function getPrimaryKey(client: pg.PoolClient, table: string): Promise<string[]> {
+async function getPrimaryKey(client: pg.PoolClient | pg.Client, table: string): Promise<string[]> {
   const result = await client.query(
     `select a.attname as name
      from pg_catalog.pg_constraint con
@@ -248,6 +261,196 @@ async function loadCatalog(client: pg.PoolClient) {
 
 function validateTableName(value: string | null): value is string {
   return typeof value === "string" && IDENTIFIER_PATTERN.test(value) && !PROTECTED_TABLES.has(value);
+}
+
+function validProfileCredentials(body: Record<string, unknown>): body is Record<string, unknown> & {
+  profileId: string;
+  passphrase: string;
+} {
+  return typeof body.profileId === "string" && body.profileId.length > 0 && body.profileId.length <= 100 &&
+    typeof body.passphrase === "string" && body.passphrase.length >= 16 && body.passphrase.length <= 256;
+}
+
+async function readSavedProfileVehicleModule(body: Record<string, unknown>, response: ApiResponse) {
+  if (!validProfileCredentials(body)) {
+    respond(response, 400, { error: "Unlock the saved database profile to load the Vehicles module." });
+    return;
+  }
+  const profileClient = await getSavedProfileClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    await profileClient.query("begin read only");
+    transactionOpen = true;
+    const tables = [];
+    for (const table of VEHICLE_PROFILE_TABLES) {
+      const exists = await publicTableExists(profileClient, table);
+      if (!exists) throw new Error(`The assigned profile is missing the required public table "${table}".`);
+      const [columns, primaryKey, count, result] = await Promise.all([
+        profileClient.query(
+          `select column_name, data_type, udt_name, is_nullable, column_default
+           from information_schema.columns
+           where table_schema = 'public' and table_name = $1
+           order by ordinal_position`,
+          [table],
+        ),
+        getPrimaryKey(profileClient, table),
+        profileClient.query(`select count(*)::text as count from public.${quoteIdentifier(table)}`),
+        profileClient.query(
+          `select * from public.${quoteIdentifier(table)} order by ${quoteIdentifier("id")} limit $1`,
+          [MAX_VEHICLE_PROFILE_ROWS + 1],
+        ),
+      ]);
+      tables.push({
+        name: table,
+        columns: columns.rows.map((column: {
+          column_name: string;
+          data_type: string;
+          udt_name: string;
+          is_nullable: "YES" | "NO";
+          column_default: string | null;
+        }) => ({
+          name: column.column_name,
+          dataType: column.data_type,
+          udtName: column.udt_name,
+          nullable: column.is_nullable === "YES",
+          defaultValue: column.column_default,
+        })),
+        primaryKey,
+        totalRows: count.rows[0].count,
+        truncated: result.rows.length > MAX_VEHICLE_PROFILE_ROWS,
+        rows: result.rows.slice(0, MAX_VEHICLE_PROFILE_ROWS),
+      });
+    }
+    await profileClient.query("commit");
+    transactionOpen = false;
+    respond(response, 200, { profileId: body.profileId, tables });
+  } finally {
+    if (transactionOpen) {
+      try {
+        await profileClient.query("rollback");
+      } catch {
+        console.error("Vehicles profile read-only transaction rollback failed.");
+      }
+    }
+    try {
+      await profileClient.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Vehicles profile connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
+  }
+}
+
+function isVehicleProfileTable(value: unknown): value is (typeof VEHICLE_PROFILE_TABLES)[number] {
+  return typeof value === "string" && (VEHICLE_PROFILE_TABLES as readonly string[]).includes(value);
+}
+
+function isVehicleProfileOperation(value: unknown): value is "insert" | "update" | "delete" {
+  return value === "insert" || value === "update" || value === "delete";
+}
+
+function isVehicleRecord(value: unknown): value is Record<string, string | number | boolean | null> {
+  return isRecord(value) && Object.keys(value).length > 0 &&
+    Object.values(value).every((entry) => entry === null || typeof entry === "string" ||
+      typeof entry === "number" && Number.isFinite(entry) || typeof entry === "boolean");
+}
+
+async function mutateSavedProfileVehicleModule(body: Record<string, unknown>, response: ApiResponse) {
+  if (!validProfileCredentials(body)) {
+    respond(response, 400, { error: "Choose a valid Vehicles table and operation, and unlock its saved profile." });
+    return;
+  }
+  const table = body.table;
+  const operation = body.operation;
+  if (!isVehicleProfileTable(table) || !isVehicleProfileOperation(operation)) {
+    respond(response, 400, { error: "Choose a valid Vehicles table and operation, and unlock its saved profile." });
+    return;
+  }
+  const profileClient = await getSavedProfileClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    const schema = await profileClient.query(
+      `select column_name from information_schema.columns
+       where table_schema = 'public' and table_name = $1
+       order by ordinal_position`,
+      [table],
+    );
+    if (!schema.rowCount) throw new Error(`The assigned profile is missing the required public table "${table}".`);
+    const columns = new Set(schema.rows.map((row: { column_name: string }) => row.column_name as string));
+    const primaryKey = await getPrimaryKey(profileClient, table);
+    if (primaryKey.length !== 1 || primaryKey[0] !== "id") {
+      throw new Error(`The table "${table}" does not have the expected single-column id key.`);
+    }
+
+    await profileClient.query("begin");
+    transactionOpen = true;
+    let result: pg.QueryResult;
+    if (operation === "insert") {
+      if (!isVehicleRecord(body.values)) {
+        throw new Error("Provide valid field values for the new record.");
+      }
+      const entries = Object.entries(body.values);
+      if (entries.some(([column]) => !columns.has(column) || column === "id" || column === "created_at")) {
+        throw new Error("The new record contains an unsupported or generated column.");
+      }
+      const names = entries.map(([column]) => quoteIdentifier(column)).join(", ");
+      const placeholders = entries.map((_, index) => `$${index + 1}`).join(", ");
+      result = await profileClient.query(
+        `insert into public.${quoteIdentifier(table)} (${names}) values (${placeholders}) returning *`,
+        entries.map(([, value]) => value),
+      );
+    } else {
+      if (typeof body.id !== "number" || !Number.isSafeInteger(body.id) || body.id < 1) {
+        throw new Error("A valid record ID is required.");
+      }
+      if (operation === "delete") {
+        result = await profileClient.query(
+          `delete from public.${quoteIdentifier(table)} where ${quoteIdentifier("id")} = $1 returning *`,
+          [body.id],
+        );
+      } else {
+        if (!isVehicleRecord(body.values)) {
+          throw new Error("Provide valid field values to save.");
+        }
+        const entries = Object.entries(body.values);
+        if (entries.some(([column]) => !columns.has(column) || column === "id" || column === "created_at")) {
+          throw new Error("The updated record contains an unsupported or immutable column.");
+        }
+        const assignments = entries.map(([column], index) =>
+          `${quoteIdentifier(column)} = $${index + 1}`);
+        if (columns.has("updated_at") && !entries.some(([column]) => column === "updated_at")) {
+          assignments.push(`${quoteIdentifier("updated_at")} = current_timestamp`);
+        }
+        result = await profileClient.query(
+          `update public.${quoteIdentifier(table)} set ${assignments.join(", ")}
+           where ${quoteIdentifier("id")} = $${entries.length + 1} returning *`,
+          [...entries.map(([, value]) => value), body.id],
+        );
+      }
+    }
+    if (result.rowCount !== 1) {
+      throw new Error(result.rowCount ? "The operation unexpectedly affected multiple records." : "The record was not found or could not be saved.");
+    }
+    await profileClient.query("commit");
+    transactionOpen = false;
+    respond(response, 200, { operation, table, row: result.rows[0] });
+  } finally {
+    if (transactionOpen) {
+      try {
+        await profileClient.query("rollback");
+      } catch {
+        console.error("Vehicles profile write transaction rollback failed.");
+      }
+    }
+    try {
+      await profileClient.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Vehicles profile write connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
+  }
 }
 
 async function validateSqlTables(client: pg.PoolClient | pg.Client, tables: string[]) {
@@ -487,7 +690,8 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       if (!isRecord(body) ||
         (body.action !== "review-sql" && body.action !== "execute-sql" && body.action !== "test-connection" &&
           body.action !== "profile-catalog" && body.action !== "profile-rows" &&
-          body.action !== "profile-review-sql" && body.action !== "profile-execute-sql")) {
+          body.action !== "profile-review-sql" && body.action !== "profile-execute-sql" &&
+          body.action !== "profile-vehicles-data" && body.action !== "profile-vehicles-mutate")) {
         respond(response, 400, { error: "Choose a supported database action." });
         return;
       }
@@ -497,6 +701,14 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       }
       if (body.action === "profile-review-sql" || body.action === "profile-execute-sql") {
         await runSavedProfileSql(body, response);
+        return;
+      }
+      if (body.action === "profile-vehicles-data") {
+        await readSavedProfileVehicleModule(body, response);
+        return;
+      }
+      if (body.action === "profile-vehicles-mutate") {
+        await mutateSavedProfileVehicleModule(body, response);
         return;
       }
       if (body.action === "test-connection") {

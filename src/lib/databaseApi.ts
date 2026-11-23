@@ -61,6 +61,44 @@ export interface DatabaseConnectionTestResult {
   database: string;
 }
 
+export const VEHICLE_PROFILE_TABLES = [
+  "vehicles",
+  "alerts",
+  "certificates",
+  "expenses",
+  "fuel_consumptions",
+  "insurance_policies",
+  "monthly_targets",
+  "odometer_logs",
+  "services",
+  "travel_logs",
+] as const;
+
+export type VehicleProfileTableName = (typeof VEHICLE_PROFILE_TABLES)[number];
+export type VehicleProfileRow = Record<string, unknown>;
+
+export interface VehicleProfileColumn {
+  name: string;
+  dataType: string;
+  udtName: string;
+  nullable: boolean;
+  defaultValue: string | null;
+}
+
+export interface VehicleProfileTable {
+  name: VehicleProfileTableName;
+  columns: VehicleProfileColumn[];
+  primaryKey: string[];
+  totalRows: string;
+  truncated: boolean;
+  rows: VehicleProfileRow[];
+}
+
+export interface VehicleProfileData {
+  profileId: string;
+  tables: VehicleProfileTable[];
+}
+
 async function request(path: string, body?: Record<string, unknown>): Promise<Response> {
   const response = await fetch(path, {
     method: body ? "POST" : "GET",
@@ -171,4 +209,34 @@ export async function executeSavedProfileDatabaseSql(
     confirmation,
     statementHash,
   })).json() as SqlExecutionResult;
+}
+
+export async function loadSavedProfileVehicleData(
+  profileId: string,
+  passphrase: string,
+): Promise<VehicleProfileData> {
+  return await (await request("/api/database", {
+    action: "profile-vehicles-data",
+    profileId,
+    passphrase,
+  })).json() as VehicleProfileData;
+}
+
+export async function mutateSavedProfileVehicleRecord(
+  profileId: string,
+  passphrase: string,
+  table: VehicleProfileTableName,
+  operation: "insert" | "update" | "delete",
+  values?: Record<string, string | number | boolean | null>,
+  id?: number,
+): Promise<{ operation: "insert" | "update" | "delete"; table: VehicleProfileTableName; row: VehicleProfileRow }> {
+  return await (await request("/api/database", {
+    action: "profile-vehicles-mutate",
+    profileId,
+    passphrase,
+    table,
+    operation,
+    ...(values ? { values } : {}),
+    ...(id !== undefined ? { id } : {}),
+  })).json() as { operation: "insert" | "update" | "delete"; table: VehicleProfileTableName; row: VehicleProfileRow };
 }

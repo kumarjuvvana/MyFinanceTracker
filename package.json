@@ -14,7 +14,8 @@
     "db:insert-many": "node scripts/db.mjs insert-many",
     "db:update": "node scripts/db.mjs update",
     "db:delete": "node scripts/db.mjs delete",
-    "db:create-table": "node scripts/db.mjs create-table"
+    "db:create-table": "node scripts/db.mjs create-table",
+    "db:profile": "node scripts/database-profile.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

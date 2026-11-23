@@ -1068,6 +1068,27 @@ body{background:#f3f5ef}
 .cooking-group-control,.issues-group-control,.career-group-control,.family-group-control,.vehicle-group-control,.electricity-group-control,.personal-document-group-control{width:min(100%,180px);margin:0}
 .vehicle-record-groups{display:grid;gap:14px;min-width:0}
 .vehicle-record-groups>section{display:grid;gap:10px;min-width:0}
+.vehicle-profile-report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px;margin:14px 0}
+.vehicle-profile-months,.vehicle-profile-due-list{display:grid;gap:12px}
+.vehicle-profile-month{display:grid;gap:7px;padding:10px 0;border-top:1px solid #eef0ec}
+.vehicle-profile-month>strong{font-size:11px;color:#414a42}
+.vehicle-profile-bar-row{display:grid;grid-template-columns:66px minmax(40px,1fr) 88px;align-items:center;gap:8px;font-size:9px;color:#858d83}
+.vehicle-profile-bar-row>strong{text-align:right;font-size:9px;color:#414a42}
+.vehicle-profile-bar-track{height:8px;overflow:hidden;border-radius:8px;background:#eef0ec}
+.vehicle-profile-bar{height:100%;min-width:2px;border-radius:8px;background:#628b68}
+.vehicle-profile-bar-fuel{background:#d2a449}
+.vehicle-profile-bar-services{background:#718bb0}
+.vehicle-profile-records{display:grid;margin-top:14px}
+.vehicle-profile-records .database-row{padding:14px 0}
+.vehicle-profile-records .database-row-head{margin-bottom:8px}
+.app-shell.dark .vehicle-profile-month{border-color:#343d35}
+.app-shell.dark .vehicle-profile-month>strong,.app-shell.dark .vehicle-profile-bar-row>strong{color:#e3e8e2}
+.app-shell.dark .vehicle-profile-bar-track{background:#343d35}
+@media(max-width:600px){
+  .vehicle-profile-report-grid{grid-template-columns:minmax(0,1fr)}
+  .vehicle-profile-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .vehicle-profile-bar-row{grid-template-columns:58px minmax(28px,1fr) 74px;gap:5px}
+}
 .cooking-plan-filter-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px}
 .cooking-plan-filter-controls>.field-wrap{flex:1 1 130px;min-width:120px}
 .cooking-plan-record-groups{display:grid;gap:12px}
