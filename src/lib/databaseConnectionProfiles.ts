@@ -1,4 +1,4 @@
-import { decryptVaultPayload, encryptVaultPayload, isEncryptedVault } from "./credentialVault";
+import { decryptVaultPayload, encryptVaultPayload, isEncryptedVault } from "./credentialVault.js";
 import type { EncryptedVault } from "../types";
 
 export interface DatabaseConnectionProfile {
