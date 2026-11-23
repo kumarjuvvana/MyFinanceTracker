@@ -4,7 +4,7 @@ import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
 
 const { Client, Pool } = pg;
-const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault"]);
+const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault", "database_connection_vault"]);
 const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/i;
 const MAX_PAGE_SIZE = 50;
 
@@ -214,7 +214,7 @@ async function loadCatalog(client: pg.PoolClient) {
        join pg_catalog.pg_namespace n on n.oid = c.relnamespace
        left join pg_catalog.pg_stat_user_tables s on s.relid = c.oid
        where n.nspname = 'public' and c.relkind in ('r', 'p')
-         and c.relname <> all (array['daybook_data', 'daybook_state', 'credential_vault'])
+         and c.relname <> all (array['daybook_data', 'daybook_state', 'credential_vault', 'database_connection_vault'])
        order by c.relname`,
     ),
     client.query(

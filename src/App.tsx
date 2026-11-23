@@ -15,6 +15,7 @@ import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi"
 import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, reviewDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
+import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
@@ -149,6 +150,7 @@ const navigation: NavigationItem[] = [
   { name: "Personal documents", icon: FileText, group: "Data & tools" },
   { name: "Documents", icon: FileDown, group: "Data & tools" },
   { name: "Database manager", icon: Database, group: "Data & tools" },
+  { name: "Database connections", icon: Database, group: "Data & tools" },
   { name: "Hosting & storage", icon: HardDrive, group: "Data & tools" },
   { name: "Archive", icon: Archive, group: "Data & tools" },
   { name: "Account credentials", icon: KeyRound, group: "Data & tools" },
@@ -17246,6 +17248,7 @@ export default function App() {
     "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
     Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={[...new Map(allDocuments.map((document) => [document.storagePath, document])).values()].reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onCopy={copyDocument} onArchive={archiveDocument} onRemoveFile={removeDocumentFile} />,
     "Database manager": <DatabaseManagerPage />,
+    "Database connections": <DatabaseConnectionsPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
     "Account credentials": <AccountCredentialsPage records={data.credentialRecords ?? []} vault={data.credentialVault}

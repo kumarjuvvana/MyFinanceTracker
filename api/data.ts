@@ -1,13 +1,14 @@
 import seedFile from "../data/daybook.json" with { type: "json" };
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { normalizeTrackerData, validateData } from "../src/lib/data.js";
-import type { TrackerData } from "../src/types.js";
+import type { EncryptedVault, TrackerData } from "../src/types.js";
 
 const MAX_DATA_BYTES = 2 * 1024 * 1024;
 const seedData = seedFile as TrackerData;
 
 interface ApiRequest {
   method?: string;
+  url?: string;
   headers: Record<string, string | string[] | undefined>;
   body?: unknown;
 }
@@ -72,6 +73,10 @@ function supabaseCredentials(): { baseUrl: string; key: string } {
     throw new Error("SUPABASE_URL must be the HTTPS origin of your Supabase project.");
   }
   return { baseUrl: url.origin, key };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 async function supabaseRequest(path: string, init?: RequestInit): Promise<Response> {
@@ -232,6 +237,39 @@ async function saveReminderCategories(categories: string[], expectedRevision: st
   return result;
 }
 
+function isEncryptedDatabaseConnectionVault(value: unknown): value is EncryptedVault {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const vault = value as Record<string, unknown>;
+  return vault.version === 1 && vault.kdf === "PBKDF2-SHA-256" && vault.iterations === 310_000 &&
+    typeof vault.salt === "string" && /^[A-Za-z0-9+/]{22}==$/.test(vault.salt) &&
+    typeof vault.iv === "string" && /^[A-Za-z0-9+/]{16}$/.test(vault.iv) &&
+    typeof vault.ciphertext === "string" && /^[A-Za-z0-9+/]+={0,2}$/.test(vault.ciphertext) &&
+    vault.ciphertext.length <= 1_000_000;
+}
+
+async function loadDatabaseConnectionVault(): Promise<EncryptedVault | null> {
+  const response = await supabaseRequest("database_connection_vault?select=vault&id=eq.shared");
+  const result: unknown = await response.json();
+  if (!Array.isArray(result) || result.length > 1) {
+    throw new Error("Supabase returned an invalid database connection vault.");
+  }
+  if (result.length === 0) return null;
+  const row: unknown = result[0];
+  if (typeof row !== "object" || row === null || !("vault" in row) ||
+    !isEncryptedDatabaseConnectionVault(row.vault)) {
+    throw new Error("The encrypted database connection vault is invalid.");
+  }
+  return row.vault;
+}
+
+async function saveDatabaseConnectionVault(vault: EncryptedVault): Promise<void> {
+  await supabaseRequest("database_connection_vault?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ id: "shared", vault, updated_at: new Date().toISOString() }),
+  });
+}
+
 export default async function dataHandler(request: ApiRequest, response: ApiResponse) {
   if (!isAuthenticated(request)) {
     respond(response, 401, { error: "Your Daybook session expired. Enter the access password again." });
@@ -240,6 +278,11 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
 
   try {
     if (request.method === "GET") {
+      const requestUrl = new URL(request.url ?? "/", `https://${request.headers.host ?? "localhost"}`);
+      if (requestUrl.searchParams.get("resource") === "database-connection-vault") {
+        respond(response, 200, { vault: await loadDatabaseConnectionVault() });
+        return;
+      }
       const current = await loadStoredData();
       const savedPreferences = await loadStoredPreferences();
       const baseData = current?.data ?? seedData;
@@ -276,6 +319,16 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
     }
 
     const body = requestBody(request);
+    if (request.method === "POST") {
+      if (!isRecord(body) || body.resource !== "database-connection-vault" ||
+        body.action !== "save" || !isEncryptedDatabaseConnectionVault(body.vault)) {
+        respond(response, 400, { error: "The encrypted database connection settings are invalid. No changes were saved." });
+        return;
+      }
+      await saveDatabaseConnectionVault(body.vault);
+      respond(response, 200, { saved: true });
+      return;
+    }
     if (request.method === "PATCH") {
       if (typeof body !== "object" || body === null ||
         !("favoritePages" in body) || !("preferences" in body) ||
@@ -301,8 +354,8 @@ export default async function dataHandler(request: ApiRequest, response: ApiResp
     }
 
     if (request.method !== "PUT") {
-      response.setHeader("Allow", "GET, PUT, PATCH");
-      respond(response, 405, { error: "Only GET, PUT, and PATCH requests are supported." });
+      response.setHeader("Allow", "GET, POST, PUT, PATCH");
+      respond(response, 405, { error: "Only GET, POST, PUT, and PATCH requests are supported." });
       return;
     }
 

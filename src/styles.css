@@ -127,6 +127,13 @@ button{cursor:pointer}
 .app-shell.dark .danger-card .settings-icon{background:#392726;color:#f0aaa0}
 .preference-toggle{margin-top:12px}
 .connector-card{max-width:760px}
+.database-connections-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:14px}
+.database-connections-layout>.connector-card:last-child{grid-column:1/-1}
+.database-connection-list{display:grid;margin-top:12px}
+.database-connection-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.database-connection-row>div:first-child{min-width:0}
+.database-connection-row strong{overflow-wrap:anywhere}
+.database-connection-row p{margin:5px 0 0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
 .gmail-authorization{display:grid;justify-items:start;gap:12px;margin:12px 0}
 .gmail-authorization .alert{margin:0}
 .connector-actions{display:flex;align-items:center;gap:8px;margin:16px 0}
@@ -152,6 +159,7 @@ button{cursor:pointer}
 .app-shell.dark .connector-card .alert{background:#332f24;border-color:#51462f;color:#e0c991}
 .app-shell.dark .connector-card .alert-error{background:#382725;border-color:#563b38;color:#f0aaa0}
 .app-shell.dark .connector-card .alert-success{background:#263429;border-color:#3a5140;color:#b5d7b8}
+@media(max-width:760px){.database-connections-layout{grid-template-columns:1fr}.database-connections-layout>.connector-card:last-child{grid-column:auto}}
 @media(max-width:600px){.connector-form{grid-template-columns:1fr}.connector-form .full{grid-column:auto}.connector-card>.card-head{flex-direction:column}}
 .dashboard-reminders{margin-top:18px}
 .dashboard-reminders .recent-name,.dashboard-reminders .recent-meta,.section-grid .recent-name,.section-grid .recent-meta{white-space:normal;overflow-wrap:anywhere}

@@ -1,4 +1,4 @@
-import type { CredentialRecord, EncryptedCredentialVault } from "../types";
+import type { CredentialRecord, EncryptedCredentialVault, EncryptedVault } from "../types";
 
 const ITERATIONS = 310_000;
 const encoder = new TextEncoder();
@@ -65,8 +65,12 @@ export function validateCredentialRecords(value: unknown): value is CredentialRe
 }
 
 async function encryptRecords(records: CredentialRecord[], key: CryptoKey, salt: Uint8Array): Promise<EncryptedCredentialVault> {
+  return encryptPayload({ version: 1, records }, key, salt);
+}
+
+async function encryptPayload(payload: unknown, key: CryptoKey, salt: Uint8Array): Promise<EncryptedVault> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const plaintext = encoder.encode(JSON.stringify({ version: 1, records }));
+  const plaintext = encoder.encode(JSON.stringify(payload));
   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
   return {
     version: 1,
@@ -76,6 +80,40 @@ async function encryptRecords(records: CredentialRecord[], key: CryptoKey, salt:
     iv: toBase64(iv),
     ciphertext: toBase64(new Uint8Array(encrypted)),
   };
+}
+
+export function isEncryptedVault(value: unknown): value is EncryptedVault {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return record.version === 1 && record.kdf === "PBKDF2-SHA-256" &&
+    record.iterations === ITERATIONS && typeof record.salt === "string" &&
+    typeof record.iv === "string" && typeof record.ciphertext === "string" &&
+    /^[A-Za-z0-9+/]{22}==$/.test(record.salt) &&
+    /^[A-Za-z0-9+/]{16}$/.test(record.iv) &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(record.ciphertext) && record.ciphertext.length <= 1_000_000;
+}
+
+export async function encryptVaultPayload(payload: unknown, password: string): Promise<EncryptedVault> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(password, salt);
+  return encryptPayload(payload, key, salt);
+}
+
+export async function decryptVaultPayload<T>(vault: EncryptedVault, password: string): Promise<T> {
+  if (!isEncryptedVault(vault)) throw new Error("This encrypted vault uses an unsupported or invalid format.");
+  const key = await deriveKey(password, fromBase64(vault.salt));
+  const iv = fromBase64(vault.iv);
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, fromBase64(vault.ciphertext));
+  } catch {
+    throw new Error("The vault passphrase is incorrect, or its encrypted data has been changed.");
+  }
+  try {
+    return JSON.parse(decoder.decode(plaintext)) as T;
+  } catch {
+    throw new Error("The decrypted vault data has an invalid format.");
+  }
 }
 
 export async function createCredentialVault(password: string): Promise<{ vault: EncryptedCredentialVault; key: CryptoKey }> {
@@ -98,25 +136,28 @@ export async function unlockCredentialVault(
 }
 
 async function decryptRecords(vault: EncryptedCredentialVault, key: CryptoKey): Promise<CredentialRecord[]> {
+  const payload = await decryptPayload(vault, key);
+  if (typeof payload !== "object" || payload === null || !("version" in payload) ||
+    payload.version !== 1 || !("records" in payload) || !validateCredentialRecords(payload.records)) {
+    throw new Error("The decrypted credential vault has invalid records.");
+  }
+  return payload.records;
+}
+
+async function decryptPayload(vault: EncryptedVault, key: CryptoKey): Promise<unknown> {
   const iv = fromBase64(vault.iv);
-  if (iv.length !== 12) throw new Error("The encrypted credential vault is damaged.");
+  if (iv.length !== 12) throw new Error("The encrypted vault is damaged.");
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, fromBase64(vault.ciphertext));
   } catch {
     throw new Error("The vault password is incorrect, or its encrypted data has been changed.");
   }
-  let payload: unknown;
   try {
-    payload = JSON.parse(decoder.decode(plaintext));
+    return JSON.parse(decoder.decode(plaintext)) as unknown;
   } catch {
-    throw new Error("The decrypted credential vault has an invalid format.");
+    throw new Error("The decrypted vault has an invalid format.");
   }
-  if (typeof payload !== "object" || payload === null || !("version" in payload) ||
-    payload.version !== 1 || !("records" in payload) || !validateCredentialRecords(payload.records)) {
-    throw new Error("The decrypted credential vault has invalid records.");
-  }
-  return payload.records;
 }
 
 export function decryptCredentialVaultWithKey(vault: EncryptedCredentialVault, key: CryptoKey): Promise<CredentialRecord[]> {

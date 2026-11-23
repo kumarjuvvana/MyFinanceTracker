@@ -45,6 +45,7 @@ export type Page =
   | "Documents"
   | "AI Prompts"
   | "Database manager"
+  | "Database connections"
   | "Hosting & storage"
   | "Archive"
   | "Account credentials"
@@ -56,7 +57,7 @@ export const FAVORITABLE_PAGES: Page[] = [
   "Learning", "Mind & habits", "Activities", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
   "Electricity", "Subscriptions & bills", "Personal documents", "Documents", "AI Prompts",
-  "Database manager", "Hosting & storage", "Archive", "Account credentials",
+  "Database manager", "Database connections", "Hosting & storage", "Archive", "Account credentials",
   "Data management", "R&D / Test Connectors",
 ];
 
@@ -1082,7 +1083,7 @@ export interface BankTransaction {
   importedAt: string;
 }
 
-export interface EncryptedCredentialVault {
+export interface EncryptedVault {
   version: 1;
   kdf: "PBKDF2-SHA-256";
   iterations: number;
@@ -1090,6 +1091,7 @@ export interface EncryptedCredentialVault {
   iv: string;
   ciphertext: string;
 }
+export type EncryptedCredentialVault = EncryptedVault;
 
 export interface TrackerData {
   version: 1;
