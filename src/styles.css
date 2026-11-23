@@ -1081,6 +1081,11 @@ body{background:#f3f5ef}
 .vehicle-profile-records{display:grid;margin-top:14px}
 .vehicle-profile-records .database-row{padding:14px 0}
 .vehicle-profile-records .database-row-head{margin-bottom:8px}
+.vehicle-profile-table-toolbar .filter-drawer-trigger{flex:none}
+.vehicle-profile-pagination{margin-top:14px;flex-wrap:wrap}
+.vehicle-profile-pagination>div{align-items:flex-end;flex-wrap:wrap}
+.vehicle-profile-pagination .field-wrap{width:76px}
+.vehicle-profile-pagination>div>span{align-self:center}
 .app-shell.dark .vehicle-profile-month{border-color:#343d35}
 .app-shell.dark .vehicle-profile-month>strong,.app-shell.dark .vehicle-profile-bar-row>strong{color:#e3e8e2}
 .app-shell.dark .vehicle-profile-bar-track{background:#343d35}
@@ -1088,6 +1093,8 @@ body{background:#f3f5ef}
   .vehicle-profile-report-grid{grid-template-columns:minmax(0,1fr)}
   .vehicle-profile-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
   .vehicle-profile-bar-row{grid-template-columns:58px minmax(28px,1fr) 74px;gap:5px}
+  .vehicle-profile-pagination>span,.vehicle-profile-pagination>div{width:100%}
+  .vehicle-profile-pagination>div{justify-content:flex-start}
 }
 .cooking-plan-filter-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px}
 .cooking-plan-filter-controls>.field-wrap{flex:1 1 130px;min-width:120px}

@@ -16,7 +16,7 @@ import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
-import { VehiclesProfilePage } from "./components/VehiclesProfilePage";
+import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
 import { loadDatabaseConnectionVault } from "./lib/databaseConnectionsApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
@@ -15803,13 +15803,16 @@ export default function App() {
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     try {
       await signOut();
+      const vehiclesPassphraseCleared = clearVehiclesProfileSessionPassphrase();
       authenticatedRef.current = false;
       setAuthenticated(false);
       setData(null);
       setSetupRequired(false);
       setSyncStatus("saved");
       setSyncMessage("");
-      setError("");
+      setError(vehiclesPassphraseCleared
+        ? ""
+        : "Signed out, but the remembered Vehicles passphrase could not be cleared. Close this browser tab to remove it.");
       setNotice("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not sign out.");

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, BarChart3, Car, Database, Fuel, LockKeyhole, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { Badge, Button, Card, DateInput, EmptyState, Field, Input, Select } from "./ui";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, BarChart3, Car, Copy, Database, Fuel, LockKeyhole, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input, Select } from "./ui";
 import { loadSavedProfileVehicleData, mutateSavedProfileVehicleRecord, VEHICLE_PROFILE_TABLES, type VehicleProfileColumn, type VehicleProfileData, type VehicleProfileRow, type VehicleProfileTable, type VehicleProfileTableName } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
@@ -17,6 +17,16 @@ const TABLE_LABELS: Record<VehicleProfileTableName, string> = {
   services: "Services",
   travel_logs: "Travel logs",
 };
+const VEHICLES_SESSION_PASSPHRASE_KEY = "myfinance-tracker.vehicles-profile-passphrase";
+
+export function clearVehiclesProfileSessionPassphrase(): boolean {
+  try {
+    window.sessionStorage.removeItem(VEHICLES_SESSION_PASSPHRASE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function rowValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -60,6 +70,34 @@ function getDefaultInput(column: VehicleProfileColumn): string {
   return "";
 }
 
+function columnLabel(name: string): string {
+  return name.replace(/_/g, " ").replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
+}
+
+function compareColumnValues(left: unknown, right: unknown, dataType: string): number {
+  if (left === null || left === undefined) return right === null || right === undefined ? 0 : 1;
+  if (right === null || right === undefined) return -1;
+  if (["smallint", "integer", "bigint", "numeric", "real", "double precision"].includes(dataType)) {
+    const leftNumber = Number(left);
+    const rightNumber = Number(right);
+    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) return leftNumber - rightNumber;
+  }
+  if (dataType === "boolean") return Number(left === true || left === "true") - Number(right === true || right === "true");
+  if (dataType === "date" || dataType.startsWith("timestamp")) {
+    const leftTime = Date.parse(String(left));
+    const rightTime = Date.parse(String(right));
+    if (Number.isFinite(leftTime) && Number.isFinite(rightTime)) return leftTime - rightTime;
+  }
+  return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function profileRecordTitle(table: VehicleProfileTableName, row: VehicleProfileRow): string {
+  const description = ["name", "title", "description", "registration_number", "certificate_number"]
+    .map((column) => row[column])
+    .find((value) => typeof value === "string" && value.trim());
+  return `${TABLE_LABELS[table]} #${rowValue(row.id)}${description ? ` · ${String(description)}` : ""}`;
+}
+
 export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [source, setSource] = useState<"ridertracker" | "daybook">("ridertracker");
   const [vaultLoading, setVaultLoading] = useState(true);
@@ -74,7 +112,19 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [editor, setEditor] = useState<{ table: VehicleProfileTable; row: VehicleProfileRow | null } | null>(null);
+  const [editor, setEditor] = useState<{
+    table: VehicleProfileTable;
+    row: VehicleProfileRow | null;
+    mode: "add" | "edit" | "copy";
+  } | null>(null);
+  const [filterColumn, setFilterColumn] = useState("");
+  const [filterValue, setFilterValue] = useState("");
+  const [filterMatch, setFilterMatch] = useState<"contains" | "exact">("contains");
+  const [sortColumn, setSortColumn] = useState("id");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const sessionResumeAttempted = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -85,7 +135,22 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     return () => { active = false; };
   }, []);
 
-  async function loadProfileData(profileId: string, key = passphrase) {
+  useEffect(() => {
+    if (vaultLoading || !vault || sessionResumeAttempted.current) return;
+    sessionResumeAttempted.current = true;
+    let savedPassphrase: string | null;
+    try {
+      savedPassphrase = window.sessionStorage.getItem(VEHICLES_SESSION_PASSPHRASE_KEY);
+    } catch {
+      setError("Browser session storage is unavailable. Enter the vault passphrase to connect.");
+      return;
+    }
+    if (!savedPassphrase) return;
+    setPassphrase(savedPassphrase);
+    void unlockProfilesWithPassphrase(savedPassphrase, vault, false, true);
+  }, [unlockProfilesWithPassphrase, vault, vaultLoading]);
+
+  async function loadProfileData(profileId: string, key = passphrase, resetToReports = true) {
     setLoading(true);
     setError("");
     setNotice("");
@@ -93,7 +158,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
       const loaded = await loadSavedProfileVehicleData(profileId, key);
       setData(loaded);
       setSelectedProfileId(profileId);
-      setActiveTable("reports");
+      if (resetToReports) setActiveTable("reports");
       setNotice("Vehicles data loaded directly from the assigned saved database profile. No data was copied.");
       return true;
     } catch (caught) {
@@ -104,40 +169,69 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     }
   }
 
-  async function unlockProfiles(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function unlockProfilesWithPassphrase(
+    key: string,
+    savedVault: Awaited<ReturnType<typeof loadDatabaseConnectionVault>>,
+    rememberForSession: boolean,
+    restoringSession = false,
+  ) {
     setError("");
     setNotice("");
-    if (!vault) {
+    if (!savedVault) {
       setError("No saved database connection vault is available. Add a profile assigned to Vehicles first.");
-      return;
+      return false;
     }
     setBusy(true);
+    let storageWarning = "";
     try {
-      const unlocked = await decryptDatabaseConnectionProfiles(vault, passphrase);
+      const unlocked = await decryptDatabaseConnectionProfiles(savedVault, key);
       const assigned = unlocked.filter((profile) =>
         profile.modules.some((module) => module.trim().toLocaleLowerCase() === "vehicles"));
       if (!assigned.length) {
         setProfiles([]);
         setError("No saved database profile is assigned to Vehicles. Assign the profile to Vehicles in Database connections.");
-        return;
+        if (restoringSession && !clearVehiclesProfileSessionPassphrase()) {
+          setError("No saved profile is assigned to Vehicles, and the remembered passphrase could not be cleared. Close this browser tab.");
+        }
+        return false;
+      }
+      if (rememberForSession) {
+        try {
+          window.sessionStorage.setItem(VEHICLES_SESSION_PASSPHRASE_KEY, key);
+        } catch {
+          storageWarning = "Connected, but this browser could not remember the passphrase for this tab session.";
+        }
       }
       setProfiles(assigned);
       setSelectedProfileId(assigned[0].id);
-      if (assigned.length === 1) await loadProfileData(assigned[0].id, passphrase);
+      setPassphrase(key);
+      if (assigned.length === 1) await loadProfileData(assigned[0].id, key);
+      if (storageWarning) setError(storageWarning);
+      return true;
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not unlock the database connection vault.");
+      const cleared = restoringSession ? clearVehiclesProfileSessionPassphrase() : true;
+      const detail = caught instanceof Error ? caught.message : "Could not unlock the database connection vault.";
+      setError(restoringSession && !cleared
+        ? `${detail} The remembered passphrase could not be cleared; close this browser tab.`
+        : detail);
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
+  async function unlockProfiles(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await unlockProfilesWithPassphrase(passphrase, vault, true);
+  }
+
   function lockProfiles() {
+    const cleared = clearVehiclesProfileSessionPassphrase();
     setData(null);
     setProfiles([]);
     setSelectedProfileId("");
     setPassphrase("");
-    setError("");
+    setError(cleared ? "" : "The remembered passphrase could not be cleared. Close this browser tab to remove it.");
     setNotice("The Vehicles database profile is locked.");
   }
 
@@ -145,18 +239,24 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     if (!selectedProfileId) return;
     setBusy(true);
     setError("");
+    const mode = editor?.mode ?? "add";
+    const operation = mode === "edit" ? "update" : "insert";
     try {
       await mutateSavedProfileVehicleRecord(
         selectedProfileId,
         passphrase,
         table.name,
-        editor?.row ? "update" : "insert",
+        operation,
         values,
-        editor?.row ? Number(editor.row.id) : undefined,
+        operation === "update" && editor?.row ? Number(editor.row.id) : undefined,
       );
       setEditor(null);
-      if (await loadProfileData(selectedProfileId)) {
-        setNotice(`${TABLE_LABELS[table.name]} record saved to RiderTracker.`);
+      if (await loadProfileData(selectedProfileId, passphrase, false)) {
+        setNotice(mode === "edit"
+          ? `${TABLE_LABELS[table.name]} record updated in RiderTracker.`
+          : mode === "copy"
+            ? `${TABLE_LABELS[table.name]} record copied to RiderTracker.`
+            : `${TABLE_LABELS[table.name]} record added to RiderTracker.`);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The record could not be saved.");
@@ -166,13 +266,21 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   }
 
   async function deleteRecord(table: VehicleProfileTable, row: VehicleProfileRow) {
-    if (!selectedProfileId || typeof row.id !== "number") return;
+    const recordId = Number(row.id);
+    if (!selectedProfileId) {
+      setError("Select a saved Vehicles profile before deleting a record.");
+      return;
+    }
+    if (!Number.isSafeInteger(recordId) || recordId < 1) {
+      setError("This record does not have a valid ID and cannot be deleted.");
+      return;
+    }
     if (!window.confirm(`Permanently delete this record from RiderTracker's ${TABLE_LABELS[table.name]} table? This cannot be undone.`)) return;
     setBusy(true);
     setError("");
     try {
-      await mutateSavedProfileVehicleRecord(selectedProfileId, passphrase, table.name, "delete", undefined, row.id);
-      if (await loadProfileData(selectedProfileId)) {
+      await mutateSavedProfileVehicleRecord(selectedProfileId, passphrase, table.name, "delete", undefined, recordId);
+      if (await loadProfileData(selectedProfileId, passphrase, false)) {
         setNotice(`Record deleted from RiderTracker's ${TABLE_LABELS[table.name]} table.`);
       }
     } catch (caught) {
@@ -253,8 +361,37 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   }
 
   const activeTableData = activeTable === "reports" ? null : tableData.find((table) => table.name === activeTable) ?? null;
-  const visibleRows = (activeTableData?.rows ?? []).filter((row) =>
-    !search.trim() || Object.values(row).some((value) => rowValue(value).toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())));
+  const searchTerm = search.trim().toLocaleLowerCase();
+  const fieldFilter = filterValue.trim().toLocaleLowerCase();
+  const matchingRows = (activeTableData?.rows ?? []).filter((row) => {
+    const matchesSearch = !searchTerm ||
+      Object.values(row).some((value) => rowValue(value).toLocaleLowerCase().includes(searchTerm));
+    if (!matchesSearch || !fieldFilter || !filterColumn) return matchesSearch;
+    const cell = row[filterColumn];
+    const filterText = cell === null || cell === undefined ? "" : rowValue(cell).toLocaleLowerCase();
+    return filterMatch === "exact" ? filterText === fieldFilter : filterText.includes(fieldFilter);
+  });
+  const selectedSortColumn = activeTableData?.columns.find((column) => column.name === sortColumn)
+    ?? activeTableData?.columns.find((column) => column.name === "id")
+    ?? activeTableData?.columns[0];
+  const sortedRows = selectedSortColumn
+    ? [...matchingRows].sort((left, right) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      return direction * compareColumnValues(left[selectedSortColumn.name], right[selectedSortColumn.name], selectedSortColumn.dataType)
+        || compareColumnValues(left.id, right.id, "integer");
+    })
+    : matchingRows;
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageRows = sortedRows.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const firstVisibleRow = sortedRows.length ? currentPage * pageSize + 1 : 0;
+  const lastVisibleRow = Math.min((currentPage + 1) * pageSize, sortedRows.length);
+  const activeFilterCount = [
+    Boolean(searchTerm),
+    Boolean(filterColumn && fieldFilter),
+    sortColumn !== "id",
+    sortDirection !== "asc",
+  ].filter(Boolean).length;
   const monthlyMax = Math.max(1, ...analytics.costByMonth.flatMap((month) => [month.expenses, month.fuel, month.services]));
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId);
   const truncatedTables = tableData.filter((table) => table.truncated);
@@ -262,7 +399,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   return <>
     <div className="page-head"><div><p className="eyebrow">RiderTracker · Live database</p><h1 className="page-title">Vehicles</h1><p className="page-subtitle">Manage the assigned RiderTracker profile directly. Records stay in RiderTracker; nothing is copied into MyFinanceTracker.</p></div>
       <div className="connector-actions">
-        <Button type="button" variant="outline" disabled={!data || loading || busy} onClick={() => void loadProfileData(selectedProfileId)}><RefreshCw size={14} />Refresh</Button>
+        <Button type="button" variant="outline" disabled={!data || loading || busy} onClick={() => void loadProfileData(selectedProfileId, passphrase, false)}><RefreshCw size={14} />Refresh</Button>
         {profiles.length > 0 && <Button type="button" variant="ghost" onClick={lockProfiles}><LockKeyhole size={14} />Lock profile</Button>}
         <Button type="button" variant="outline" onClick={() => setSource("daybook")}>MyFinanceTracker records</Button>
       </div>
@@ -272,7 +409,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     {vaultLoading
       ? <Card><p className="section-description">Loading the saved connection vault...</p></Card>
       : !profiles.length
-        ? <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Connect the Vehicles profile</h2><p className="section-description">Unlock the encrypted connection vault. The passphrase is used only for this session and is not saved.</p></div><LockKeyhole size={16} /></div>
+        ? <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Connect the Vehicles profile</h2><p className="section-description">Unlock the encrypted connection vault once per tab. The passphrase is remembered in this browser tab until you lock the profile or sign out; avoid this on shared devices.</p></div><LockKeyhole size={16} /></div>
           <form className="connector-form" onSubmit={(event) => void unlockProfiles(event)}>
             <Field className="full" label="Database connection vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={passphrase} onChange={(event) => setPassphrase(event.target.value)} /></Field>
             <div className="full"><Button type="submit" disabled={busy || !vault}>{busy ? "Unlocking..." : "Unlock Vehicles profile"}</Button></div>
@@ -291,7 +428,16 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
         <Button type="button" variant={activeTable === "reports" ? "primary" : "outline"} role="tab" aria-selected={activeTable === "reports"} onClick={() => setActiveTable("reports")}><BarChart3 size={14} />Reports & analytics</Button>
         {VEHICLE_PROFILE_TABLES.map((table) => {
           const count = tableData.find((item) => item.name === table)?.totalRows ?? "0";
-          return <Button type="button" key={table} variant={activeTable === table ? "primary" : "outline"} role="tab" aria-selected={activeTable === table} onClick={() => { setActiveTable(table); setSearch(""); }}>{TABLE_LABELS[table]} · {count}</Button>;
+          return <Button type="button" key={table} variant={activeTable === table ? "primary" : "outline"} role="tab" aria-selected={activeTable === table} onClick={() => {
+            setActiveTable(table);
+            setSearch("");
+            setFilterColumn("");
+            setFilterValue("");
+            setFilterMatch("contains");
+            setSortColumn("id");
+            setSortDirection("asc");
+            setPage(0);
+          }}>{TABLE_LABELS[table]} · {count}</Button>;
         })}
       </div>
       {activeTable === "reports" ? <>
@@ -321,18 +467,53 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
           <p className="section-description">{fuel.filter((row) => row.mileage !== null && row.mileage !== undefined).length} fuel records include mileage · average recorded mileage: {analytics.averageMileage ? `${analytics.averageMileage.toFixed(2)} km/L` : "not available"}.</p>
         </Card>
       </> : activeTableData && <>
-        <Card className="database-browser"><div className="database-table-select"><div><h2 className="section-title">{TABLE_LABELS[activeTableData.name]}</h2><p className="section-description">{activeTableData.totalRows} record(s) in RiderTracker · {activeTableData.columns.length} columns</p></div><Button type="button" disabled={busy} onClick={() => setEditor({ table: activeTableData, row: null })}><Plus size={14} />Add record</Button></div>
-          <div className="toolbar filter-toolbar"><div className="search-wrap"><Input aria-label={`Search ${TABLE_LABELS[activeTableData.name]}`} placeholder={`Search ${TABLE_LABELS[activeTableData.name].toLocaleLowerCase()}...`} value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{visibleRows.length} shown</Badge></div>
-          <div className="database-column-list"><strong>Columns</strong>{activeTableData.columns.map((column) => <Badge key={column.name}>{column.name} · {column.dataType}{activeTableData.primaryKey.includes(column.name) ? " · PK" : ""}</Badge>)}</div>
-          {visibleRows.length ? <div className="vehicle-profile-records">{visibleRows.map((row) => <article className="database-row" key={String(row.id)}><div className="database-row-head"><strong>{activeTableData.primaryKey.map((key) => `${key}=${rowValue(row[key])}`).join(", ")}</strong><div className="table-actions"><button type="button" className="icon-button" disabled={busy} aria-label={`Edit ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => setEditor({ table: activeTableData, row })}><Pencil size={14} /></button><button type="button" className="icon-button" disabled={busy} aria-label={`Delete ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => void deleteRecord(activeTableData, row)}><Trash2 size={14} /></button></div></div><div className="database-fields">{activeTableData.columns.map((column) => <div key={column.name}><span>{column.name}</span><pre>{rowValue(row[column.name])}</pre></div>)}</div></article>)}</div> : <EmptyState icon={<Database size={18} />} title={search ? "No matching records" : "No records yet"} description={search ? "Try another search." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
-          {activeTableData.truncated && <p className="section-description">Showing the first 1,000 records. Use search or Database Manager for larger datasets.</p>}
+        <Card className="database-browser"><div className="database-table-select"><div><h2 className="section-title">{TABLE_LABELS[activeTableData.name]}</h2><p className="section-description">{activeTableData.totalRows} record(s) in RiderTracker</p></div><Button type="button" disabled={busy} onClick={() => setEditor({ table: activeTableData, row: null, mode: "add" })}><Plus size={14} />Add record</Button></div>
+          <div className="toolbar filter-toolbar vehicle-profile-table-toolbar">
+            <div className="search-wrap"><Input aria-label={`Search ${TABLE_LABELS[activeTableData.name]}`} placeholder={`Search ${TABLE_LABELS[activeTableData.name].toLocaleLowerCase()}...`} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
+            <FilterDrawer activeCount={activeFilterCount} label={`Filter and sort ${TABLE_LABELS[activeTableData.name]}`} closeOnChange={false}>
+              <Field label="Filter field"><Select value={filterColumn} onChange={(event) => { setFilterColumn(event.target.value); setPage(0); }}><option value="">Choose a field</option>{activeTableData.columns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+              <Field label="Filter value"><Input value={filterValue} onChange={(event) => { setFilterValue(event.target.value); setPage(0); }} placeholder="Enter a value" /></Field>
+              <Field label="Match"><Select value={filterMatch} onChange={(event) => { setFilterMatch(event.target.value as "contains" | "exact"); setPage(0); }}><option value="contains">Contains</option><option value="exact">Exact match</option></Select></Field>
+              <Field label="Sort by"><Select value={selectedSortColumn?.name ?? ""} onChange={(event) => { setSortColumn(event.target.value); setPage(0); }}>{activeTableData.columns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+              <Field label="Order"><Select value={sortDirection} onChange={(event) => { setSortDirection(event.target.value as "asc" | "desc"); setPage(0); }}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
+              <Button type="button" size="sm" variant="outline" onClick={() => {
+                setSearch("");
+                setFilterColumn("");
+                setFilterValue("");
+                setFilterMatch("contains");
+                setSortColumn("id");
+                setSortDirection("asc");
+                setPage(0);
+              }}>Clear filters</Button>
+            </FilterDrawer>
+            <Badge>{matchingRows.length} {matchingRows.length === 1 ? "record" : "records"}</Badge>
+          </div>
+          {pageRows.length ? <div className="vehicle-profile-records">{pageRows.map((row) => <article className="database-row" key={String(row.id)}>
+            <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row)}</strong><div className="table-actions">
+              <button type="button" className="icon-button" disabled={busy} aria-label={`Copy ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => setEditor({ table: activeTableData, row, mode: "copy" })}><Copy size={14} /></button>
+              <button type="button" className="icon-button" disabled={busy} aria-label={`Edit ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => setEditor({ table: activeTableData, row, mode: "edit" })}><Pencil size={14} /></button>
+              <button type="button" className="icon-button" disabled={busy} aria-label={`Delete ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => void deleteRecord(activeTableData, row)}><Trash2 size={14} /></button>
+            </div></div>
+            <div className="database-fields">{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name)).map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{rowValue(row[column.name])}</pre></div>)}</div>
+          </article>)}</div> : <EmptyState icon={<Database size={18} />} title={searchTerm || fieldFilter ? "No matching records" : "No records yet"} description={searchTerm || fieldFilter ? "Try changing the search or field filter." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
+          <div className="database-pagination vehicle-profile-pagination">
+            <span aria-live="polite">Rows {firstVisibleRow}–{lastVisibleRow} of {sortedRows.length} matching · {activeTableData.totalRows} total</span>
+            <div>
+              <Field label="Rows"><Select aria-label={`${TABLE_LABELS[activeTableData.name]} rows per page`} value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option></Select></Field>
+              <Button type="button" variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button>
+              <span aria-live="polite">{currentPage + 1} / {pageCount}</span>
+              <Button type="button" variant="outline" size="sm" disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)}>Next</Button>
+            </div>
+          </div>
+          {activeTableData.truncated && <p className="section-description">Filters, sorting, and paging use the first 1,000 loaded records. This table has {activeTableData.totalRows} records; use Database Manager to inspect records beyond that limit.</p>}
         </Card>
       </>}
     </>}
     {editor && <VehicleProfileRecordEditor
-      key={`${editor.table.name}-${editor.row?.id ?? "new"}`}
+      key={`${editor.table.name}-${editor.mode}-${editor.row?.id ?? "new"}`}
       table={editor.table}
       initial={editor.row}
+      mode={editor.mode}
       vehicles={vehicles}
       busy={busy}
       onClose={() => setEditor(null)}
@@ -341,9 +522,10 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   </>;
 }
 
-function VehicleProfileRecordEditor({ table, initial, vehicles, busy, onClose, onSave }: {
+function VehicleProfileRecordEditor({ table, initial, mode, vehicles, busy, onClose, onSave }: {
   table: VehicleProfileTable;
   initial: VehicleProfileRow | null;
+  mode: "add" | "edit" | "copy";
   vehicles: VehicleProfileRow[];
   busy: boolean;
   onClose: () => void;
@@ -351,6 +533,7 @@ function VehicleProfileRecordEditor({ table, initial, vehicles, busy, onClose, o
 }) {
   const editableColumns = useMemo(() => table.columns.filter((column) =>
     !table.primaryKey.includes(column.name) && column.name !== "created_at" && column.name !== "updated_at"), [table]);
+  const isEditing = mode === "edit";
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(editableColumns.map((column) => {
     const value = initial?.[column.name];
     return [column.name, value === null || value === undefined
@@ -367,7 +550,7 @@ function VehicleProfileRecordEditor({ table, initial, vehicles, busy, onClose, o
       const rawValue = values[column.name] ?? "";
       if (rawValue === "") {
         if (column.nullable) payload[column.name] = null;
-        else if (!initial && column.defaultValue) continue;
+        else if (!isEditing && column.defaultValue) continue;
         else {
           setError(`${column.name} is required.`);
           return;
@@ -390,27 +573,28 @@ function VehicleProfileRecordEditor({ table, initial, vehicles, busy, onClose, o
     await onSave(payload);
   }
 
-  const title = `${initial ? "Edit" : "Add"} ${TABLE_LABELS[table.name]} record`;
+  const title = `${mode === "edit" ? "Edit" : mode === "copy" ? "Copy" : "Add"} ${TABLE_LABELS[table.name]} record`;
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
     <section className="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="vehicle-record-title">
       <div className="modal-head"><h2 id="vehicle-record-title">{title}</h2><button type="button" className="icon-button" aria-label="Close dialog" disabled={busy} onClick={onClose}>×</button></div>
       <form onSubmit={(event) => void submit(event)}><div className="form-grid">
         {editableColumns.map((column) => {
-          const label = column.name.replace(/_/g, " ");
+          const label = columnLabel(column.name);
+          const required = !column.nullable && !(column.defaultValue && !isEditing);
           const isDate = column.dataType === "date";
           const isBoolean = column.dataType === "boolean";
           const isNumeric = ["smallint", "integer", "bigint", "numeric", "real", "double precision"].includes(column.dataType);
           const options = column.name === "vehicle_id" ? vehicles : [];
-          if (isDate) return <Field key={column.name} label={label}><DateInput required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onValueChange={(value) => setValues((current) => ({ ...current, [column.name]: value }))} /></Field>;
-          if (isBoolean) return <Field key={column.name} label={label}><Select required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">Choose...</option><option value="true">Yes</option><option value="false">No</option></Select></Field>;
-          if (options.length || column.name === "vehicle_id") return <Field key={column.name} label={label}><Select required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">{column.nullable ? "None" : "Choose a vehicle"}</option>{options.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{String(vehicle.name ?? "Vehicle")} · ID {String(vehicle.id)}</option>)}</Select></Field>;
-          if (isNumeric) return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input type="number" step={["smallint", "integer", "bigint"].includes(column.dataType) ? "1" : "any"} required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
-          if (column.dataType === "text" || column.dataType.startsWith("character varying")) return <Field key={column.name} label={label}><textarea className="field textarea" rows={column.dataType === "text" ? 3 : 1} maxLength={column.dataType.startsWith("character varying") ? Number(column.dataType.match(/\d+/)?.[0] ?? 5000) : 5000} required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
-          return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input required={!column.nullable && !(column.defaultValue && !initial)} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
+          if (isDate) return <Field key={column.name} label={label}><DateInput required={required} value={values[column.name] ?? ""} onValueChange={(value) => setValues((current) => ({ ...current, [column.name]: value }))} /></Field>;
+          if (isBoolean) return <Field key={column.name} label={label}><Select required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">Choose...</option><option value="true">Yes</option><option value="false">No</option></Select></Field>;
+          if (options.length || column.name === "vehicle_id") return <Field key={column.name} label={label}><Select required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">{column.nullable ? "None" : "Choose a vehicle"}</option>{options.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{String(vehicle.name ?? "Vehicle")} · ID {String(vehicle.id)}</option>)}</Select></Field>;
+          if (isNumeric) return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input type="number" step={["smallint", "integer", "bigint"].includes(column.dataType) ? "1" : "any"} required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
+          if (column.dataType === "text" || column.dataType.startsWith("character varying")) return <Field key={column.name} label={label}><textarea className="field textarea" rows={column.dataType === "text" ? 3 : 1} maxLength={column.dataType.startsWith("character varying") ? Number(column.dataType.match(/\d+/)?.[0] ?? 5000) : 5000} required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
+          return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
         })}
         <p className="section-description full">Numeric type codes are stored and shown as-is; RiderTracker does not expose a label map for them.</p>
       </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
-        <div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving..." : initial ? "Save changes" : "Add record"}</Button></div>
+        <div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving..." : mode === "edit" ? "Save changes" : mode === "copy" ? "Create copy" : "Add record"}</Button></div>
       </form>
     </section>
   </div>;
