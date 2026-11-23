@@ -103,21 +103,7 @@ export async function executeDatabaseSql(sql: string, confirmation: string, stat
 }
 
 export async function testSupabaseConnection(connectionString: string): Promise<DatabaseConnectionTestResult> {
-  const response = await fetch("/api/database-connection-test", {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify({ connectionString }),
-    cache: "no-store",
-    credentials: "same-origin",
-  });
-  const payload: unknown = await response.json();
-  if (!response.ok) {
-    const message = typeof payload === "object" && payload !== null && "error" in payload &&
-      typeof payload.error === "string"
-      ? payload.error
-      : `Supabase connection test failed (${response.status}).`;
-    throw new Error(message);
-  }
+  const payload: unknown = await (await request("/api/database", { action: "test-connection", connectionString })).json();
   if (typeof payload !== "object" || payload === null || !("connected" in payload) ||
     payload.connected !== true || !("database" in payload) || typeof payload.database !== "string") {
     throw new Error("The server returned an invalid Supabase connection test result.");
