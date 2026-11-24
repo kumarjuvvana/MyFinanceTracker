@@ -2704,6 +2704,20 @@ button.fleet-bar-row:disabled{cursor:default}
 .rider-fleet-record-actions{display:flex;align-items:center;gap:2px;flex:none}
 .rider-fleet-record-actions .icon-button{width:30px;height:30px;color:var(--fleet-muted)}
 .rider-fleet-record-actions .icon-button:hover{border-color:var(--fleet-line);background:var(--fleet-bg);color:var(--fleet-ink)}
+.rider-fleet-data-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:11px}
+.rider-fleet-data-grid>.database-row{min-width:0;margin:0;padding:13px;border:1px solid var(--fleet-line);border-radius:11px;background:var(--fleet-card)}
+.rider-fleet-data-grid .database-row-head{align-items:flex-start;gap:8px}
+.rider-fleet-data-grid .database-row-head>strong{min-width:0;overflow-wrap:anywhere}
+.rider-fleet-data-grid .database-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px}
+.rider-fleet-data-grid .database-fields>div{min-width:0;padding:7px;border-color:var(--fleet-line);border-radius:7px}
+.rider-fleet-data-grid .database-fields pre{color:var(--fleet-ink);overflow-wrap:anywhere}
+.rider-fleet-data-list{display:grid;gap:7px}
+.rider-fleet-data-list-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--fleet-line);border-radius:10px;background:var(--fleet-card)}
+.rider-fleet-data-list-row>div:first-child{display:grid;gap:5px;min-width:0}
+.rider-fleet-data-list-row h3{margin:0;color:var(--fleet-ink);font-size:11px;overflow-wrap:anywhere}
+.rider-fleet-data-list-row>div:first-child>div{display:flex;gap:7px 14px;flex-wrap:wrap}
+.rider-fleet-data-list-row>div:first-child span{color:var(--fleet-muted);font-size:9px;overflow-wrap:anywhere}
+.rider-fleet-data-list-row>div:first-child span strong{color:var(--fleet-ink);font-weight:650}
 .rider-fleet-table-wrap{width:100%;overflow-x:auto}
 .rider-fleet-table{width:100%;min-width:680px;border-collapse:collapse}
 .rider-fleet-table th,.rider-fleet-table td{padding:10px 11px;border-bottom:1px solid var(--fleet-line);text-align:left;vertical-align:middle}
@@ -2756,6 +2770,11 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .rider-fleet-overview-heading h2,.app-shell.design-modern-dark .rider-fleet-overview-heading h2,.app-shell.design-premium-fintech .rider-fleet-overview-heading h2,
 .app-shell.dark .rider-fleet-overview-metrics strong,.app-shell.design-modern-dark .rider-fleet-overview-metrics strong,.app-shell.design-premium-fintech .rider-fleet-overview-metrics strong{color:var(--fleet-ink)}
 .app-shell.dark .rider-fleet-vehicle-card,.app-shell.dark .rider-fleet-compact-row,.app-shell.design-modern-dark .rider-fleet-vehicle-card,.app-shell.design-modern-dark .rider-fleet-compact-row,.app-shell.design-premium-fintech .rider-fleet-vehicle-card,.app-shell.design-premium-fintech .rider-fleet-compact-row{border-color:var(--fleet-line);background:var(--fleet-card)}
+.app-shell.dark .rider-fleet-data-grid>.database-row,.app-shell.design-modern-dark .rider-fleet-data-grid>.database-row,.app-shell.design-premium-fintech .rider-fleet-data-grid>.database-row{border-color:var(--fleet-line);background:var(--fleet-card)}
+.app-shell.dark .rider-fleet-data-grid .database-row-head>strong,.app-shell.dark .rider-fleet-data-grid .database-fields pre,.app-shell.dark .rider-fleet-data-list-row h3,.app-shell.dark .rider-fleet-data-list-row>div:first-child span strong,.app-shell.design-modern-dark .rider-fleet-data-grid .database-row-head>strong,.app-shell.design-modern-dark .rider-fleet-data-grid .database-fields pre,.app-shell.design-modern-dark .rider-fleet-data-list-row h3,.app-shell.design-modern-dark .rider-fleet-data-list-row>div:first-child span strong,.app-shell.design-premium-fintech .rider-fleet-data-grid .database-row-head>strong,.app-shell.design-premium-fintech .rider-fleet-data-grid .database-fields pre,.app-shell.design-premium-fintech .rider-fleet-data-list-row h3,.app-shell.design-premium-fintech .rider-fleet-data-list-row>div:first-child span strong{color:var(--fleet-ink)}
+.app-shell.dark .rider-fleet-data-grid .database-fields>div,.app-shell.design-modern-dark .rider-fleet-data-grid .database-fields>div,.app-shell.design-premium-fintech .rider-fleet-data-grid .database-fields>div{border-color:var(--fleet-line)}
+.app-shell.dark .rider-fleet-data-list-row,.app-shell.design-modern-dark .rider-fleet-data-list-row,.app-shell.design-premium-fintech .rider-fleet-data-list-row{border-color:var(--fleet-line);background:var(--fleet-card)}
+.app-shell.dark .rider-fleet-data-list-row>div:first-child span,.app-shell.design-modern-dark .rider-fleet-data-list-row>div:first-child span,.app-shell.design-premium-fintech .rider-fleet-data-list-row>div:first-child span{color:var(--fleet-muted)}
 .app-shell.dark .rider-fleet-vehicle-title h3,.app-shell.dark .rider-fleet-vehicle-metadata strong,.app-shell.dark .rider-fleet-vehicle-extras strong,.app-shell.dark .rider-fleet-compact-main h3,.app-shell.dark .rider-fleet-table td,.app-shell.design-modern-dark .rider-fleet-vehicle-title h3,.app-shell.design-modern-dark .rider-fleet-vehicle-metadata strong,.app-shell.design-modern-dark .rider-fleet-vehicle-extras strong,.app-shell.design-modern-dark .rider-fleet-compact-main h3,.app-shell.design-modern-dark .rider-fleet-table td,.app-shell.design-premium-fintech .rider-fleet-vehicle-title h3,.app-shell.design-premium-fintech .rider-fleet-vehicle-metadata strong,.app-shell.design-premium-fintech .rider-fleet-vehicle-extras strong,.app-shell.design-premium-fintech .rider-fleet-compact-main h3,.app-shell.design-premium-fintech .rider-fleet-table td{color:var(--fleet-ink)}
 .app-shell.dark .rider-fleet-vehicle-mark,.app-shell.design-modern-dark .rider-fleet-vehicle-mark,.app-shell.design-premium-fintech .rider-fleet-vehicle-mark{background:#153b3a;color:#5eead4}
 .app-shell.dark .rider-fleet-vehicle-metadata span,.app-shell.dark .rider-fleet-vehicle-extras span,.app-shell.dark .rider-fleet-compact-main>div>span,.app-shell.dark .rider-fleet-compact-row>p,.app-shell.dark .rider-fleet-vehicle-card-footer>span,.app-shell.design-modern-dark .rider-fleet-vehicle-metadata span,.app-shell.design-modern-dark .rider-fleet-vehicle-extras span,.app-shell.design-modern-dark .rider-fleet-compact-main>div>span,.app-shell.design-modern-dark .rider-fleet-compact-row>p,.app-shell.design-modern-dark .rider-fleet-vehicle-card-footer>span,.app-shell.design-premium-fintech .rider-fleet-vehicle-metadata span,.app-shell.design-premium-fintech .rider-fleet-vehicle-extras span,.app-shell.design-premium-fintech .rider-fleet-compact-main>div>span,.app-shell.design-premium-fintech .rider-fleet-compact-row>p,.app-shell.design-premium-fintech .rider-fleet-vehicle-card-footer>span{color:var(--fleet-muted)}
@@ -2771,7 +2790,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .fleet-technical-details>summary,.app-shell.dark .fleet-technical-details p span,.app-shell.design-modern-dark .fleet-technical-details>summary,.app-shell.design-modern-dark .fleet-technical-details p span,.app-shell.design-premium-fintech .fleet-technical-details>summary,.app-shell.design-premium-fintech .fleet-technical-details p span{color:var(--fleet-muted)}
 @media(max-width:1050px){
   .rider-fleet-primary-nav{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .rider-fleet-vehicle-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rider-fleet-vehicle-grid,.rider-fleet-data-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:760px){
   .rider-fleet-page-head{align-items:flex-start;flex-direction:column}
@@ -2779,7 +2798,7 @@ button.fleet-bar-row:disabled{cursor:default}
   .rider-fleet-primary-nav .button{justify-content:flex-start}
   .rider-fleet-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .rider-fleet-toolbar>.search-wrap{flex-basis:100%}
-  .rider-fleet-vehicle-grid{grid-template-columns:minmax(0,1fr)}
+  .rider-fleet-vehicle-grid,.rider-fleet-data-grid{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:600px){
   .rider-fleet-registry-heading{align-items:flex-start;flex-direction:column}
@@ -2790,6 +2809,7 @@ button.fleet-bar-row:disabled{cursor:default}
   .rider-fleet-detail-fields{grid-template-columns:minmax(0,1fr)}
   .rider-fleet-overview-grid{grid-template-columns:minmax(0,1fr)}
   .rider-fleet-overview-heading{align-items:flex-start;flex-direction:column}
+  .rider-fleet-data-list-row{align-items:flex-start;flex-direction:column}
 }
 @media(max-width:400px){
   .rider-fleet-kpis>.card{padding:10px}

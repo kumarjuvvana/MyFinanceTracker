@@ -155,7 +155,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [vehicleType, setVehicleType] = useState("all");
   const [vehicleManufacturer, setVehicleManufacturer] = useState("all");
   const [vehicleYear, setVehicleYear] = useState("all");
-  const [vehicleDetails, setVehicleDetails] = useState<VehicleProfileRow | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<{ table: VehicleProfileTable; row: VehicleProfileRow } | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -313,7 +313,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     setProfiles([]);
     setSelectedProfileId("");
     setActiveModule("overview");
-    setVehicleDetails(null);
+    setViewingRecord(null);
     setPassphrase("");
     setError(cleared ? "" : "The remembered passphrase could not be cleared. Close this browser tab to remove it.");
     setNotice("The Vehicles database profile is locked.");
@@ -661,7 +661,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
           onPageChange={setPage}
           onPageSizeChange={(value) => { setPageSize(value); setPage(0); }}
           onAdd={() => activeTableData && setEditor({ table: activeTableData, row: null, mode: "add" })}
-          onViewRow={setVehicleDetails}
+          onViewRow={(row) => activeTableData && setViewingRecord({ table: activeTableData, row })}
           onEditRow={(row) => activeTableData && setEditor({ table: activeTableData, row, mode: "edit" })}
           onCopyRow={(row) => activeTableData && setEditor({ table: activeTableData, row, mode: "copy" })}
           onDeleteRow={(row) => activeTableData && void deleteRecord(activeTableData, row)}
@@ -687,17 +687,29 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
                 setPage(0);
               }}>Clear filters</Button>
             </FilterDrawer>
+            <div className="rider-fleet-view-toggle" role="group" aria-label={`${TABLE_LABELS[activeTableData.name]} display mode`}>
+              <Button type="button" variant={vehicleView === "grid" ? "primary" : "outline"} aria-pressed={vehicleView === "grid"} aria-label="Card grid view" title="Card grid view" onClick={() => setVehicleView("grid")}><Grid2X2 size={15} /><span>Grid</span></Button>
+              <Button type="button" variant={vehicleView === "table" ? "primary" : "outline"} aria-pressed={vehicleView === "table"} aria-label="Table view" title="Table view" onClick={() => setVehicleView("table")}><Table2 size={15} /><span>Table</span></Button>
+              <Button type="button" variant={vehicleView === "list" ? "primary" : "outline"} aria-pressed={vehicleView === "list"} aria-label="Compact list view" title="Compact list view" onClick={() => setVehicleView("list")}><List size={15} /><span>List</span></Button>
+            </div>
             <Badge>{matchingRows.length} {matchingRows.length === 1 ? "record" : "records"}</Badge>
           </div>
-          {pageRows.length ? <div className="vehicle-profile-records">{pageRows.map((row) => <article className="database-row" key={String(row.id)}>
-            <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row)}</strong><div className="table-actions">
-              <button type="button" className="icon-button" disabled={busy} aria-label={`Copy ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => setEditor({ table: activeTableData, row, mode: "copy" })}><Copy size={14} /></button>
-              <button type="button" className="icon-button" disabled={busy} aria-label={`Edit ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => setEditor({ table: activeTableData, row, mode: "edit" })}><Pencil size={14} /></button>
-              <button type="button" className="icon-button" disabled={busy} aria-label={`Delete ${TABLE_LABELS[activeTableData.name]} record ${rowValue(row.id)}`} onClick={() => void deleteRecord(activeTableData, row)}><Trash2 size={14} /></button>
-            </div></div>
-            <div className="database-fields">{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayProfileValue(row, column)}</pre></div>)}</div>
-            {activeTableData.columns.some(isTechnicalTimestampColumn) && <details className="fleet-technical-details"><summary>Technical details</summary><div>{activeTableData.columns.filter(isTechnicalTimestampColumn).map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column)}</strong></p>)}</div></details>}
-          </article>)}</div> : <EmptyState icon={<Database size={18} />} title={searchTerm || fieldFilter ? "No matching records" : "No records yet"} description={searchTerm || fieldFilter ? "Try changing the search or field filter." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
+          {pageRows.length ? vehicleView === "table"
+            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{activeTableData.columns.filter((column) => !isTechnicalTimestampColumn(column)).map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{activeTableData.columns.filter((column) => !isTechnicalTimestampColumn(column)).map((column) => <td key={column.name}>{displayProfileValue(row, column)}</td>)}<td><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></td></tr>)}</tbody></table></div>
+            : vehicleView === "list"
+              ? <div className="rider-fleet-data-list">{pageRows.map((row) => {
+                const summaryColumns = activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).slice(0, 3);
+                return <article className="rider-fleet-data-list-row" key={String(row.id)}>
+                  <div><h3>{profileRecordTitle(activeTableData.name, row)}</h3><div>{summaryColumns.map((column) => <span key={column.name}><strong>{columnLabel(column.name)}:</strong> {displayProfileValue(row, column)}</span>)}</div></div>
+                  <VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} />
+                </article>;
+              })}</div>
+              : <div className="rider-fleet-data-grid">{pageRows.map((row) => <article className="database-row" key={String(row.id)}>
+                <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row)}</strong><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></div>
+                <div className="database-fields">{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayProfileValue(row, column)}</pre></div>)}</div>
+                {activeTableData.columns.some(isTechnicalTimestampColumn) && <details className="fleet-technical-details"><summary>Technical details</summary><div>{activeTableData.columns.filter(isTechnicalTimestampColumn).map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column)}</strong></p>)}</div></details>}
+              </article>)}</div>
+            : <EmptyState icon={<Database size={18} />} title={searchTerm || fieldFilter ? "No matching records" : "No records yet"} description={searchTerm || fieldFilter ? "Try changing the search or field filter." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
           <div className="database-pagination vehicle-profile-pagination">
             <span aria-live="polite">Rows {firstVisibleRow}–{lastVisibleRow} of {sortedRows.length} matching · {activeTableData.totalRows} total</span>
             <div>
@@ -721,11 +733,11 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
       onClose={() => setEditor(null)}
       onSave={(values) => saveRecord(editor.table, values)}
     />}
-    {vehicleDetails && <VehicleDetailsDialog
-      row={vehicleDetails}
-      table={vehiclesTable}
-      onClose={() => setVehicleDetails(null)}
-      onEdit={() => { if (vehiclesTable) setEditor({ table: vehiclesTable, row: vehicleDetails, mode: "edit" }); setVehicleDetails(null); }}
+    {viewingRecord && <ProfileRecordDetailsDialog
+      row={viewingRecord.row}
+      table={viewingRecord.table}
+      onClose={() => setViewingRecord(null)}
+      onEdit={() => { setEditor({ table: viewingRecord.table, row: viewingRecord.row, mode: "edit" }); setViewingRecord(null); }}
     />}
   </div>;
 }
@@ -915,15 +927,16 @@ function VehicleStatus({ value, columnAvailable }: { value: string; columnAvaila
   return <span className={`rider-fleet-status ${tone}`}>{value || "Status not set"}</span>;
 }
 
-function VehicleRecordActions({ row, busy, onView, onEdit, onCopy, onDelete }: {
+function VehicleRecordActions({ row, busy, entityLabel = "vehicle", onView, onEdit, onCopy, onDelete }: {
   row: VehicleProfileRow;
   busy: boolean;
+  entityLabel?: string;
   onView: (row: VehicleProfileRow) => void;
   onEdit: (row: VehicleProfileRow) => void;
   onCopy: (row: VehicleProfileRow) => void;
   onDelete: (row: VehicleProfileRow) => void;
 }) {
-  const label = `vehicle ${rowValue(row.id)}`;
+  const label = `${entityLabel} ${rowValue(row.id)}`;
   return <div className="rider-fleet-record-actions">
     <button type="button" className="icon-button" disabled={busy} aria-label={`View ${label}`} title="View" onClick={() => onView(row)}><Eye size={14} /></button>
     <button type="button" className="icon-button" disabled={busy} aria-label={`Edit ${label}`} title="Edit" onClick={() => onEdit(row)}><Pencil size={14} /></button>
@@ -932,20 +945,22 @@ function VehicleRecordActions({ row, busy, onView, onEdit, onCopy, onDelete }: {
   </div>;
 }
 
-function VehicleDetailsDialog({ row, table, onClose, onEdit }: {
+function ProfileRecordDetailsDialog({ row, table, onClose, onEdit }: {
   row: VehicleProfileRow;
-  table?: VehicleProfileTable;
+  table: VehicleProfileTable;
   onClose: () => void;
   onEdit: () => void;
 }) {
-  const columns = table?.columns ?? [];
+  const columns = table.columns;
   const technicalColumns = columns.filter(isTechnicalTimestampColumn);
+  const vehicleName = rowValue(row.name ?? row.vehicle_name ?? row.title);
+  const title = table.name === "vehicles" && vehicleName !== "—" ? vehicleName : profileRecordTitle(table.name, row);
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="modal modal-wide rider-fleet-details-dialog" role="dialog" aria-modal="true" aria-labelledby="vehicle-details-title">
-      <div className="modal-head"><div><p className="eyebrow">Vehicle record · {rowValue(row.id)}</p><h2 id="vehicle-details-title">{rowValue(row.name ?? row.vehicle_name ?? row.title) === "—" ? "Vehicle details" : rowValue(row.name ?? row.vehicle_name ?? row.title)}</h2></div><button type="button" className="icon-button" aria-label="Close vehicle details" onClick={onClose}><X size={18} /></button></div>
-      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table?.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{displayProfileValue(row, column)}</dd></div>)}</dl>
+      <div className="modal-head"><div><p className="eyebrow">{TABLE_LABELS[table.name]} record · {rowValue(row.id)}</p><h2 id="vehicle-details-title">{title}</h2></div><button type="button" className="icon-button" aria-label={`Close ${TABLE_LABELS[table.name]} details`} onClick={onClose}><X size={18} /></button></div>
+      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{displayProfileValue(row, column)}</dd></div>)}</dl>
       {technicalColumns.length > 0 && <details className="fleet-technical-details"><summary>Technical details</summary><div>{technicalColumns.map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column)}</strong></p>)}</div></details>}
-      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" onClick={onEdit}><Pencil size={14} />Edit vehicle</Button></div>
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" onClick={onEdit}><Pencil size={14} />Edit {table.name === "vehicles" ? "vehicle" : "record"}</Button></div>
     </section>
   </div>;
 }
