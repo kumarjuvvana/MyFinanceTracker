@@ -6,6 +6,54 @@ interface UploadPreparation {
   contentType: string;
 }
 
+export interface DocumentStorageUsage {
+  bucket: string;
+  usedBytes: number;
+  objectCount: number;
+  largestFiles: { name: string; sizeBytes: number }[];
+  capacityBytes: number | null;
+  measuredAt: string;
+}
+
+export async function loadDocumentStorageUsage(): Promise<DocumentStorageUsage> {
+  const response = await fetch("/api/documents?resource=storage-usage", {
+    method: "GET",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  const payload: unknown = await response.json();
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload !== null && "error" in payload && typeof payload.error === "string"
+      ? payload.error
+      : `Could not load actual storage usage (${response.status}).`;
+    throw new Error(message);
+  }
+  if (typeof payload !== "object" || payload === null || !("bucket" in payload) ||
+    typeof payload.bucket !== "string" || !("usedBytes" in payload) || typeof payload.usedBytes !== "number" ||
+    !Number.isSafeInteger(payload.usedBytes) || !("objectCount" in payload) || typeof payload.objectCount !== "number" ||
+    !Number.isSafeInteger(payload.objectCount) || !("largestFiles" in payload) || !Array.isArray(payload.largestFiles) ||
+    !payload.largestFiles.every((file) => typeof file === "object" && file !== null &&
+      "name" in file && typeof file.name === "string" && "sizeBytes" in file &&
+      typeof file.sizeBytes === "number" && Number.isSafeInteger(file.sizeBytes)) ||
+    !("capacityBytes" in payload) || (payload.capacityBytes !== null &&
+      (typeof payload.capacityBytes !== "number" || !Number.isSafeInteger(payload.capacityBytes))) ||
+    !("measuredAt" in payload) || typeof payload.measuredAt !== "string") {
+    throw new Error("The server returned an invalid storage usage report.");
+  }
+  return {
+    bucket: payload.bucket,
+    usedBytes: payload.usedBytes,
+    objectCount: payload.objectCount,
+    largestFiles: payload.largestFiles.map((file) => ({
+      name: file.name,
+      sizeBytes: file.sizeBytes,
+    })),
+    capacityBytes: payload.capacityBytes,
+    measuredAt: payload.measuredAt,
+  };
+}
+
 async function requestUpload(file: File): Promise<UploadPreparation> {
   const response = await fetch("/api/documents", {
     method: "POST",

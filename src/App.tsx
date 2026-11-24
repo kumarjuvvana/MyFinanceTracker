@@ -3,7 +3,7 @@ import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell, History,
   ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
-  ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
+  ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical, Grid2X2, List, Table2,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, Select } from "./components/ui";
@@ -12,11 +12,12 @@ import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
-import { deleteDocumentFile, uploadDocumentFile } from "./lib/documentApi";
+import { deleteDocumentFile, loadDocumentStorageUsage, uploadDocumentFile, type DocumentStorageUsage } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
-import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
+import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
 import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
+import { clearDocumentModulesSessionPassphrase, DocumentModulesDatabaseGate } from "./components/DocumentModulesDatabaseGate";
 import { loadDatabaseConnectionVault } from "./lib/databaseConnectionsApi";
 import { loadCloudUsage, loadDeploymentUsage, type CloudUsage, type DeploymentUsage } from "./lib/usageApi";
 import { createCredentialVault, decryptCredentialVaultWithKey, unlockCredentialVault, updateCredentialVault, type UnlockedCredentialVault } from "./lib/credentialVault";
@@ -24,7 +25,7 @@ import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } fro
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
 import type { EncryptedVault } from "./types";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type DocumentCategory, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { DESIGN_THEMES, type DesignTheme } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
@@ -92,7 +93,7 @@ const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
 const DASHBOARD_WIDGET_OPTIONS: { id: DashboardWidget; label: string; description: string }[] = [
   { id: "shopping", label: "Shopping", description: "Spending, shopping list, and trips" },
   { id: "reminders", label: "Notes & reminders", description: "Upcoming and overdue reminders" },
-  { id: "personalDocuments", label: "Personal documents", description: "Upcoming and expired document dates" },
+  { id: "personalDocuments", label: "Personal documents", description: "Upcoming and past-due document dates" },
   { id: "stocks", label: "Stocks", description: "Tracked stocks and quantities" },
   { id: "assets", label: "Asset manager", description: "Your saved assets and valuations" },
   { id: "learning", label: "Learning", description: "Learning topics and progress" },
@@ -737,7 +738,7 @@ function DashboardModuleCard({ title, page, entries, emptyMessage, onPage }: {
   </Card>;
 }
 
-function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: DashboardWidget[]; onPage: (page: Page) => void }) {
+function Dashboard({ data, documentModulesData, widgets, onPage }: { data: TrackerData; documentModulesData: DocumentModulesData | null; widgets: DashboardWidget[]; onPage: (page: Page) => void }) {
   const formatCurrency = useCurrencyFormatter();
   const currentMonth = monthKey(today());
   const daily = data.purchases.filter((purchase) => purchase.date === today()).reduce((sum, purchase) => sum + purchase.price, 0);
@@ -747,7 +748,7 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
   const pendingValue = pending.reduce((sum, item) => sum + item.estimatedPrice * item.quantity, 0);
   const tripCount = data.trips.filter((trip) => monthKey(trip.date) === currentMonth).length;
   const reminders = (data.reminders ?? []).filter((reminder) => !reminder.completed && reminder.date <= dateAfterDays(7)).sort((a, b) => a.date.localeCompare(b.date));
-  const documentDue = (data.personalRecords ?? []).filter((record) => record.dueDate &&
+  const documentDue = (documentModulesData?.personalDocuments ?? []).filter((record) => record.isArchived !== true && record.dueDate &&
     (daysUntil(record.dueDate) < 0 || daysUntil(record.dueDate) <= record.reminderDays))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const stats = [
@@ -800,8 +801,11 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
       }),
     },
     documents: {
-      title: "Documents", page: "Documents", emptyMessage: "No documents uploaded yet.",
-      entries: [...(data.documents ?? [])].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4).map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
+      title: "Documents", page: "Documents",
+      emptyMessage: documentModulesData ? "No documents uploaded yet." : "Open Documents to connect and load its records.",
+      entries: [...(documentModulesData?.documents ?? [])].filter((document) => document.isArchived !== true)
+        .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4)
+        .map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
     },
     devotional: {
       title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries, Bible readings, songs, daily prayers, or prayer requests recorded yet.",
@@ -863,10 +867,10 @@ function Dashboard({ data, widgets, onPage }: { data: TrackerData; widgets: Dash
     </>}
     {widgets.includes("reminders") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Notes & reminders</h2><p className="section-description">Due now or coming up in the next 7 days</p></div><button className="text-link" onClick={() => onPage("Notes & reminders")}>See all <ChevronRight size={12} /></button></div>{reminders.length ? <div className="reminder-list">{reminders.slice(0, 4).map((reminder) => <div className="reminder-row" key={reminder.id}><Bell size={15} /><div className="recent-info"><div className="recent-name">{reminder.title}</div><div className="recent-meta">{reminder.category || "General"} · <LinkifiedText>{reminder.details || "No extra details"}</LinkifiedText></div></div><Badge tone={reminder.date < today() ? "amber" : "green"}>{reminder.date < today() ? "Overdue" : reminder.date === today() ? "Today" : dateLabel(reminder.date)}</Badge></div>)}</div> : <p className="dashboard-module-empty">No upcoming reminders.</p>}</Card>}
     <ImportantDatesDashboardCard onPage={onPage} />
-    {widgets.includes("personalDocuments") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Document & policy dates</h2><p className="section-description">Expired or approaching the reminder date you set</p></div><button className="text-link" onClick={() => onPage("Personal documents")}>Manage records <ChevronRight size={12} /></button></div>{documentDue.length ? <div className="reminder-list">{documentDue.slice(0, 5).map((record) => {
+    {widgets.includes("personalDocuments") && <Card className="dashboard-reminders"><div className="card-head"><div><h2 className="section-title">Document & policy dates</h2><p className="section-description">Past due or approaching the reminder date you set</p></div><button className="text-link" onClick={() => onPage("Personal documents")}>Manage records <ChevronRight size={12} /></button></div>{documentDue.length ? <div className="reminder-list">{documentDue.slice(0, 5).map((record) => {
       const remaining = daysUntil(record.dueDate);
-      return <div className="reminder-row" key={record.id}><FileText size={15} /><div className="recent-info"><div className="recent-name">{record.title}</div><div className="recent-meta">{record.type} · Due {dateLabel(record.dueDate)}</div></div><Badge tone="amber">{remaining < 0 ? "Expired" : remaining === 0 ? "Today" : `${remaining} days`}</Badge></div>;
-    })}</div> : <p className="dashboard-module-empty">No documents or policy dates need attention.</p>}</Card>}
+      return <div className="reminder-row" key={record.id}><FileText size={15} /><div className="recent-info"><div className="recent-name">{record.title}</div><div className="recent-meta">{record.type} · Due {dateLabel(record.dueDate)}</div></div><Badge tone="amber">{remaining < 0 ? "Past due" : remaining === 0 ? "Today" : `${remaining} days`}</Badge></div>;
+    })}</div> : <p className="dashboard-module-empty">{documentModulesData ? "No documents or policy dates need attention." : "Open Personal Documents to connect and load due dates."}</p>}</Card>}
     <div className="dashboard-module-grid">{DASHBOARD_WIDGET_OPTIONS.filter((option): option is typeof option & { id: Exclude<DashboardWidget, "shopping" | "reminders" | "personalDocuments"> } =>
       widgets.includes(option.id) && option.id !== "shopping" && option.id !== "reminders" && option.id !== "personalDocuments")
       .map(({ id }) => {
@@ -13592,13 +13596,15 @@ function FamilyPage({ members, onSave, onDelete }: {
   </>;
 }
 
-function PersonalRecordModal({ initial, onClose, onSave }: {
+function PersonalRecordModal({ initial, categories, onClose, onSave }: {
   initial: PersonalRecord | null;
+  categories: DocumentCategory[];
   onClose: () => void;
-  onSave: (record: Omit<PersonalRecord, "id">) => void;
+  onSave: (record: Omit<PersonalRecord, "id">) => Promise<void> | void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [type, setType] = useState<PersonalRecordType>(initial?.type ?? "Identity");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
   const [holder, setHolder] = useState(initial?.holder ?? "");
   const [recordNumber, setRecordNumber] = useState(initial?.recordNumber ?? "");
   const [issuer, setIssuer] = useState(initial?.issuer ?? "");
@@ -13609,8 +13615,9 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
   const [reminderDays, setReminderDays] = useState(initial?.reminderDays ?? 30);
   const [additionalFields, setAdditionalFields] = useState<PersonalRecordField[]>(initial?.additionalFields ?? []);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     const link = documentLink.trim();
     if (!title.trim()) { setError("Enter a title for this record."); return; }
@@ -13618,38 +13625,48 @@ function PersonalRecordModal({ initial, onClose, onSave }: {
       setError("Enter a valid HTTP, HTTPS, FTP, or local path link.");
       return;
     }
-    onSave({
-      title: title.trim(),
-      type,
-      holder: holder.trim(),
-      recordNumber: recordNumber.trim(),
-      issuer: issuer.trim(),
-      issueDate,
-      dueDate,
-      documentLink: link,
-      notes: notes.trim(),
-      reminderDays,
-      additionalFields: additionalFields
-        .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
-        .filter((field) => field.label || field.value),
-    });
+    setBusy(true);
+    try {
+      await onSave({
+        title: title.trim(),
+        type,
+        categoryId,
+        holder: holder.trim(),
+        recordNumber: recordNumber.trim(),
+        issuer: issuer.trim(),
+        issueDate,
+        dueDate,
+        documentLink: link,
+        notes: notes.trim(),
+        reminderDays,
+        additionalFields: additionalFields
+          .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
+          .filter((field) => field.label || field.value),
+      });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The personal document could not be saved.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  return <Modal title={initial ? "Edit personal record" : "Add a personal record"} onClose={onClose} wide><form onSubmit={submit}><div className="form-grid">
+  return <Modal title={initial ? "Edit personal record" : "Add a personal record"} onClose={onClose} wide><form onSubmit={(event) => void submit(event)}><div className="form-grid">
     <Field className="full" label="Record title"><Input autoFocus required maxLength={120} placeholder="e.g. Aadhaar card, health insurance" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
     <Field label="Type"><Select value={type} onChange={(event) => setType(event.target.value as PersonalRecordType)}><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field>
+    <Field label="Category"><Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Uncategorized</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</Select></Field>
     <Field label="Name on record"><Input maxLength={120} placeholder="Optional" value={holder} onChange={(event) => setHolder(event.target.value)} /></Field>
     <Field label="Document / policy number"><Input maxLength={120} autoComplete="off" placeholder="Store only if needed" value={recordNumber} onChange={(event) => setRecordNumber(event.target.value)} /></Field>
     <Field label="Issued by / provider"><Input maxLength={120} placeholder="Authority or insurer" value={issuer} onChange={(event) => setIssuer(event.target.value)} /></Field>
     <Field label="Issue date"><DateInput value={issueDate} onValueChange={setIssueDate} /></Field>
-    <Field label="Expiry / renewal date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
+    <Field label="Due / renewal date"><DateInput value={dueDate} onValueChange={setDueDate} /></Field>
     <Field label="Remind me"><Select value={reminderDays} onChange={(event) => setReminderDays(Number(event.target.value))}><option value={0}>On the due date</option><option value={7}>7 days before</option><option value={30}>30 days before</option><option value={60}>60 days before</option><option value={90}>90 days before</option></Select></Field>
     <Field className="full" label="Shared document link"><ExternalLinkInput maxLength={2000} placeholder="URL or local path" value={documentLink} onChange={(event) => setDocumentLink(event.target.value)} /></Field>
     <Field className="full" label="Notes"><textarea className="field textarea" rows={3} maxLength={5000} placeholder="Additional information, renewal instructions, contacts..." value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     <div className="personal-fields full"><div className="personal-fields-head"><div><span className="field-label">Additional details</span><p className="section-description">Add any extra label and value for this record.</p></div><Button type="button" variant="outline" onClick={() => setAdditionalFields((fields) => [...fields, { label: "", value: "" }])}><Plus size={13} />Add field</Button></div>
       {additionalFields.map((field, index) => <div className="personal-field-row" key={index}><Input aria-label={`Additional field ${index + 1} name`} maxLength={80} placeholder="Field name" value={field.label} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, label: event.target.value } : entry))} /><Input aria-label={`Additional field ${index + 1} value`} maxLength={500} placeholder="Value" value={field.value} onChange={(event) => setAdditionalFields((fields) => fields.map((entry, fieldIndex) => fieldIndex === index ? { ...entry, value: event.target.value } : entry))} /><button type="button" className="icon-button" aria-label="Remove additional field" onClick={() => setAdditionalFields((fields) => fields.filter((_, fieldIndex) => fieldIndex !== index))}><Trash2 size={14} /></button></div>)}
     </div>
-  </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }}>{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit">{initial ? "Save changes" : "Save record"}</Button></div></form></Modal>;
+  </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving..." : initial ? "Save changes" : "Save record"}</Button></div></form></Modal>;
 }
 
 function daysUntil(date: string): number {
@@ -13658,20 +13675,32 @@ function daysUntil(date: string): number {
   return Math.round((due.getTime() - now.getTime()) / 86400000);
 }
 
-function PersonalRecordsPage({ records, onSave, onDelete }: {
+function maskedDocumentNumber(value: string | undefined): string {
+  const number = value?.trim() ?? "";
+  if (!number) return "";
+  return number.length > 4 ? `•••• ${number.slice(-4)}` : "••••";
+}
+
+function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onDelete, onRestore }: {
   records: PersonalRecord[];
-  onSave: (record: Omit<PersonalRecord, "id">, id?: string) => void;
-  onDelete: (record: PersonalRecord) => void;
+  archivedRecords: PersonalRecord[];
+  categories: DocumentCategory[];
+  onSave: (record: Omit<PersonalRecord, "id">, id?: string) => Promise<void>;
+  onDelete: (record: PersonalRecord) => Promise<void>;
+  onRestore: (record: PersonalRecord) => Promise<void>;
 }) {
   const [editor, setEditor] = useState<{ initial: PersonalRecord | null } | null>(null);
   const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [operationError, setOperationError] = useState("");
   const [typeFilter, setTypeFilter] = useState("All records");
   const [holderFilter, setHolderFilter] = useState("All people");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("expiry");
+  const [groupBy, setGroupBy] = useState("due");
   const [sortBy, setSortBy] = useState("due-soon");
-  const visibleRecords = records
+  const sourceRecords = showArchived ? archivedRecords : records;
+  const visibleRecords = sourceRecords
     .filter((record) => typeFilter === "All records" || record.type === typeFilter)
     .filter((record) => holderFilter === "All people" || record.holder === holderFilter)
     .filter((record) => (!dateFrom && !dateTo) || Boolean(record.dueDate && (!dateFrom || record.dueDate >= dateFrom) && (!dateTo || record.dueDate <= dateTo)))
@@ -13684,6 +13713,14 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
       if (!b.dueDate) return -1;
       return a.dueDate.localeCompare(b.dueDate);
     });
+  async function runAction(action: () => Promise<void>) {
+    setOperationError("");
+    try {
+      await action();
+    } catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : "The personal document action could not be completed.");
+    }
+  }
   const expiredCount = records.filter((record) => record.dueDate && daysUntil(record.dueDate) < 0).length;
   const dueSoonCount = records.filter((record) => record.dueDate && daysUntil(record.dueDate) >= 0 &&
     daysUntil(record.dueDate) <= record.reminderDays).length;
@@ -13691,7 +13728,7 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
   function dueLabel(record: PersonalRecord): { text: string; tone: "amber" | "green" | "neutral" } {
     if (!record.dueDate) return { text: "No due date", tone: "neutral" };
     const remaining = daysUntil(record.dueDate);
-    if (remaining < 0) return { text: `Expired ${dateLabel(record.dueDate)}`, tone: "amber" };
+    if (remaining < 0) return { text: `Past due ${dateLabel(record.dueDate)}`, tone: "amber" };
     if (remaining === 0) return { text: "Due today", tone: "amber" };
     if (remaining <= record.reminderDays) return { text: `Due in ${remaining} days`, tone: "amber" };
     return { text: `Due ${dateLabel(record.dueDate)}`, tone: "green" };
@@ -13701,33 +13738,51 @@ function PersonalRecordsPage({ records, onSave, onDelete }: {
     return <div className="personal-record-list">{entries.map((record) => {
       const due = dueLabel(record);
       return <Card className="personal-record-card" key={record.id}>
-        <div className="personal-record-head"><div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => onDelete(record)}><Archive size={14} /></button></div></div>
+        <div className="personal-record-head">        <div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{categories.find((category) => category.id === record.categoryId)?.name ?? record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge>{!showArchived && <><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => {
+          const { id, ...copy } = record;
+          void runAction(() => onSave({ ...copy, title: copyLabel(copy.title, 160) }));
+        }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => {
+          if (window.confirm(`Move "${record.title}" to the archive?`)) void runAction(() => onDelete(record));
+        }}><Archive size={14} /></button></>}{showArchived && <button className="icon-button" aria-label={`Restore ${record.title}`} onClick={() => void runAction(() => onRestore(record))}><ArrowDownToLine size={14} /></button>}</div></div>
         <div className="personal-record-details">
-          {record.recordNumber && <div><span>Document / policy number</span><strong>{record.recordNumber}</strong></div>}
+          {record.recordNumber && <div><span>Document / policy number</span><strong>{maskedDocumentNumber(record.recordNumber)}</strong></div>}
           {record.issueDate && <div><span>Issue date</span><strong>{dateLabel(record.issueDate)}</strong></div>}
-          {record.dueDate && <div><span>Expiry / renewal</span><strong>{dateLabel(record.dueDate)}</strong></div>}
+          {record.dueDate && <div><span>Due / renewal</span><strong>{dateLabel(record.dueDate)}</strong></div>}
           {record.additionalFields.map((field, index) => field.label || field.value ? <div key={index}><span><LinkifiedText>{field.label || "Additional detail"}</LinkifiedText></span><strong><LinkifiedText>{field.value || "—"}</LinkifiedText></strong></div> : null)}
         </div>
         {record.notes && <p className="personal-record-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
         {record.documentLink && <a className="personal-document-link" href={activityLinkHref(record.documentLink)} target="_blank" rel="noopener noreferrer"><FileText size={14} /> Open shared document link</a>}
+        {(record.createdAt || record.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{record.createdAt && <p><strong>Created</strong><span>{new Date(record.createdAt).toLocaleString()}</span></p>}{record.updatedAt && <p><strong>Updated</strong><span>{new Date(record.updatedAt).toLocaleString()}</span></p>}</details>}
       </Card>;
     })}</div>;
   }
 
-  return <><PageHeading eyebrow="Important information" title="Personal documents" subtitle="Keep frequently needed IDs, policies, dates and secure document links together." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add record</Button>} />
-    <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These record details are stored in Supabase as readable text. Anyone with the Daybook password or Supabase service-role access can read them. Use the separate Documents screen to upload files to private storage; uploaded files are not end-to-end encrypted.</span></div>
-    {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} expired` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
-    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(records.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Expiry from"><DateInput aria-label="Expiry from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Expiry to"><DateInput aria-label="Expiry to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Expiry date (soonest)</option><option value="due-latest">Expiry date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="expiry">Expiry date</option><option value="month">Expiry month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+  return <><PageHeading eyebrow="Important information" title="Personal documents" subtitle="Keep frequently needed IDs, policies, dates and secure document links together." action={!showArchived ? <Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add record</Button> : undefined} />
+    <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These records are stored in the assigned mydocumentsmanager database as readable text. Database administrators with service-role access can read them. Use the Documents screen to attach files in the existing private storage bucket; files are access-controlled, not end-to-end encrypted.</span></div>
+    <nav className="document-subnav" aria-label="Personal document sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active records ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
+    {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} past due` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
+    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(sourceRecords.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Due from"><DateInput aria-label="Due from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Due to"><DateInput aria-label="Due to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Due date (soonest)</option><option value="due-latest">Due date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="due">Due date</option><option value="month">Due month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    {operationError && <div className="alert alert-error" role="alert">{operationError}</div>}
     {visibleRecords.length ? groupBy === "type"
       ? [...new Set(visibleRecords.map((record) => record.type))].sort((a, b) => a.localeCompare(b)).map((type) => <section key={type}><h2 className="shopping-record-group-title">{type}<span>{visibleRecords.filter((record) => record.type === type).length}</span></h2>{renderPersonalRecords(visibleRecords.filter((record) => record.type === type))}</section>)
       : groupBy === "none" ? renderPersonalRecords(visibleRecords)
-        : <DateGroupedRecords items={visibleRecords} getDate={(record) => groupBy === "month" ? record.dueDate?.slice(0, 7) : record.dueDate || undefined} title={(date) => `Expiry / renewal · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "due-latest" ? "newest" : "oldest"}>{(dueRecords) => renderPersonalRecords(dueRecords)}</DateGroupedRecords>
-      : <Card><EmptyState icon={<FileText size={18} />} title={records.length ? "No matching records" : "No personal records yet"} description={records.length ? "Try changing the search, person, type, or expiry range." : "Add a record for an ID, insurance policy, license or other frequently needed information."} /></Card>}
-    {editor && <PersonalRecordModal key={editor.initial?.id ?? "new-personal-record"} initial={editor.initial} onClose={() => setEditor(null)} onSave={(record) => { onSave(record, editor.initial?.id); setEditor(null); }} />}
+        : <DateGroupedRecords items={visibleRecords} getDate={(record) => groupBy === "month" ? record.dueDate?.slice(0, 7) : record.dueDate || undefined} title={(date) => `Due / renewal · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "due-latest" ? "newest" : "oldest"}>{(dueRecords) => renderPersonalRecords(dueRecords)}</DateGroupedRecords>
+      : <Card><EmptyState icon={<FileText size={18} />} title={sourceRecords.length ? "No matching records" : showArchived ? "No archived personal records" : "No personal records yet"} description={sourceRecords.length ? "Try changing the search, person, type, or due date range." : "Add a record for an ID, insurance policy, license or other frequently needed information."} /></Card>}
+    {editor && <PersonalRecordModal key={editor.initial?.id ?? "new-personal-record"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={(record) => onSave(record, editor.initial?.id)} />}
   </>;
 }
 
-type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes"> & { externalLink: string };
+type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes"> & {
+  externalLink: string;
+  categoryId?: string;
+  documentType?: string;
+  referenceNumber?: string;
+  issuingAuthority?: string;
+  issueDate?: string;
+  dueDate?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+};
 
 function formatFileSize(sizeBytes: number): string {
   if (sizeBytes <= 0) return "0 B";
@@ -13735,8 +13790,9 @@ function formatFileSize(sizeBytes: number): string {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function DocumentModal({ initial, onClose, onSave }: {
+function DocumentModal({ initial, categories, onClose, onSave }: {
   initial: DocumentAttachment | null;
+  categories: DocumentCategory[];
   onClose: () => void;
   onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
 }) {
@@ -13744,6 +13800,14 @@ function DocumentModal({ initial, onClose, onSave }: {
   const [personName, setPersonName] = useState(initial?.personName ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [externalLink, setExternalLink] = useState(initial?.externalLink ?? "");
+  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? "");
+  const [documentType, setDocumentType] = useState(initial?.documentType ?? "");
+  const [referenceNumber, setReferenceNumber] = useState(initial?.referenceNumber ?? "");
+  const [issuingAuthority, setIssuingAuthority] = useState(initial?.issuingAuthority ?? "");
+  const [issueDate, setIssueDate] = useState(initial?.issueDate ?? "");
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
+  const [tagsText, setTagsText] = useState(initial?.tags?.join(", ") ?? "");
+  const [isFavorite, setIsFavorite] = useState(initial?.isFavorite ?? false);
   const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -13775,7 +13839,20 @@ function DocumentModal({ initial, onClose, onSave }: {
     }
     setBusy(true);
     try {
-      await onSave({ title: title.trim(), personName: personName.trim(), notes: notes.trim(), externalLink: externalLink.trim() }, file, initial?.id);
+      await onSave({
+        title: title.trim(),
+        personName: personName.trim(),
+        notes: notes.trim(),
+        externalLink: externalLink.trim(),
+        categoryId,
+        documentType: documentType.trim(),
+        referenceNumber: referenceNumber.trim(),
+        issuingAuthority: issuingAuthority.trim(),
+        issueDate,
+        dueDate,
+        tags: [...new Set(tagsText.split(",").map((tag) => tag.trim()).filter(Boolean))],
+        isFavorite,
+      }, file, initial?.id);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The document could not be saved.");
@@ -13788,6 +13865,14 @@ function DocumentModal({ initial, onClose, onSave }: {
     <form onSubmit={(event) => void submit(event)}><div className="form-grid">
       <Field className="full" label="Document name"><Input autoFocus required maxLength={120} placeholder="e.g. Aadhaar card, PAN card" value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
       <Field className="full" label="Belongs to (person's name)"><Input maxLength={120} placeholder="Optional" value={personName} onChange={(event) => setPersonName(event.target.value)} /></Field>
+      <Field label="Category"><Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Uncategorized</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</Select></Field>
+      <Field label="Document type"><Input maxLength={80} placeholder="Optional" value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></Field>
+      <Field label="Reference number"><Input maxLength={120} placeholder="Optional" value={referenceNumber} onChange={(event) => setReferenceNumber(event.target.value)} /></Field>
+      <Field label="Issuing authority"><Input maxLength={120} placeholder="Optional" value={issuingAuthority} onChange={(event) => setIssuingAuthority(event.target.value)} /></Field>
+      <Field label="Issue date"><DateInput aria-label="Issue date" value={issueDate} onValueChange={setIssueDate} /></Field>
+      <Field label="Due date (optional)"><DateInput aria-label="Due date" value={dueDate} onValueChange={setDueDate} min={issueDate || undefined} /></Field>
+      <Field className="full" label="Tags (comma separated)"><Input maxLength={500} placeholder="Optional" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
+      <label className="document-favorite-toggle"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /> Add to favorites</label>
       <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 10 MB per file."}</span></Field>
       {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
@@ -13798,31 +13883,66 @@ function DocumentModal({ initial, onClose, onSave }: {
 
 function DocumentViewer({ document, onClose }: { document: DocumentAttachment; onClose: () => void }) {
   const source = `/api/documents?path=${encodeURIComponent(document.storagePath)}`;
-  const isImage = document.contentType.startsWith("image/");
+  const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+  const isImage = contentType.startsWith("image/");
   return <Modal title={document.title} onClose={onClose} wide><div className="document-viewer">
     {isImage ? <img src={source} alt={document.title} /> : <iframe title={document.title} src={source} />}
   </div></Modal>;
 }
 
-function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, onSave, onCopy, onArchive, onRemoveFile }: {
+function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate }: {
   documents: DocumentAttachment[];
-  archivedDocumentCount: number;
+  categories: DocumentCategory[];
   totalStoredBytes: number;
   onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
-  onCopy: (document: DocumentAttachment) => void;
-  onArchive: (document: DocumentAttachment) => void;
-  onRemoveFile: (document: DocumentAttachment) => void;
+  onSaveCategory: (category: DocumentCategory) => Promise<void>;
+  onCopy: (document: DocumentAttachment) => Promise<void>;
+  onArchive: (document: DocumentAttachment) => Promise<void>;
+  onRestore: (document: DocumentAttachment) => Promise<void>;
+  onDelete: (document: DocumentAttachment) => Promise<void>;
+  onToggleFavorite: (document: DocumentAttachment) => Promise<void>;
+  onRemoveFile: (document: DocumentAttachment) => Promise<void>;
+  onNavigate: (page: Page) => void;
 }) {
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
   const [viewer, setViewer] = useState<DocumentAttachment | null>(null);
+  const [categoryEditor, setCategoryEditor] = useState(false);
   const [search, setSearch] = useState("");
   const [personFilter, setPersonFilter] = useState("All people");
   const [typeFilter, setTypeFilter] = useState("All file types");
+  const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("date");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
+  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived">("all");
+  const [view, setView] = useState<"grid" | "table" | "list">("grid");
   const [sortBy, setSortBy] = useState("newest");
-  const percentUsed = totalStoredBytes / (1024 * 1024 * 1024) * 100;
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(12);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState("#0D9488");
+  const [operationError, setOperationError] = useState("");
+  const [storageUsage, setStorageUsage] = useState<DocumentStorageUsage | null>(null);
+  const [storageError, setStorageError] = useState("");
+  const [storageLoading, setStorageLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void loadDocumentStorageUsage()
+      .then((usage) => { if (active) setStorageUsage(usage); })
+      .catch((caught: unknown) => {
+        if (active) setStorageError(caught instanceof Error ? caught.message : "Actual bucket storage usage could not be loaded.");
+      })
+      .finally(() => { if (active) setStorageLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   function documentCategory(document: DocumentAttachment): string {
     const extension = getDocumentFileType(document.fileName)?.extension;
     if (extension === ".pdf") return "PDF";
@@ -13833,48 +13953,274 @@ function DocumentManager({ documents, archivedDocumentCount, totalStoredBytes, o
     if (extension === ".txt") return "Text";
     return document.externalLink ? "External links" : "No file";
   }
-  const documentTypes = [...new Set(documents.map(documentCategory))].sort((a, b) => a.localeCompare(b));
-  const visible = documents.filter((document) =>
-    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
+  function dueStatus(value: string | undefined): { label: string; tone: "amber" | "green" | "neutral" } {
+    if (!value) return { label: "No due date", tone: "neutral" };
+    const remaining = daysUntil(value);
+    if (remaining < 0) return { label: "Due date passed", tone: "amber" };
+    if (remaining <= 7) return { label: remaining === 0 ? "Due today" : `Due in ${remaining} days`, tone: "amber" };
+    if (remaining <= 30) return { label: `Due in ${remaining} days`, tone: "amber" };
+    return { label: `Due ${dateLabel(value)}`, tone: "green" };
+  }
+  async function runAction(action: () => Promise<void>) {
+    setOperationError("");
+    try {
+      await action();
+    } catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : "The document operation could not be completed.");
+    }
+  }
+  const activeDocuments = documents.filter((document) => document.isArchived !== true);
+  const archivedDocuments = documents.filter((document) => document.isArchived === true);
+  const dueDocuments = activeDocuments.filter((document) => Boolean(document.dueDate));
+  const expiredCount = dueDocuments.filter((document) => daysUntil(document.dueDate ?? "") < 0).length;
+  const dueSoonCount = dueDocuments.filter((document) => {
+    const remaining = daysUntil(document.dueDate ?? "");
+    return remaining >= 0 && remaining <= 30;
+  }).length;
+  const addedThisMonth = activeDocuments.filter((document) => document.uploadedAt.slice(0, 7) === today().slice(0, 7)).length;
+  const viewDocuments = section === "archived"
+    ? archivedDocuments
+    : section === "favorites"
+      ? activeDocuments.filter((document) => document.isFavorite)
+      : section === "due"
+        ? dueDocuments
+        : activeDocuments;
+  const documentTypes = [...new Set(viewDocuments.map(documentCategory))].sort((a, b) => a.localeCompare(b));
+  const visible = viewDocuments.filter((document) =>
+    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes} ${document.referenceNumber ?? ""} ${document.issuingAuthority ?? ""} ${document.documentType ?? ""} ${(document.tags ?? []).join(" ")} ${categories.find((category) => category.id === document.categoryId)?.name ?? ""}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
     (personFilter === "All people" || document.personName === personFilter) &&
     (typeFilter === "All file types" || documentCategory(document) === typeFilter) &&
-    (!dateFrom || document.uploadedAt.slice(0, 10) >= dateFrom) && (!dateTo || document.uploadedAt.slice(0, 10) <= dateTo))
-    .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title) :
-      (sortBy === "oldest" ? 1 : -1) * a.uploadedAt.localeCompare(b.uploadedAt));
+    (categoryFilter === "All categories" || document.categoryId === categoryFilter) &&
+    (!dateFrom || document.uploadedAt.slice(0, 10) >= dateFrom) && (!dateTo || document.uploadedAt.slice(0, 10) <= dateTo) &&
+    (!dueFrom || Boolean(document.dueDate && document.dueDate >= dueFrom)) &&
+    (!dueTo || Boolean(document.dueDate && document.dueDate <= dueTo)))
+    .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title)
+      : sortBy === "due" ? (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
+        : sortBy === "size" ? b.sizeBytes - a.sizeBytes
+          : sortBy === "category" ? (categories.find((category) => category.id === a.categoryId)?.name ?? "").localeCompare(categories.find((category) => category.id === b.categoryId)?.name ?? "")
+            : (sortBy === "oldest" ? 1 : -1) * a.uploadedAt.localeCompare(b.uploadedAt));
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageDocuments = visible.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const calendarOffset = (calendarMonth.getDay() + 6) % 7;
+  const calendarDays = Array.from({ length: 42 }, (_, index) =>
+    new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), index - calendarOffset + 1));
+  const dueDocumentsByDate = new Map<string, DocumentAttachment[]>();
+  for (const document of dueDocuments) {
+    if (!document.dueDate) continue;
+    dueDocumentsByDate.set(document.dueDate, [...(dueDocumentsByDate.get(document.dueDate) ?? []), document]);
+  }
+  const categoriesView = categories.map((category) => {
+    const categoryDocuments = activeDocuments.filter((document) => document.categoryId === category.id);
+    return {
+      category,
+      count: categoryDocuments.length,
+      bytes: categoryDocuments.reduce((total, document) => total + document.sizeBytes, 0),
+    };
+  });
+  function exportCurrentReport() {
+    const csv = exportCsvRows(visible.map((document) => ({
+      documentName: document.title,
+      category: categories.find((category) => category.id === document.categoryId)?.name ?? "",
+      person: document.personName,
+      documentNumber: document.referenceNumber ?? "",
+      fileName: document.fileName,
+      fileType: document.documentType || documentCategory(document),
+      sizeBytes: document.sizeBytes,
+      addedDate: document.uploadedAt.slice(0, 10),
+      issueDate: document.issueDate ?? "",
+      dueDate: document.dueDate ?? "",
+      status: document.isArchived ? "Archived" : document.dueDate
+        ? daysUntil(document.dueDate) < 0 ? "Past due" : daysUntil(document.dueDate) <= 30 ? "Due soon" : "Valid"
+        : "No due date",
+    })));
+    if (!csv) {
+      setOperationError("There are no document rows to export from this view.");
+      return;
+    }
+    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `document-${section}-report-${today()}.csv`);
+  }
+  function exportCategoryReport() {
+    const csv = exportCsvRows(categoriesView.map(({ category, count, bytes }) => ({
+      category: category.name,
+      description: category.description,
+      documentCount: count,
+      trackedStorageBytes: bytes,
+    })));
+    if (csv) downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `document-category-report-${today()}.csv`);
+  }
+
+  async function saveCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    await runAction(async () => {
+      await onSaveCategory({
+        id: createId(),
+        name,
+        description: newCategoryDescription.trim(),
+        icon: "folder",
+        color: newCategoryColor,
+        isSystem: false,
+      });
+      setNewCategoryName("");
+      setNewCategoryDescription("");
+      setNewCategoryColor("#0D9488");
+      setCategoryEditor(false);
+    });
+  }
 
   function renderDocuments(entries: DocumentAttachment[]) {
-    return <div className="document-list">{entries.map((document) => {
+    if (view === "table") {
+      return <div className="document-table-wrap"><table className="document-table"><thead><tr>
+        <th>Document</th><th>Category</th><th>Person</th><th>Format / size</th><th>Added</th><th>Due</th><th>Status</th><th>Actions</th>
+      </tr></thead><tbody>{entries.map((document) => {
+        const category = categories.find((entry) => entry.id === document.categoryId);
+        const due = dueStatus(document.dueDate);
+        const format = document.documentType || documentCategory(document);
+        const hasFile = Boolean(document.storagePath);
+        const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+        const canPreview = hasFile && (contentType === "application/pdf" || contentType.startsWith("image/"));
+        return <tr key={document.id}>
+          <td><strong>{document.title}</strong>{document.referenceNumber && <small>Ref. {maskedDocumentNumber(document.referenceNumber)}</small>}</td>
+          <td>{category?.name ?? "Uncategorized"}</td><td>{document.personName || "—"}</td>
+          <td>{format}{document.storagePath ? ` · ${formatFileSize(document.sizeBytes)}` : ""}</td>
+          <td>{dateLabel(document.uploadedAt.slice(0, 10))}</td><td>{document.dueDate ? dateLabel(document.dueDate) : "—"}</td>
+          <td><Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></td>
+          <td><div className="document-card-actions">
+            {canPreview && <Button size="sm" variant="outline" onClick={() => setViewer(document)}>View</Button>}
+          {document.storagePath && <a className="button button-outline document-download" href={`/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`} target="_blank" rel="noopener noreferrer">Download</a>}
+          {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">Open link</a>}
+            <button type="button" className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
+          {hasFile && <button type="button" className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} onClick={() => {
+            if (window.confirm(`Detach the uploaded file for "${document.title}"? The stored file will be retained.`)) void runAction(() => onRemoveFile(document));
+          }}><Trash2 size={14} /></button>}
+          {!document.isArchived && <><button type="button" className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button><button type="button" className="icon-button" aria-label={`Copy record for ${document.title}`} onClick={() => void runAction(() => onCopy(document))}><Copy size={14} /></button></>}
+          {document.isArchived ? <><button type="button" className="icon-button" aria-label={`Restore ${document.title}`} onClick={() => void runAction(() => onRestore(document))}><ArrowDownToLine size={14} /></button><button type="button" className="icon-button" aria-label={`Delete ${document.title} permanently`} disabled={hasFile} title={hasFile ? "Detach the file first; the stored object will be retained" : "Delete permanently"} onClick={() => {
+            if (window.confirm(`Permanently delete the archived record "${document.title}"? Its stored file will be retained.`)) void runAction(() => onDelete(document));
+          }}><Trash2 size={14} /></button></>
+            : <button type="button" className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => {
+                if (window.confirm(`Move "${document.title}" to the archive? Its uploaded file will remain stored.`)) void runAction(() => onArchive(document));
+              }}><Archive size={14} /></button>}
+          </div></td>
+        </tr>;
+      })}</tbody></table></div>;
+    }
+    return <div className={`document-list ${view === "grid" ? "document-grid" : "document-compact-list"}`}>{entries.map((document) => {
       const hasFile = Boolean(document.storagePath);
-      const canPreview = hasFile && (document.contentType === "application/pdf" || document.contentType.startsWith("image/"));
       const downloadUrl = hasFile
         ? `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`
         : "";
-      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><h2>{document.title}</h2><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}</small></div></div><div className="document-card-actions">
+      const category = categories.find((entry) => entry.id === document.categoryId);
+      const due = dueStatus(document.dueDate);
+      const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+      const canPreview = hasFile && (contentType === "application/pdf" || contentType.startsWith("image/"));
+      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><div className="document-card-heading"><h2>{document.title}</h2>{document.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div><div className="document-meta-badges">{category && <Badge>{category.name}</Badge>}<Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></div><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.documentType && <small>{document.documentType}{document.referenceNumber ? ` · Ref. ${maskedDocumentNumber(document.referenceNumber)}` : ""}</small>}{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}{document.dueDate ? ` · Due ${dateLabel(document.dueDate)}` : ""}</small>{(document.createdAt || document.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{document.createdAt && <p><strong>Created</strong><span>{new Date(document.createdAt).toLocaleString()}</span></p>}{document.updatedAt && <p><strong>Updated</strong><span>{new Date(document.updatedAt).toLocaleString()}</span></p>}</details>}</div></div><div className="document-card-actions">
         {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
         {hasFile && <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>}
         {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
-        {hasFile && <button className="icon-button" aria-label={`Remove uploaded file from ${document.title}`} title="Remove uploaded file" onClick={() => onRemoveFile(document)}><Trash2 size={14} /></button>}
+        <button className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} title={document.isFavorite ? "Remove favorite" : "Add to favorites"} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
+        {hasFile && <button className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} title="Detach uploaded file" onClick={() => {
+          if (window.confirm(`Detach the uploaded file from "${document.title}"? The stored file will be retained to preserve migrated source records.`)) void runAction(() => onRemoveFile(document));
+        }}><Trash2 size={14} /></button>}
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
-        <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => onCopy(document)}><Copy size={14} /></button>
-        <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => onArchive(document)}><Archive size={14} /></button>
+        <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => void runAction(() => onCopy(document))}><Copy size={14} /></button>
+        {document.isArchived
+          ? <><button className="icon-button" aria-label={`Restore ${document.title}`} onClick={() => void runAction(() => onRestore(document))}><ArrowDownToLine size={14} /></button><button className="icon-button" aria-label={`Delete ${document.title} permanently`} title={hasFile ? "Remove the file first before deleting this record" : "Delete permanently"} disabled={hasFile} onClick={() => {
+            if (window.confirm(`Permanently delete the archived record "${document.title}"? The stored file, if previously detached, will remain in the private bucket.`)) void runAction(() => onDelete(document));
+          }}><Trash2 size={14} /></button></>
+          : <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => {
+            if (window.confirm(`Move "${document.title}" to the archive? Its uploaded file will remain stored.`)) void runAction(() => onArchive(document));
+          }}><Archive size={14} /></button>}
       </div></Card>;
     })}</div>;
   }
 
-  return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Keep important household documents together using private uploads, external links, or both." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Uploaded files are stored in a private Supabase Storage bucket and document records are saved to Supabase before the form closes. A record can also be saved without a file, then edited later to upload one. External links are stored as document details and open in a new tab. Anyone with the shared Daybook password can access uploaded files. Files are protected by access controls, not end-to-end encrypted.</span></div>
-    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage overview</h2><p className="section-description">1 GB Supabase Free-plan bucket; each upload can be up to 10 MB. The estimate tracks document records only; student photos and ID-card images also use this bucket but are not included.</p></div><Database size={16} /></div><div className="document-storage-stats"><span>{documents.length} active {documents.length === 1 ? "document" : "documents"}</span><span>{archivedDocumentCount} archived</span><strong>{formatFileSize(totalStoredBytes)} tracked ({percentUsed.toFixed(1)}% of 1 GB)</strong></div><div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, percentUsed)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, percentUsed)}%` }} /></div>{percentUsed >= 75 && <p className={`document-storage-warning${percentUsed >= 90 ? " near-limit" : ""}`} role="status">{percentUsed >= 90 ? "Document storage is nearly full. Download and permanently remove files you no longer need." : "Document storage is getting full. This estimate includes Daybook files only, not other files in the Supabase project."}</p>}</Card>
-    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search name, person, file, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Document filters" activeCount={(personFilter === "All people" ? 0 : 1) + (typeFilter === "All file types" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}><Field label="Person"><Select aria-label="Filter documents by person" value={personFilter} onChange={(event) => setPersonFilter(event.target.value)}><option>All people</option>{[...new Set(documents.map((document) => document.personName.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((person) => <option key={person}>{person}</option>)}</Select></Field><Field label="File type"><Select aria-label="Filter documents by file type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All file types</option>{documentTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field><Field label="Added from"><DateInput aria-label="Documents added from" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Added to"><DateInput aria-label="Documents added to" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setDateFrom(""); setDateTo(""); setSortBy("newest"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group documents" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Added date</option><option value="month">Added month</option><option value="person">Person</option><option value="type">File type</option><option value="none">No grouping</option></Select></Field><Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge></div>
-    {visible.length ? groupBy === "person" || groupBy === "type"
-      ? [...new Set(visible.map((document) => groupBy === "person" ? document.personName.trim() || "Unassigned" : documentCategory(document)))].sort((a, b) => a.localeCompare(b)).map((group) => {
-        const groupDocuments = visible.filter((document) => (groupBy === "person" ? document.personName.trim() || "Unassigned" : documentCategory(document)) === group);
-        return <section key={group}><h2 className="shopping-record-group-title">{group}<span>{groupDocuments.length}</span></h2>{renderDocuments(groupDocuments)}</section>;
-      })
-      : groupBy === "none" ? renderDocuments(visible)
-        : <DateGroupedRecords items={visible} getDate={(document) => groupBy === "month" ? document.uploadedAt.slice(0, 7) : document.uploadedAt.slice(0, 10)} title={(date) => `Documents added · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "oldest" ? "oldest" : "newest"}>{(dateDocuments) => renderDocuments(dateDocuments)}</DateGroupedRecords>
-      : <Card><EmptyState icon={<FileDown size={18} />} title={documents.length ? "No matching documents" : "No documents uploaded yet"} description={documents.length ? "Try another search or filter." : "Add a document record now and attach a file later if you prefer."} /></Card>}
-    {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} onClose={() => setEditor(null)} onSave={onSave} />}
+  return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Manage files, personal records, due dates, and categories from one document workspace." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Document records are stored in mydocumentsmanager. Uploaded files remain in the existing private Supabase Storage bucket and are accessed through the existing signed-link API. Database records and uploaded files are access-controlled, not end-to-end encrypted.</span></div>
+    <div className="document-kpi-grid">
+      <Card><span>Total documents</span><strong>{activeDocuments.length + archivedDocuments.length}</strong><small>{addedThisMonth} added this month</small></Card>
+      <Card><span>Active</span><strong>{activeDocuments.length}</strong><small>Available in the library</small></Card>
+      <Card><span>Due soon</span><strong>{dueSoonCount}</strong><small>{expiredCount} past due</small></Card>
+      <Card><span>Actual bucket usage</span><strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading" : "Unavailable"}</strong><small>{storageUsage ? `${storageUsage.objectCount} objects · measured from ${storageUsage.bucket}` : "Storage API measurement unavailable"}</small></Card>
+    </div>
+    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the existing private bucket, including files used by other application modules. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
+      <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
+      {storageError && <p className="document-storage-warning" role="status">Actual storage usage could not be measured: {storageError}</p>}
+      {storageUsage?.capacityBytes ? <div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)}%` }} /></div> : null}
+      {storageUsage?.largestFiles.length ? <div className="document-largest-files"><strong>Largest files</strong>{storageUsage.largestFiles.slice(0, 5).map((file) => <div key={`${file.name}-${file.sizeBytes}`}><span>{file.name}</span><b>{formatFileSize(file.sizeBytes)}</b></div>)}</div> : null}
+    </Card>
+    <nav className="document-subnav" aria-label="Document sections">
+      {([
+        ["all", "All documents"],
+        ["categories", "Categories"],
+        ["due", "Due tracker"],
+        ["favorites", "Favorites"],
+        ["archived", "Archived"],
+      ] as const).map(([id, label]) => <Button key={id} type="button" variant={section === id ? "primary" : "outline"} aria-pressed={section === id} onClick={() => { setSection(id); setPage(0); }}>{label}{id === "archived" ? ` (${archivedDocuments.length})` : ""}</Button>)}
+      <Button type="button" variant="ghost" onClick={() => onNavigate("Personal documents")}>Personal documents</Button>
+    </nav>
+    {section === "categories" ? <>
+      <div className="document-category-heading"><div><h2 className="section-title">Document categories</h2><p className="section-description">Categories organize existing records; unclassified documents stay uncategorized.</p></div><div className="document-category-actions"><Button variant="outline" onClick={exportCategoryReport}><Download size={14} />Export CSV</Button><Button onClick={() => setCategoryEditor(true)}><Plus size={14} />Create category</Button></div></div>
+      <div className="document-category-grid">{categoriesView.map(({ category, count, bytes }) => <Card className="document-category-card" key={category.id}><div className="document-category-color" style={{ backgroundColor: category.color }} /><div><h3>{category.name}</h3><p>{category.description || "No description"}</p><small>{count} {count === 1 ? "document" : "documents"} · {formatFileSize(bytes)}</small></div></Card>)}</div>
+    </> : <>
+    <div className="document-storage-summary"><span>{activeDocuments.length} active</span><span>{archivedDocuments.length} archived</span><span>{dueSoonCount} due soon</span><span>{expiredCount} past due</span></div>
+    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search names, people, category, number, file, notes, tags..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
+      <FilterDrawer label="Document filters" activeCount={(personFilter === "All people" ? 0 : 1) + (typeFilter === "All file types" ? 0 : 1) + (categoryFilter === "All categories" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (dueFrom ? 1 : 0) + (dueTo ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}>
+        <Field label="Person"><Select aria-label="Filter documents by person" value={personFilter} onChange={(event) => setPersonFilter(event.target.value)}><option>All people</option>{[...new Set(viewDocuments.map((document) => document.personName.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((person) => <option key={person}>{person}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter documents by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</Select></Field>
+        <Field label="File format"><Select aria-label="Filter documents by file format" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All file types</option>{documentTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field>
+        <Field label="Added from"><DateInput aria-label="Documents added from" value={dateFrom} onValueChange={(value) => { setDateFrom(value); setPage(0); }} max={dateTo || undefined} /></Field>
+        <Field label="Added to"><DateInput aria-label="Documents added to" value={dateTo} onValueChange={(value) => { setDateTo(value); setPage(0); }} min={dateFrom || undefined} /></Field>
+        <Field label="Due from"><DateInput aria-label="Documents due from" value={dueFrom} onValueChange={(value) => { setDueFrom(value); setPage(0); }} max={dueTo || undefined} /></Field>
+        <Field label="Due to"><DateInput aria-label="Documents due to" value={dueTo} onValueChange={(value) => { setDueTo(value); setPage(0); }} min={dueFrom || undefined} /></Field>
+        <Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Name (A–Z)</option><option value="due">Due date</option><option value="size">File size</option><option value="category">Category</option></Select></Field>
+        <Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setCategoryFilter("All categories"); setDateFrom(""); setDateTo(""); setDueFrom(""); setDueTo(""); setSortBy("newest"); setPage(0); }}>Clear filters</Button>
+      </FilterDrawer>
+      <div className="document-view-switch" role="group" aria-label="Document display mode">
+        <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={14} />Grid</Button>
+        <Button type="button" variant={view === "table" ? "primary" : "outline"} aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 size={14} />Table</Button>
+        <Button type="button" variant={view === "list" ? "primary" : "outline"} aria-pressed={view === "list"} onClick={() => setView("list")}><List size={14} />List</Button>
+      </div>
+      <Button type="button" variant="outline" onClick={exportCurrentReport}><Download size={14} />Export CSV</Button>
+      <Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge>
+    </div>
+    {operationError && <div className="alert alert-error" role="alert">{operationError}</div>}
+    {section === "due" && <div className="document-due-summary" role="status">{expiredCount} past due · {dueSoonCount} due within 30 days · {activeDocuments.length - dueDocuments.length} without a due date</div>}
+    {section === "due" && <Card className="document-due-calendar"><div className="document-category-heading"><h2 className="section-title">{calendarMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</h2><div><Button type="button" size="sm" variant="outline" aria-label="Previous month" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}><ChevronLeft size={14} /></Button><Button type="button" size="sm" variant="outline" aria-label="Next month" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}><ChevronRight size={14} /></Button></div></div><div className="document-calendar-grid">
+      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => <strong key={day}>{day}</strong>)}
+      {calendarDays.map((day) => {
+        const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+        const dayDocuments = dueDocumentsByDate.get(key) ?? [];
+        return <div className={`document-calendar-day${day.getMonth() === calendarMonth.getMonth() ? "" : " outside-month"}`} key={key}>
+          <span className="document-calendar-date">{day.getDate()}</span>
+          {dayDocuments.map((document) => {
+            const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+            const canPreview = contentType === "application/pdf" || contentType.startsWith("image/");
+            return document.storagePath && canPreview
+              ? <button type="button" key={document.id} title={document.title} onClick={() => setViewer(document)}>{document.title}</button>
+              : document.storagePath
+                ? <a key={document.id} title={document.title} href={`/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`} target="_blank" rel="noopener noreferrer">{document.title}</a>
+                : document.externalLink
+              ? <a key={document.id} title={document.title} href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">{document.title}</a>
+              : <span className="document-calendar-event" key={document.id} title={document.title}>{document.title}</span>;
+          })}
+        </div>;
+      })}
+    </div></Card>}
+    {pageDocuments.length ? renderDocuments(pageDocuments)
+      : <Card><EmptyState icon={<FileDown size={18} />} title={visible.length || viewDocuments.length ? "No matching documents" : section === "archived" ? "No archived documents" : section === "favorites" ? "No favorite documents" : "No documents uploaded yet"} description={visible.length || viewDocuments.length ? "Try changing the search or filters." : "Add a document record now and attach a file later if you prefer."} /></Card>}
+    {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Field label="Rows per page"><Select value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select></Field><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
+    </>}
+    {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
     {viewer && <DocumentViewer document={viewer} onClose={() => setViewer(null)} />}
+    {categoryEditor && <Modal title="Create document category" onClose={() => setCategoryEditor(false)}>
+      <form onSubmit={(event) => void saveCategory(event)}><div className="form-grid">
+        <Field className="full" label="Category name"><Input autoFocus required maxLength={60} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} /></Field>
+        <Field className="full" label="Description (optional)"><Input maxLength={240} value={newCategoryDescription} onChange={(event) => setNewCategoryDescription(event.target.value)} /></Field>
+        <Field label="Color"><Input type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} /></Field>
+      </div>{operationError && <div className="alert alert-error" role="alert">{operationError}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={() => setCategoryEditor(false)}>Cancel</Button><Button type="submit">Create category</Button></div></form>
+    </Modal>}
   </>;
 }
 
@@ -13937,7 +14283,7 @@ function CredentialModal({ initial, onClose, onSave }: {
       });
       onClose();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The credential could not be encrypted and saved.");
+      setError(caught instanceof Error ? caught.message : "The credential could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -13960,7 +14306,7 @@ function CredentialModal({ initial, onClose, onSave }: {
         </div>
       </div>
       {error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}
-      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Encrypting..." : initial ? "Encrypt and save" : "Encrypt and add"}</Button></div>
+      <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : initial ? "Save changes" : "Add account"}</Button></div>
     </form>
   </Modal>;
 }
@@ -14152,14 +14498,17 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
   </>;
 }
 
-function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLegacy }: {
+function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArchive, onRestore, onImportLegacy }: {
   records: CredentialRecord[];
+  archivedRecords: CredentialRecord[];
   vault?: EncryptedCredentialVault;
   onSave: (record: CredentialRecord) => Promise<void>;
   onArchive: (record: CredentialRecord) => Promise<void>;
+  onRestore: (record: CredentialRecord) => Promise<void>;
   onImportLegacy: (credentials: CredentialRecord[], banks: BankAccount[]) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);
@@ -14167,7 +14516,8 @@ function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLeg
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const query = search.trim().toLocaleLowerCase();
-  const filteredRecords = [...records].filter((record) =>
+  const visibleSource = showArchived ? archivedRecords : records;
+  const filteredRecords = [...visibleSource].filter((record) =>
     record.kind !== "bank-account" &&
     [record.provider, record.category, record.website, record.username, record.recoveryInfo,
       record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value])]
@@ -14209,18 +14559,21 @@ function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLeg
   }
 
   return <>
-    <PageHeading eyebrow="Finance & account references" title="Account credentials" subtitle="Search and manage account sign-in details." action={<Button onClick={() => setEditor(null)}><Plus size={15} />Add account</Button>} />
-    <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored in a separate, readable Supabase table and included in JSON backups. Anyone with database/service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
+    <PageHeading eyebrow="Finance & account references" title="Account credentials" subtitle="Search and manage account sign-in details." action={!showArchived ? <Button onClick={() => setEditor(null)}><Plus size={15} />Add account</Button> : undefined} />
+    <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored as readable records in the assigned mydocumentsmanager database and are not included in Daybook JSON backups. Database administrators with service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
     {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
     {error && <div className="alert alert-error" role="alert">{error}</div>}
+    <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
     {filteredRecords.length ? <div className="credential-list">{filteredRecords.map((record) => <details className="credential-card credential-record compact-details" key={record.id}>
       <summary className="credential-card-head compact-summary">
         <div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p><LinkifiedText>{`${record.category}${record.username ? ` · ${record.username}` : ""}`}</LinkifiedText></p></div></div>
         <div className="table-actions">
-          <button type="button" className="icon-button" aria-label={`Edit ${record.provider}`} onClick={(event) => { event.preventDefault(); setEditor(record); }}><Pencil size={14} /></button>
-          <button type="button" className="icon-button" aria-label={`Copy ${record.provider}`} title="Create a separately editable copy" onClick={(event) => { event.preventDefault(); void onSave({ ...record, id: createId(), provider: copyLabel(record.provider, 120) }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the account credential.")); }}><Copy size={14} /></button>
-          <button type="button" className="icon-button" aria-label={`Archive ${record.provider}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${record.provider}" to the Archive?`)) void onArchive(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the account credential.")); }}><Archive size={14} /></button>
+          {showArchived ? <button type="button" className="icon-button" aria-label={`Restore ${record.provider}`} onClick={(event) => { event.preventDefault(); void onRestore(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not restore the account credential.")); }}><ArrowDownToLine size={14} /></button> : <>
+            <button type="button" className="icon-button" aria-label={`Edit ${record.provider}`} onClick={(event) => { event.preventDefault(); setEditor(record); }}><Pencil size={14} /></button>
+            <button type="button" className="icon-button" aria-label={`Copy ${record.provider}`} title="Create a separately editable copy" onClick={(event) => { event.preventDefault(); void onSave({ ...record, id: createId(), provider: copyLabel(record.provider, 120) }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the account credential.")); }}><Copy size={14} /></button>
+            <button type="button" className="icon-button" aria-label={`Archive ${record.provider}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${record.provider}" to the Archive?`)) void onArchive(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the account credential.")); }}><Archive size={14} /></button>
+          </>}
         </div>
       </summary>
       <div className="compact-details-body">
@@ -14233,7 +14586,7 @@ function AccountCredentialsPage({ records, vault, onSave, onArchive, onImportLeg
           {record.notes && <p><LinkifiedText>{record.notes}</LinkifiedText></p>}
         </div>
       </div>
-    </details>)}</div> : <Card><EmptyState icon={<KeyRound size={18} />} title={records.length ? "No matching accounts" : "No account credentials saved"} description={records.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
+    </details>)}</div> : <Card><EmptyState icon={<KeyRound size={18} />} title={visibleSource.length ? "No matching accounts" : showArchived ? "No archived account credentials" : "No account credentials saved"} description={visibleSource.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
     {editor !== undefined && <CredentialModal key={editor?.id ?? "new-direct-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
       await onSave({ ...record, id: editor?.id ?? createId() });
     }} />}
@@ -14648,16 +15001,16 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     <SettingsDisclosure title="Screen descriptions" description="Show or hide page subtitles and built-in help notes" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies to page descriptions and built-in help notes across the app.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={() => void saveDesignTheme()} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a full backup</h3><p>Save all Daybook records, including archive and encrypted credential-vault data, as versioned JSON. Uploaded document files are stored separately and are not included; protect the downloaded backup because it contains your personal records.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download full JSON backup</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a Daybook backup</h3><p>Save shared Daybook records, archive data, and the encrypted credential-vault blob as versioned JSON. Documents, Personal Documents, and Account credentials in mydocumentsmanager are separate and excluded. Uploaded files remain in private storage and are not included.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download Daybook JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
         const blob = new Blob([exportCsv(data.purchases)], { type: "text/csv;charset=utf-8" });
         downloadBlob(blob, `daybook-purchases-${today()}.csv`);
       }}><ArrowDownToLine size={14} /> Export purchases CSV</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export other sections</h3><p>Download spreadsheet-friendly CSV files. Related history is included in each section export; nested education details are preserved in their cells.</p><div className="connector-actions"><Button variant="outline" disabled={!stockRows.length} onClick={() => downloadSectionCsv("stocks", stockRows)}><ArrowDownToLine size={14} />Stocks ({stockRows.length})</Button><Button variant="outline" disabled={!subscriptionRows.length} onClick={() => downloadSectionCsv("subscriptions", subscriptionRows)}><ArrowDownToLine size={14} />Subscriptions ({(data.subscriptions ?? []).length})</Button><Button variant="outline" disabled={!educationRows.length} onClick={() => downloadSectionCsv("education", educationRows)}><ArrowDownToLine size={14} />Education ({educationRows.length})</Button><Button variant="outline" disabled={!vehicleRows.length} onClick={() => downloadSectionCsv("vehicles", vehicleRows)}><ArrowDownToLine size={14} />Vehicles ({vehicleRows.length})</Button></div></Card>
-      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Choose a Daybook JSON backup to validate and preview its section counts before replacing your current shared data.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) { const backup = await onPreviewImport(file); if (backup) setRestorePreview({ backup, fileName: file.name }); } input.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Choose a Daybook JSON backup to validate and preview its section counts before replacing shared Daybook data. This does not change mydocumentsmanager or uploaded files.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) { const backup = await onPreviewImport(file); if (backup) setRestorePreview({ backup, fileName: file.name }); } input.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
       <Card className="settings-card danger-card"><div className="settings-icon"><Trash2 size={17} /></div><h3>Clear all data</h3><p>Move all active records in shared Supabase data to the Archive. Favorites and display preferences remain. This cannot be undone.</p><Button variant="danger" onClick={onClear}><Trash2 size={14} /> Clear my data</Button></Card></div></SettingsDisclosure>
     <SettingsDisclosure title="Data overview" description="Counts for data currently saved in Supabase" icon={<Database size={17} />}><Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">At a glance</h2><p className="section-description">What's saved in shared data right now</p></div><Database size={16} color="#829080" /></div><div className="stat-grid" style={{ gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}><div><div className="stat-foot">Shopping list items</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.items.length}</div></div><div><div className="stat-foot">Purchases recorded</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.purchases.length}</div></div><div><div className="stat-foot">Shopping trips</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.trips.length}</div></div><div><div className="stat-foot">Saved products</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.products ?? []).length}</div></div><div><div className="stat-foot">Saved stores</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stores ?? []).length}</div></div><div><div className="stat-foot">Notes & reminders</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.reminders ?? []).length}</div></div><div><div className="stat-foot">Tracked stocks</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stocks ?? []).length}</div></div><div><div className="stat-foot">Saved stock prices</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stockQuotes ?? []).length}</div></div></div></Card></SettingsDisclosure>
-    {restorePreview && <Modal title="Preview backup restore" onClose={() => setRestorePreview(null)} wide><p className="section-description">File: <strong>{restorePreview.fileName}</strong></p><div className="alert alert-error" role="alert" style={{ marginTop: 14 }}>Continuing will replace your current Daybook data with this backup and save it to Supabase. This cannot be automatically undone. Uploaded document files are not included in JSON backups.</div><div className="backup-preview-table"><div className="backup-preview-row backup-preview-header"><strong>Section</strong><strong>Current</strong><strong>Backup</strong></div>{restoreCounts.map((entry) => <div className="backup-preview-row" key={entry.label}><span>{entry.label}</span><span>{entry.current}</span><span>{entry.backup}</span></div>)}</div><div className="modal-actions"><Button type="button" variant="outline" onClick={() => setRestorePreview(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => { onRestore(restorePreview.backup); setRestorePreview(null); }}>Replace current data</Button></div></Modal>}
+    {restorePreview && <Modal title="Preview backup restore" onClose={() => setRestorePreview(null)} wide><p className="section-description">File: <strong>{restorePreview.fileName}</strong></p><div className="alert alert-error" role="alert" style={{ marginTop: 14 }}>Continuing will replace shared Daybook data and save it to Supabase. This cannot be automatically undone. It does not change mydocumentsmanager or its uploaded files.</div><div className="backup-preview-table"><div className="backup-preview-row backup-preview-header"><strong>Section</strong><strong>Current</strong><strong>Backup</strong></div>{restoreCounts.map((entry) => <div className="backup-preview-row" key={entry.label}><span>{entry.label}</span><span>{entry.current}</span><span>{entry.backup}</span></div>)}</div><div className="modal-actions"><Button type="button" variant="outline" onClick={() => setRestorePreview(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => { onRestore(restorePreview.backup); setRestorePreview(null); }}>Replace current data</Button></div></Modal>}
   </>;
 }
 
@@ -15542,6 +15895,7 @@ function readLegacyBrowserData(): TrackerData | null {
 
 export default function App() {
   const [data, setData] = useState<TrackerData | null>(null);
+  const [documentModulesData, setDocumentModulesData] = useState<DocumentModulesData | null>(null);
   const [page, setPage] = useState<Page>(() => readAppRoute().page);
   const [globalSearchQuery, setGlobalSearchQuery] = useState(() => readAppRoute().query);
   const [selectedSearchResultKey, setSelectedSearchResultKey] = useState<string | null>(() => readAppRoute().selectedKey);
@@ -15804,6 +16158,7 @@ export default function App() {
     try {
       await signOut();
       const vehiclesPassphraseCleared = clearVehiclesProfileSessionPassphrase();
+      const documentModulesPassphraseCleared = clearDocumentModulesSessionPassphrase();
       authenticatedRef.current = false;
       setAuthenticated(false);
       setData(null);
@@ -15811,7 +16166,9 @@ export default function App() {
       setSyncStatus("saved");
       setSyncMessage("");
       setError(vehiclesPassphraseCleared
-        ? ""
+        ? documentModulesPassphraseCleared
+          ? ""
+          : "Signed out, but the remembered document database passphrase could not be cleared. Close this browser tab to remove it."
         : "Signed out, but the remembered Vehicles passphrase could not be cleared. Close this browser tab to remove it.");
       setNotice("");
     } catch (caught) {
@@ -16912,159 +17269,6 @@ export default function App() {
       familyMembers: (previous.familyMembers ?? []).filter((current) => current.id !== member.id),
     }));
   }
-  function savePersonalRecord(record: Omit<PersonalRecord, "id">, id?: string) {
-    update((previous) => ({
-      ...previous,
-      personalRecords: id
-        ? (previous.personalRecords ?? []).map((entry) => entry.id === id ? { ...record, id } : entry)
-        : [{ ...record, id: createId() }, ...(previous.personalRecords ?? [])],
-    }));
-  }
-  function deletePersonalRecord(record: PersonalRecord) {
-    if (!window.confirm(`Move "${record.title}" to the archive?`)) return;
-    update((previous) => ({
-      ...withArchivedRecord(previous, record.title, { personalRecords: [record] }),
-      personalRecords: (previous.personalRecords ?? []).filter((entry) => entry.id !== record.id),
-    }));
-  }
-  async function saveDocument(details: DocumentDetails, file: File | undefined, id?: string): Promise<void> {
-    let uploadedPath = "";
-    try {
-      if (id) {
-        const uploaded = file ? await uploadDocumentFile(file) : null;
-        uploadedPath = uploaded?.storagePath ?? "";
-        const existingDocument = (latestDataRef.current?.documents ?? []).find((document) => document.id === id);
-        await persistUpdate((previous) => ({
-          ...previous,
-          documents: (previous.documents ?? []).map((document) => document.id === id
-            ? {
-              ...document,
-              ...details,
-              ...(file && uploaded ? {
-                fileName: file.name,
-                contentType: uploaded.contentType,
-                sizeBytes: file.size,
-                storagePath: uploaded.storagePath,
-              } : {}),
-            }
-            : document),
-        }));
-        const oldPath = existingDocument?.storagePath;
-        const oldPathStillUsed = oldPath && oldPath !== uploadedPath && [
-          ...(latestDataRef.current?.documents ?? []).filter((document) => document.id !== id).map((document) => document.storagePath),
-          ...(latestDataRef.current?.archivedRecords ?? []).flatMap((record) => record.snapshot.documents ?? []).map((document) => document.storagePath),
-        ].includes(oldPath);
-        if (oldPath && oldPath !== uploadedPath && !oldPathStillUsed) {
-          try {
-            await deleteDocumentFile(oldPath);
-          } catch (caught) {
-            const message = caught instanceof Error ? caught.message : "The previous file could not be removed from storage.";
-            setError(`The new file was saved, but the previous uploaded file could not be deleted. ${message}`);
-          }
-        }
-        return;
-      }
-      const uploaded = file ? await uploadDocumentFile(file) : null;
-      uploadedPath = uploaded?.storagePath ?? "";
-      const document: DocumentAttachment = {
-        ...details,
-        id: createId(),
-        fileName: file?.name ?? "",
-        contentType: uploaded?.contentType ?? "",
-        sizeBytes: file?.size ?? 0,
-        storagePath: uploadedPath,
-        uploadedAt: new Date().toISOString(),
-      };
-      await persistUpdate((previous) => ({ ...previous, documents: [document, ...(previous.documents ?? [])] }));
-    } catch (caught) {
-      if (uploadedPath) {
-        try {
-          await deleteDocumentFile(uploadedPath);
-        } catch (cleanupError) {
-          const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
-          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : "The uploaded file could not be removed.";
-          throw new Error(`${saveMessage} Cleanup also failed: ${cleanupMessage}`);
-        }
-      }
-      throw caught;
-    }
-  }
-  async function archiveDocument(document: DocumentAttachment) {
-    if (!window.confirm(`Move "${document.title}" to the archive? Its file will remain stored until you permanently delete the archived record.`)) return;
-    try {
-      await persistUpdate((previous) => ({
-        ...withArchivedRecord(previous, document.title, { documents: [document] }),
-        documents: (previous.documents ?? []).filter((entry) => entry.id !== document.id),
-      }));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The document could not be archived.");
-    }
-  }
-  async function removeDocumentFile(document: DocumentAttachment) {
-    const path = document.storagePath;
-    if (!path) return;
-    const otherReferences = [
-      ...(data?.documents ?? []).filter((entry) => entry.id !== document.id).map((entry) => entry.storagePath),
-      ...(data?.archivedRecords ?? []).flatMap((entry) => entry.snapshot.documents ?? []).map((entry) => entry.storagePath),
-    ].filter(Boolean);
-    const fileIsShared = otherReferences.includes(path);
-    if (!window.confirm(fileIsShared
-      ? `Remove the uploaded file from "${document.title}"? Other active or archived records still use this file, so it will remain stored.`
-      : `Permanently delete the uploaded file for "${document.title}" from private storage? The document record will remain.`)) return;
-    try {
-      await persistUpdate((previous) => ({
-        ...previous,
-        documents: (previous.documents ?? []).map((entry) => entry.id === document.id
-          ? { ...entry, fileName: "", contentType: "", sizeBytes: 0, storagePath: "" }
-          : entry),
-      }));
-      if (!fileIsShared) {
-        try {
-          await deleteDocumentFile(path);
-        } catch (caught) {
-          const message = caught instanceof Error ? caught.message : "The file could not be removed from storage.";
-          try {
-            await persistUpdate((previous) => ({
-              ...previous,
-              documents: (previous.documents ?? []).map((entry) => entry.id === document.id
-                ? { ...entry, fileName: document.fileName, contentType: document.contentType, sizeBytes: document.sizeBytes, storagePath: path }
-                : entry),
-            }));
-            setError(`The uploaded file could not be deleted, so the document attachment was restored. ${message}`);
-          } catch (restoreError) {
-            const restoreMessage = restoreError instanceof Error ? restoreError.message : "The document attachment could not be restored.";
-            setError(`The uploaded file could not be deleted. Restoring its document record also failed: ${restoreMessage}`);
-          }
-          return;
-        }
-      }
-      setNotice(fileIsShared
-        ? "The file was removed from this document. It remains stored because another active or archived record uses it."
-        : "The uploaded file was deleted. The document record was kept.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The document attachment could not be removed.");
-    }
-  }
-  async function copyDocument(document: DocumentAttachment) {
-    try {
-      await persistUpdate((previous) => ({
-        ...previous,
-        documents: [{
-          ...document,
-          id: createId(),
-          title: copyLabel(document.title, 160),
-          fileName: "",
-          contentType: "",
-          sizeBytes: 0,
-          storagePath: "",
-          uploadedAt: new Date().toISOString(),
-        }, ...(previous.documents ?? [])],
-      }));
-      setNotice(`Copied "${document.title}" without copying its uploaded file.`);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The document record could not be copied.");
-    }
-  }
   async function previewBackup(file: File): Promise<TrackerData | null> {
     try {
       const parsed: unknown = JSON.parse(await file.text());
@@ -17087,8 +17291,14 @@ export default function App() {
   }
   function exportBackup() {
     if (!data) return;
-    downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), `daybook-backup-${today()}.json`);
-    setNotice("Your full backup is ready to save. Keep it private; it contains your personal records and encrypted vault data.");
+    const backup: TrackerData = {
+      ...data,
+      documents: [],
+      personalRecords: [],
+      credentialRecords: [],
+    };
+    downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }), `daybook-backup-${today()}.json`);
+    setNotice("Your Daybook backup is ready. Records in mydocumentsmanager and uploaded files are excluded.");
   }
   function clearData() {
     if (!data) return;
@@ -17155,8 +17365,6 @@ export default function App() {
   if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Daybook records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Daybook data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
   if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
   const favoritePages = data.favoritePages ?? [];
-  const archivedDocuments = (data.archivedRecords ?? []).flatMap((record) => record.snapshot.documents ?? []);
-  const allDocuments = [...(data.documents ?? []), ...archivedDocuments];
   const menuGroups = (() => {
     if (!groupMenus) return [{ group: null, entries: orderedNavigation(navigation, menuSortOrder) }];
     const groups = menuSortOrder === "ascending"
@@ -17168,9 +17376,9 @@ export default function App() {
     }));
   })();
   const pageContent: Record<Page, ReactNode> = {
-    Dashboard: <Dashboard data={data} widgets={dashboardWidgets} onPage={changePage} />,
+    Dashboard: <Dashboard data={data} documentModulesData={documentModulesData} widgets={dashboardWidgets} onPage={changePage} />,
     Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
-    "Global search": <GlobalSearchPage data={data} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
+    "Global search": <GlobalSearchPage data={data} documentModulesData={documentModulesData} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
@@ -17339,27 +17547,139 @@ export default function App() {
     Vehicles: <VehiclesProfilePage localView={<VehicleManagement vehicles={data.vehicles ?? []} journeys={data.vehicleJourneys ?? []} maintenance={data.vehicleMaintenance ?? []} onSaveVehicle={saveVehicle} onCopyVehicle={copyVehicle} onDeleteVehicle={deleteVehicle} onSaveJourney={saveVehicleJourney} onDeleteJourney={deleteVehicleJourney} onSaveMaintenance={saveVehicleMaintenance} onDeleteMaintenance={deleteVehicleMaintenance} />} />,
     Electricity: <ElectricityPage readings={data.electricityReadings ?? []} onSave={saveElectricityReading} onDelete={deleteElectricityReading} />,
     "Subscriptions & bills": <SubscriptionsPage accounts={data.subscriptions ?? []} onSaveAccount={saveSubscriptionAccount} onArchiveAccount={archiveSubscriptionAccount} onSaveTransaction={saveSubscriptionTransaction} onArchiveTransaction={archiveSubscriptionTransaction} />,
-    "Personal documents": <PersonalRecordsPage records={data.personalRecords ?? []} onSave={savePersonalRecord} onDelete={deletePersonalRecord} />,
-    Documents: <DocumentManager documents={data.documents ?? []} archivedDocumentCount={archivedDocuments.length} totalStoredBytes={[...new Map(allDocuments.map((document) => [document.storagePath, document])).values()].reduce((total, document) => total + document.sizeBytes, 0)} onSave={saveDocument} onCopy={copyDocument} onArchive={archiveDocument} onRemoveFile={removeDocumentFile} />,
+    "Personal documents": <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate }) => <PersonalRecordsPage
+      records={moduleData.personalDocuments.filter((record) => record.isArchived !== true)}
+      archivedRecords={moduleData.personalDocuments.filter((record) => record.isArchived === true)}
+      categories={moduleData.categories}
+      onSave={async (record, id) => {
+        await mutate({ collection: "personalDocuments", action: "upsert", record: { ...record, id: id ?? createId() } });
+      }}
+      onDelete={async (record) => {
+        await mutate({ collection: "personalDocuments", action: "archive", id: record.id });
+      }}
+      onRestore={(record) => mutate({ collection: "personalDocuments", action: "restore", id: record.id })}
+    />}</DocumentModulesDatabaseGate>,
+    Documents: <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate }) => {
+      const allModuleDocuments = moduleData.documents;
+      const documents = allModuleDocuments.filter((document) => document.isArchived !== true);
+      const totalBytes = [...new Map(allModuleDocuments.filter((document) => document.storagePath)
+        .map((document) => [document.storagePath, document])).values()]
+        .reduce((total, document) => total + document.sizeBytes, 0);
+
+      async function saveModuleDocument(details: DocumentDetails, file: File | undefined, id?: string): Promise<void> {
+        const existing = id ? documents.find((document) => document.id === id) : undefined;
+        const contentHash = file
+          ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))
+            .map((byte) => byte.toString(16).padStart(2, "0")).join("")
+          : "";
+        const matchingFile = contentHash
+          ? allModuleDocuments.find((document) => document.contentHash === contentHash && document.storagePath)
+          : undefined;
+        const uploaded = file && !matchingFile ? await uploadDocumentFile(file) : null;
+        const next: DocumentAttachment = {
+          ...(existing ?? {
+            id: id ?? createId(),
+            fileName: "",
+            contentType: "",
+            sizeBytes: 0,
+            storagePath: "",
+            uploadedAt: new Date().toISOString(),
+          }),
+          ...details,
+          ...(file ? {
+            fileName: file?.name ?? "",
+            contentType: matchingFile?.contentType ?? uploaded?.contentType ?? "",
+            sizeBytes: file?.size ?? 0,
+            storagePath: matchingFile?.storagePath ?? uploaded?.storagePath ?? "",
+            contentHash,
+          } : {}),
+        };
+        try {
+          await mutate({ collection: "documents", action: "upsert", record: next });
+        } catch (caught) {
+          if (uploaded?.storagePath) {
+            try {
+              await deleteDocumentFile(uploaded.storagePath);
+            } catch (cleanupError) {
+              const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
+              const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : "The new uploaded file could not be removed.";
+              throw new Error(`${saveMessage} Cleanup also failed: ${cleanupMessage}`);
+            }
+          }
+          throw caught;
+        }
+        if (existing?.storagePath && uploaded?.storagePath && existing.storagePath !== uploaded.storagePath) {
+          setNotice("The document was updated. Its previous uploaded file was retained to preserve migrated source records.");
+        }
+        if (matchingFile) setNotice(`Reused an existing stored file for "${details.title}"; no duplicate file was uploaded.`);
+      }
+
+      async function removeModuleDocumentFile(document: DocumentAttachment) {
+        const withoutFile = { ...document, fileName: "", contentType: "", sizeBytes: 0, storagePath: "", contentHash: undefined };
+        await mutate({ collection: "documents", action: "upsert", record: withoutFile });
+        setNotice("The file was detached from this record and retained in private storage to preserve source references.");
+      }
+
+      return <DocumentManager
+        documents={allModuleDocuments}
+        categories={moduleData.categories}
+        totalStoredBytes={totalBytes}
+        onSave={saveModuleDocument}
+        onSaveCategory={(category) => mutate({ collection: "categories", action: "upsert", record: category })}
+        onCopy={async (document) => {
+          const { id, ...copy } = document;
+          await mutate({
+            collection: "documents",
+            action: "upsert",
+            record: {
+              ...copy,
+              id: createId(),
+              title: copyLabel(copy.title, 160),
+              fileName: "",
+              contentType: "",
+              sizeBytes: 0,
+              storagePath: "",
+              contentHash: undefined,
+              uploadedAt: new Date().toISOString(),
+            },
+          });
+        }}
+        onArchive={(document) => mutate({ collection: "documents", action: "archive", id: document.id })}
+        onRestore={(document) => mutate({ collection: "documents", action: "restore", id: document.id })}
+        onDelete={(document) => mutate({ collection: "documents", action: "delete", id: document.id })}
+        onToggleFavorite={(document) => mutate({
+          collection: "documents",
+          action: "upsert",
+          record: { ...document, isFavorite: !document.isFavorite },
+        })}
+        onRemoveFile={removeModuleDocumentFile}
+        onNavigate={changePage}
+      />;
+    }}</DocumentModulesDatabaseGate>,
     "Database manager": <DatabaseManagerPage />,
     "Database connections": <DatabaseConnectionsPage />,
     "Hosting & storage": <HostingStoragePage />,
     Archive: <ArchivePage records={data.archivedRecords ?? []} onRestore={restoreArchivedRecord} onCopy={copyArchivedRecord} onDelete={permanentlyDeleteArchivedRecord} />,
-    "Account credentials": <AccountCredentialsPage records={data.credentialRecords ?? []} vault={data.credentialVault}
-      onSave={(record) => persistUpdate((previous) => ({
-        ...previous,
-        credentialRecords: [record, ...(previous.credentialRecords ?? []).filter((entry) => entry.id !== record.id)],
-      }))}
-      onArchive={(record) => persistUpdate((previous) => ({
-        ...withArchivedRecord(previous, `Account credential: ${record.provider}`, { credentialRecords: [record] }),
-        credentialRecords: (previous.credentialRecords ?? []).filter((entry) => entry.id !== record.id),
-      }))}
-      onImportLegacy={(credentials, banks) => persistUpdate((previous) => ({
-        ...previous,
-        credentialVault: undefined,
-        credentialRecords: [...credentials, ...(previous.credentialRecords ?? []).filter((entry) => !credentials.some((record) => record.id === entry.id))],
-        bankAccounts: [...banks, ...(previous.bankAccounts ?? []).filter((entry) => !banks.some((account) => account.id === entry.id))],
-      }))} />,
+    "Account credentials": <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate }) => <AccountCredentialsPage
+      records={moduleData.accountCredentials}
+      archivedRecords={moduleData.archivedAccountCredentials}
+      vault={moduleData.credentialVault}
+      onSave={(record) => mutate({ collection: "accountCredentials", action: "upsert", record })}
+      onArchive={(record) => mutate({ collection: "accountCredentials", action: "archive", id: record.id })}
+      onRestore={(record) => mutate({ collection: "accountCredentials", action: "restore", id: record.id })}
+      onImportLegacy={async (credentials, banks) => {
+        if (banks.length) {
+          await persistUpdate((previous) => ({
+            ...previous,
+            bankAccounts: [...banks, ...(previous.bankAccounts ?? []).filter((entry) => !banks.some((account) => account.id === entry.id))],
+          }));
+        }
+        for (const record of credentials) {
+          await mutate({ collection: "accountCredentials", action: "upsert", record });
+        }
+        await mutate({ collection: "credentialVault", action: "clear" });
+      }}
+    />}</DocumentModulesDatabaseGate>,
     "Data management": <DataManagement data={data} currency={currency} darkMode={darkMode} fontSize={fontSize} fontStyle={fontStyle} fontFamily={fontFamily} accentColor={accentColor} darkTheme={darkTheme} visualTheme={visualTheme} dashboardWidgets={dashboardWidgets} favoritePages={favoritePages} favoriteSavePending={favoriteSavePending} showScreenDescriptions={showScreenDescriptions} groupMenus={groupMenus} menuSortOrder={menuSortOrder} syncStatus={preferenceSavePending && syncStatus === "saved" ? "saving" : syncStatus} syncMessage={preferenceSavePending && syncStatus === "saved" ? "Saving display preferences to Supabase…" : syncMessage} refreshing={refreshing} onCurrencyChange={(value) => updatePreferences((current) => ({ ...current, currency: value }))} onToggleDarkMode={toggleDarkMode} onFontSizeChange={(value) => updatePreferences((current) => ({ ...current, fontSize: value }))} onFontStyleChange={(value) => updatePreferences((current) => ({ ...current, fontStyle: value }))} onFontFamilyChange={(value) => updatePreferences((current) => ({ ...current, fontFamily: value }))} onAccentChange={(value) => updatePreferences((current) => ({ ...current, accentColor: value }))} onDarkThemeChange={(value) => updatePreferences((current) => ({ ...current, darkTheme: value }))} onVisualThemeChange={(value) => updatePreferences((current) => ({ ...current, visualTheme: value }))} onToggleDashboardWidget={(widget) => updatePreferences((current) => ({ ...current, dashboardWidgets: current.dashboardWidgets.includes(widget) ? current.dashboardWidgets.filter((entry) => entry !== widget) : [...current.dashboardWidgets, widget] }))} onToggleFavoritePage={toggleFavoritePage} onShowScreenDescriptionsChange={(value) => updatePreferences((current) => ({ ...current, showScreenDescriptions: value }))} onGroupMenusChange={(value) => updatePreferences((current) => ({ ...current, groupMenus: value }))} onMenuSortOrderChange={(value) => updatePreferences((current) => ({ ...current, menuSortOrder: value }))} onPreviewImport={previewBackup} onRestore={restoreBackup} onClear={clearData} onExport={exportBackup} onSaveNow={saveNow} onRefresh={() => void refreshSharedData()} onSignOut={() => void handleSignOut()} />,
     "R&D / Test Connectors": <TestConnectors
       accounts={data.bankAccounts ?? []}

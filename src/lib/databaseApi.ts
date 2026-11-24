@@ -1,3 +1,5 @@
+import type { CredentialRecord, DocumentAttachment, DocumentCategory, EncryptedCredentialVault, PersonalRecord } from "../types";
+
 export interface DatabaseTable {
   name: string;
   column_count: number;
@@ -98,6 +100,21 @@ export interface VehicleProfileData {
   profileId: string;
   tables: VehicleProfileTable[];
 }
+
+export interface DocumentModulesData {
+  documents: DocumentAttachment[];
+  personalDocuments: PersonalRecord[];
+  accountCredentials: CredentialRecord[];
+  archivedAccountCredentials: CredentialRecord[];
+  categories: DocumentCategory[];
+  credentialVault?: EncryptedCredentialVault;
+}
+
+export type DocumentModuleCollection = "documents" | "personalDocuments" | "accountCredentials" | "categories";
+export type DocumentModuleMutation =
+  | { collection: DocumentModuleCollection; action: "upsert"; record: DocumentAttachment | PersonalRecord | CredentialRecord | DocumentCategory }
+  | { collection: Exclude<DocumentModuleCollection, "categories">; action: "archive" | "restore" | "delete"; id: string }
+  | { collection: "credentialVault"; action: "clear" };
 
 async function request(path: string, body?: Record<string, unknown>): Promise<Response> {
   const response = await fetch(path, {
@@ -239,4 +256,30 @@ export async function mutateSavedProfileVehicleRecord(
     ...(values ? { values } : {}),
     ...(id !== undefined ? { id } : {}),
   })).json() as { operation: "insert" | "update" | "delete"; table: VehicleProfileTableName; row: VehicleProfileRow };
+}
+
+export async function loadSavedProfileDocumentModules(
+  profileId: string,
+  passphrase: string,
+): Promise<DocumentModulesData> {
+  return await (await request("/api/database", {
+    action: "profile-document-modules-data",
+    profileId,
+    passphrase,
+  })).json() as DocumentModulesData;
+}
+
+export async function mutateSavedProfileDocumentModules(
+  profileId: string,
+  passphrase: string,
+  mutation: DocumentModuleMutation,
+): Promise<DocumentModulesData> {
+  const { action: operation, ...details } = mutation;
+  return await (await request("/api/database", {
+    action: "profile-document-modules-mutate",
+    profileId,
+    passphrase,
+    ...details,
+    operation,
+  })).json() as DocumentModulesData;
 }

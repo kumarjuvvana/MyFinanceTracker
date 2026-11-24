@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { loadUnlockedDatabaseConnectionProfile } from "../server/databaseConnections.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
+import { isDocumentStoragePath } from "../src/lib/documentFiles.js";
 
 const { Client, Pool } = pg;
 const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault", "database_connection_vault"]);
@@ -21,6 +22,8 @@ const VEHICLE_PROFILE_TABLES = [
 const MAX_VEHICLE_PROFILE_ROWS = 1000;
 const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/i;
 const MAX_PAGE_SIZE = 50;
+const MAX_DOCUMENT_MODULE_RECORDS = 5000;
+const DOCUMENT_MODULES = ["Documents", "Personal Documents", "Account credentials"] as const;
 
 interface ApiRequest {
   method?: string;
@@ -338,6 +341,275 @@ async function readSavedProfileVehicleModule(body: Record<string, unknown>, resp
       const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
         ? caught.code : "unknown";
       console.error("Vehicles profile connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
+  }
+}
+
+function hasAssignedDocumentModules(profile: Awaited<ReturnType<typeof loadUnlockedDatabaseConnectionProfile>>): boolean {
+  const assigned = new Set(profile.modules.map((module) => module.trim().toLocaleLowerCase()));
+  return profile.name === "mydocumentsmanager" &&
+    DOCUMENT_MODULES.every((module) => assigned.has(module.toLocaleLowerCase()));
+}
+
+async function getDocumentModulesClient(profileId: string, passphrase: string): Promise<pg.Client> {
+  const profile = await loadUnlockedDatabaseConnectionProfile(profileId, passphrase);
+  if (!hasAssignedDocumentModules(profile)) {
+    throw new Error("The selected saved profile must be named mydocumentsmanager and assigned to Documents, Personal Documents, and Account credentials.");
+  }
+  const connectionString = parseSupabaseConnectionString(profile.connectionString);
+  const caCertificate = parseSupabaseCaCertificate(profile.caCertificate);
+  if (!connectionString || caCertificate === null) {
+    throw new Error("The saved document database connection profile is invalid.");
+  }
+  const profileClient = new Client({
+    connectionString,
+    ssl: { rejectUnauthorized: true, ...(caCertificate ? { ca: caCertificate } : {}) },
+    connectionTimeoutMillis: 10000,
+    query_timeout: 10000,
+    statement_timeout: 15000,
+  });
+  await profileClient.connect();
+  return profileClient;
+}
+
+async function readDocumentModulesData(client: pg.Client) {
+  const [documents, personalDocuments, credentials, archivedCredentials, categories, credentialVault] = await Promise.all([
+    client.query("select record from public.documents order by position, id limit $1", [MAX_DOCUMENT_MODULE_RECORDS + 1]),
+    client.query("select record from public.personal_documents order by position, id limit $1", [MAX_DOCUMENT_MODULE_RECORDS + 1]),
+    client.query("select record from public.account_credentials order by position, id limit $1", [MAX_DOCUMENT_MODULE_RECORDS + 1]),
+    client.query("select record from public.archived_account_credentials order by position, id limit $1", [MAX_DOCUMENT_MODULE_RECORDS + 1]),
+    client.query("select record from public.document_categories order by position, id limit $1", [MAX_DOCUMENT_MODULE_RECORDS + 1]),
+    client.query("select vault from public.credential_vault where id = 'shared'"),
+  ]);
+  if ([documents, personalDocuments, credentials, archivedCredentials, categories]
+    .some((result) => result.rows.length > MAX_DOCUMENT_MODULE_RECORDS)) {
+    throw new Error(`The document database exceeds the supported ${MAX_DOCUMENT_MODULE_RECORDS} records per collection.`);
+  }
+  const activeCredentials = credentials.rows
+    .map((row: { record: Record<string, unknown> }) => row.record)
+    .filter((record: Record<string, unknown>) => record.isArchived !== true);
+  const archivedCredentialRecords = [
+    ...credentials.rows.map((row: { record: Record<string, unknown> }) => row.record)
+      .filter((record: Record<string, unknown>) => record.isArchived === true),
+    ...archivedCredentials.rows.map((row: { record: Record<string, unknown> }) => row.record),
+  ];
+  return {
+    documents: documents.rows.map((row: { record: Record<string, unknown> }) => row.record),
+    personalDocuments: personalDocuments.rows.map((row: { record: Record<string, unknown> }) => row.record),
+    accountCredentials: activeCredentials,
+    archivedAccountCredentials: archivedCredentialRecords,
+    categories: categories.rows.map((row: { record: Record<string, unknown> }) => row.record),
+    ...(credentialVault.rows[0] ? { credentialVault: credentialVault.rows[0].vault } : {}),
+  };
+}
+
+async function readSavedProfileDocumentModules(body: Record<string, unknown>, response: ApiResponse) {
+  if (!validProfileCredentials(body)) {
+    respond(response, 400, { error: "Unlock the mydocumentsmanager profile to load document modules." });
+    return;
+  }
+  const client = await getDocumentModulesClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    await client.query("begin read only");
+    transactionOpen = true;
+    const data = await readDocumentModulesData(client);
+    await client.query("commit");
+    transactionOpen = false;
+    respond(response, 200, data);
+  } finally {
+    if (transactionOpen) {
+      try {
+        await client.query("rollback");
+      } catch {
+        console.error("Document module read-only transaction rollback failed.");
+      }
+    }
+    try {
+      await client.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Document module database connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
+    }
+  }
+}
+
+function isDocumentModuleCollection(value: unknown): value is "documents" | "personalDocuments" | "accountCredentials" | "categories" {
+  return value === "documents" || value === "personalDocuments" || value === "accountCredentials" || value === "categories";
+}
+
+function isDocumentModuleAction(value: unknown): value is "upsert" | "archive" | "restore" | "delete" {
+  return value === "upsert" || value === "archive" || value === "restore" || value === "delete";
+}
+
+function documentCollectionTable(collection: "documents" | "personalDocuments" | "accountCredentials" | "categories"): string {
+  if (collection === "personalDocuments") return "personal_documents";
+  if (collection === "accountCredentials") return "account_credentials";
+  if (collection === "categories") return "document_categories";
+  return "documents";
+}
+
+async function mutateSavedProfileDocumentModules(body: Record<string, unknown>, response: ApiResponse) {
+  if (!validProfileCredentials(body)) {
+    respond(response, 400, { error: "Unlock the mydocumentsmanager profile before changing document modules." });
+    return;
+  }
+  if (body.collection === "credentialVault" && body.operation === "clear") {
+    const client = await getDocumentModulesClient(body.profileId, body.passphrase);
+    let transactionOpen = false;
+    try {
+      await client.query("begin");
+      transactionOpen = true;
+      await client.query("delete from public.credential_vault where id = 'shared'");
+      await client.query(
+        `insert into public.document_activity (id, module, record_id, action)
+         values ($1, 'Account credentials', 'shared', 'credential-vault-cleared')`,
+        [randomUUID()],
+      );
+      const data = await readDocumentModulesData(client);
+      await client.query("commit");
+      transactionOpen = false;
+      respond(response, 200, data);
+    } finally {
+      if (transactionOpen) {
+        try {
+          await client.query("rollback");
+        } catch {
+          console.error("Document module mutation rollback failed.");
+        }
+      }
+      try {
+        await client.end();
+      } catch {
+        console.error("Document module database connection cleanup failed.");
+      }
+    }
+    return;
+  }
+  if (!isDocumentModuleCollection(body.collection) || !isDocumentModuleAction(body.operation) ||
+    (body.collection === "categories" && body.operation !== "upsert")) {
+    respond(response, 400, { error: "Choose a supported document module collection and action." });
+    return;
+  }
+  const collection = body.collection;
+  const action = body.operation;
+  const table = documentCollectionTable(collection);
+  const id = action === "upsert" && isRecord(body.record) ? body.record.id : body.id;
+  if (typeof id !== "string" || !id.trim() || id.length > 200) {
+    respond(response, 400, { error: "A valid document record ID is required." });
+    return;
+  }
+  if (action === "upsert" && (!isRecord(body.record) || JSON.stringify(body.record).length > 256000)) {
+    respond(response, 400, { error: "Provide a valid document record no larger than 256 KB." });
+    return;
+  }
+  if (action === "upsert" && collection === "categories") {
+    const record = body.record as Record<string, unknown>;
+    if (typeof record.name !== "string" || !record.name.trim() || record.name.length > 60 ||
+      typeof record.description !== "string" || record.description.length > 240 ||
+      typeof record.color !== "string" || !/^#[0-9a-f]{6}$/i.test(record.color)) {
+      respond(response, 400, { error: "Provide a category name, description, and six-digit hex color." });
+      return;
+    }
+  }
+  if (action === "upsert" && collection === "documents") {
+    const record = body.record as Record<string, unknown>;
+    const storagePath = record.storagePath;
+    if (typeof storagePath !== "string" || (storagePath !== "" && !isDocumentStoragePath(storagePath)) ||
+      typeof record.sizeBytes !== "number" || !Number.isSafeInteger(record.sizeBytes) ||
+      record.sizeBytes < 0 || record.sizeBytes > 10 * 1024 * 1024 ||
+      record.contentHash !== undefined && (typeof record.contentHash !== "string" || !/^[0-9a-f]{64}$/i.test(record.contentHash))) {
+      respond(response, 400, { error: "The document attachment path or file size is invalid." });
+      return;
+    }
+  }
+
+  const client = await getDocumentModulesClient(body.profileId, body.passphrase);
+  let transactionOpen = false;
+  try {
+    await client.query("begin");
+    transactionOpen = true;
+    let result: pg.QueryResult;
+    if (action === "upsert") {
+      if (collection === "categories") {
+        const existingCategory = await client.query(
+          "select record->>'isSystem' as is_system from public.document_categories where id = $1 for update",
+          [id],
+        );
+        if (existingCategory.rows[0]?.is_system === "true") {
+          throw new Error("Predefined document categories cannot be overwritten.");
+        }
+        const duplicateName = await client.query(
+          "select 1 from public.document_categories where lower(record->>'name') = lower($1) and id <> $2 limit 1",
+          [(body.record as Record<string, unknown>).name, id],
+        );
+        if (duplicateName.rowCount) throw new Error("A document category with that name already exists.");
+      }
+      result = await client.query(
+        `insert into public.${table} (id, position, record)
+         values ($1, coalesce((select max(position) + 1 from public.${table}), 1), $2::jsonb)
+         on conflict (id) do update set record = excluded.record, updated_at = now()
+         returning id`,
+        [id, JSON.stringify(body.record)],
+      );
+    } else if (action === "archive") {
+      result = await client.query(
+        `update public.${table}
+         set record = record || jsonb_build_object('isArchived', true, 'archivedAt', now()),
+             updated_at = now()
+         where id = $1 returning id`,
+        [id],
+      );
+    } else if (action === "restore") {
+      result = await client.query(
+        `update public.${table}
+         set record = record - 'isArchived' - 'archivedAt', updated_at = now()
+         where id = $1 returning id`,
+        [id],
+      );
+    } else {
+      const existing = await client.query(
+        `select record->>'isArchived' as archived${collection === "documents" ? ", record->>'storagePath' as storage_path" : ""}
+         from public.${table} where id = $1 for update`,
+        [id],
+      );
+      if (existing.rowCount !== 1 || existing.rows[0].archived !== "true") {
+        throw new Error("Only archived records can be permanently deleted.");
+      }
+      if (collection === "documents" && existing.rows[0].storage_path) {
+        throw new Error("Detach the uploaded file before permanently deleting this record. The stored object is retained.");
+      }
+      result = await client.query(`delete from public.${table} where id = $1 returning id`, [id]);
+    }
+    if (result.rowCount !== 1) {
+      throw new Error(result.rowCount ? "The document operation unexpectedly affected multiple records." : "The record was not found or could not be saved.");
+    }
+    const module = collection === "personalDocuments" ? "Personal Documents"
+      : collection === "accountCredentials" ? "Account credentials" : "Documents";
+    await client.query(
+      `insert into public.document_activity (id, module, record_id, action)
+       values ($1, $2, $3, $4)`,
+      [randomUUID(), module, id, action],
+    );
+    const data = await readDocumentModulesData(client);
+    await client.query("commit");
+    transactionOpen = false;
+    respond(response, 200, data);
+  } finally {
+    if (transactionOpen) {
+      try {
+        await client.query("rollback");
+      } catch {
+        console.error("Document module mutation rollback failed.");
+      }
+    }
+    try {
+      await client.end();
+    } catch (caught) {
+      const code = typeof caught === "object" && caught !== null && "code" in caught && typeof caught.code === "string"
+        ? caught.code : "unknown";
+      console.error("Document module database connection cleanup failed:", /^[A-Z0-9_]+$/.test(code) ? code : "unknown");
     }
   }
 }
@@ -691,7 +963,8 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
         (body.action !== "review-sql" && body.action !== "execute-sql" && body.action !== "test-connection" &&
           body.action !== "profile-catalog" && body.action !== "profile-rows" &&
           body.action !== "profile-review-sql" && body.action !== "profile-execute-sql" &&
-          body.action !== "profile-vehicles-data" && body.action !== "profile-vehicles-mutate")) {
+          body.action !== "profile-vehicles-data" && body.action !== "profile-vehicles-mutate" &&
+          body.action !== "profile-document-modules-data" && body.action !== "profile-document-modules-mutate")) {
         respond(response, 400, { error: "Choose a supported database action." });
         return;
       }
@@ -709,6 +982,14 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       }
       if (body.action === "profile-vehicles-mutate") {
         await mutateSavedProfileVehicleModule(body, response);
+        return;
+      }
+      if (body.action === "profile-document-modules-data") {
+        await readSavedProfileDocumentModules(body, response);
+        return;
+      }
+      if (body.action === "profile-document-modules-mutate") {
+        await mutateSavedProfileDocumentModules(body, response);
         return;
       }
       if (body.action === "test-connection") {

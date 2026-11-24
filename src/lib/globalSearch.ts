@@ -1,4 +1,5 @@
 import type { Page, TrackerData } from "../types";
+import type { DocumentModulesData } from "./databaseApi";
 
 export interface GlobalSearchField {
   label: string;
@@ -18,7 +19,7 @@ export interface GlobalSearchResult {
   providers: string[];
 }
 
-const collections: { key: keyof TrackerData; label: string; page: Page; titles: string[] }[] = [
+const collections: { key: keyof TrackerData | "personalDocuments"; label: string; page: Page; titles: string[] }[] = [
   { key: "items", label: "Shopping list", page: "Shopping list", titles: ["name"] },
   { key: "purchases", label: "Purchase history", page: "Purchase history", titles: ["itemName"] },
   { key: "trips", label: "Shopping trips", page: "Shopping trips", titles: ["store"] },
@@ -50,7 +51,7 @@ const collections: { key: keyof TrackerData; label: string; page: Page; titles: 
   { key: "workExperiences", label: "Work experience", page: "Education & career", titles: ["jobTitle", "company"] },
   { key: "professionalSkills", label: "Professional skills", page: "Education & career", titles: ["name"] },
   { key: "familyMembers", label: "Family", page: "Family", titles: ["name"] },
-  { key: "personalRecords", label: "Personal documents", page: "Personal documents", titles: ["title"] },
+  { key: "personalDocuments", label: "Personal documents", page: "Personal documents", titles: ["title"] },
   { key: "documents", label: "Documents", page: "Documents", titles: ["title", "fileName"] },
   { key: "promptRecords", label: "AI Prompts", page: "AI Prompts", titles: ["title"] },
   { key: "mindfulHabits", label: "Mind & habits", page: "Mind & habits", titles: ["title"] },
@@ -123,14 +124,18 @@ function getResultDates(fields: GlobalSearchField[]) {
     .filter(isValidDate);
 }
 
-export function searchTrackerData(data: TrackerData, query: string): GlobalSearchResult[] {
+export function searchTrackerData(data: TrackerData, query: string, documentModulesData?: DocumentModulesData | null): GlobalSearchResult[] {
   const terms = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   const results: GlobalSearchResult[] = [];
   const stockNames = new Map((data.stocks ?? []).map((stock) => [stock.id, `${stock.symbol} · ${stock.name}`]));
   const vehicleNames = new Map((data.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle.name]));
 
   for (const collection of collections) {
-    const entries = data[collection.key];
+    const entries: unknown = collection.key === "documents"
+      ? documentModulesData?.documents
+      : collection.key === "personalDocuments"
+        ? documentModulesData?.personalDocuments
+        : data[collection.key];
     if (!Array.isArray(entries)) continue;
     for (const entry of entries) {
       if (!isRecord(entry) || typeof entry.id !== "string") continue;

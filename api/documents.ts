@@ -3,6 +3,8 @@ import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { getDocumentFileType, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "../src/lib/documentFiles.js";
 
 const BUCKET = "daybook-documents";
+const STORAGE_LIST_PAGE_SIZE = 1000;
+const MAX_STORAGE_OBJECTS = 50000;
 
 interface ApiRequest {
   method?: string;
@@ -63,7 +65,7 @@ async function storageRequest(path: string, init?: RequestInit): Promise<Respons
     ...init,
     headers: {
       apikey: key,
-      Authorization: `******`,
+      Authorization: `Bearer ${key}`,
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -101,6 +103,68 @@ function respondWithSignedRedirect(response: ApiResponse, signedPath: string, ba
   response.end();
 }
 
+async function getBucketUsage() {
+  const prefixes = [""];
+  const seenPrefixes = new Set<string>();
+  const largestFiles: { name: string; sizeBytes: number }[] = [];
+  let usedBytes = 0;
+  let objectCount = 0;
+  let requestCount = 0;
+
+  while (prefixes.length) {
+    const prefix = prefixes.shift();
+    if (prefix === undefined || seenPrefixes.has(prefix)) continue;
+    seenPrefixes.add(prefix);
+    let offset = 0;
+    while (true) {
+      requestCount += 1;
+      if (requestCount > MAX_STORAGE_OBJECTS) {
+        throw new Error(`Storage usage measurement exceeded the safety limit of ${MAX_STORAGE_OBJECTS} objects.`);
+      }
+      const response = await storageRequest(`object/list/${BUCKET}`, {
+        method: "POST",
+        body: JSON.stringify({ prefix, limit: STORAGE_LIST_PAGE_SIZE, offset }),
+      });
+      const entries: unknown = await response.json();
+      if (!Array.isArray(entries)) throw new Error("Supabase returned an invalid storage object listing.");
+      for (const entry of entries) {
+        if (typeof entry !== "object" || entry === null || !("name" in entry) ||
+          typeof entry.name !== "string" || !entry.name || entry.name === "." || entry.name === "..") {
+          throw new Error("Supabase returned an invalid storage object entry.");
+        }
+        const row = entry as { name: string; id?: unknown; metadata?: unknown };
+        if (row.id === null || !row.metadata || typeof row.metadata !== "object") {
+          prefixes.push(`${prefix}${row.name}/`);
+          continue;
+        }
+        const metadata = row.metadata as { size?: unknown };
+        const sizeBytes = typeof metadata.size === "number" ? metadata.size : Number(metadata.size);
+        if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0) {
+          throw new Error("Supabase returned an invalid document storage file size.");
+        }
+        usedBytes += sizeBytes;
+        objectCount += 1;
+        largestFiles.push({ name: `${prefix}${row.name}`, sizeBytes });
+        largestFiles.sort((a, b) => b.sizeBytes - a.sizeBytes);
+        if (largestFiles.length > 10) largestFiles.pop();
+        if (objectCount > MAX_STORAGE_OBJECTS) {
+          throw new Error(`Storage usage measurement exceeded the safety limit of ${MAX_STORAGE_OBJECTS} objects.`);
+        }
+      }
+      if (entries.length < STORAGE_LIST_PAGE_SIZE) break;
+      offset += STORAGE_LIST_PAGE_SIZE;
+    }
+  }
+  return {
+    bucket: BUCKET,
+    usedBytes,
+    objectCount,
+    largestFiles,
+    capacityBytes: null,
+    measuredAt: new Date().toISOString(),
+  };
+}
+
 function safeDownloadName(value: unknown): string | null {
   if (typeof value !== "string" || value.length < 1 || value.length > 255 ||
     /[\u0000-\u001f\u007f/\\]/.test(value) || value === "." || value === "..") return null;
@@ -116,6 +180,10 @@ export default async function documentsHandler(request: ApiRequest, response: Ap
   try {
     if (request.method === "GET") {
       const url = new URL(request.url ?? "/", "http://localhost");
+      if (url.searchParams.get("resource") === "storage-usage") {
+        respond(response, 200, await getBucketUsage());
+        return;
+      }
       const path = url.searchParams.get("path") ?? "";
       const isDownload = url.searchParams.get("download") === "1";
       const downloadName = isDownload ? safeDownloadName(url.searchParams.get("name")) : null;

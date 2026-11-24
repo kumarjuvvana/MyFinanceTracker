@@ -2,10 +2,12 @@ import { useMemo, useState, type MouseEvent } from "react";
 import { ArrowUpRight, Search, X } from "lucide-react";
 import { Button, Card, EmptyState, FilterDrawer, Input, LinkifiedText, Select } from "./ui";
 import { searchTrackerData, type GlobalSearchResult } from "../lib/globalSearch";
+import type { DocumentModulesData } from "../lib/databaseApi";
 import type { Page, TrackerData } from "../types";
 
 interface GlobalSearchPageProps {
   data: TrackerData;
+  documentModulesData: DocumentModulesData | null;
   query: string;
   selectedKey: string | null;
   onQueryChange: (query: string) => void;
@@ -35,14 +37,14 @@ function ResultDetails({ result, onClose, onGoToPage }: {
   </div>;
 }
 
-export function GlobalSearchPage({ data, query, selectedKey, onQueryChange, onSelect, onGoToPage }: GlobalSearchPageProps) {
+export function GlobalSearchPage({ data, documentModulesData, query, selectedKey, onQueryChange, onSelect, onGoToPage }: GlobalSearchPageProps) {
   const [section, setSection] = useState("");
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
   const [provider, setProvider] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const allResults = useMemo(() => searchTrackerData(data, ""), [data]);
+  const allResults = useMemo(() => searchTrackerData(data, "", documentModulesData), [data, documentModulesData]);
   const activeQuery = query.trim().length >= 2 ? query : "";
   const normalizedSearch = activeQuery.toLocaleLowerCase().trim();
   const searchTerms = normalizedSearch.split(/\s+/).filter(Boolean);

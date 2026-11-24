@@ -1023,6 +1023,11 @@ export interface PersonalRecord {
   notes: string;
   reminderDays: number;
   additionalFields: PersonalRecordField[];
+  categoryId?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface DocumentAttachment {
@@ -1035,7 +1040,31 @@ export interface DocumentAttachment {
   sizeBytes: number;
   storagePath: string;
   uploadedAt: string;
+  contentHash?: string;
   externalLink?: string;
+  categoryId?: string;
+  documentType?: string;
+  referenceNumber?: string;
+  issuingAuthority?: string;
+  issueDate?: string;
+  dueDate?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+  isArchived?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DocumentCategory {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  isSystem?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface CredentialRecord {
@@ -1056,6 +1085,10 @@ export interface CredentialRecord {
   routingCode?: string;
   branch?: string;
   customerService?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BankAccount {
