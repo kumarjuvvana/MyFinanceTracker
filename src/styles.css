@@ -1853,6 +1853,19 @@ button.fleet-bar-row:disabled{cursor:default}
 .credential-lock-form{display:grid;gap:14px}
 .credential-page-actions{display:flex;gap:8px;flex-wrap:wrap}
 .credential-list{display:grid;gap:14px}
+.credential-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.credential-grid>.credential-card{min-width:0;padding:16px}
+.credential-grid .credential-card-head{align-items:flex-start}
+.credential-grid .credential-card-title{flex:1}
+.credential-table-wrap{overflow-x:auto;border:1px solid var(--panel-line,#e8ece6);border-radius:12px}
+.credential-table{min-width:900px}
+.credential-table-password{display:flex;align-items:center;gap:6px;min-width:130px}
+.credential-table-password code{min-width:0;overflow-wrap:anywhere;word-break:break-all}
+.credential-table-disclosure>summary{cursor:pointer;list-style:none}
+.credential-table-disclosure>summary::-webkit-details-marker{display:none}
+.credential-table-disclosure>summary strong{display:block;color:var(--text-main,#303830)}
+.credential-table-disclosure>summary span{display:block;margin-top:3px;color:var(--text-muted,#858d83);font-size:10px}
+.credential-table-disclosure[open] .credential-secondary{max-width:320px}
 .credential-card{min-width:0;padding:18px}
 .credential-card-head,.credential-card-title{display:flex;align-items:center;gap:10px}
 .credential-card-head{justify-content:space-between}
@@ -1964,6 +1977,8 @@ button.fleet-bar-row:disabled{cursor:default}
   .credential-card{padding:14px}
   .credential-page-actions{align-items:flex-start;justify-content:flex-end}
 }
+@media(max-width:1100px){.credential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.credential-grid{grid-template-columns:minmax(0,1fr)}}
 
 @media(max-width:600px){
   .trip-grid,.asset-list,.electricity-list,.devotional-list,.cooking-list,.issues-list,.career-list,.family-list,.education-list,.learning-list,.training-session-list,.personal-record-list,.document-list{gap:0}

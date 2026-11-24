@@ -14591,6 +14591,7 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
 }) {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [view, setView] = useState<"grid" | "list" | "table">("grid");
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);
@@ -14605,6 +14606,79 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
       record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.provider.localeCompare(b.provider));
+
+  function togglePassword(record: CredentialRecord) {
+    setVisiblePasswords((visible) => {
+      const next = new Set(visible);
+      if (next.has(record.id)) next.delete(record.id);
+      else next.add(record.id);
+      return next;
+    });
+  }
+
+  function renderCredentialActions(record: CredentialRecord) {
+    return <div className="table-actions">
+      {showArchived
+        ? <button type="button" className="icon-button" aria-label={`Restore ${record.provider}`} onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void onRestore(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not restore the account credential."));
+        }}><ArrowDownToLine size={14} /></button>
+        : <>
+          <button type="button" className="icon-button" aria-label={`Edit ${record.provider}`} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setEditor(record); }}><Pencil size={14} /></button>
+          <button type="button" className="icon-button" aria-label={`Copy ${record.provider}`} title="Create a separately editable copy" onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void onSave({ ...record, id: createId(), provider: copyLabel(record.provider, 120) })
+              .catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the account credential."));
+          }}><Copy size={14} /></button>
+          <button type="button" className="icon-button" aria-label={`Archive ${record.provider}`} onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (window.confirm(`Move "${record.provider}" to the Archive?`)) {
+              void onArchive(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the account credential."));
+            }
+          }}><Archive size={14} /></button>
+        </>}
+    </div>;
+  }
+
+  function renderCredentialDetails(record: CredentialRecord) {
+    return <div className="credential-secondary">
+      {record.website && <a className="personal-document-link" href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open sign-in page</a>}
+      {record.recoveryInfo && <p><strong>Recovery:</strong> <LinkifiedText>{record.recoveryInfo}</LinkifiedText></p>}
+      {record.tags.length > 0 && <p><strong>Tags:</strong> <LinkifiedText>{record.tags.join(", ")}</LinkifiedText></p>}
+      {record.additionalFields.map((field, index) => <p key={`${record.id}-${index}`}><strong><LinkifiedText>{`${field.label}:`}</LinkifiedText></strong> <LinkifiedText>{field.value}</LinkifiedText></p>)}
+      {record.notes && <p><LinkifiedText>{record.notes}</LinkifiedText></p>}
+    </div>;
+  }
+
+  function renderCredentialCard(record: CredentialRecord) {
+    return <details className="credential-card credential-record compact-details" key={record.id}>
+      <summary className="credential-card-head compact-summary">
+        <div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p><LinkifiedText>{`${record.category}${record.username ? ` · ${record.username}` : ""}`}</LinkifiedText></p></div></div>
+        {renderCredentialActions(record)}
+      </summary>
+      <div className="compact-details-body">
+        <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password || "Not saved" : record.password ? "••••••••••••" : "Not saved"}</code><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => togglePassword(record)}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
+        {renderCredentialDetails(record)}
+      </div>
+    </details>;
+  }
+
+  function renderCredentialTable() {
+    return <div className="credential-table-wrap"><table className="data-table document-table credential-table">
+      <thead><tr><th>Provider</th><th>Category</th><th>Username</th><th>Password</th><th>Website</th><th>Actions</th></tr></thead>
+      <tbody>{filteredRecords.map((record) => <tr key={record.id}>
+        <td><details className="credential-table-disclosure"><summary><strong>{record.provider}</strong><span>Details</span></summary>{renderCredentialDetails(record)}</details></td>
+        <td>{record.category || "—"}</td>
+        <td>{record.username || "—"}</td>
+        <td><div className="credential-table-password"><code>{visiblePasswords.has(record.id) ? record.password || "Not saved" : record.password ? "••••••••••••" : "Not saved"}</code><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => togglePassword(record)}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div></td>
+        <td>{record.website ? <a href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer">Open sign-in</a> : "—"}</td>
+        <td>{renderCredentialActions(record)}</td>
+      </tr>)}</tbody>
+    </table></div>;
+  }
 
   async function importLegacyRecords(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -14646,29 +14720,16 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
     {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
-    {filteredRecords.length ? <div className="credential-list">{filteredRecords.map((record) => <details className="credential-card credential-record compact-details" key={record.id}>
-      <summary className="credential-card-head compact-summary">
-        <div className="credential-card-title"><div className="credential-icon"><KeyRound size={17} /></div><div><h2>{record.provider}</h2><p><LinkifiedText>{`${record.category}${record.username ? ` · ${record.username}` : ""}`}</LinkifiedText></p></div></div>
-        <div className="table-actions">
-          {showArchived ? <button type="button" className="icon-button" aria-label={`Restore ${record.provider}`} onClick={(event) => { event.preventDefault(); void onRestore(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not restore the account credential.")); }}><ArrowDownToLine size={14} /></button> : <>
-            <button type="button" className="icon-button" aria-label={`Edit ${record.provider}`} onClick={(event) => { event.preventDefault(); setEditor(record); }}><Pencil size={14} /></button>
-            <button type="button" className="icon-button" aria-label={`Copy ${record.provider}`} title="Create a separately editable copy" onClick={(event) => { event.preventDefault(); void onSave({ ...record, id: createId(), provider: copyLabel(record.provider, 120) }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the account credential.")); }}><Copy size={14} /></button>
-            <button type="button" className="icon-button" aria-label={`Archive ${record.provider}`} onClick={(event) => { event.preventDefault(); if (window.confirm(`Move "${record.provider}" to the Archive?`)) void onArchive(record).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the account credential.")); }}><Archive size={14} /></button>
-          </>}
-        </div>
-      </summary>
-      <div className="compact-details-body">
-        <div className="credential-password-row"><span>Password</span><code>{visiblePasswords.has(record.id) ? record.password || "Not saved" : record.password ? "••••••••••••" : "Not saved"}</code><button type="button" className="icon-button" aria-label={visiblePasswords.has(record.id) ? `Hide ${record.provider} password` : `Show ${record.provider} password`} onClick={() => setVisiblePasswords((visible) => { const next = new Set(visible); if (next.has(record.id)) next.delete(record.id); else next.add(record.id); return next; })}>{visiblePasswords.has(record.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></div>
-        <div className="credential-secondary">
-          {record.website && <a className="personal-document-link" href={activityLinkHref(record.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open sign-in page</a>}
-          {record.recoveryInfo && <p><strong>Recovery:</strong> <LinkifiedText>{record.recoveryInfo}</LinkifiedText></p>}
-          {record.tags.length > 0 && <p><strong>Tags:</strong> <LinkifiedText>{record.tags.join(", ")}</LinkifiedText></p>}
-          {record.additionalFields.map((field, index) => <p key={`${record.id}-${index}`}><strong><LinkifiedText>{`${field.label}:`}</LinkifiedText></strong> <LinkifiedText>{field.value}</LinkifiedText></p>)}
-          {record.notes && <p><LinkifiedText>{record.notes}</LinkifiedText></p>}
-        </div>
-      </div>
-    </details>)}</div> : <Card><EmptyState icon={<KeyRound size={18} />} title={visibleSource.length ? "No matching accounts" : showArchived ? "No archived account credentials" : "No account credentials saved"} description={visibleSource.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="document-view-switch" role="group" aria-label="Account credential display mode">
+      <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={14} />Grid</Button>
+      <Button type="button" variant={view === "list" ? "primary" : "outline"} aria-pressed={view === "list"} onClick={() => setView("list")}><List size={14} />List</Button>
+      <Button type="button" variant={view === "table" ? "primary" : "outline"} aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 size={14} />Table</Button>
+    </div><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
+    {filteredRecords.length
+      ? view === "table"
+        ? renderCredentialTable()
+        : <div className={view === "grid" ? "credential-grid" : "credential-list"}>{filteredRecords.map(renderCredentialCard)}</div>
+      : <Card><EmptyState icon={<KeyRound size={18} />} title={visibleSource.length ? "No matching accounts" : showArchived ? "No archived account credentials" : "No account credentials saved"} description={visibleSource.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
     {editor !== undefined && <CredentialModal key={editor?.id ?? "new-direct-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
       await onSave({ ...record, id: editor?.id ?? createId() });
     }} />}
