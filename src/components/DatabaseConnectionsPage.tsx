@@ -9,6 +9,7 @@ import {
   type DatabaseRows,
   type DatabaseTable,
 } from "../lib/databaseApi";
+import { testProfileDocumentStorage } from "../lib/documentApi";
 import { loadDatabaseConnectionVault, saveDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import {
   decryptDatabaseConnectionProfiles,
@@ -45,8 +46,13 @@ export function DatabaseConnectionsPage() {
   const [modules, setModules] = useState("");
   const [connectionString, setConnectionString] = useState("");
   const [caCertificate, setCaCertificate] = useState("");
+  const [storageUrl, setStorageUrl] = useState("");
+  const [storageServiceRoleKey, setStorageServiceRoleKey] = useState("");
+  const [storageBucket, setStorageBucket] = useState("mydocumentsmanager-documents");
+  const [showStorageServiceRoleKey, setShowStorageServiceRoleKey] = useState(false);
   const [showConnectionString, setShowConnectionString] = useState(true);
   const [testedFingerprint, setTestedFingerprint] = useState("");
+  const [testedStorageFingerprint, setTestedStorageFingerprint] = useState("");
   const [browsingProfileId, setBrowsingProfileId] = useState("");
   const [profileTables, setProfileTables] = useState<DatabaseTable[]>([]);
   const [selectedProfileTable, setSelectedProfileTable] = useState("");
@@ -73,6 +79,7 @@ export function DatabaseConnectionsPage() {
   }, []);
 
   const currentFingerprint = `${connectionString.trim()}\n${caCertificate.trim()}`;
+  const currentStorageFingerprint = `${storageUrl.trim()}\n${storageServiceRoleKey.trim()}\n${storageBucket.trim()}`;
 
   function resetEditor() {
     setProfileId("");
@@ -80,8 +87,13 @@ export function DatabaseConnectionsPage() {
     setModules("");
     setConnectionString("");
     setCaCertificate("");
+    setStorageUrl("");
+    setStorageServiceRoleKey("");
+    setStorageBucket("mydocumentsmanager-documents");
+    setShowStorageServiceRoleKey(false);
     setShowConnectionString(true);
     setTestedFingerprint("");
+    setTestedStorageFingerprint("");
   }
 
   async function unlockOrCreateVault(event: FormEvent<HTMLFormElement>) {
@@ -124,6 +136,22 @@ export function DatabaseConnectionsPage() {
     }
   }
 
+  async function testStorageConnection() {
+    setError("");
+    setNotice("");
+    setTestedStorageFingerprint("");
+    setBusy(true);
+    try {
+      await testProfileDocumentStorage(storageUrl.trim(), storageServiceRoleKey.trim(), storageBucket.trim());
+      setTestedStorageFingerprint(currentStorageFingerprint);
+      setNotice(`Connected to the private "${storageBucket.trim()}" bucket. Its contents will remain separate from the other Supabase projects.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not verify the private Storage bucket.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function persistProfiles(nextProfiles: DatabaseConnectionProfile[], successMessage: string) {
     const encryptedVault = await encryptDatabaseConnectionProfiles(nextProfiles, passphrase);
     await saveDatabaseConnectionVault(encryptedVault);
@@ -147,6 +175,18 @@ export function DatabaseConnectionsPage() {
       setError("Test the current URI and CA certificate before saving this profile.");
       return;
     }
+    const assignedModules = new Set(moduleNames(modules).map((module) => module.toLocaleLowerCase()));
+    const isDocumentProfile = name.trim() === "mydocumentsmanager" &&
+      ["Documents", "Personal Documents", "Account credentials"].every((module) => assignedModules.has(module.toLocaleLowerCase()));
+    if (isDocumentProfile && (!storageUrl.trim() || !storageServiceRoleKey.trim() || !storageBucket.trim())) {
+      setError("Configure the new project's Supabase URL, service-role key, and private bucket before saving the mydocumentsmanager profile.");
+      return;
+    }
+    if ((storageUrl.trim() || storageServiceRoleKey.trim()) &&
+      testedStorageFingerprint !== currentStorageFingerprint) {
+      setError("Test the Storage project and private bucket before saving these Storage settings.");
+      return;
+    }
 
     const profile: DatabaseConnectionProfile = {
       id: profileId || createId(),
@@ -154,6 +194,11 @@ export function DatabaseConnectionsPage() {
       modules: moduleNames(modules),
       connectionString: connectionString.trim(),
       caCertificate: caCertificate.trim(),
+      ...(storageUrl.trim() && storageServiceRoleKey.trim() ? {
+        storageUrl: storageUrl.trim(),
+        storageServiceRoleKey: storageServiceRoleKey.trim(),
+        storageBucket: storageBucket.trim(),
+      } : {}),
     };
     const nextProfiles = profileId
       ? profiles.map((entry) => entry.id === profileId ? profile : entry)
@@ -197,8 +242,13 @@ export function DatabaseConnectionsPage() {
     setModules(profile.modules.join(", "));
     setConnectionString(profile.connectionString);
     setCaCertificate(profile.caCertificate);
+    setStorageUrl(profile.storageUrl ?? "");
+    setStorageServiceRoleKey(profile.storageServiceRoleKey ?? "");
+    setStorageBucket(profile.storageBucket ?? "mydocumentsmanager-documents");
+    setShowStorageServiceRoleKey(false);
     setShowConnectionString(true);
     setTestedFingerprint("");
+    setTestedStorageFingerprint("");
     setError("");
     setNotice("");
   }
@@ -292,7 +342,11 @@ export function DatabaseConnectionsPage() {
               <Field label="Module / screen names (comma-separated)"><Input maxLength={4000} placeholder="e.g. Vehicles, Payments, Documents" value={modules} onChange={(event) => setModules(event.target.value)} /></Field>
               <Field className="full" label="Supabase PostgreSQL connection URI"><div className="credential-secret-field"><Input type={showConnectionString ? "text" : "password"} autoComplete="off" maxLength={2000} required placeholder="postgresql://user:password@host:5432/database" value={connectionString} onChange={(event) => { setConnectionString(event.target.value); setTestedFingerprint(""); }} /><button type="button" className="icon-button" aria-label={showConnectionString ? "Hide connection URI" : "Show connection URI"} title={showConnectionString ? "Hide connection URI" : "Show connection URI"} onClick={() => setShowConnectionString((visible) => !visible)}>{showConnectionString ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></Field>
               <Field className="full" label="Optional Supabase database CA certificate (PEM)"><textarea className="field textarea" rows={3} maxLength={20000} autoComplete="off" placeholder="Paste the certificate only if TLS verification fails." value={caCertificate} onChange={(event) => { setCaCertificate(event.target.value); setTestedFingerprint(""); }} /></Field>
-              <div className="full connector-actions"><Button type="submit" disabled={busy}>{busy ? "Testing..." : "Test connection"}</Button><Button type="button" variant="outline" disabled={busy || testedFingerprint !== currentFingerprint} onClick={() => void saveProfile()}>{busy ? "Saving..." : profileId ? "Save profile changes" : "Save encrypted profile"}</Button>{profileId && <Button type="button" variant="ghost" disabled={busy} onClick={resetEditor}>Cancel edit</Button>}</div>
+              <div className="full"><h3 className="section-title">Supabase Storage for this profile</h3><p className="section-description">For mydocumentsmanager, enter the new Supabase project URL and service-role key. The key is included only in the encrypted profile vault and used by the server to access a private bucket. Other modules continue using their existing storage configuration.</p></div>
+              <Field className="full" label="Supabase project URL"><Input type="url" autoComplete="url" maxLength={300} placeholder="https://your-project.supabase.co" value={storageUrl} onChange={(event) => { setStorageUrl(event.target.value); setTestedStorageFingerprint(""); }} /></Field>
+              <Field label="Private bucket name"><Input autoComplete="off" maxLength={63} placeholder="mydocumentsmanager-documents" value={storageBucket} onChange={(event) => { setStorageBucket(event.target.value); setTestedStorageFingerprint(""); }} /></Field>
+              <Field label="Supabase service-role key"><div className="credential-secret-field"><Input type={showStorageServiceRoleKey ? "text" : "password"} autoComplete="new-password" maxLength={4096} value={storageServiceRoleKey} onChange={(event) => { setStorageServiceRoleKey(event.target.value); setTestedStorageFingerprint(""); }} /><button type="button" className="icon-button" aria-label={showStorageServiceRoleKey ? "Hide service-role key" : "Show service-role key"} title={showStorageServiceRoleKey ? "Hide service-role key" : "Show service-role key"} onClick={() => setShowStorageServiceRoleKey((visible) => !visible)}>{showStorageServiceRoleKey ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></Field>
+              <div className="full connector-actions"><Button type="submit" disabled={busy}>{busy ? "Testing..." : "Test database connection"}</Button><Button type="button" variant="outline" disabled={busy || !storageUrl.trim() || !storageServiceRoleKey.trim() || !storageBucket.trim() || testedStorageFingerprint === currentStorageFingerprint} onClick={() => void testStorageConnection()}>{busy ? "Testing..." : testedStorageFingerprint === currentStorageFingerprint ? "Private bucket verified" : "Test Storage & create private bucket"}</Button><Button type="button" variant="outline" disabled={busy || testedFingerprint !== currentFingerprint || (Boolean(storageUrl.trim() || storageServiceRoleKey.trim()) && testedStorageFingerprint !== currentStorageFingerprint)} onClick={() => void saveProfile()}>{busy ? "Saving..." : profileId ? "Save profile changes" : "Save encrypted profile"}</Button>{profileId && <Button type="button" variant="ghost" disabled={busy} onClick={resetEditor}>Cancel edit</Button>}</div>
             </form>
           </Card>
           <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Saved connection profiles</h2><p className="section-description">Assignments remain labels for other modules. Use Read tables to browse this database without changing any data.</p></div><Badge>{profiles.length}</Badge></div>

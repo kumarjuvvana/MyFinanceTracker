@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import pg from "pg";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
-import { loadUnlockedDatabaseConnectionProfile } from "../server/databaseConnections.js";
+import { loadUnlockedDatabaseConnectionProfile, loadUnlockedDatabaseConnectionProfiles } from "../server/databaseConnections.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
 import { isDocumentStoragePath } from "../src/lib/documentFiles.js";
+import { getProfileStorageCredentials, measureBucketUsage } from "../server/documentStorage.js";
 
 const { Client, Pool } = pg;
 const PROTECTED_TABLES = new Set(["daybook_data", "daybook_state", "credential_vault", "database_connection_vault"]);
@@ -750,6 +751,69 @@ async function getSavedProfileClient(profileId: string, passphrase: string): Pro
   return profileClient;
 }
 
+async function loadSavedProfileHostingUsage(body: Record<string, unknown>, response: ApiResponse) {
+  if (typeof body.passphrase !== "string" || body.passphrase.length < 16 || body.passphrase.length > 256) {
+    respond(response, 400, { error: "Unlock the saved database connection vault to measure profile usage." });
+    return;
+  }
+  const profiles = await loadUnlockedDatabaseConnectionProfiles(body.passphrase);
+  const usage: Record<string, unknown>[] = [];
+  for (let offset = 0; offset < profiles.length; offset += 4) {
+    const batch = await Promise.all(profiles.slice(offset, offset + 4).map(async (profile) => {
+      let databaseBytes: number | null = null;
+      let databaseError = "";
+      let storage: Awaited<ReturnType<typeof measureBucketUsage>> | null = null;
+      let storageError = "";
+      const connectionString = parseSupabaseConnectionString(profile.connectionString);
+      const caCertificate = parseSupabaseCaCertificate(profile.caCertificate);
+      if (!connectionString || caCertificate === null) {
+        databaseError = "Saved database connection details are invalid.";
+      } else {
+        const client = new Client({
+          connectionString,
+          ssl: { rejectUnauthorized: true, ...(caCertificate ? { ca: caCertificate } : {}) },
+          connectionTimeoutMillis: 10000,
+          query_timeout: 10000,
+          statement_timeout: 15000,
+        });
+        try {
+          await client.connect();
+          const result = await client.query("select pg_catalog.pg_database_size(pg_catalog.current_database())::text as database_bytes");
+          const bytes = Number(result.rows[0]?.database_bytes);
+          if (!Number.isSafeInteger(bytes) || bytes < 0) throw new Error("The database returned an invalid size.");
+          databaseBytes = bytes;
+        } catch {
+          databaseError = "Database usage could not be measured for this profile.";
+        } finally {
+          try {
+            await client.end();
+          } catch {
+            console.error("Saved-profile usage database connection cleanup failed.");
+          }
+        }
+      }
+      try {
+        const storageCredentials = getProfileStorageCredentials(profile);
+        if (storageCredentials) storage = await measureBucketUsage(storageCredentials);
+        else storageError = "Storage is not configured for this profile.";
+      } catch (caught) {
+        storageError = caught instanceof Error ? caught.message : "Storage usage could not be measured for this profile.";
+      }
+      return {
+        profileId: profile.id,
+        profileName: profile.name,
+        modules: profile.modules,
+        databaseBytes,
+        databaseError,
+        storage,
+        storageError,
+      };
+    }));
+    usage.push(...batch);
+  }
+  respond(response, 200, { measuredAt: new Date().toISOString(), profiles: usage });
+}
+
 async function readSavedProfileDatabase(
   body: Record<string, unknown>,
   response: ApiResponse,
@@ -964,7 +1028,8 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
           body.action !== "profile-catalog" && body.action !== "profile-rows" &&
           body.action !== "profile-review-sql" && body.action !== "profile-execute-sql" &&
           body.action !== "profile-vehicles-data" && body.action !== "profile-vehicles-mutate" &&
-          body.action !== "profile-document-modules-data" && body.action !== "profile-document-modules-mutate")) {
+          body.action !== "profile-document-modules-data" && body.action !== "profile-document-modules-mutate" &&
+          body.action !== "profile-hosting-usage")) {
         respond(response, 400, { error: "Choose a supported database action." });
         return;
       }
@@ -990,6 +1055,10 @@ async function databaseHandler(request: ApiRequest, response: ApiResponse) {
       }
       if (body.action === "profile-document-modules-mutate") {
         await mutateSavedProfileDocumentModules(body, response);
+        return;
+      }
+      if (body.action === "profile-hosting-usage") {
+        await loadSavedProfileHostingUsage(body, response);
         return;
       }
       if (body.action === "test-connection") {

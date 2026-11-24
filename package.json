@@ -15,7 +15,8 @@
     "db:update": "node scripts/db.mjs update",
     "db:delete": "node scripts/db.mjs delete",
     "db:create-table": "node scripts/db.mjs create-table",
-    "db:profile": "node scripts/database-profile.mjs"
+    "db:profile": "node scripts/database-profile.mjs",
+    "documents:storage-migrate": "node scripts/migrate-document-storage.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

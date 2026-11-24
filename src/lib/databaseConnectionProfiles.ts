@@ -7,6 +7,9 @@ export interface DatabaseConnectionProfile {
   modules: string[];
   connectionString: string;
   caCertificate: string;
+  storageUrl?: string;
+  storageServiceRoleKey?: string;
+  storageBucket?: string;
 }
 
 interface DatabaseConnectionVaultPayload {
@@ -52,7 +55,25 @@ export function validateDatabaseConnectionProfiles(value: unknown): value is Dat
       !record.modules.every((module) => typeof module === "string" && module.trim().length > 0 && module.length <= 80) ||
       typeof record.connectionString !== "string" || record.connectionString.length < 1 ||
       record.connectionString.length > 2000 ||
-      typeof record.caCertificate !== "string" || record.caCertificate.length > 20000) return false;
+      typeof record.caCertificate !== "string" || record.caCertificate.length > 20000 ||
+      record.storageUrl !== undefined && (typeof record.storageUrl !== "string" || record.storageUrl.length > 300) ||
+      record.storageServiceRoleKey !== undefined && (typeof record.storageServiceRoleKey !== "string" || record.storageServiceRoleKey.length > 4096) ||
+      record.storageBucket !== undefined && (typeof record.storageBucket !== "string" || record.storageBucket.length > 63)) return false;
+    const hasStorageUrl = typeof record.storageUrl === "string" && Boolean(record.storageUrl.trim());
+    const hasStorageKey = typeof record.storageServiceRoleKey === "string" && Boolean(record.storageServiceRoleKey.trim());
+    if (hasStorageUrl !== hasStorageKey) return false;
+    if (hasStorageUrl && (typeof record.storageBucket !== "string" ||
+      !/^[a-z0-9][a-z0-9_-]{1,61}[a-z0-9]$/.test(record.storageBucket))) return false;
+    if (hasStorageUrl) {
+      try {
+        const storageUrl = new URL(record.storageUrl as string);
+        if (storageUrl.protocol !== "https:" || !/^[a-z0-9-]+\.supabase\.co$/i.test(storageUrl.hostname) ||
+          storageUrl.port || storageUrl.username || storageUrl.password ||
+          storageUrl.pathname !== "/" || storageUrl.search || storageUrl.hash) return false;
+      } catch {
+        return false;
+      }
+    }
     ids.add(record.id);
     return true;
   });

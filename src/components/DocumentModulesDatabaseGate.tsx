@@ -9,6 +9,14 @@ import {
 } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
+import {
+  createProfileDocumentSignedUrl,
+  deleteProfileDocumentFile,
+  loadProfileDocumentStorageUsage,
+  uploadProfileDocumentFile,
+  type DocumentStorageUsage,
+} from "../lib/documentApi";
+import type { UploadPreparation } from "../lib/documentApi";
 
 const DOCUMENT_MODULES_SESSION_PASSPHRASE_KEY = "myfinance-tracker.document-modules-profile-passphrase";
 const REQUIRED_MODULES = ["Documents", "Personal Documents", "Account credentials"];
@@ -35,12 +43,16 @@ export function DocumentModulesDatabaseGate({
   children: (controls: {
     data: DocumentModulesData;
     mutate: (mutation: DocumentModuleMutation) => Promise<void>;
+    uploadFile: (file: File) => Promise<UploadPreparation>;
+    createFileUrl: (storagePath: string, downloadName?: string) => Promise<string>;
+    deleteFile: (storagePath: string) => Promise<void>;
+    loadStorageUsage: () => Promise<DocumentStorageUsage>;
   }) => ReactNode;
   onDataChange?: (data: DocumentModulesData | null) => void;
 }) {
   const [vaultLoading, setVaultLoading] = useState(true);
   const [vault, setVault] = useState<Awaited<ReturnType<typeof loadDatabaseConnectionVault>>>(null);
-  const [profiles, setProfiles] = useState<DatabaseConnectionProfile[]>([]);
+  const [profiles, setProfiles] = useState<Pick<DatabaseConnectionProfile, "id" | "name">[]>([]);
   const [profileId, setProfileId] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [data, setData] = useState<DocumentModulesData | null>(null);
@@ -48,6 +60,17 @@ export function DocumentModulesDatabaseGate({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const resumeAttempted = useRef(false);
+
+  function requireStorageProfile() {
+    if (!profileId || !passphrase) throw new Error("Unlock the mydocumentsmanager profile before accessing its file storage.");
+    return { profileId, passphrase };
+  }
+
+  const uploadFile = (file: File) => uploadProfileDocumentFile(file, requireStorageProfile());
+  const createFileUrl = (storagePath: string, downloadName?: string) =>
+    createProfileDocumentSignedUrl(requireStorageProfile(), storagePath, downloadName);
+  const deleteFile = (storagePath: string) => deleteProfileDocumentFile(requireStorageProfile(), storagePath);
+  const loadStorageUsage = () => loadProfileDocumentStorageUsage(requireStorageProfile());
 
   async function connect(key: string, savedProfiles: DatabaseConnectionProfile[], remember: boolean) {
     const assigned = savedProfiles.filter(isAssignedProfile);
@@ -66,7 +89,7 @@ export function DocumentModulesDatabaseGate({
         setNotice("Connected, but this browser could not remember the passphrase for this tab session.");
       }
     }
-    setProfiles(assigned);
+    setProfiles(assigned.map(({ id, name }) => ({ id, name })));
     setProfileId(profile.id);
     setPassphrase(key);
     setData(loaded);
@@ -158,12 +181,12 @@ export function DocumentModulesDatabaseGate({
       </div>
       {error && <div className="alert alert-error" role="alert">{error}</div>}
       {notice && <div className="alert alert-success" role="status">{notice}</div>}
-      {children({ data, mutate })}
+      {children({ data, mutate, uploadFile, createFileUrl, deleteFile, loadStorageUsage })}
     </div>;
   }
 
   return <Card className="document-modules-connect">
-    <div className="card-head"><div><h2 className="section-title">Connect document database</h2><p className="section-description">Unlock the saved profile assigned to Documents, Personal Documents, and Account credentials. Files remain in the existing private storage bucket.</p></div><Database size={16} /></div>
+    <div className="card-head"><div><h2 className="section-title">Connect document database</h2><p className="section-description">Unlock the saved profile assigned to Documents, Personal Documents, and Account credentials. Their uploaded files use that profile's private Storage bucket.</p></div><Database size={16} /></div>
     {vaultLoading || loading ? <p className="section-description">{vaultLoading ? "Loading saved database profile..." : "Connecting to mydocumentsmanager..."}</p> : <form className="connector-form" onSubmit={(event) => void unlock(event)}>
       <Field className="full" label="Database connection vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={passphrase} onChange={(event) => setPassphrase(event.target.value)} /></Field>
       <div className="full connector-actions"><Button type="submit" disabled={!vault || loading}>{loading ? "Connecting..." : "Unlock document database"}</Button></div>

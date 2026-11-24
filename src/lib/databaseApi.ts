@@ -1,4 +1,5 @@
 import type { CredentialRecord, DocumentAttachment, DocumentCategory, EncryptedCredentialVault, PersonalRecord } from "../types";
+import type { DocumentStorageUsage } from "./documentApi";
 
 export interface DatabaseTable {
   name: string;
@@ -108,6 +109,16 @@ export interface DocumentModulesData {
   archivedAccountCredentials: CredentialRecord[];
   categories: DocumentCategory[];
   credentialVault?: EncryptedCredentialVault;
+}
+
+export interface SavedProfileHostingUsage {
+  profileId: string;
+  profileName: string;
+  modules: string[];
+  databaseBytes: number | null;
+  databaseError: string;
+  storage: DocumentStorageUsage | null;
+  storageError: string;
 }
 
 export type DocumentModuleCollection = "documents" | "personalDocuments" | "accountCredentials" | "categories";
@@ -282,4 +293,42 @@ export async function mutateSavedProfileDocumentModules(
     ...details,
     operation,
   })).json() as DocumentModulesData;
+}
+
+export async function loadSavedProfilesHostingUsage(passphrase: string): Promise<SavedProfileHostingUsage[]> {
+  const response = await request("/api/database", {
+    action: "profile-hosting-usage",
+    passphrase,
+  });
+  const payload: unknown = await response.json();
+  if (typeof payload !== "object" || payload === null || !("profiles" in payload) ||
+    !Array.isArray(payload.profiles) || !payload.profiles.every((profile: unknown) => {
+      if (typeof profile !== "object" || profile === null ||
+        !("profileId" in profile) || typeof profile.profileId !== "string" ||
+        !("profileName" in profile) || typeof profile.profileName !== "string" ||
+        !("modules" in profile) || !Array.isArray(profile.modules) ||
+        !profile.modules.every((module: unknown) => typeof module === "string") ||
+        !("databaseBytes" in profile) || (profile.databaseBytes !== null &&
+          (typeof profile.databaseBytes !== "number" || !Number.isSafeInteger(profile.databaseBytes))) ||
+        !("databaseError" in profile) || typeof profile.databaseError !== "string" ||
+        !("storageError" in profile) || typeof profile.storageError !== "string" ||
+        !("storage" in profile)) return false;
+      const storage = profile.storage;
+      return storage === null || (
+        typeof storage === "object" && storage !== null &&
+        "bucket" in storage && typeof storage.bucket === "string" &&
+        "usedBytes" in storage && typeof storage.usedBytes === "number" && Number.isSafeInteger(storage.usedBytes) &&
+        "objectCount" in storage && typeof storage.objectCount === "number" && Number.isSafeInteger(storage.objectCount) &&
+        "largestFiles" in storage && Array.isArray(storage.largestFiles) &&
+        storage.largestFiles.every((file: unknown) => typeof file === "object" && file !== null &&
+          "name" in file && typeof file.name === "string" &&
+          "sizeBytes" in file && typeof file.sizeBytes === "number" && Number.isSafeInteger(file.sizeBytes)) &&
+        "capacityBytes" in storage && (storage.capacityBytes === null ||
+          (typeof storage.capacityBytes === "number" && Number.isSafeInteger(storage.capacityBytes))) &&
+        "measuredAt" in storage && typeof storage.measuredAt === "string"
+      );
+    })) {
+    throw new Error("The server returned an invalid saved-profile usage report.");
+  }
+  return payload.profiles as SavedProfileHostingUsage[];
 }

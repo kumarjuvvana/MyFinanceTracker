@@ -12,9 +12,9 @@ import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
-import { deleteDocumentFile, loadDocumentStorageUsage, uploadDocumentFile, type DocumentStorageUsage } from "./lib/documentApi";
+import { deleteDocumentFile, uploadDocumentFile, type DocumentStorageUsage } from "./lib/documentApi";
 import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
-import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
+import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, loadSavedProfilesHostingUsage, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SavedProfileHostingUsage, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
 import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
 import { clearDocumentModulesSessionPassphrase, DocumentModulesDatabaseGate } from "./components/DocumentModulesDatabaseGate";
@@ -9941,8 +9941,12 @@ function CapacityCard({ title, usedBytes, limitBytes, detail }: {
 function HostingStoragePage() {
   const [cloudUsage, setCloudUsage] = useState<CloudUsage | null>(null);
   const [deploymentUsage, setDeploymentUsage] = useState<DeploymentUsage | null>(null);
+  const [profileUsage, setProfileUsage] = useState<SavedProfileHostingUsage[] | null>(null);
+  const [profilePassphrase, setProfilePassphrase] = useState("");
   const [cloudError, setCloudError] = useState("");
   const [deploymentError, setDeploymentError] = useState("");
+  const [profileUsageError, setProfileUsageError] = useState("");
+  const [profileUsageLoading, setProfileUsageLoading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function refreshUsage() {
@@ -9966,6 +9970,23 @@ function HostingStoragePage() {
     void refreshUsage();
   }, []);
 
+  async function measureSavedProfileUsage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileUsageLoading(true);
+    setProfileUsageError("");
+    setProfileUsage(null);
+    try {
+      const profiles = await loadSavedProfilesHostingUsage(profilePassphrase);
+      setProfileUsage(profiles);
+      setProfilePassphrase("");
+      if (!profiles.length) setProfileUsageError("No saved database profiles are available.");
+    } catch (caught) {
+      setProfileUsageError(caught instanceof Error ? caught.message : "Could not measure saved profile usage.");
+    } finally {
+      setProfileUsageLoading(false);
+    }
+  }
+
   function measuredTime(value: string) {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
@@ -9973,14 +9994,14 @@ function HostingStoragePage() {
 
   return <>
     <PageHeading eyebrow="Infrastructure overview" title="Hosting & storage" subtitle="Review measured Supabase usage and the size of this Vercel deployment build." action={<Button variant="outline" onClick={() => void refreshUsage()} disabled={loading}><RefreshCw size={14} />{loading ? "Measuring..." : "Refresh usage"}</Button>} />
-    <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>Supabase usage is measured from the connected project. Quotas shown are Free-plan reference limits, not live billing data. Vercel reports this build’s output size; account-wide hosting usage and remaining quota are not available from this metric.</span></div>
+    <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>The connected project below is the original Daybook Supabase project. Saved-profile usage is measured separately for each database profile. Bucket capacity and plan quotas are not exposed by these measurements. Vercel reports this build’s output size, not account-wide remaining quota.</span></div>
     {cloudError && <div className="alert alert-error" role="alert">{cloudError}</div>}
     {deploymentError && <div className="alert alert-warning" role="status">{deploymentError}</div>}
     {loading && !cloudUsage && !deploymentUsage && <Card><p className="section-description">Measuring project usage...</p></Card>}
     <div className="hosting-usage-grid">
       {cloudUsage && <>
-        <CapacityCard title="Supabase database" usedBytes={cloudUsage.databaseBytes} limitBytes={FREE_DATABASE_LIMIT_BYTES} detail="Total PostgreSQL database size, including tables, indexes, and system data." />
-        <CapacityCard title="Supabase Storage" usedBytes={cloudUsage.storageBytes} limitBytes={FREE_STORAGE_LIMIT_BYTES} detail={`${cloudUsage.storageObjects.toLocaleString()} stored object(s), across all buckets in this project.`} />
+        <CapacityCard title="Original Daybook Supabase database" usedBytes={cloudUsage.databaseBytes} limitBytes={FREE_DATABASE_LIMIT_BYTES} detail="Total PostgreSQL database size, including tables, indexes, and system data. Quota shown is only a Free-plan reference." />
+        <CapacityCard title="Original Daybook Supabase Storage" usedBytes={cloudUsage.storageBytes} limitBytes={FREE_STORAGE_LIMIT_BYTES} detail={`${cloudUsage.storageObjects.toLocaleString()} stored object(s), across all buckets in this project. Quota shown is only a Free-plan reference.`} />
       </>}
       {deploymentUsage && <Card className="capacity-card hosting-output-card">
         <h2 className="section-title">Vercel deployment output</h2>
@@ -9991,6 +10012,24 @@ function HostingStoragePage() {
     </div>
     {cloudUsage && <p className="usage-measured-at">Supabase measured {measuredTime(cloudUsage.measuredAt)}.</p>}
     {deploymentUsage && <p className="usage-measured-at">Build output measured {measuredTime(deploymentUsage.measuredAt)}.</p>}
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Saved database profile usage</h2><p className="section-description">Measure PostgreSQL size and, when configured, actual usage for each profile’s private Storage bucket. The profile passphrase is sent only to the authenticated API for this measurement.</p></div><Database size={16} /></div>
+      <form className="connector-form" onSubmit={(event) => void measureSavedProfileUsage(event)}>
+        <Field className="full" label="Database connection vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={profilePassphrase} onChange={(event) => setProfilePassphrase(event.target.value)} /></Field>
+        <div className="full"><Button type="submit" disabled={profileUsageLoading}>{profileUsageLoading ? "Measuring profiles..." : "Measure saved profiles"}</Button></div>
+      </form>
+      {profileUsageError && <div className="alert alert-error" role="alert" style={{ marginTop: 12 }}>{profileUsageError}</div>}
+      {profileUsage?.map((profile) => <div className="saved-profile-usage" key={profile.profileId}>
+        <div className="card-head"><div><h3 className="section-title">{profile.profileName}</h3><p className="section-description">{profile.modules.join(" · ") || "No module assignments"}</p></div><Badge tone="blue">Saved profile</Badge></div>
+        <div className="document-storage-stats">
+          <span>Database: <strong>{profile.databaseBytes === null ? profile.databaseError || "Unavailable" : formatCapacity(profile.databaseBytes)}</strong></span>
+          {profile.storage
+            ? <><span>Private bucket: <strong>{profile.storage.bucket}</strong></span><span>Storage used: <strong>{formatCapacity(profile.storage.usedBytes)}</strong></span><span>{profile.storage.objectCount.toLocaleString()} objects</span></>
+            : <span>Storage: <strong>{profile.storageError || "Not configured"}</strong></span>}
+        </div>
+        {profile.storage?.capacityBytes === null && <p className="capacity-detail">Bucket capacity is not provided by the configured Storage API; usage is actual measured object size, not a capacity percentage.</p>}
+      </div>)}
+      {profileUsage && <p className="usage-measured-at">Saved profile usage measured {profileUsageLoading ? "…" : "now"}.</p>}
+    </Card>
   </>;
 }
 
@@ -13882,8 +13921,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   </Modal>;
 }
 
-function DocumentViewer({ document, onClose }: { document: DocumentAttachment; onClose: () => void }) {
-  const source = `/api/documents?path=${encodeURIComponent(document.storagePath)}`;
+function DocumentViewer({ document, source, onClose }: { document: DocumentAttachment; source: string; onClose: () => void }) {
   const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
   return <Modal title={document.title} onClose={onClose} wide><div className="document-viewer">
@@ -13891,7 +13929,7 @@ function DocumentViewer({ document, onClose }: { document: DocumentAttachment; o
   </div></Modal>;
 }
 
-function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate }: {
+function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate, createFileUrl, loadStorageUsage }: {
   documents: DocumentAttachment[];
   categories: DocumentCategory[];
   totalStoredBytes: number;
@@ -13904,9 +13942,11 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   onToggleFavorite: (document: DocumentAttachment) => Promise<void>;
   onRemoveFile: (document: DocumentAttachment) => Promise<void>;
   onNavigate: (page: Page) => void;
+  createFileUrl: (storagePath: string, downloadName?: string) => Promise<string>;
+  loadStorageUsage: () => Promise<DocumentStorageUsage>;
 }) {
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
-  const [viewer, setViewer] = useState<DocumentAttachment | null>(null);
+  const [viewer, setViewer] = useState<{ document: DocumentAttachment; source: string } | null>(null);
   const [categoryEditor, setCategoryEditor] = useState(false);
   const [search, setSearch] = useState("");
   const [personFilter, setPersonFilter] = useState("All people");
@@ -13940,7 +13980,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
 
   useEffect(() => {
     let active = true;
-    void loadDocumentStorageUsage()
+    void loadStorageUsage()
       .then((usage) => { if (active) setStorageUsage(usage); })
       .catch((caught: unknown) => {
         if (active) setStorageError(caught instanceof Error ? caught.message : "Actual bucket storage usage could not be loaded.");
@@ -13974,6 +14014,27 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     } catch (caught) {
       setOperationError(caught instanceof Error ? caught.message : "The document operation could not be completed.");
     }
+  }
+  async function openDocumentFile(document: DocumentAttachment, download = false) {
+    let downloadWindow: Window | null = null;
+    if (download) {
+      downloadWindow = window.open("about:blank", "_blank");
+      if (!downloadWindow) {
+        setOperationError("Allow pop-ups to open this private document download.");
+        return;
+      }
+      downloadWindow.opener = null;
+    }
+    await runAction(async () => {
+      try {
+        const source = await createFileUrl(document.storagePath, download ? document.fileName : undefined);
+        if (download && downloadWindow) downloadWindow.location.replace(source);
+        else setViewer({ document, source });
+      } catch (caught) {
+        downloadWindow?.close();
+        throw caught;
+      }
+    });
   }
   const activeDocuments = documents.filter((document) => document.isArchived !== true);
   const archivedDocuments = documents.filter((document) => document.isArchived === true);
@@ -14103,8 +14164,8 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
           <td>{dateLabel(document.uploadedAt.slice(0, 10))}</td><td>{document.dueDate ? dateLabel(document.dueDate) : "—"}</td>
           <td><Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></td>
           <td><div className="document-card-actions">
-            {canPreview && <Button size="sm" variant="outline" onClick={() => setViewer(document)}>View</Button>}
-          {document.storagePath && <a className="button button-outline document-download" href={`/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`} target="_blank" rel="noopener noreferrer">Download</a>}
+            {canPreview && <Button size="sm" variant="outline" onClick={() => void openDocumentFile(document)}>View</Button>}
+          {document.storagePath && <Button size="sm" variant="outline" onClick={() => void openDocumentFile(document, true)}>Download</Button>}
           {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">Open link</a>}
             <button type="button" className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
           {hasFile && <button type="button" className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} onClick={() => {
@@ -14123,16 +14184,13 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     }
     return <div className={`document-list ${view === "grid" ? "document-grid" : "document-compact-list"}`}>{entries.map((document) => {
       const hasFile = Boolean(document.storagePath);
-      const downloadUrl = hasFile
-        ? `/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`
-        : "";
       const category = categories.find((entry) => entry.id === document.categoryId);
       const due = dueStatus(document.dueDate);
       const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
       const canPreview = hasFile && (contentType === "application/pdf" || contentType.startsWith("image/"));
       return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><div className="document-card-heading"><h2>{document.title}</h2>{document.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div><div className="document-meta-badges">{category && <Badge>{category.name}</Badge>}<Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></div><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.documentType && <small>{document.documentType}{document.referenceNumber ? ` · Ref. ${maskedDocumentNumber(document.referenceNumber)}` : ""}</small>}{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}{document.dueDate ? ` · Due ${dateLabel(document.dueDate)}` : ""}</small>{(document.createdAt || document.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{document.createdAt && <p><strong>Created</strong><span>{new Date(document.createdAt).toLocaleString()}</span></p>}{document.updatedAt && <p><strong>Updated</strong><span>{new Date(document.updatedAt).toLocaleString()}</span></p>}</details>}</div></div><div className="document-card-actions">
-        {canPreview && <Button variant="outline" onClick={() => setViewer(document)}><Eye size={14} />View</Button>}
-        {hasFile && <a className="button button-outline document-download" href={downloadUrl} target="_blank" rel="noopener noreferrer"><Download size={14} />Download</a>}
+        {canPreview && <Button variant="outline" onClick={() => void openDocumentFile(document)}><Eye size={14} />View</Button>}
+        {hasFile && <Button variant="outline" onClick={() => void openDocumentFile(document, true)}><Download size={14} />Download</Button>}
         {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
         <button className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} title={document.isFavorite ? "Remove favorite" : "Add to favorites"} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
         {hasFile && <button className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} title="Detach uploaded file" onClick={() => {
@@ -14152,7 +14210,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   }
 
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Manage files, personal records, due dates, and categories from one document workspace." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
-    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Document records are stored in mydocumentsmanager. Uploaded files remain in the existing private Supabase Storage bucket and are accessed through the existing signed-link API. Database records and uploaded files are access-controlled, not end-to-end encrypted.</span></div>
+    <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Document records and newly uploaded files are stored in the assigned mydocumentsmanager project. File content uses its verified private Supabase Storage bucket; the service-role key remains server-side during file operations. These records are access-controlled, not end-to-end encrypted.</span></div>
     <div className="document-kpi-grid">
       <Card><span>Total documents</span><strong>{activeDocuments.length + archivedDocuments.length}</strong><small>Active and archived records</small></Card>
       <Card><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Available in the library</small></Card>
@@ -14163,7 +14221,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       <Card><span>Categories</span><strong>{categories.length}</strong><small>Available categories</small></Card>
       <Card><span>Added this month</span><strong>{addedThisMonth}</strong><small>Based on document upload date</small></Card>
     </div>
-    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the existing private bucket, including files used by other application modules. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
+    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the private Storage bucket assigned to mydocumentsmanager. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
       <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
       {storageError && <p className="document-storage-warning" role="status">Actual storage usage could not be measured: {storageError}</p>}
       {storageUsage?.capacityBytes ? <div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)}%` }} /></div> : null}
@@ -14222,9 +14280,9 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
             const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
             const canPreview = contentType === "application/pdf" || contentType.startsWith("image/");
             return document.storagePath && canPreview
-              ? <button type="button" key={document.id} title={document.title} onClick={() => setViewer(document)}>{document.title}</button>
+              ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document)}>{document.title}</button>
               : document.storagePath
-                ? <a key={document.id} title={document.title} href={`/api/documents?path=${encodeURIComponent(document.storagePath)}&download=1&name=${encodeURIComponent(document.fileName)}`} target="_blank" rel="noopener noreferrer">{document.title}</a>
+                ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document, true)}>{document.title}</button>
                 : document.externalLink
               ? <a key={document.id} title={document.title} href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">{document.title}</a>
               : <span className="document-calendar-event" key={document.id} title={document.title}>{document.title}</span>;
@@ -14237,7 +14295,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Field label="Rows per page"><Select value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select></Field><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
     </>}
     {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
-    {viewer && <DocumentViewer document={viewer} onClose={() => setViewer(null)} />}
+    {viewer && <DocumentViewer document={viewer.document} source={viewer.source} onClose={() => setViewer(null)} />}
     {categoryEditor && <Modal title="Create document category" onClose={() => setCategoryEditor(false)}>
       <form onSubmit={(event) => void saveCategory(event)}><div className="form-grid">
         <Field className="full" label="Category name"><Input autoFocus required maxLength={60} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} /></Field>
@@ -17583,7 +17641,7 @@ export default function App() {
       }}
       onRestore={(record) => mutate({ collection: "personalDocuments", action: "restore", id: record.id })}
     />}</DocumentModulesDatabaseGate>,
-    Documents: <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate }) => {
+    Documents: <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate, uploadFile, deleteFile, createFileUrl, loadStorageUsage }) => {
       const allModuleDocuments = moduleData.documents;
       const documents = allModuleDocuments.filter((document) => document.isArchived !== true);
       const totalBytes = [...new Map(allModuleDocuments.filter((document) => document.storagePath)
@@ -17599,7 +17657,7 @@ export default function App() {
         const matchingFile = contentHash
           ? allModuleDocuments.find((document) => document.contentHash === contentHash && document.storagePath)
           : undefined;
-        const uploaded = file && !matchingFile ? await uploadDocumentFile(file) : null;
+        const uploaded = file && !matchingFile ? await uploadFile(file) : null;
         const next: DocumentAttachment = {
           ...(existing ?? {
             id: id ?? createId(),
@@ -17623,7 +17681,7 @@ export default function App() {
         } catch (caught) {
           if (uploaded?.storagePath) {
             try {
-              await deleteDocumentFile(uploaded.storagePath);
+              await deleteFile(uploaded.storagePath);
             } catch (cleanupError) {
               const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
               const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : "The new uploaded file could not be removed.";
@@ -17678,6 +17736,8 @@ export default function App() {
         })}
         onRemoveFile={removeModuleDocumentFile}
         onNavigate={changePage}
+        createFileUrl={createFileUrl}
+        loadStorageUsage={loadStorageUsage}
       />;
     }}</DocumentModulesDatabaseGate>,
     "Database manager": <DatabaseManagerPage />,

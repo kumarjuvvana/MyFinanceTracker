@@ -1,6 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { getDocumentFileType, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "../src/lib/documentFiles.js";
+import {
+  createSignedDocumentUrl,
+  createSignedUpload,
+  deleteStoredDocument,
+  ensurePrivateBucket,
+  measureBucketUsage,
+  resolveDocumentStorageCredentials,
+  validateStorageCredentials,
+} from "../server/documentStorage.js";
 
 const BUCKET = "daybook-documents";
 const STORAGE_LIST_PAGE_SIZE = 1000;
@@ -171,6 +180,56 @@ function safeDownloadName(value: unknown): string | null {
   return value;
 }
 
+function validProfileStorageRequest(body: Record<string, unknown>): body is Record<string, unknown> & {
+  profileId: string;
+  passphrase: string;
+} {
+  return typeof body.profileId === "string" && body.profileId.length > 0 && body.profileId.length <= 100 &&
+    typeof body.passphrase === "string" && body.passphrase.length >= 16 && body.passphrase.length <= 256;
+}
+
+async function handleProfileStorageRequest(body: Record<string, unknown>, response: ApiResponse): Promise<boolean> {
+  if (body.action === "test-profile-storage") {
+    const storage = validateStorageCredentials(body.storageUrl, body.serviceRoleKey, body.bucket);
+    await ensurePrivateBucket(storage);
+    respond(response, 200, { verified: true, bucket: storage.bucket });
+    return true;
+  }
+  if (body.action !== "profile-upload" && body.action !== "profile-signed-url" &&
+    body.action !== "profile-delete" && body.action !== "profile-storage-usage") return false;
+  if (!validProfileStorageRequest(body)) {
+    respond(response, 400, { error: "Unlock the assigned mydocumentsmanager profile to use its private Storage." });
+    return true;
+  }
+  const storage = await resolveDocumentStorageCredentials(body.profileId, body.passphrase);
+  if (body.action === "profile-upload") {
+    const fileName = typeof body.fileName === "string" ? body.fileName : "";
+    const sizeBytes = typeof body.sizeBytes === "number" ? body.sizeBytes : NaN;
+    respond(response, 200, await createSignedUpload(storage, fileName, sizeBytes));
+    return true;
+  }
+  if (body.action === "profile-signed-url") {
+    const storagePath = typeof body.storagePath === "string" ? body.storagePath : "";
+    const downloadName = body.downloadName === undefined ? undefined : safeDownloadName(body.downloadName);
+    if (body.downloadName !== undefined && !downloadName) {
+      respond(response, 400, { error: "The document download name is invalid." });
+      return true;
+    }
+    respond(response, 200, {
+      signedUrl: await createSignedDocumentUrl(storage, storagePath, downloadName ?? undefined),
+    });
+    return true;
+  }
+  if (body.action === "profile-delete") {
+    const storagePath = typeof body.storagePath === "string" ? body.storagePath : "";
+    await deleteStoredDocument(storage, storagePath);
+    respond(response, 200, { deleted: true });
+    return true;
+  }
+  respond(response, 200, { ...await measureBucketUsage(storage) });
+  return true;
+}
+
 export default async function documentsHandler(request: ApiRequest, response: ApiResponse) {
   if (!isAuthenticated(request)) {
     respond(response, 401, { error: "Your Daybook session expired. Enter the access password again." });
@@ -223,6 +282,7 @@ export default async function documentsHandler(request: ApiRequest, response: Ap
       respond(response, 400, { error: "Choose a valid document operation." });
       return;
     }
+    if (await handleProfileStorageRequest(body, response)) return;
 
     if (body.action === "upload") {
       const fileName = "fileName" in body && typeof body.fileName === "string" ? body.fileName : "";
