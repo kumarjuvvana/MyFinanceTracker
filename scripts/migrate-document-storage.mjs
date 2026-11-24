@@ -98,24 +98,57 @@ async function targetStorageRequest(profile, path, init = {}) {
   return response;
 }
 
-async function ensureTargetBucket(profile) {
-  const response = await targetStorageRequest(profile, "bucket", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: profile.storageBucket,
-      name: profile.storageBucket,
-      public: false,
-      file_size_limit: 10 * 1024 * 1024,
-    }),
-  });
-  if (!response.ok && response.status !== 409) {
-    throw new Error(`Could not create the target private bucket (HTTP ${response.status}).`);
+async function targetStorageError(response) {
+  try {
+    const payload = await response.json();
+    for (const key of ["message", "error", "error_description"]) {
+      if (typeof payload?.[key] === "string" && payload[key].trim()) {
+        return payload[key].trim().slice(0, 300);
+      }
+    }
+  } catch {
+    // Keep the HTTP status when Storage does not return a JSON error.
   }
-  const check = await targetStorageRequest(profile, `bucket/${encodeURIComponent(profile.storageBucket)}`);
-  if (!check.ok) throw new Error(`Could not verify the target bucket is available (HTTP ${check.status}).`);
-  const bucket = await check.json();
-  if (bucket?.public !== false) throw new Error("The target bucket must be private before copying files.");
+  return `HTTP ${response.status}`;
+}
+
+async function getTargetBucket(profile) {
+  const response = await targetStorageRequest(
+    profile,
+    `bucket/${encodeURIComponent(profile.storageBucket)}`,
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Could not inspect the target Storage bucket: ${await targetStorageError(response)}.`);
+  }
+  return response.json();
+}
+
+async function ensureTargetBucket(profile) {
+  let bucket = await getTargetBucket(profile);
+  if (bucket === null) {
+    const response = await targetStorageRequest(profile, "bucket", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: profile.storageBucket,
+        name: profile.storageBucket,
+        public: false,
+        file_size_limit: 10 * 1024 * 1024,
+      }),
+    });
+    if (!response.ok) {
+      bucket = await getTargetBucket(profile);
+      if (bucket === null) {
+        throw new Error(`Could not create the target private bucket: ${await targetStorageError(response)}.`);
+      }
+    } else {
+      bucket = await getTargetBucket(profile);
+    }
+  }
+  if (!bucket || bucket.public !== false) {
+    throw new Error("The target bucket must be private before copying files.");
+  }
 }
 
 async function loadSourcePaths(client) {
@@ -153,7 +186,9 @@ async function downloadTarget(profile, path) {
   );
   if (response.status === 404) return null;
   if (!response.ok) {
-    throw new Error(`Could not verify the target file ${path} (HTTP ${response.status}).`);
+    const detail = await targetStorageError(response);
+    if (response.status === 400 && /^object not found$/i.test(detail)) return null;
+    throw new Error(`Could not verify the target file ${path}: ${detail}.`);
   }
   return new Uint8Array(await response.arrayBuffer());
 }
@@ -180,10 +215,14 @@ async function copyAndVerify(profile, row) {
         body: sourceBytes,
       },
     );
-    if (!response.ok && response.status !== 409) {
-      throw new Error(`Could not copy ${row.storage_path} to the target bucket (HTTP ${response.status}). Source file remains untouched.`);
+    if (!response.ok) {
+      existing = await downloadTarget(profile, row.storage_path);
+      if (!existing || fingerprint(existing) !== sourceHash) {
+        throw new Error(`Could not copy ${row.storage_path} to the target bucket: ${await targetStorageError(response)}. Source file remains untouched.`);
+      }
+    } else {
+      existing = await downloadTarget(profile, row.storage_path);
     }
-    existing = await downloadTarget(profile, row.storage_path);
   }
   if (!existing || fingerprint(existing) !== sourceHash) {
     throw new Error(`Target verification failed for ${row.storage_path}. Source file remains untouched.`);
