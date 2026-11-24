@@ -1096,6 +1096,111 @@ body{background:#f3f5ef}
   .vehicle-profile-pagination>span,.vehicle-profile-pagination>div{width:100%}
   .vehicle-profile-pagination>div{justify-content:flex-start}
 }
+.fleet-dashboard{display:grid;gap:14px;color:#1e293b}
+.fleet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;border:1px solid #dce5ef;border-radius:14px;background:#fff;box-shadow:0 4px 16px #142d4e0a}
+.fleet-header h2{margin:2px 0 5px;color:#142d4e;font:750 22px/1.2 Manrope,sans-serif}
+.fleet-header>div>p:last-child{max-width:760px;margin:0;color:#64748b;font-size:11px;line-height:1.55}
+.fleet-header .eyebrow{margin:0;color:#2563eb;font-size:9px;font-weight:800;letter-spacing:1px}
+.fleet-header-actions,.fleet-export-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fleet-filter-panel{border-color:#dce5ef}
+.fleet-filter-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.fleet-filter-heading h3,.fleet-report-head h3{margin:0;color:#142d4e;font-size:13px}
+.fleet-filter-heading p,.fleet-report-head p{margin:4px 0 0;color:#64748b;font-size:10px}
+.fleet-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,165px),1fr));align-items:end;gap:10px}
+.fleet-filter-note{grid-column:1/-1;margin:0;color:#64748b;font-size:10px}
+.fleet-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:10px}
+.fleet-kpi{position:relative;display:grid;gap:6px;min-width:0;padding:13px 14px;border:1px solid #e1e8f0;box-shadow:0 4px 14px #142d4e08}
+.fleet-kpi-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px}
+.fleet-kpi-label{color:#64748b;font-size:10px;font-weight:650}
+.fleet-kpi>strong{color:#142d4e;font:750 19px/1.2 Manrope,sans-serif;overflow-wrap:anywhere}
+.fleet-kpi>small{color:#64748b;font-size:9px;line-height:1.45}
+.fleet-data-note,.fleet-footnote{margin:0;padding:9px 12px;border:1px solid #dbeafe;border-radius:9px;background:#eff6ff;color:#334155;font-size:10px;line-height:1.55}
+.fleet-chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:12px}
+.fleet-chart-card{min-width:0;padding:14px;border:1px solid #e1e8f0;box-shadow:0 4px 16px #142d4e08}
+.fleet-card-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.fleet-card-head h3{margin:0;color:#142d4e;font-size:12px;font-weight:750}
+.fleet-card-head p{margin:4px 0 0;color:#64748b;font-size:9px;line-height:1.45}
+.fleet-card-icon{display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:9px;background:#eff6ff;color:#2563eb}
+.fleet-bars{display:grid;gap:10px;padding:4px 0}
+.fleet-bar-row{display:grid;grid-template-columns:minmax(70px,110px) minmax(40px,1fr) minmax(60px,auto);align-items:center;gap:9px;width:100%;padding:0;border:0;background:transparent;text-align:left}
+button.fleet-bar-row{cursor:pointer}
+button.fleet-bar-row:disabled{cursor:default}
+.fleet-bar-row>span:first-child{overflow:hidden;color:#475569;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.fleet-bar-track{display:block;height:9px;overflow:hidden;border-radius:8px;background:#edf2f7}
+.fleet-bar-fill{display:block;height:100%;min-width:3px;border-radius:8px;transition:width .25s ease}
+.fleet-bar-row>strong{color:#334155;font-size:9px;text-align:right;white-space:nowrap}
+.fleet-bar-row:not(:disabled):hover>span:first-child{color:#2563eb}
+.fleet-unavailable{display:grid;justify-items:start;gap:7px;min-height:110px;align-content:center;padding:12px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;color:#64748b}
+.fleet-unavailable>svg{color:#94a3b8}
+.fleet-unavailable>strong{color:#334155;font-size:10px}
+.fleet-unavailable>span{font-size:9px;line-height:1.55}
+.fleet-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,350px),1fr));gap:12px}
+.fleet-due-list{display:grid}
+.fleet-due-row{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid #e8edf3}
+.fleet-due-row>div{display:grid;flex:1;gap:3px;min-width:0}
+.fleet-due-row>div>strong{overflow:hidden;color:#334155;font-size:10px;text-overflow:ellipsis;white-space:nowrap}
+.fleet-due-row>div>small{color:#64748b;font-size:9px}
+.fleet-due-dot{width:8px;height:8px;flex:none;border-radius:50%;background:#f59e0b}
+.fleet-insights-card{padding:15px;border:1px solid #dce5ef}
+.fleet-insights{display:grid;gap:8px}
+.fleet-insight{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid #dbeafe;border-radius:9px;background:#f8fbff}
+.fleet-insight>span{color:#334155;font-size:10px;line-height:1.5}
+.fleet-insight-warning{border-color:#fde4b3;background:#fffbeb}
+.fleet-report-card{padding:15px;border:1px solid #dce5ef}
+.fleet-report-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.fleet-report-head .eyebrow{margin:0 0 3px;color:#2563eb;font-size:8px;font-weight:800;letter-spacing:.9px}
+.fleet-report-controls{display:flex;align-items:end;gap:9px;margin-bottom:12px}
+.fleet-report-controls>.field-wrap{flex:1;min-width:160px}
+.fleet-report-controls .search-wrap{flex:2}
+.fleet-report-extra-filters{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.fleet-report-extra-filters>.field-wrap{flex:1 1 160px}
+.fleet-column-visibility{position:relative;min-width:150px}
+.fleet-column-visibility>summary{padding:9px 11px;border:1px solid #dce5ef;border-radius:8px;color:#334155;font-size:10px;cursor:pointer}
+.fleet-column-visibility>div{position:absolute;z-index:4;right:0;top:calc(100% + 4px);display:grid;gap:5px;max-height:260px;min-width:190px;overflow:auto;padding:10px;border:1px solid #dce5ef;border-radius:9px;background:#fff;box-shadow:0 10px 24px #142d4e1c}
+.fleet-column-visibility label{display:flex;align-items:center;gap:7px;color:#334155;font-size:10px}
+.fleet-report-table tfoot th,.fleet-report-table tfoot td{background:#f8fafc;color:#142d4e;font-weight:750}
+.fleet-report-table-wrap{max-width:100%;overflow:auto;border:1px solid #e2e8f0;border-radius:9px}
+.fleet-report-table{width:100%;border-collapse:collapse;font-size:10px}
+.fleet-report-table th,.fleet-report-table td{max-width:260px;padding:9px 10px;border-bottom:1px solid #e8edf3;color:#334155;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.fleet-report-table th{position:sticky;top:0;background:#f1f5f9}
+.fleet-report-table th button{padding:0;border:0;background:transparent;color:#142d4e;font-size:9px;font-weight:750;text-align:left;cursor:pointer}
+.fleet-report-table tbody tr:hover{background:#f8fafc}
+.fleet-report-pagination{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:12px}
+.fleet-report-pagination>span,.fleet-report-pagination>div>span{color:#64748b;font-size:9px}
+.fleet-report-pagination>div{display:flex;align-items:end;gap:7px;flex-wrap:wrap}
+.fleet-report-pagination .field-wrap{width:70px}
+.fleet-footer-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;color:#64748b;font-size:9px;line-height:1.55}
+.fleet-footer-note>svg{flex:none;color:#f59e0b}
+.app-shell.dark .fleet-dashboard{color:#e2e8f0}
+.app-shell.dark .fleet-header,.app-shell.dark .fleet-kpi,.app-shell.dark .fleet-chart-card,.app-shell.dark .fleet-insights-card,.app-shell.dark .fleet-report-card{border-color:#334155;background:#172333}
+.app-shell.dark .fleet-header h2,.app-shell.dark .fleet-filter-heading h3,.app-shell.dark .fleet-report-head h3,.app-shell.dark .fleet-card-head h3,.app-shell.dark .fleet-kpi>strong{color:#e2e8f0}
+.app-shell.dark .fleet-header>div>p:last-child,.app-shell.dark .fleet-filter-heading p,.app-shell.dark .fleet-report-head p,.app-shell.dark .fleet-card-head p,.app-shell.dark .fleet-kpi-label,.app-shell.dark .fleet-kpi>small{color:#94a3b8}
+.app-shell.dark .fleet-bar-row>span:first-child,.app-shell.dark .fleet-bar-row>strong,.app-shell.dark .fleet-due-row>div>strong,.app-shell.dark .fleet-insight>span{color:#cbd5e1}
+.app-shell.dark .fleet-bar-track{background:#334155}
+.app-shell.dark .fleet-unavailable,.app-shell.dark .fleet-footer-note{border-color:#334155;background:#111c29;color:#94a3b8}
+.app-shell.dark .fleet-unavailable>strong{color:#e2e8f0}
+.app-shell.dark .fleet-data-note{border-color:#1e3a5f;background:#13243a;color:#cbd5e1}
+.app-shell.dark .fleet-due-row,.app-shell.dark .fleet-report-table th,.app-shell.dark .fleet-report-table td{border-color:#334155}
+.app-shell.dark .fleet-report-table th{background:#1e293b}
+.app-shell.dark .fleet-report-table th button{color:#e2e8f0}
+.app-shell.dark .fleet-report-table td{color:#cbd5e1}
+.app-shell.dark .fleet-column-visibility>summary{border-color:#334155;color:#cbd5e1}
+.app-shell.dark .fleet-column-visibility>div{border-color:#334155;background:#172333}
+.app-shell.dark .fleet-column-visibility label{color:#cbd5e1}
+.app-shell.dark .fleet-report-table tfoot th,.app-shell.dark .fleet-report-table tfoot td{background:#1e293b;color:#e2e8f0}
+.app-shell.dark .fleet-report-table tbody tr:hover{background:#1e293b}
+@media(max-width:650px){
+  .fleet-header,.fleet-report-head{align-items:flex-start;flex-direction:column}
+  .fleet-header h2{font-size:19px}
+  .fleet-report-controls{align-items:stretch;flex-direction:column}
+  .fleet-report-controls>.field-wrap,.fleet-report-controls .search-wrap{width:100%}
+  .fleet-report-pagination>span,.fleet-report-pagination>div{width:100%}
+  .fleet-report-pagination>div{justify-content:flex-start}
+}
+@media print{
+  .fleet-dashboard .fleet-header-actions,.fleet-dashboard .fleet-filter-panel,.fleet-dashboard .fleet-report-controls,.fleet-dashboard .fleet-export-actions,.fleet-dashboard .fleet-report-pagination{display:none!important}
+  .fleet-dashboard .card{break-inside:avoid;box-shadow:none}
+}
 .cooking-plan-filter-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px}
 .cooking-plan-filter-controls>.field-wrap{flex:1 1 130px;min-width:120px}
 .cooking-plan-record-groups{display:grid;gap:12px}

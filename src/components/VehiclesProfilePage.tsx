@@ -4,6 +4,7 @@ import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input,
 import { loadSavedProfileVehicleData, mutateSavedProfileVehicleRecord, VEHICLE_PROFILE_TABLES, type VehicleProfileColumn, type VehicleProfileData, type VehicleProfileRow, type VehicleProfileTable, type VehicleProfileTableName } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
+import { VehicleFleetIntelligence } from "./VehicleFleetIntelligence";
 
 const TABLE_LABELS: Record<VehicleProfileTableName, string> = {
   vehicles: "Vehicles",
@@ -106,7 +107,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [profiles, setProfiles] = useState<DatabaseConnectionProfile[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState("");
   const [data, setData] = useState<VehicleProfileData | null>(null);
-  const [activeTable, setActiveTable] = useState<"reports" | VehicleProfileTableName>("reports");
+  const [activeTable, setActiveTable] = useState<"reports" | "fleet-intelligence" | VehicleProfileTableName>("reports");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -426,6 +427,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
       {truncatedTables.length > 0 && <div className="alert alert-warning"><AlertTriangle size={15} style={{ flex: "none", marginTop: 1 }} /><span>For safety, only the first 1,000 records per table are loaded. Reports use the loaded rows for: {truncatedTables.map((table) => table.name).join(", ")}.</span></div>}
       <div className="database-tabs" role="tablist" aria-label="Vehicles data and reports">
         <Button type="button" variant={activeTable === "reports" ? "primary" : "outline"} role="tab" aria-selected={activeTable === "reports"} onClick={() => setActiveTable("reports")}><BarChart3 size={14} />Reports & analytics</Button>
+        <Button type="button" variant={activeTable === "fleet-intelligence" ? "primary" : "outline"} role="tab" aria-selected={activeTable === "fleet-intelligence"} onClick={() => setActiveTable("fleet-intelligence")}><BarChart3 size={14} />Fleet Intelligence</Button>
         {VEHICLE_PROFILE_TABLES.map((table) => {
           const count = tableData.find((item) => item.name === table)?.totalRows ?? "0";
           return <Button type="button" key={table} variant={activeTable === table ? "primary" : "outline"} role="tab" aria-selected={activeTable === table} onClick={() => {
@@ -440,7 +442,9 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
           }}>{TABLE_LABELS[table]} · {count}</Button>;
         })}
       </div>
-      {activeTable === "reports" ? <>
+      {activeTable === "fleet-intelligence"
+        ? <VehicleFleetIntelligence data={data} onOpenTable={setActiveTable} />
+        : activeTable === "reports" ? <>
         <div className="electricity-summary vehicle-profile-summary">
           <Card><span>Vehicles</span><strong>{vehicles.length}</strong></Card>
           <Card><span>Expense records</span><strong>{currencyValue(analytics.expenseTotal)}</strong></Card>
