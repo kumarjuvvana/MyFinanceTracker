@@ -237,18 +237,23 @@ export function DatabaseConnectionsPage() {
   }
 
   function editProfile(profile: DatabaseConnectionProfile) {
+    const savedStorageUrl = profile.storageUrl ?? "";
+    const savedStorageServiceRoleKey = profile.storageServiceRoleKey ?? "";
+    const savedStorageBucket = profile.storageBucket ?? "mydocumentsmanager-documents";
     setProfileId(profile.id);
     setName(profile.name);
     setModules(profile.modules.join(", "));
     setConnectionString(profile.connectionString);
     setCaCertificate(profile.caCertificate);
-    setStorageUrl(profile.storageUrl ?? "");
-    setStorageServiceRoleKey(profile.storageServiceRoleKey ?? "");
-    setStorageBucket(profile.storageBucket ?? "mydocumentsmanager-documents");
+    setStorageUrl(savedStorageUrl);
+    setStorageServiceRoleKey(savedStorageServiceRoleKey);
+    setStorageBucket(savedStorageBucket);
     setShowStorageServiceRoleKey(false);
     setShowConnectionString(true);
-    setTestedFingerprint("");
-    setTestedStorageFingerprint("");
+    setTestedFingerprint(`${profile.connectionString.trim()}\n${profile.caCertificate.trim()}`);
+    setTestedStorageFingerprint(savedStorageUrl && savedStorageServiceRoleKey
+      ? `${savedStorageUrl.trim()}\n${savedStorageServiceRoleKey.trim()}\n${savedStorageBucket.trim()}`
+      : "");
     setError("");
     setNotice("");
   }
