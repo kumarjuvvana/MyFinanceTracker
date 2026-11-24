@@ -54,6 +54,20 @@ function asDate(value: unknown): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
 }
 
+function formatFleetDate(value: unknown): string {
+  const date = asDate(value);
+  if (!date) return valueText(value);
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+function formatFleetMonth(value: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  return match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" })
+    : value;
+}
+
 function humanize(value: string): string {
   return value.replace(/_/g, " ").replace(/\b[a-z]/g, (letter) => letter.toLocaleUpperCase());
 }
@@ -273,7 +287,9 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     title: valueText(firstValue(row, ["name", "title", "description", "registration_number", "certificate_number"])) === "—"
       ? `${LABELS[reportSource]} #${valueText(row.id)}`
       : valueText(firstValue(row, ["name", "title", "description", "registration_number", "certificate_number"])),
-    subtitle: asDate(firstValue(row, DATE_COLUMNS)) || `Record ID ${valueText(row.id)}`,
+    subtitle: asDate(firstValue(row, DATE_COLUMNS))
+      ? formatFleetDate(firstValue(row, DATE_COLUMNS))
+      : `Record ID ${valueText(row.id)}`,
     source: reportSource,
     row,
   })).filter((item) => {
@@ -382,7 +398,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
         }} /> : <Unavailable title="Distance data unavailable" detail="Travel logs do not expose a recognized distance field." />}
       </ChartCard>
       <ChartCard title="Fuel spend by month" subtitle="Actual recorded fuel cost · selected period" icon={<Fuel size={16} />}>
-        {hasFuelData && monthlyFuel.length ? <HorizontalBars items={[...monthlyFuel].reverse()} format={formatCurrency} /> : <Unavailable title="Fuel cost history unavailable" detail="No fuel records with dates and cost values are available in this period." />}
+        {hasFuelData && monthlyFuel.length ? <HorizontalBars items={[...monthlyFuel].reverse().map(([month, value]): [string, number] => [formatFleetMonth(month), value])} format={formatCurrency} /> : <Unavailable title="Fuel cost history unavailable" detail="No fuel records with dates and cost values are available in this period." />}
       </ChartCard>
       <ChartCard title="Fuel consumption by vehicle" subtitle="Recorded quantity · selected period" icon={<Fuel size={16} />}>
         {fuelVolume > 0 ? <HorizontalBars items={fuelByVehicle} format={(value) => `${formatNumber(value)} L`} /> : <Unavailable title="Fuel quantities unavailable" detail="The selected records do not contain a recognized fuel quantity." />}
@@ -394,10 +410,10 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
         }} /> : <Unavailable title="Maintenance cost unavailable" detail="Service cost is not recorded in the connected profile." />}
       </ChartCard>
       <ChartCard title="Maintenance spend by month" subtitle="Recorded service dates and costs · selected period" icon={<Wrench size={16} />}>
-        {hasServiceCost && monthlyServices.length ? <HorizontalBars items={[...monthlyServices].reverse()} format={formatCurrency} /> : <Unavailable title="Maintenance trend unavailable" detail="No dated service cost records are available in this period." />}
+        {hasServiceCost && monthlyServices.length ? <HorizontalBars items={[...monthlyServices].reverse().map(([month, value]): [string, number] => [formatFleetMonth(month), value])} format={formatCurrency} /> : <Unavailable title="Maintenance trend unavailable" detail="No dated service cost records are available in this period." />}
       </ChartCard>
       <ChartCard title="Other expenses by month" subtitle="Recorded expenses, shown separately from fuel and services" icon={<BarChart3 size={16} />}>
-        {hasExpenseCost && monthlyExpenses.length ? <HorizontalBars items={[...monthlyExpenses].reverse()} format={formatCurrency} /> : <Unavailable title="Expense trend unavailable" detail="No dated expense amounts are available in this period." />}
+        {hasExpenseCost && monthlyExpenses.length ? <HorizontalBars items={[...monthlyExpenses].reverse().map(([month, value]): [string, number] => [formatFleetMonth(month), value])} format={formatCurrency} /> : <Unavailable title="Expense trend unavailable" detail="No dated expense amounts are available in this period." />}
       </ChartCard>
       <ChartCard title="Driver performance" subtitle="Driver metrics require linked driver records" icon={<Gauge size={16} />}>
         {hasDriverData
@@ -420,7 +436,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
 
     <div className="fleet-detail-grid">
       <ChartCard title="Compliance & upcoming dates" subtitle="Actual due dates recorded in RiderTracker" icon={<ShieldCheck size={16} />}>
-        {dueItems.length ? <div className="fleet-due-list">{dueItems.slice(0, 8).map((item, index) => <div className="fleet-due-row" key={`${item.kind}-${index}`}><span className="fleet-due-dot" /><div><strong>{item.label}</strong><small>{item.kind} · {item.due}</small></div><Badge tone="amber">Due soon</Badge></div>)}</div> : <Unavailable title="No upcoming expirations found" detail="No matching alert, certificate, or insurance due dates within 30 days." />}
+        {dueItems.length ? <div className="fleet-due-list">{dueItems.slice(0, 8).map((item, index) => <div className="fleet-due-row" key={`${item.kind}-${index}`}><span className="fleet-due-dot" /><div><strong>{item.label}</strong><small>{item.kind} · {formatFleetDate(item.due)}</small></div><Badge tone="amber">Due soon</Badge></div>)}</div> : <Unavailable title="No upcoming expirations found" detail="No matching alert, certificate, or insurance due dates within 30 days." />}
       </ChartCard>
       <ChartCard title="Fleet availability & utilization" subtitle="Availability requires explicit active/maintenance status and time-at-work data" icon={<Gauge size={16} />}>
         <Unavailable title={`${activeVehicleCount} vehicles have recorded trips`} detail={`Trip coverage is ${activityPercent}% in this period. Trip coverage is not the same as vehicle utilization or availability; the source profile has no verified downtime/status denominator.`} />
@@ -459,7 +475,9 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
           else { setSortKey(column.name); setSortDirection("asc"); }
           setPage(0);
         }}>{humanize(column.name)}{activeSortKey === column.name ? sortDirection === "asc" ? " ↑" : " ↓" : ""}</button></th>)}</tr></thead>
-          <tbody>{visibleReportRows.map((item) => <tr key={item.id}>{reportColumns.map((column) => <td key={column.name}>{valueText(item.row[column.name])}</td>)}</tr>)}</tbody>
+          <tbody>{visibleReportRows.map((item) => <tr key={item.id}>{reportColumns.map((column) => <td key={column.name}>{column.dataType === "date" || column.dataType.startsWith("timestamp")
+            ? formatFleetDate(item.row[column.name])
+            : valueText(item.row[column.name])}</td>)}</tr>)}</tbody>
           <tfoot>
             <tr><th>Filtered total</th>{reportColumns.slice(1).map((column) => {
               const summary = summaryColumns.find((entry) => entry.name === column.name);
