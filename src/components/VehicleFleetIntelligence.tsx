@@ -137,7 +137,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
   data: VehicleProfileData;
   onOpenTable: (table: VehicleProfileTableName) => void;
 }) {
-  const [period, setPeriod] = useState("90");
+  const [period, setPeriod] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [vehicleId, setVehicleId] = useState("all");
@@ -199,6 +199,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
   const alerts = filterRecords("alerts");
   const certificates = filterRecords("certificates");
   const insurance = filterRecords("insurance_policies");
+  const activityRecordCount = trips.length + fuel.length + services.length + expenses.length + odometer.length;
   const totalDistance = trips.reduce((sum, row) => sum + (asNumber(firstValue(row, DISTANCE_COLUMNS)) ?? 0), 0);
   const fuelVolume = fuel.reduce((sum, row) => sum + (asNumber(firstValue(row, FUEL_QUANTITY_COLUMNS)) ?? 0), 0);
   const fuelCost = fuel.reduce((sum, row) => sum + (asNumber(firstValue(row, FUEL_COST_COLUMNS)) ?? 0), 0);
@@ -334,9 +335,9 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     </section>
 
     <Card className="fleet-filter-panel">
-      <div className="fleet-filter-heading"><div><h3>Report filters</h3><p>Applied across the analytics and detailed report.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => { setPeriod("90"); setFromDate(""); setToDate(""); setVehicleId("all"); setManufacturer("all"); setCategory("all"); setModel("all"); setPage(0); }}>Reset</Button></div>
+      <div className="fleet-filter-heading"><div><h3>Report filters</h3><p>Applied across the analytics and detailed report.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => { setPeriod("all"); setFromDate(""); setToDate(""); setVehicleId("all"); setManufacturer("all"); setCategory("all"); setModel("all"); setPage(0); }}>Reset</Button></div>
       <div className="fleet-filters">
-        <Field label="Period"><Select value={period} onChange={(event) => { setPeriod(event.target.value); setFromDate(""); setPage(0); }}><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option><option value="all">All available records</option></Select></Field>
+        <Field label="Period"><Select value={period} onChange={(event) => { setPeriod(event.target.value); setFromDate(""); setToDate(""); setPage(0); }}><option value="all">All available records</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option></Select></Field>
         <Field label="From"><DateInput value={fromDate} max={toDate || undefined} onValueChange={(value) => { setFromDate(value); setPeriod("all"); setPage(0); }} /></Field>
         <Field label="To"><DateInput value={toDate} min={fromDate || undefined} onValueChange={(value) => { setToDate(value); setPeriod("all"); setPage(0); }} /></Field>
         <Field label="Vehicle"><Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setPage(0); }}><option value="all">All vehicles</option>{vehiclesAll.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{valueText(vehicle.name)} · #{valueText(vehicle.id)}</option>)}</Select></Field>
@@ -346,6 +347,9 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
         <p className="fleet-filter-note">Location, driver, and department filters are unavailable because these fields are not present in the selected profile.</p>
       </div>
     </Card>
+    {!activityRecordCount && <div className="fleet-period-empty" role="status"><AlertTriangle size={15} /><span>{period === "all" && !fromDate && !toDate
+      ? "No dated activity records are available for this vehicle selection."
+      : <>No dated activity records match this period and vehicle selection. Choose <strong>All available records</strong> or set a custom date range to view historical activity.</>}</span></div>}
 
     <div className="fleet-kpis">
       <Kpi icon={<Car size={17} />} label="Total vehicles" value={String(selectedVehicles.length)} note="Saved fleet records" color={BLUE} />

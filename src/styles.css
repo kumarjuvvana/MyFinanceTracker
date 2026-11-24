@@ -1115,6 +1115,8 @@ body{background:#f3f5ef}
 .fleet-kpi>strong{color:#142d4e;font:750 19px/1.2 Manrope,sans-serif;overflow-wrap:anywhere}
 .fleet-kpi>small{color:#64748b;font-size:9px;line-height:1.45}
 .fleet-data-note,.fleet-footnote{margin:0;padding:9px 12px;border:1px solid #dbeafe;border-radius:9px;background:#eff6ff;color:#334155;font-size:10px;line-height:1.55}
+.fleet-period-empty{display:flex;align-items:flex-start;gap:8px;padding:11px 12px;border:1px solid #f4d28f;border-radius:9px;background:#fffbeb;color:#854d0e;font-size:10px;line-height:1.5}
+.fleet-period-empty>svg{flex:none;margin-top:1px;color:#b45309}
 .fleet-chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:12px}
 .fleet-chart-card{min-width:0;padding:14px;border:1px solid #e1e8f0;box-shadow:0 4px 16px #142d4e08}
 .fleet-card-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
@@ -1180,6 +1182,8 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .fleet-unavailable,.app-shell.dark .fleet-footer-note{border-color:#334155;background:#111c29;color:#94a3b8}
 .app-shell.dark .fleet-unavailable>strong{color:#e2e8f0}
 .app-shell.dark .fleet-data-note{border-color:#1e3a5f;background:#13243a;color:#cbd5e1}
+.app-shell.dark .fleet-period-empty{border-color:#78541a;background:#332a18;color:#fde68a}
+.app-shell.dark .fleet-period-empty>svg{color:#fbbf24}
 .app-shell.dark .fleet-due-row,.app-shell.dark .fleet-report-table th,.app-shell.dark .fleet-report-table td{border-color:#334155}
 .app-shell.dark .fleet-report-table th{background:#1e293b}
 .app-shell.dark .fleet-report-table th button{color:#e2e8f0}
@@ -1189,6 +1193,13 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .fleet-column-visibility label{color:#cbd5e1}
 .app-shell.dark .fleet-report-table tfoot th,.app-shell.dark .fleet-report-table tfoot td{background:#1e293b;color:#e2e8f0}
 .app-shell.dark .fleet-report-table tbody tr:hover{background:#1e293b}
+.app-shell.dark .fleet-insight{border-color:#294360;background:#14283b}
+.app-shell.dark .fleet-insight-warning{border-color:#78541a;background:#332a18}
+.app-shell.dark .fleet-insight>span{color:#e2e8f0}
+.app-shell.dark .fleet-insight-warning>span{color:#fde68a}
+.app-shell.dark .fleet-insight .badge-blue{background:#1e3a5f;color:#bfdbfe}
+.app-shell.dark .fleet-insight .badge-green{background:#14532d;color:#bbf7d0}
+.app-shell.dark .fleet-insight .badge-amber{background:#713f12;color:#fde68a}
 @media(max-width:650px){
   .fleet-header,.fleet-report-head{align-items:flex-start;flex-direction:column}
   .fleet-header h2{font-size:19px}
