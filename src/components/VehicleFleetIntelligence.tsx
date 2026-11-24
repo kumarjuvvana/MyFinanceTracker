@@ -9,6 +9,7 @@ import {
   type VehicleProfileRow,
   type VehicleProfileTableName,
 } from "../lib/databaseApi";
+import { vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
 
 const LABELS: Record<VehicleProfileTableName, string> = {
   vehicles: "Vehicles",
@@ -178,7 +179,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     ? [...new Set(vehiclesAll.map((vehicle) => valueText(vehicle[manufacturerColumn.name])).filter((value) => value !== "—"))].sort()
     : [];
   const categoryOptions = categoryColumn
-    ? [...new Set(vehiclesAll.map((vehicle) => valueText(vehicle[categoryColumn.name])).filter((value) => value !== "—"))].sort()
+    ? [...new Set(vehiclesAll.map((vehicle) => vehicleTypeLabel(vehicle[categoryColumn.name])).filter((value) => value !== "—"))].sort()
     : [];
   const modelOptions = modelColumn
     ? [...new Set(vehiclesAll.map((vehicle) => valueText(vehicle[modelColumn.name])).filter((value) => value !== "—"))].sort()
@@ -189,7 +190,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
   const selectedVehicles = vehiclesAll.filter((vehicle) =>
     (vehicleId === "all" || String(vehicle.id) === vehicleId) &&
     (manufacturer === "all" || valueText(vehicle[manufacturerColumn?.name ?? ""]) === manufacturer) &&
-    (category === "all" || valueText(vehicle[categoryColumn?.name ?? ""]) === category) &&
+    (category === "all" || vehicleTypeLabel(vehicle[categoryColumn?.name ?? ""]) === category) &&
     (model === "all" || valueText(vehicle[modelColumn?.name ?? ""]) === model));
   const selectedVehicleIds = new Set(selectedVehicles.map((vehicle) => String(vehicle.id)));
   const hasVehicleFilter = vehicleId !== "all" || manufacturer !== "all" || category !== "all" || model !== "all";
@@ -243,22 +244,22 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     ? aggregateBy(selectedVehicles, (row) => valueText(row[manufacturerColumn.name]), () => 1)
     : [];
   const categoryMix = categoryColumn
-    ? aggregateBy(selectedVehicles, (row) => valueText(row[categoryColumn.name]), () => 1)
+    ? aggregateBy(selectedVehicles, (row) => vehicleTypeLabel(row[categoryColumn.name]), () => 1)
     : [];
   const modelMix = modelColumn
     ? aggregateBy(selectedVehicles, (row) => valueText(row[modelColumn.name]), () => 1)
     : [];
   const fuelByVehicle = aggregateBy(fuel, (row) => {
     const vehicle = vehiclesAll.find((entry) => String(entry.id) === String(row.vehicle_id));
-    return String(vehicle?.name ?? `Vehicle ${row.vehicle_id ?? "unlinked"}`);
+    return vehicle ? vehicleDisplayName(vehicle) : "Vehicle not linked";
   }, (row) => asNumber(firstValue(row, FUEL_QUANTITY_COLUMNS)) ?? 0);
   const distanceByVehicle = aggregateBy(trips, (row) => {
     const vehicle = vehiclesAll.find((entry) => String(entry.id) === String(row.vehicle_id));
-    return String(vehicle?.name ?? `Vehicle ${row.vehicle_id ?? "unlinked"}`);
+    return vehicle ? vehicleDisplayName(vehicle) : "Vehicle not linked";
   }, (row) => asNumber(firstValue(row, DISTANCE_COLUMNS)) ?? 0);
   const serviceByVehicle = aggregateBy(services, (row) => {
     const vehicle = vehiclesAll.find((entry) => String(entry.id) === String(row.vehicle_id));
-    return String(vehicle?.name ?? `Vehicle ${row.vehicle_id ?? "unlinked"}`);
+    return vehicle ? vehicleDisplayName(vehicle) : "Vehicle not linked";
   }, (row) => asNumber(firstValue(row, SERVICE_COST_COLUMNS)) ?? 0);
   const monthlyServices = aggregateBy(services.filter((row) => asDate(firstValue(row, ["service_date", ...DATE_COLUMNS]))),
     (row) => asDate(firstValue(row, ["service_date", ...DATE_COLUMNS])).slice(0, 7),
@@ -285,30 +286,52 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
   const reportRows: ReportRow[] = filterRecords(reportSource).map((row) => ({
     id: `${reportSource}-${String(row.id)}`,
     title: valueText(firstValue(row, ["name", "title", "description", "registration_number", "certificate_number"])) === "—"
-      ? `${LABELS[reportSource]} #${valueText(row.id)}`
+      ? reportSource === "vehicles" ? vehicleDisplayName(row) : row.vehicle_id !== undefined
+        ? vehicleNameForId(vehiclesAll, row.vehicle_id)
+        : `${LABELS[reportSource]} record`
       : valueText(firstValue(row, ["name", "title", "description", "registration_number", "certificate_number"])),
     subtitle: asDate(firstValue(row, DATE_COLUMNS))
       ? formatFleetDate(firstValue(row, DATE_COLUMNS))
-      : `Record ID ${valueText(row.id)}`,
+      : "No date recorded",
     source: reportSource,
     row,
   })).filter((item) => {
     const term = search.trim().toLocaleLowerCase();
-    const matchesSearch = !term || Object.values(item.row).some((value) => valueText(value).toLocaleLowerCase().includes(term));
+    const searchableColumns = (reportTable?.columns ?? []).filter((column) => !reportTable?.primaryKey.includes(column.name) && !column.name.endsWith("_at"));
+    const matchesSearch = !term || searchableColumns.some((column) => {
+      const value = column.name.toLocaleLowerCase() === "vehicle_id"
+        ? vehicleNameForId(vehiclesAll, item.row[column.name])
+        : reportSource === "vehicles" && categoryColumn?.name === column.name
+          ? vehicleTypeLabel(item.row[column.name])
+          : valueText(item.row[column.name]);
+      return value.toLocaleLowerCase().includes(term);
+    });
     const filterValue = reportFilterValue.trim().toLocaleLowerCase();
-    const fieldValue = reportFilterColumn ? valueText(item.row[reportFilterColumn]).toLocaleLowerCase() : "";
+    const fieldValue = reportFilterColumn
+      ? reportFilterColumn.toLocaleLowerCase() === "vehicle_id"
+        ? vehicleNameForId(vehiclesAll, item.row[reportFilterColumn]).toLocaleLowerCase()
+        : reportSource === "vehicles" && categoryColumn?.name === reportFilterColumn
+          ? vehicleTypeLabel(item.row[reportFilterColumn]).toLocaleLowerCase()
+          : valueText(item.row[reportFilterColumn]).toLocaleLowerCase()
+      : "";
     const matchesColumn = !filterValue || Boolean(reportFilterColumn) && fieldValue.includes(filterValue);
     return matchesSearch && matchesColumn;
   });
-  const allReportColumns = reportTable?.columns.filter((column) => !column.name.endsWith("_at")) ?? [];
+  const allReportColumns = reportTable?.columns.filter((column) => !reportTable.primaryKey.includes(column.name) && !column.name.endsWith("_at")) ?? [];
+  const reportColumnLabel = (name: string) => name.toLocaleLowerCase() === "vehicle_id" ? "Vehicle" : humanize(name);
+  const reportColumnValue = (row: VehicleProfileRow, name: string) => name.toLocaleLowerCase() === "vehicle_id"
+    ? vehicleNameForId(vehiclesAll, row[name])
+    : reportSource === "vehicles" && categoryColumn?.name === name
+      ? vehicleTypeLabel(row[name])
+      : row[name];
   const reportColumns = visibleColumns.length
     ? allReportColumns.filter((column) => visibleColumns.includes(column.name))
     : allReportColumns;
   const activeSortKey = reportColumns.some((column) => column.name === sortKey) ? sortKey : reportColumns[0]?.name ?? "id";
   const sortColumn = reportColumns.find((column) => column.name === activeSortKey);
   const sortedReportRows = [...reportRows].sort((left, right) => {
-    const leftValue = left.row[activeSortKey];
-    const rightValue = right.row[activeSortKey];
+    const leftValue = reportColumnValue(left.row, activeSortKey);
+    const rightValue = reportColumnValue(right.row, activeSortKey);
     const result = sortColumn?.dataType.match(/int|numeric|double|real|decimal/) && asNumber(leftValue) !== null && asNumber(rightValue) !== null
       ? (asNumber(leftValue) ?? 0) - (asNumber(rightValue) ?? 0)
       : String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, { numeric: true, sensitivity: "base" });
@@ -340,8 +363,8 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
 
   function exportReport(excelCompatible: boolean) {
     const columns = reportColumns;
-    const rows = sortedReportRows.map((item) => columns.map((column) => item.row[column.name]));
-    downloadCsv(`${report}-${new Date().toISOString().slice(0, 10)}${excelCompatible ? "-excel" : ""}.csv`, columns.map((column) => column.name), rows);
+    const rows = sortedReportRows.map((item) => columns.map((column) => reportColumnValue(item.row, column.name)));
+    downloadCsv(`${report}-${new Date().toISOString().slice(0, 10)}${excelCompatible ? "-excel" : ""}.csv`, columns.map((column) => reportColumnLabel(column.name)), rows);
   }
 
   return <div className="fleet-dashboard">
@@ -356,7 +379,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
         <Field label="Period"><Select value={period} onChange={(event) => { setPeriod(event.target.value); setFromDate(""); setToDate(""); setPage(0); }}><option value="all">All available records</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option></Select></Field>
         <Field label="From"><DateInput value={fromDate} max={toDate || undefined} onValueChange={(value) => { setFromDate(value); setPeriod("all"); setPage(0); }} /></Field>
         <Field label="To"><DateInput value={toDate} min={fromDate || undefined} onValueChange={(value) => { setToDate(value); setPeriod("all"); setPage(0); }} /></Field>
-        <Field label="Vehicle"><Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setPage(0); }}><option value="all">All vehicles</option>{vehiclesAll.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{valueText(vehicle.name)} · #{valueText(vehicle.id)}</option>)}</Select></Field>
+        <Field label="Vehicle"><Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setPage(0); }}><option value="all">All vehicles</option>{vehiclesAll.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{vehicleDisplayName(vehicle)}</option>)}</Select></Field>
         {manufacturerColumn && <Field label="Manufacturer"><Select value={manufacturer} onChange={(event) => { setManufacturer(event.target.value); setPage(0); }}><option value="all">All manufacturers</option>{manufacturerOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
         {categoryColumn && <Field label="Recorded type"><Select value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option value="all">All recorded types</option>{categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
         {modelColumn && <Field label="Model"><Select value={model} onChange={(event) => { setModel(event.target.value); setPage(0); }}><option value="all">All models</option>{modelOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
@@ -393,7 +416,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
       </ChartCard>
       <ChartCard title="Distance by vehicle" subtitle={`${trips.length} travel logs in selected date range`} icon={<Route size={16} />}>
         {hasDistanceData ? <HorizontalBars items={distanceByVehicle} format={(value) => `${formatNumber(value)} km`} onSelect={(label) => {
-          const found = vehiclesAll.find((vehicle) => String(vehicle.name) === label);
+          const found = vehiclesAll.find((vehicle) => vehicleDisplayName(vehicle) === label);
           if (found) setVehicleId(String(found.id));
         }} /> : <Unavailable title="Distance data unavailable" detail="Travel logs do not expose a recognized distance field." />}
       </ChartCard>
@@ -405,7 +428,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
       </ChartCard>
       <ChartCard title="Maintenance cost by vehicle" subtitle="Service costs, kept separate from general expenses" icon={<Wrench size={16} />}>
         {hasServiceCost ? <HorizontalBars items={serviceByVehicle} format={formatCurrency} onSelect={(label) => {
-          const found = vehiclesAll.find((vehicle) => String(vehicle.name) === label);
+          const found = vehiclesAll.find((vehicle) => vehicleDisplayName(vehicle) === label);
           if (found) setVehicleId(String(found.id));
         }} /> : <Unavailable title="Maintenance cost unavailable" detail="Service cost is not recorded in the connected profile." />}
       </ChartCard>
@@ -456,7 +479,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
         <Button type="button" variant="outline" onClick={() => window.print()}><Printer size={14} />Print / PDF</Button>
       </div>
       <div className="fleet-report-extra-filters">
-        <Field label="Filter column"><Select value={reportFilterColumn} onChange={(event) => { setReportFilterColumn(event.target.value); setPage(0); }}><option value="">All columns</option>{allReportColumns.map((column) => <option value={column.name} key={column.name}>{humanize(column.name)}</option>)}</Select></Field>
+        <Field label="Filter column"><Select value={reportFilterColumn} onChange={(event) => { setReportFilterColumn(event.target.value); setPage(0); }}><option value="">All columns</option>{allReportColumns.map((column) => <option value={column.name} key={column.name}>{reportColumnLabel(column.name)}</option>)}</Select></Field>
         <Field label="Column value"><Input value={reportFilterValue} onChange={(event) => { setReportFilterValue(event.target.value); setPage(0); }} placeholder="Contains..." /></Field>
         <details className="fleet-column-visibility"><summary>Columns ({reportColumns.length} of {allReportColumns.length})</summary><div>{allReportColumns.map((column) => {
           const current = visibleColumns.length ? visibleColumns : allReportColumns.map((entry) => entry.name);
@@ -466,7 +489,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
               ? [...current, column.name]
               : current.filter((name) => name !== column.name);
             if (next.length) setVisibleColumns(next);
-          }} />{humanize(column.name)}</label>;
+          }} />{reportColumnLabel(column.name)}</label>;
         })}</div></details>
       </div>
       {reportTable && reportColumns.length && visibleReportRows.length
@@ -474,10 +497,10 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
           if (sortKey === column.name) setSortDirection(sortDirection === "asc" ? "desc" : "asc");
           else { setSortKey(column.name); setSortDirection("asc"); }
           setPage(0);
-        }}>{humanize(column.name)}{activeSortKey === column.name ? sortDirection === "asc" ? " ↑" : " ↓" : ""}</button></th>)}</tr></thead>
+        }}>{reportColumnLabel(column.name)}{activeSortKey === column.name ? sortDirection === "asc" ? " ↑" : " ↓" : ""}</button></th>)}</tr></thead>
           <tbody>{visibleReportRows.map((item) => <tr key={item.id}>{reportColumns.map((column) => <td key={column.name}>{column.dataType === "date" || column.dataType.startsWith("timestamp")
-            ? formatFleetDate(item.row[column.name])
-            : valueText(item.row[column.name])}</td>)}</tr>)}</tbody>
+            ? formatFleetDate(reportColumnValue(item.row, column.name))
+            : valueText(reportColumnValue(item.row, column.name))}</td>)}</tr>)}</tbody>
           <tfoot>
             <tr><th>Filtered total</th>{reportColumns.slice(1).map((column) => {
               const summary = summaryColumns.find((entry) => entry.name === column.name);

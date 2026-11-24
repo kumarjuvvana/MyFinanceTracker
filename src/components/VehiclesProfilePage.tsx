@@ -4,6 +4,7 @@ import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input,
 import { loadSavedProfileVehicleData, mutateSavedProfileVehicleRecord, type VehicleProfileColumn, type VehicleProfileData, type VehicleProfileRow, type VehicleProfileTable, type VehicleProfileTableName } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
+import { vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
 import { VehicleFleetIntelligence } from "./VehicleFleetIntelligence";
 
 const TABLE_LABELS: Record<VehicleProfileTableName, string> = {
@@ -78,9 +79,10 @@ function isTechnicalTimestampColumn(column: VehicleProfileColumn): boolean {
   return ["created_at", "updated_at", "created_on", "updated_on", "modified_at", "last_updated_at"].includes(name);
 }
 
-function displayProfileValue(row: VehicleProfileRow, column: VehicleProfileColumn): string {
+function displayProfileValue(row: VehicleProfileRow, column: VehicleProfileColumn, vehicles: VehicleProfileRow[] = []): string {
   const value = row[column.name];
   if (value === null || value === undefined || value === "") return "—";
+  if (column.name.toLocaleLowerCase() === "vehicle_id") return vehicleNameForId(vehicles, value);
   if (column.dataType === "date") return formatProfileDate(value);
   if (column.dataType.startsWith("timestamp")) return formatProfileDate(value, true);
   return rowValue(value);
@@ -133,11 +135,14 @@ function compareColumnValues(left: unknown, right: unknown, dataType: string): n
   return String(left).localeCompare(String(right), undefined, { numeric: true, sensitivity: "base" });
 }
 
-function profileRecordTitle(table: VehicleProfileTableName, row: VehicleProfileRow): string {
+function profileRecordTitle(table: VehicleProfileTableName, row: VehicleProfileRow, vehicles: VehicleProfileRow[] = []): string {
   const description = ["name", "title", "description", "registration_number", "certificate_number"]
     .map((column) => row[column])
     .find((value) => typeof value === "string" && value.trim());
-  return `${TABLE_LABELS[table]} #${rowValue(row.id)}${description ? ` · ${String(description)}` : ""}`;
+  if (table === "vehicles") return vehicleDisplayName(row);
+  if (description) return String(description);
+  if (row.vehicle_id !== null && row.vehicle_id !== undefined) return `${vehicleNameForId(vehicles, row.vehicle_id)} · ${TABLE_LABELS[table]}`;
+  return `${TABLE_LABELS[table]} record`;
 }
 
 export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
@@ -155,6 +160,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [vehicleType, setVehicleType] = useState("all");
   const [vehicleManufacturer, setVehicleManufacturer] = useState("all");
   const [vehicleYear, setVehicleYear] = useState("all");
+  const [relatedVehicleId, setRelatedVehicleId] = useState("all");
   const [viewingRecord, setViewingRecord] = useState<{ table: VehicleProfileTable; row: VehicleProfileRow } | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -187,6 +193,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     setVehicleType("all");
     setVehicleManufacturer("all");
     setVehicleYear("all");
+    setRelatedVehicleId("all");
   }
 
   function openFleetModule(module: FleetModuleId) {
@@ -400,7 +407,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     ? [...new Set(vehicles.map((row) => rowValue(row[vehicleStatusColumn.name])).filter((value) => value !== "—"))].sort()
     : [];
   const vehicleTypeOptions = vehicleTypeColumn
-    ? [...new Set(vehicles.map((row) => rowValue(row[vehicleTypeColumn.name])).filter((value) => value !== "—"))].sort()
+    ? [...new Set(vehicles.map((row) => vehicleTypeLabel(row[vehicleTypeColumn.name])).filter((value) => value !== "—"))].sort()
     : [];
   const vehicleManufacturerOptions = vehicleManufacturerColumn
     ? [...new Set(vehicles.map((row) => rowValue(row[vehicleManufacturerColumn.name])).filter((value) => value !== "—"))].sort()
@@ -438,7 +445,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
       const vehicleTravel = matching(travel);
       return {
         id: vehicle.id,
-        name: String(vehicle.name ?? `Vehicle ${vehicle.id}`),
+        name: vehicleDisplayName(vehicle),
         expenses: vehicleExpenses.reduce((sum, row) => sum + numericValue(row.amount), 0),
         fuel: vehicleFuel.reduce((sum, row) => sum + numericValue(row.total_cost), 0),
         services: vehicleServices.reduce((sum, row) => sum + numericValue(row.cost), 0),
@@ -471,21 +478,34 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const searchTerm = search.trim().toLocaleLowerCase();
   const fieldFilter = filterValue.trim().toLocaleLowerCase();
   const matchingRows = (activeTableData?.rows ?? []).filter((row) => {
-    const matchesSearch = !searchTerm ||
-      Object.values(row).some((value) => rowValue(value).toLocaleLowerCase().includes(searchTerm));
+    const matchesSearch = !searchTerm || (activeTableData?.columns ?? [])
+      .filter((column) => !activeTableData?.primaryKey.includes(column.name))
+      .some((column) => {
+        const value = column.name.toLocaleLowerCase() === "vehicle_id"
+          ? vehicleNameForId(vehicles, row[column.name])
+          : activeTable === "vehicles" && vehicleTypeColumn?.name === column.name
+            ? vehicleTypeLabel(row[column.name])
+            : rowValue(row[column.name]);
+        return value.toLocaleLowerCase().includes(searchTerm);
+      });
     const cell = filterColumn ? row[filterColumn] : undefined;
     const filterText = cell === null || cell === undefined ? "" : rowValue(cell).toLocaleLowerCase();
     const matchesField = !fieldFilter || !filterColumn || (filterMatch === "exact" ? filterText === fieldFilter : filterText.includes(fieldFilter));
+    const matchesRelatedVehicle = relatedVehicleId === "all" || (activeTable === "vehicles"
+      ? String(row.id) === relatedVehicleId
+      : String(row.vehicle_id) === relatedVehicleId);
     const matchesVehicleFilters = activeTable !== "vehicles" ||
       ((!vehicleStatusColumn || vehicleStatus === "all" || rowValue(row[vehicleStatusColumn.name]) === vehicleStatus) &&
-        (!vehicleTypeColumn || vehicleType === "all" || rowValue(row[vehicleTypeColumn.name]) === vehicleType) &&
+        (!vehicleTypeColumn || vehicleType === "all" || vehicleTypeLabel(row[vehicleTypeColumn.name]) === vehicleType) &&
         (!vehicleManufacturerColumn || vehicleManufacturer === "all" || rowValue(row[vehicleManufacturerColumn.name]) === vehicleManufacturer) &&
         (!vehiclePurchaseColumn || vehicleYear === "all" || dateValue(row[vehiclePurchaseColumn.name]).startsWith(vehicleYear)));
-    return matchesSearch && matchesField && matchesVehicleFilters;
+    return matchesSearch && matchesField && matchesRelatedVehicle && matchesVehicleFilters;
   });
-  const selectedSortColumn = activeTableData?.columns.find((column) => column.name === sortColumn)
-    ?? activeTableData?.columns.find((column) => column.name === "id")
-    ?? activeTableData?.columns[0];
+  const relatedVehicleFilterAvailable = Boolean(activeTableData) &&
+    (activeTable === "vehicles" || Boolean(activeTableData?.columns.some((column) => column.name.toLocaleLowerCase() === "vehicle_id")));
+  const visibleRecordColumns = activeTableData?.columns.filter((column) =>
+    !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)) ?? [];
+  const selectedSortColumn = visibleRecordColumns.find((column) => column.name === sortColumn) ?? visibleRecordColumns[0];
   const sortedRows = selectedSortColumn
     ? [...matchingRows].sort((left, right) => {
       const direction = sortDirection === "asc" ? 1 : -1;
@@ -505,6 +525,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     Boolean(activeTable === "vehicles" && vehicleType !== "all"),
     Boolean(activeTable === "vehicles" && vehicleManufacturer !== "all"),
     Boolean(activeTable === "vehicles" && vehicleYear !== "all"),
+    Boolean(relatedVehicleFilterAvailable && relatedVehicleId !== "all"),
     sortColumn !== "id",
     sortDirection !== "asc",
   ].filter(Boolean).length;
@@ -655,6 +676,9 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
           typeOptions={vehicleTypeOptions}
           manufacturerOptions={vehicleManufacturerOptions}
           yearOptions={vehicleYearOptions}
+          vehicles={vehicles}
+          relatedVehicleId={relatedVehicleId}
+          onRelatedVehicleChange={(value) => { setRelatedVehicleId(value); setPage(0); }}
           statusCounts={statusCounts}
           view={vehicleView}
           onViewChange={setVehicleView}
@@ -671,11 +695,12 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
         <Card className="database-browser"><div className="database-table-select"><div><h2 className="section-title">{TABLE_LABELS[activeTableData.name]}</h2><p className="section-description">{activeTableData.totalRows} record(s) in RiderTracker</p></div><Button type="button" disabled={busy} onClick={() => setEditor({ table: activeTableData, row: null, mode: "add" })}><Plus size={14} />Add record</Button></div>
           <div className="toolbar filter-toolbar vehicle-profile-table-toolbar">
             <div className="search-wrap"><Input aria-label={`Search ${TABLE_LABELS[activeTableData.name]}`} placeholder={`Search ${TABLE_LABELS[activeTableData.name].toLocaleLowerCase()}...`} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
+            {relatedVehicleFilterAvailable && <Field label="Vehicle name"><Select value={relatedVehicleId} onChange={(event) => { setRelatedVehicleId(event.target.value); setPage(0); }}><option value="all">All vehicles</option>{vehicles.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{vehicleDisplayName(vehicle)}</option>)}</Select></Field>}
             <FilterDrawer activeCount={activeFilterCount} label={`Filter and sort ${TABLE_LABELS[activeTableData.name]}`} closeOnChange={false}>
-              <Field label="Filter field"><Select value={filterColumn} onChange={(event) => { setFilterColumn(event.target.value); setPage(0); }}><option value="">Choose a field</option>{activeTableData.columns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+              <Field label="Filter field"><Select value={filterColumn} onChange={(event) => { setFilterColumn(event.target.value); setPage(0); }}><option value="">Choose a field</option>{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && column.name.toLocaleLowerCase() !== "vehicle_id").map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
               <Field label="Filter value"><Input value={filterValue} onChange={(event) => { setFilterValue(event.target.value); setPage(0); }} placeholder="Enter a value" /></Field>
               <Field label="Match"><Select value={filterMatch} onChange={(event) => { setFilterMatch(event.target.value as "contains" | "exact"); setPage(0); }}><option value="contains">Contains</option><option value="exact">Exact match</option></Select></Field>
-              <Field label="Sort by"><Select value={selectedSortColumn?.name ?? ""} onChange={(event) => { setSortColumn(event.target.value); setPage(0); }}>{activeTableData.columns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+              <Field label="Sort by"><Select value={selectedSortColumn?.name ?? ""} onChange={(event) => { setSortColumn(event.target.value); setPage(0); }}>{visibleRecordColumns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
               <Field label="Order"><Select value={sortDirection} onChange={(event) => { setSortDirection(event.target.value as "asc" | "desc"); setPage(0); }}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
               <Button type="button" size="sm" variant="outline" onClick={() => {
                 setSearch("");
@@ -684,6 +709,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
                 setFilterMatch("contains");
                 setSortColumn("id");
                 setSortDirection("asc");
+                setRelatedVehicleId("all");
                 setPage(0);
               }}>Clear filters</Button>
             </FilterDrawer>
@@ -695,19 +721,19 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
             <Badge>{matchingRows.length} {matchingRows.length === 1 ? "record" : "records"}</Badge>
           </div>
           {pageRows.length ? vehicleView === "table"
-            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{activeTableData.columns.filter((column) => !isTechnicalTimestampColumn(column)).map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{activeTableData.columns.filter((column) => !isTechnicalTimestampColumn(column)).map((column) => <td key={column.name}>{displayProfileValue(row, column)}</td>)}<td><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></td></tr>)}</tbody></table></div>
+            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{visibleRecordColumns.map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{visibleRecordColumns.map((column) => <td key={column.name}>{displayProfileValue(row, column, vehicles)}</td>)}<td><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></td></tr>)}</tbody></table></div>
             : vehicleView === "list"
               ? <div className="rider-fleet-data-list">{pageRows.map((row) => {
-                const summaryColumns = activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).slice(0, 3);
+                const summaryColumns = visibleRecordColumns.slice(0, 3);
                 return <article className="rider-fleet-data-list-row" key={String(row.id)}>
-                  <div><h3>{profileRecordTitle(activeTableData.name, row)}</h3><div>{summaryColumns.map((column) => <span key={column.name}><strong>{columnLabel(column.name)}:</strong> {displayProfileValue(row, column)}</span>)}</div></div>
+                  <div><h3>{profileRecordTitle(activeTableData.name, row, vehicles)}</h3><div>{summaryColumns.map((column) => <span key={column.name}><strong>{columnLabel(column.name)}:</strong> {displayProfileValue(row, column, vehicles)}</span>)}</div></div>
                   <VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} />
                 </article>;
               })}</div>
               : <div className="rider-fleet-data-grid">{pageRows.map((row) => <article className="database-row" key={String(row.id)}>
-                <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row)}</strong><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></div>
-                <div className="database-fields">{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayProfileValue(row, column)}</pre></div>)}</div>
-                {activeTableData.columns.some(isTechnicalTimestampColumn) && <details className="fleet-technical-details"><summary>Technical details</summary><div>{activeTableData.columns.filter(isTechnicalTimestampColumn).map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column)}</strong></p>)}</div></details>}
+                <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row, vehicles)}</strong><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></div>
+                <div className="database-fields">{visibleRecordColumns.map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayProfileValue(row, column, vehicles)}</pre></div>)}</div>
+                {activeTableData.columns.some(isTechnicalTimestampColumn) && <details className="fleet-technical-details"><summary>Technical details</summary><div>{activeTableData.columns.filter(isTechnicalTimestampColumn).map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column, vehicles)}</strong></p>)}</div></details>}
               </article>)}</div>
             : <EmptyState icon={<Database size={18} />} title={searchTerm || fieldFilter ? "No matching records" : "No records yet"} description={searchTerm || fieldFilter ? "Try changing the search or field filter." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
           <div className="database-pagination vehicle-profile-pagination">
@@ -736,6 +762,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     {viewingRecord && <ProfileRecordDetailsDialog
       row={viewingRecord.row}
       table={viewingRecord.table}
+      vehicles={vehicles}
       onClose={() => setViewingRecord(null)}
       onEdit={() => { setEditor({ table: viewingRecord.table, row: viewingRecord.row, mode: "edit" }); setViewingRecord(null); }}
     />}
@@ -743,7 +770,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
 }
 
 function VehicleRegistryView({
-  table, tables, rows, pageRows, totalRows, page, pageCount, pageSize, firstVisibleRow, lastVisibleRow, busy,
+  table, tables, rows, pageRows, totalRows, page, pageCount, pageSize, firstVisibleRow, lastVisibleRow, busy, vehicles, relatedVehicleId, onRelatedVehicleChange,
   search, onSearchChange, activeFilterCount, filterColumn, filterValue, filterMatch, sortColumn, sortDirection,
   onFilterColumnChange, onFilterValueChange, onFilterMatchChange, onSortColumnChange, onSortDirectionChange,
   vehicleStatus, vehicleType, vehicleManufacturer, vehicleYear, onVehicleStatusChange, onVehicleTypeChange,
@@ -762,6 +789,9 @@ function VehicleRegistryView({
   firstVisibleRow: number;
   lastVisibleRow: number;
   busy: boolean;
+  vehicles: VehicleProfileRow[];
+  relatedVehicleId: string;
+  onRelatedVehicleChange: (value: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
   activeFilterCount: number;
@@ -834,7 +864,9 @@ function VehicleRegistryView({
     .filter((column, index, list): column is VehicleProfileColumn => Boolean(column) && list.findIndex((entry) => entry?.name === column?.name) === index);
   const tableColumns = vehicleColumns.length
     ? vehicleColumns
-    : (table?.columns ?? []).filter((column) => !isTechnicalTimestampColumn(column));
+    : (table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column));
+  const displayVehicleColumn = (row: VehicleProfileRow, column: VehicleProfileColumn) =>
+    typeColumn?.name === column.name ? vehicleTypeLabel(row[column.name]) : displayProfileValue(row, column, vehicles);
   const countValue = table?.totalRows ?? "0";
   const dataScopeNote = table?.truncated ? "Status totals use the first 1,000 loaded vehicle records." : "Vehicle status counts use recorded values.";
 
@@ -852,15 +884,16 @@ function VehicleRegistryView({
     <Card className="rider-fleet-registry-panel">
       <div className="rider-fleet-toolbar">
         <div className="search-wrap"><Search size={15} /><Input aria-label="Search vehicles" placeholder="Search name, registration, make, model..." value={search} onChange={(event) => onSearchChange(event.target.value)} /></div>
+        <Field label="Vehicle name"><Select value={relatedVehicleId} onChange={(event) => onRelatedVehicleChange(event.target.value)}><option value="all">All vehicle names</option>{vehicles.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{vehicleDisplayName(vehicle)}</option>)}</Select></Field>
         <FilterDrawer activeCount={activeFilterCount} label="Advanced filters" closeOnChange={false}>
           {statusColumn && <Field label="Status"><Select value={vehicleStatus} onChange={(event) => onVehicleStatusChange(event.target.value)}><option value="all">All statuses</option>{statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
           {typeColumn && <Field label="Vehicle type"><Select value={vehicleType} onChange={(event) => onVehicleTypeChange(event.target.value)}><option value="all">All types</option>{typeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
           {manufacturerColumn && <Field label="Manufacturer"><Select value={vehicleManufacturer} onChange={(event) => onVehicleManufacturerChange(event.target.value)}><option value="all">All manufacturers</option>{manufacturerOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
           {purchaseColumn && <Field label="Purchase year"><Select value={vehicleYear} onChange={(event) => onVehicleYearChange(event.target.value)}><option value="all">All years</option>{yearOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
-          <Field label="Filter field"><Select value={filterColumn} onChange={(event) => onFilterColumnChange(event.target.value)}><option value="">Any field</option>{(table?.columns ?? []).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+          <Field label="Filter field"><Select value={filterColumn} onChange={(event) => onFilterColumnChange(event.target.value)}><option value="">Any field</option>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && column.name !== typeColumn?.name).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
           <Field label="Field value"><Input value={filterValue} onChange={(event) => onFilterValueChange(event.target.value)} placeholder="Enter a value" /></Field>
           <Field label="Match"><Select value={filterMatch} onChange={(event) => onFilterMatchChange(event.target.value as "contains" | "exact")}><option value="contains">Contains</option><option value="exact">Exact match</option></Select></Field>
-          <Field label="Sort by"><Select value={sortColumn} onChange={(event) => onSortColumnChange(event.target.value)}>{(table?.columns ?? []).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+          <Field label="Sort by"><Select value={sortColumn} onChange={(event) => onSortColumnChange(event.target.value)}>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name)).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
           <Field label="Sort order"><Select value={sortDirection} onChange={(event) => onSortDirectionChange(event.target.value as "asc" | "desc")}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
           <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>Clear filters</Button>
         </FilterDrawer>
@@ -876,35 +909,35 @@ function VehicleRegistryView({
         : !totalRows
           ? <EmptyState icon={<Car size={18} />} title={rows.length ? "No matching vehicles" : table.totalRows === "0" ? "No vehicle records yet" : "No matching vehicles"} description={rows.length ? "Adjust or clear your search and filters to see vehicles." : table.totalRows === "0" ? "Add the first vehicle record to the connected RiderTracker database." : "Adjust or clear your search and filters to see vehicles."} />
           : view === "table"
-            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{tableColumns.map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{tableColumns.map((column) => <td key={column.name}>{displayProfileValue(row, column)}</td>)}<td><VehicleRecordActions row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} /></td></tr>)}</tbody></table></div>
+            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{tableColumns.map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{tableColumns.map((column) => <td key={column.name}>{displayVehicleColumn(row, column)}</td>)}<td><VehicleRecordActions entityLabel={vehicleDisplayName(row)} row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} /></td></tr>)}</tbody></table></div>
             : view === "list"
               ? <div className="rider-fleet-compact-list">{pageRows.map((row) => {
                 const status = statusColumn ? rowValue(row[statusColumn.name]) : "";
-                const name = nameColumn ? rowValue(row[nameColumn.name]) : `Vehicle #${rowValue(row.id)}`;
+                const name = vehicleDisplayName(row);
                 return <article className="rider-fleet-compact-row" key={String(row.id)}>
                   <div className="rider-fleet-compact-main"><div><h3>{name}</h3><span>{registrationColumn ? rowValue(row[registrationColumn.name]) : "Registration not recorded"}</span></div><VehicleStatus value={status} columnAvailable={Boolean(statusColumn)} /></div>
-                  <p>{[manufacturerColumn && rowValue(row[manufacturerColumn.name]), modelColumn && rowValue(row[modelColumn.name]), typeColumn && rowValue(row[typeColumn.name])].filter((value): value is string => Boolean(value && value !== "—")).join(" · ") || "Vehicle details not recorded"}</p>
-                  <VehicleRecordActions row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} />
+                  <p>{[manufacturerColumn && rowValue(row[manufacturerColumn.name]), modelColumn && rowValue(row[modelColumn.name]), typeColumn && vehicleTypeLabel(row[typeColumn.name])].filter((value): value is string => Boolean(value && value !== "—")).join(" · ") || "Vehicle details not recorded"}</p>
+                  <VehicleRecordActions entityLabel={name} row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} />
                 </article>;
               })}</div>
               : <div className="rider-fleet-vehicle-grid">{pageRows.map((row) => {
                 const odometerRow = latestRecord(linkedRows(odometerTable, row), odometerDateColumn);
                 const serviceRow = latestRecord(linkedRows(serviceTable, row), serviceDateColumn);
                 const status = statusColumn ? rowValue(row[statusColumn.name]) : "";
-                const name = nameColumn ? rowValue(row[nameColumn.name]) : `Vehicle #${rowValue(row.id)}`;
+                const name = vehicleDisplayName(row);
                 return <article className="rider-fleet-vehicle-card" key={String(row.id)}>
                   <div className="rider-fleet-vehicle-card-head"><div className="rider-fleet-vehicle-mark"><Car size={19} /></div><div className="rider-fleet-vehicle-title"><h3>{name}</h3><span>{registrationColumn ? rowValue(row[registrationColumn.name]) : "Registration not recorded"}</span></div><VehicleStatus value={status} columnAvailable={Boolean(statusColumn)} /></div>
                   <div className="rider-fleet-vehicle-metadata">
                     <div><span>Manufacturer</span><strong>{manufacturerColumn ? rowValue(row[manufacturerColumn.name]) : "Not recorded"}</strong></div>
                     <div><span>Model</span><strong>{modelColumn ? rowValue(row[modelColumn.name]) : "Not recorded"}</strong></div>
-                    <div><span>Vehicle type</span><strong>{typeColumn ? rowValue(row[typeColumn.name]) : "Not recorded"}</strong></div>
+                    <div><span>Vehicle type</span><strong>{typeColumn ? vehicleTypeLabel(row[typeColumn.name]) : "Not recorded"}</strong></div>
                     <div><span>Purchase date</span><strong>{purchaseColumn ? displayProfileValue(row, purchaseColumn) : "Not recorded"}</strong></div>
                   </div>
                   {((odometerColumn && odometerRow) || ((serviceDateColumn || serviceTypeColumn) && serviceRow)) && <div className="rider-fleet-vehicle-extras">
                     {odometerColumn && odometerRow && <div><Gauge size={14} /><span>Odometer</span><strong>{rowValue(odometerRow[odometerColumn.name])} km</strong></div>}
                     {(serviceDateColumn || serviceTypeColumn) && serviceRow && <div><Wrench size={14} /><span>Service</span><strong>{[serviceTypeColumn ? rowValue(serviceRow[serviceTypeColumn.name]) : "", serviceDateColumn ? displayProfileValue(serviceRow, serviceDateColumn) : ""].filter((value) => value && value !== "—").join(" · ") || "Record available"}</strong></div>}
                   </div>}
-                  <div className="rider-fleet-vehicle-card-footer"><span>Vehicle ID · {rowValue(row.id)}</span><VehicleRecordActions row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} /></div>
+                  <div className="rider-fleet-vehicle-card-footer"><VehicleRecordActions entityLabel={name} row={row} busy={busy} onView={onViewRow} onEdit={onEditRow} onCopy={onCopyRow} onDelete={onDeleteRow} /></div>
                 </article>;
               })}</div>}
       {table && <div className="database-pagination vehicle-profile-pagination">
@@ -936,7 +969,7 @@ function VehicleRecordActions({ row, busy, entityLabel = "vehicle", onView, onEd
   onCopy: (row: VehicleProfileRow) => void;
   onDelete: (row: VehicleProfileRow) => void;
 }) {
-  const label = `${entityLabel} ${rowValue(row.id)}`;
+  const label = entityLabel;
   return <div className="rider-fleet-record-actions">
     <button type="button" className="icon-button" disabled={busy} aria-label={`View ${label}`} title="View" onClick={() => onView(row)}><Eye size={14} /></button>
     <button type="button" className="icon-button" disabled={busy} aria-label={`Edit ${label}`} title="Edit" onClick={() => onEdit(row)}><Pencil size={14} /></button>
@@ -945,21 +978,21 @@ function VehicleRecordActions({ row, busy, entityLabel = "vehicle", onView, onEd
   </div>;
 }
 
-function ProfileRecordDetailsDialog({ row, table, onClose, onEdit }: {
+function ProfileRecordDetailsDialog({ row, table, vehicles, onClose, onEdit }: {
   row: VehicleProfileRow;
   table: VehicleProfileTable;
+  vehicles: VehicleProfileRow[];
   onClose: () => void;
   onEdit: () => void;
 }) {
   const columns = table.columns;
   const technicalColumns = columns.filter(isTechnicalTimestampColumn);
-  const vehicleName = rowValue(row.name ?? row.vehicle_name ?? row.title);
-  const title = table.name === "vehicles" && vehicleName !== "—" ? vehicleName : profileRecordTitle(table.name, row);
+  const title = profileRecordTitle(table.name, row, vehicles);
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="modal modal-wide rider-fleet-details-dialog" role="dialog" aria-modal="true" aria-labelledby="vehicle-details-title">
-      <div className="modal-head"><div><p className="eyebrow">{TABLE_LABELS[table.name]} record · {rowValue(row.id)}</p><h2 id="vehicle-details-title">{title}</h2></div><button type="button" className="icon-button" aria-label={`Close ${TABLE_LABELS[table.name]} details`} onClick={onClose}><X size={18} /></button></div>
-      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{displayProfileValue(row, column)}</dd></div>)}</dl>
-      {technicalColumns.length > 0 && <details className="fleet-technical-details"><summary>Technical details</summary><div>{technicalColumns.map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column)}</strong></p>)}</div></details>}
+      <div className="modal-head"><div><p className="eyebrow">{TABLE_LABELS[table.name]} record</p><h2 id="vehicle-details-title">{title}</h2></div><button type="button" className="icon-button" aria-label={`Close ${TABLE_LABELS[table.name]} details`} onClick={onClose}><X size={18} /></button></div>
+      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{table.name === "vehicles" && findProfileColumn(table, ["vehicle_type", "type", "category", "vehicle_category"])?.name === column.name ? vehicleTypeLabel(row[column.name]) : displayProfileValue(row, column, vehicles)}</dd></div>)}</dl>
+      {technicalColumns.length > 0 && <details className="fleet-technical-details"><summary>Technical details</summary><div>{technicalColumns.map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column, vehicles)}</strong></p>)}</div></details>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" onClick={onEdit}><Pencil size={14} />Edit {table.name === "vehicles" ? "vehicle" : "record"}</Button></div>
     </section>
   </div>;
@@ -1030,7 +1063,7 @@ function VehicleProfileRecordEditor({ table, initial, mode, vehicles, busy, onCl
           const options = column.name === "vehicle_id" ? vehicles : [];
           if (isDate) return <Field key={column.name} label={label}><DateInput required={required} value={values[column.name] ?? ""} onValueChange={(value) => setValues((current) => ({ ...current, [column.name]: value }))} /></Field>;
           if (isBoolean) return <Field key={column.name} label={label}><Select required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">Choose...</option><option value="true">Yes</option><option value="false">No</option></Select></Field>;
-          if (options.length || column.name === "vehicle_id") return <Field key={column.name} label={label}><Select required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">{column.nullable ? "None" : "Choose a vehicle"}</option>{options.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{String(vehicle.name ?? "Vehicle")} · ID {String(vehicle.id)}</option>)}</Select></Field>;
+          if (options.length || column.name === "vehicle_id") return <Field key={column.name} label={label}><Select required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))}><option value="">{column.nullable ? "None" : "Choose a vehicle"}</option>{options.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{vehicleDisplayName(vehicle)}</option>)}</Select></Field>;
           if (isNumeric) return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input type="number" step={["smallint", "integer", "bigint"].includes(column.dataType) ? "1" : "any"} required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
           if (column.dataType === "text" || column.dataType.startsWith("character varying")) return <Field key={column.name} label={label}><textarea className="field textarea" rows={column.dataType === "text" ? 3 : 1} maxLength={column.dataType.startsWith("character varying") ? Number(column.dataType.match(/\d+/)?.[0] ?? 5000) : 5000} required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
           return <Field key={column.name} label={`${label} · ${column.dataType}`}><Input required={required} value={values[column.name] ?? ""} onChange={(event) => setValues((current) => ({ ...current, [column.name]: event.target.value }))} /></Field>;
