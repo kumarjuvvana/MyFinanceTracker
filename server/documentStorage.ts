@@ -63,8 +63,9 @@ export function validateStorageCredentials(storageUrl: unknown, key: unknown, bu
     throw new Error("The Supabase Storage project URL is invalid.");
   }
   if (url.protocol !== "https:" || !/^[a-z0-9-]+\.supabase\.co$/i.test(url.hostname) ||
-    url.port || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
-    throw new Error("The Supabase Storage project URL must be an HTTPS *.supabase.co project origin.");
+    url.port || url.username || url.password ||
+    (url.pathname !== "/" && !/^\/rest\/v1\/?$/i.test(url.pathname)) || url.search || url.hash) {
+    throw new Error("Enter an HTTPS Supabase project URL, optionally ending in /rest/v1.");
   }
   return { baseUrl: url.origin, key, bucket };
 }

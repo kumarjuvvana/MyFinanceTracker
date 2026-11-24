@@ -72,10 +72,11 @@ async function loadTargetProfile() {
   const storageUrl = new URL(profile.storageUrl);
   if (storageUrl.protocol !== "https:" || !/^[a-z0-9-]+\.supabase\.co$/i.test(storageUrl.hostname) ||
     storageUrl.port || storageUrl.username || storageUrl.password ||
-    storageUrl.pathname !== "/" || storageUrl.search || storageUrl.hash) {
+    (storageUrl.pathname !== "/" && !/^\/rest\/v1\/?$/i.test(storageUrl.pathname)) ||
+    storageUrl.search || storageUrl.hash) {
     throw new Error("The target project URL must be a Supabase HTTPS project URL.");
   }
-  return profile;
+  return { ...profile, storageUrl: storageUrl.origin };
 }
 
 function storageHeaders(key) {

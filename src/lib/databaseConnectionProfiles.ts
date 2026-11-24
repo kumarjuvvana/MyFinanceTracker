@@ -69,7 +69,8 @@ export function validateDatabaseConnectionProfiles(value: unknown): value is Dat
         const storageUrl = new URL(record.storageUrl as string);
         if (storageUrl.protocol !== "https:" || !/^[a-z0-9-]+\.supabase\.co$/i.test(storageUrl.hostname) ||
           storageUrl.port || storageUrl.username || storageUrl.password ||
-          storageUrl.pathname !== "/" || storageUrl.search || storageUrl.hash) return false;
+          (storageUrl.pathname !== "/" && !/^\/rest\/v1\/?$/i.test(storageUrl.pathname)) ||
+          storageUrl.search || storageUrl.hash) return false;
       } catch {
         return false;
       }
