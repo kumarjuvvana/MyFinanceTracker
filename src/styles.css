@@ -2140,6 +2140,9 @@ button.fleet-bar-row:disabled{cursor:default}
 
 .hosting-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:16px}
 .capacity-card{min-width:0}
+.saved-profiles-usage-panel{max-width:none}
+.saved-profile-usage{margin-top:16px}
+.saved-profile-capacity-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
 .capacity-values{display:grid;gap:10px;margin:18px 0 12px}
 .capacity-values>div,.capacity-remaining{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
 .capacity-values span,.capacity-remaining span{font-size:11px;color:#818a80}
@@ -2154,7 +2157,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .capacity-values strong,.app-shell.dark .capacity-remaining strong,.app-shell.dark .hosting-output-card .deployment-size{color:#a6c1a8}
 .app-shell.dark .capacity-track{background:#343d35}
 @media(max-width:900px){.hosting-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.hosting-usage-grid{grid-template-columns:1fr;gap:9px}.capacity-card{padding:15px}}
+@media(max-width:600px){.hosting-usage-grid,.saved-profile-capacity-grid{grid-template-columns:1fr;gap:9px}.capacity-card{padding:15px}}
 
 .cooking-planner-section{display:grid;gap:12px;margin:18px 0 22px}
 .cooking-planner-section>.devotional-section-head h2{display:flex;align-items:center;gap:7px;margin:0;font:700 13px Manrope,sans-serif;color:#3d493e}

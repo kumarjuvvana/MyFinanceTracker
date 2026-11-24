@@ -9923,17 +9923,18 @@ function formatCapacity(bytes: number): string {
 
 function CapacityCard({ title, usedBytes, limitBytes, detail }: {
   title: string;
-  usedBytes: number;
+  usedBytes: number | null;
   limitBytes: number;
   detail?: string;
 }) {
-  const remainingBytes = Math.max(0, limitBytes - usedBytes);
-  const percentage = Math.min(100, usedBytes / limitBytes * 100);
+  const remainingBytes = usedBytes === null ? null : Math.max(0, limitBytes - usedBytes);
+  const percentage = usedBytes === null ? null : Math.min(100, usedBytes / limitBytes * 100);
+  const overLimitBytes = usedBytes !== null && usedBytes > limitBytes ? usedBytes - limitBytes : null;
   return <Card className="capacity-card">
     <h2 className="section-title">{title}</h2>
-    <div className="capacity-values"><div><span>Used</span><strong>{formatCapacity(usedBytes)}</strong></div><div><span>Free-plan reference limit</span><strong>{formatCapacity(limitBytes)}</strong></div></div>
-    <div className="capacity-track" role="progressbar" aria-label={`${title} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percentage)}><div style={{ width: `${percentage}%` }} /></div>
-    <div className="capacity-remaining"><span>{usedBytes > limitBytes ? "Over reference limit" : "Remaining"}</span><strong>{usedBytes > limitBytes ? formatCapacity(usedBytes - limitBytes) : formatCapacity(remainingBytes)}</strong></div>
+    <div className="capacity-values"><div><span>Used</span><strong>{usedBytes === null ? "Unavailable" : formatCapacity(usedBytes)}</strong></div><div><span>Free-plan reference limit</span><strong>{formatCapacity(limitBytes)}</strong></div></div>
+    {usedBytes !== null && percentage !== null && <div className="capacity-track" role="progressbar" aria-label={`${title} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percentage)}><div style={{ width: `${percentage}%` }} /></div>}
+    {remainingBytes !== null && <div className="capacity-remaining"><span>{overLimitBytes !== null ? "Over reference limit" : "Remaining"}</span><strong>{overLimitBytes !== null ? formatCapacity(overLimitBytes) : formatCapacity(remainingBytes)}</strong></div>}
     {detail && <p className="capacity-detail">{detail}</p>}
   </Card>;
 }
@@ -9992,6 +9993,10 @@ function HostingStoragePage() {
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
   }
 
+  const measuredStorageProfiles = profileUsage?.filter((profile) =>
+    profile.storageError !== "Storage is not configured for this profile.",
+  );
+
   return <>
     <PageHeading eyebrow="Infrastructure overview" title="Hosting & storage" subtitle="Review measured Supabase usage and the size of this Vercel deployment build." action={<Button variant="outline" onClick={() => void refreshUsage()} disabled={loading}><RefreshCw size={14} />{loading ? "Measuring..." : "Refresh usage"}</Button>} />
     <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>The connected project below is the original Daybook Supabase project. Saved-profile usage is measured separately for each database profile. Bucket capacity and plan quotas are not exposed by these measurements. Vercel reports this build’s output size, not account-wide remaining quota.</span></div>
@@ -10012,22 +10017,32 @@ function HostingStoragePage() {
     </div>
     {cloudUsage && <p className="usage-measured-at">Supabase measured {measuredTime(cloudUsage.measuredAt)}.</p>}
     {deploymentUsage && <p className="usage-measured-at">Build output measured {measuredTime(deploymentUsage.measuredAt)}.</p>}
-    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Saved database profile usage</h2><p className="section-description">Measure PostgreSQL size and, when configured, actual usage for each profile’s private Storage bucket. The profile passphrase is sent only to the authenticated API for this measurement.</p></div><Database size={16} /></div>
+    <Card className="connector-card saved-profiles-usage-panel"><div className="card-head"><div><h2 className="section-title">Saved database profile usage</h2><p className="section-description">Measure PostgreSQL size and, when configured, actual usage for each profile’s private Storage bucket. The profile passphrase is sent only to the authenticated API for this measurement.</p></div><Database size={16} /></div>
       <form className="connector-form" onSubmit={(event) => void measureSavedProfileUsage(event)}>
         <Field className="full" label="Database connection vault passphrase"><Input type="password" autoComplete="current-password" maxLength={256} required value={profilePassphrase} onChange={(event) => setProfilePassphrase(event.target.value)} /></Field>
         <div className="full"><Button type="submit" disabled={profileUsageLoading}>{profileUsageLoading ? "Measuring profiles..." : "Measure saved profiles"}</Button></div>
       </form>
       {profileUsageError && <div className="alert alert-error" role="alert" style={{ marginTop: 12 }}>{profileUsageError}</div>}
-      {profileUsage?.map((profile) => <div className="saved-profile-usage" key={profile.profileId}>
+      {measuredStorageProfiles?.map((profile) => <div className="saved-profile-usage" key={profile.profileId}>
         <div className="card-head"><div><h3 className="section-title">{profile.profileName}</h3><p className="section-description">{profile.modules.join(" · ") || "No module assignments"}</p></div><Badge tone="blue">Saved profile</Badge></div>
-        <div className="document-storage-stats">
-          <span>Database: <strong>{profile.databaseBytes === null ? profile.databaseError || "Unavailable" : formatCapacity(profile.databaseBytes)}</strong></span>
-          {profile.storage
-            ? <><span>Private bucket: <strong>{profile.storage.bucket}</strong></span><span>Storage used: <strong>{formatCapacity(profile.storage.usedBytes)}</strong></span><span>{profile.storage.objectCount.toLocaleString()} objects</span></>
-            : <span>Storage: <strong>{profile.storageError || "Not configured"}</strong></span>}
+        <div className="saved-profile-capacity-grid">
+          <CapacityCard
+            title={`${profile.profileName} database`}
+            usedBytes={profile.databaseBytes}
+            limitBytes={FREE_DATABASE_LIMIT_BYTES}
+            detail={profile.databaseError || "Total PostgreSQL database size, including tables, indexes, and system data. Quota shown is only a Free-plan reference."}
+          />
+          <CapacityCard
+            title={`${profile.profileName} Storage`}
+            usedBytes={profile.storage?.usedBytes ?? null}
+            limitBytes={FREE_STORAGE_LIMIT_BYTES}
+            detail={profile.storage
+              ? `${profile.storage.bucket} · ${profile.storage.objectCount.toLocaleString()} stored object(s). Quota shown is only a Free-plan reference.`
+              : profile.storageError || "Storage usage could not be measured for this profile."}
+          />
         </div>
-        {profile.storage?.capacityBytes === null && <p className="capacity-detail">Bucket capacity is not provided by the configured Storage API; usage is actual measured object size, not a capacity percentage.</p>}
       </div>)}
+      {profileUsage && measuredStorageProfiles?.length === 0 && <p className="section-description">No saved database profiles have Storage configured; profiles without Storage are omitted.</p>}
       {profileUsage && <p className="usage-measured-at">Saved profile usage measured {profileUsageLoading ? "…" : "now"}.</p>}
     </Card>
   </>;
