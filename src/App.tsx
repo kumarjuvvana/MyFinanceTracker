@@ -13730,8 +13730,9 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
     const remaining = daysUntil(record.dueDate);
     if (remaining < 0) return { text: `Past due ${dateLabel(record.dueDate)}`, tone: "amber" };
     if (remaining === 0) return { text: "Due today", tone: "amber" };
-    if (remaining <= record.reminderDays) return { text: `Due in ${remaining} days`, tone: "amber" };
-    return { text: `Due ${dateLabel(record.dueDate)}`, tone: "green" };
+    if (remaining <= 7) return { text: `Due in ${remaining} days`, tone: "amber" };
+    if (remaining <= 30) return { text: "Due within 30 days", tone: "amber" };
+    return { text: `Valid until ${dateLabel(record.dueDate)}`, tone: "green" };
   }
 
   function renderPersonalRecords(entries: PersonalRecord[]) {
@@ -13910,11 +13911,16 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   const [search, setSearch] = useState("");
   const [personFilter, setPersonFilter] = useState("All people");
   const [typeFilter, setTypeFilter] = useState("All file types");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState("All document types");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [issueFrom, setIssueFrom] = useState("");
+  const [issueTo, setIssueTo] = useState("");
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
+  const [minFileSizeMb, setMinFileSizeMb] = useState("");
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState("");
   const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived">("all");
   const [view, setView] = useState<"grid" | "table" | "list">("grid");
   const [sortBy, setSortBy] = useState("newest");
@@ -13956,10 +13962,10 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   function dueStatus(value: string | undefined): { label: string; tone: "amber" | "green" | "neutral" } {
     if (!value) return { label: "No due date", tone: "neutral" };
     const remaining = daysUntil(value);
-    if (remaining < 0) return { label: "Due date passed", tone: "amber" };
+    if (remaining < 0) return { label: "Past due", tone: "amber" };
     if (remaining <= 7) return { label: remaining === 0 ? "Due today" : `Due in ${remaining} days`, tone: "amber" };
-    if (remaining <= 30) return { label: `Due in ${remaining} days`, tone: "amber" };
-    return { label: `Due ${dateLabel(value)}`, tone: "green" };
+    if (remaining <= 30) return { label: "Due within 30 days", tone: "amber" };
+    return { label: "Valid", tone: "green" };
   }
   async function runAction(action: () => Promise<void>) {
     setOperationError("");
@@ -13986,14 +13992,23 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         ? dueDocuments
         : activeDocuments;
   const documentTypes = [...new Set(viewDocuments.map(documentCategory))].sort((a, b) => a.localeCompare(b));
+  const metadataDocumentTypes = [...new Set(viewDocuments.map((document) => document.documentType?.trim()).filter((value): value is string => Boolean(value)))]
+    .sort((a, b) => a.localeCompare(b));
+  const minFileSizeBytes = minFileSizeMb ? Number(minFileSizeMb) * 1024 * 1024 : null;
+  const maxFileSizeBytes = maxFileSizeMb ? Number(maxFileSizeMb) * 1024 * 1024 : null;
   const visible = viewDocuments.filter((document) =>
     `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes} ${document.referenceNumber ?? ""} ${document.issuingAuthority ?? ""} ${document.documentType ?? ""} ${(document.tags ?? []).join(" ")} ${categories.find((category) => category.id === document.categoryId)?.name ?? ""}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
     (personFilter === "All people" || document.personName === personFilter) &&
     (typeFilter === "All file types" || documentCategory(document) === typeFilter) &&
+    (documentTypeFilter === "All document types" || document.documentType === documentTypeFilter) &&
     (categoryFilter === "All categories" || document.categoryId === categoryFilter) &&
     (!dateFrom || document.uploadedAt.slice(0, 10) >= dateFrom) && (!dateTo || document.uploadedAt.slice(0, 10) <= dateTo) &&
+    (!issueFrom || Boolean(document.issueDate && document.issueDate >= issueFrom)) &&
+    (!issueTo || Boolean(document.issueDate && document.issueDate <= issueTo)) &&
     (!dueFrom || Boolean(document.dueDate && document.dueDate >= dueFrom)) &&
-    (!dueTo || Boolean(document.dueDate && document.dueDate <= dueTo)))
+    (!dueTo || Boolean(document.dueDate && document.dueDate <= dueTo)) &&
+    (minFileSizeBytes === null || document.sizeBytes >= minFileSizeBytes) &&
+    (maxFileSizeBytes === null || document.sizeBytes <= maxFileSizeBytes))
     .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title)
       : sortBy === "due" ? (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
         : sortBy === "size" ? b.sizeBytes - a.sizeBytes
@@ -14139,10 +14154,14 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   return <><PageHeading eyebrow="Private file storage" title="Documents" subtitle="Manage files, personal records, due dates, and categories from one document workspace." action={<Button onClick={() => setEditor({ initial: null })}><Plus size={15} /> Add document</Button>} />
     <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>Document records are stored in mydocumentsmanager. Uploaded files remain in the existing private Supabase Storage bucket and are accessed through the existing signed-link API. Database records and uploaded files are access-controlled, not end-to-end encrypted.</span></div>
     <div className="document-kpi-grid">
-      <Card><span>Total documents</span><strong>{activeDocuments.length + archivedDocuments.length}</strong><small>{addedThisMonth} added this month</small></Card>
-      <Card><span>Active</span><strong>{activeDocuments.length}</strong><small>Available in the library</small></Card>
-      <Card><span>Due soon</span><strong>{dueSoonCount}</strong><small>{expiredCount} past due</small></Card>
-      <Card><span>Actual bucket usage</span><strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading" : "Unavailable"}</strong><small>{storageUsage ? `${storageUsage.objectCount} objects · measured from ${storageUsage.bucket}` : "Storage API measurement unavailable"}</small></Card>
+      <Card><span>Total documents</span><strong>{activeDocuments.length + archivedDocuments.length}</strong><small>Active and archived records</small></Card>
+      <Card><span>Active documents</span><strong>{activeDocuments.length}</strong><small>Available in the library</small></Card>
+      <Card><span>Archived documents</span><strong>{archivedDocuments.length}</strong><small>Recoverable records</small></Card>
+      <Card><span>Total storage used</span><strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading" : "Unavailable"}</strong><small>{storageUsage ? `Actual bucket usage · ${storageUsage.objectCount} objects` : "Storage API measurement unavailable"}</small></Card>
+      <Card><span>Documents due soon</span><strong>{dueSoonCount}</strong><small>Due within 30 days</small></Card>
+      <Card><span>Past-due documents</span><strong>{expiredCount}</strong><small>Renewal or due date has passed</small></Card>
+      <Card><span>Categories</span><strong>{categories.length}</strong><small>Available categories</small></Card>
+      <Card><span>Added this month</span><strong>{addedThisMonth}</strong><small>Based on document upload date</small></Card>
     </div>
     <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the existing private bucket, including files used by other application modules. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
       <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
@@ -14166,16 +14185,21 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     </> : <>
     <div className="document-storage-summary"><span>{activeDocuments.length} active</span><span>{archivedDocuments.length} archived</span><span>{dueSoonCount} due soon</span><span>{expiredCount} past due</span></div>
     <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search documents" placeholder="Search names, people, category, number, file, notes, tags..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
-      <FilterDrawer label="Document filters" activeCount={(personFilter === "All people" ? 0 : 1) + (typeFilter === "All file types" ? 0 : 1) + (categoryFilter === "All categories" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (dueFrom ? 1 : 0) + (dueTo ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}>
+      <FilterDrawer label="Document filters" activeCount={(personFilter === "All people" ? 0 : 1) + (typeFilter === "All file types" ? 0 : 1) + (documentTypeFilter === "All document types" ? 0 : 1) + (categoryFilter === "All categories" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (issueFrom ? 1 : 0) + (issueTo ? 1 : 0) + (dueFrom ? 1 : 0) + (dueTo ? 1 : 0) + (minFileSizeMb ? 1 : 0) + (maxFileSizeMb ? 1 : 0) + (sortBy !== "newest" ? 1 : 0)}>
         <Field label="Person"><Select aria-label="Filter documents by person" value={personFilter} onChange={(event) => setPersonFilter(event.target.value)}><option>All people</option>{[...new Set(viewDocuments.map((document) => document.personName.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((person) => <option key={person}>{person}</option>)}</Select></Field>
         <Field label="Category"><Select aria-label="Filter documents by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</Select></Field>
         <Field label="File format"><Select aria-label="Filter documents by file format" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All file types</option>{documentTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field>
+        <Field label="Document type"><Select aria-label="Filter documents by document type" value={documentTypeFilter} onChange={(event) => setDocumentTypeFilter(event.target.value)}><option>All document types</option>{metadataDocumentTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field>
         <Field label="Added from"><DateInput aria-label="Documents added from" value={dateFrom} onValueChange={(value) => { setDateFrom(value); setPage(0); }} max={dateTo || undefined} /></Field>
         <Field label="Added to"><DateInput aria-label="Documents added to" value={dateTo} onValueChange={(value) => { setDateTo(value); setPage(0); }} min={dateFrom || undefined} /></Field>
+        <Field label="Issued from"><DateInput aria-label="Documents issued from" value={issueFrom} onValueChange={(value) => { setIssueFrom(value); setPage(0); }} max={issueTo || undefined} /></Field>
+        <Field label="Issued to"><DateInput aria-label="Documents issued to" value={issueTo} onValueChange={(value) => { setIssueTo(value); setPage(0); }} min={issueFrom || undefined} /></Field>
         <Field label="Due from"><DateInput aria-label="Documents due from" value={dueFrom} onValueChange={(value) => { setDueFrom(value); setPage(0); }} max={dueTo || undefined} /></Field>
         <Field label="Due to"><DateInput aria-label="Documents due to" value={dueTo} onValueChange={(value) => { setDueTo(value); setPage(0); }} min={dueFrom || undefined} /></Field>
+        <Field label="Minimum size (MB)"><Input aria-label="Minimum document file size in megabytes" type="number" min="0" step="0.1" value={minFileSizeMb} onChange={(event) => { setMinFileSizeMb(event.target.value); setPage(0); }} /></Field>
+        <Field label="Maximum size (MB)"><Input aria-label="Maximum document file size in megabytes" type="number" min="0" step="0.1" value={maxFileSizeMb} onChange={(event) => { setMaxFileSizeMb(event.target.value); setPage(0); }} /></Field>
         <Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Name (A–Z)</option><option value="due">Due date</option><option value="size">File size</option><option value="category">Category</option></Select></Field>
-        <Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setCategoryFilter("All categories"); setDateFrom(""); setDateTo(""); setDueFrom(""); setDueTo(""); setSortBy("newest"); setPage(0); }}>Clear filters</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setDocumentTypeFilter("All document types"); setCategoryFilter("All categories"); setDateFrom(""); setDateTo(""); setIssueFrom(""); setIssueTo(""); setDueFrom(""); setDueTo(""); setMinFileSizeMb(""); setMaxFileSizeMb(""); setSortBy("newest"); setPage(0); }}>Clear filters</Button>
       </FilterDrawer>
       <div className="document-view-switch" role="group" aria-label="Document display mode">
         <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={14} />Grid</Button>
