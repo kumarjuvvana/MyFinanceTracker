@@ -54,7 +54,7 @@ export function validateStorageCredentials(storageUrl: unknown, key: unknown, bu
   if (typeof storageUrl !== "string" || storageUrl.length > 300 ||
     typeof key !== "string" || key.length < 20 || key.length > 4096 ||
     typeof bucket !== "string" || !/^[a-z0-9][a-z0-9_-]{1,61}[a-z0-9]$/.test(bucket)) {
-    throw new Error("Enter a valid Supabase project URL, service-role key, and bucket name.");
+    throw new Error("Enter a valid Supabase project URL, secret or service-role key, and bucket name.");
   }
   let url: URL;
   try {
@@ -70,6 +70,12 @@ export function validateStorageCredentials(storageUrl: unknown, key: unknown, bu
   return { baseUrl: url.origin, key, bucket };
 }
 
+function storageAuthHeaders(key: string): Record<string, string> {
+  return key.startsWith("sb_secret_")
+    ? { apikey: key }
+    : { apikey: key, Authorization: `Bearer ${key}` };
+}
+
 export async function resolveDocumentStorageCredentials(profileId: string, passphrase: string): Promise<DocumentStorageCredentials> {
   const profile = await loadUnlockedDatabaseConnectionProfile(profileId, passphrase);
   return getDocumentStorageCredentials(profile);
@@ -83,8 +89,7 @@ export async function storageRequest(
   const response = await fetch(`${credentials.baseUrl}/storage/v1/${path}`, {
     ...init,
     headers: {
-      apikey: credentials.key,
-      Authorization: `Bearer ${credentials.key}`,
+      ...storageAuthHeaders(credentials.key),
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -106,26 +111,64 @@ export async function requirePrivateBucket(credentials: DocumentStorageCredentia
   }
 }
 
-export async function ensurePrivateBucket(credentials: DocumentStorageCredentials): Promise<void> {
-  const response = await fetch(`${credentials.baseUrl}/storage/v1/bucket`, {
-    method: "POST",
-    headers: {
-      apikey: credentials.key,
-      Authorization: `Bearer ${credentials.key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      id: credentials.bucket,
-      name: credentials.bucket,
-      public: false,
-      file_size_limit: MAX_DOCUMENT_FILE_BYTES,
-    }),
-    cache: "no-store",
-  });
-  if (!response.ok && response.status !== 409) {
-    throw new Error(`Could not create or verify the private Storage bucket (HTTP ${response.status}).`);
+async function storageResponseError(response: Response): Promise<string> {
+  try {
+    const payload: unknown = await response.json();
+    if (typeof payload === "object" && payload !== null) {
+      if ("message" in payload && typeof payload.message === "string" && payload.message.trim()) {
+        return payload.message.trim().slice(0, 300);
+      }
+      if ("error" in payload && typeof payload.error === "string" && payload.error.trim()) {
+        return payload.error.trim().slice(0, 300);
+      }
+      if ("error_description" in payload && typeof payload.error_description === "string" &&
+        payload.error_description.trim()) {
+        return payload.error_description.trim().slice(0, 300);
+      }
+    }
+  } catch {
+    // Keep the HTTP status when Storage does not return a JSON error.
   }
-  await requirePrivateBucket(credentials);
+  return `HTTP ${response.status}`;
+}
+
+export async function ensurePrivateBucket(credentials: DocumentStorageCredentials): Promise<void> {
+  const bucketUrl = `${credentials.baseUrl}/storage/v1/bucket/${encodeURIComponent(credentials.bucket)}`;
+  const headers = storageAuthHeaders(credentials.key);
+  const getBucket = async (): Promise<unknown | null> => {
+    const response = await fetch(bucketUrl, { headers, cache: "no-store" });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Could not inspect the Supabase Storage bucket: ${await storageResponseError(response)}.`);
+    }
+    return response.json();
+  };
+
+  let bucket = await getBucket();
+  if (bucket === null) {
+    const response = await fetch(`${credentials.baseUrl}/storage/v1/bucket`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: credentials.bucket,
+        name: credentials.bucket,
+        public: false,
+        file_size_limit: MAX_DOCUMENT_FILE_BYTES,
+      }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      bucket = await getBucket();
+      if (bucket === null) {
+        throw new Error(`Could not create the private Supabase Storage bucket: ${await storageResponseError(response)}.`);
+      }
+    } else {
+      bucket = await getBucket();
+    }
+  }
+  if (typeof bucket !== "object" || bucket === null || !("public" in bucket) || bucket.public !== false) {
+    throw new Error(`The "${credentials.bucket}" bucket must be private. Update it in Supabase Storage settings.`);
+  }
 }
 
 export async function createSignedUpload(credentials: DocumentStorageCredentials, fileName: string, sizeBytes: number) {

@@ -80,10 +80,9 @@ async function loadTargetProfile() {
 }
 
 function storageHeaders(key) {
-  return {
-    apikey: key,
-    Authorization: `Bearer ${key}`,
-  };
+  return key.startsWith("sb_secret_")
+    ? { apikey: key }
+    : { apikey: key, Authorization: `Bearer ${key}` };
 }
 
 async function targetStorageRequest(profile, path, init = {}) {
