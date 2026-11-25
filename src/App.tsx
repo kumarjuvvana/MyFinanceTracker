@@ -6,7 +6,7 @@ import {
   ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical, Grid2X2, List, Table2,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
-import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, Select } from "./components/ui";
+import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, Select, type RecordViewMode } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
@@ -979,7 +979,7 @@ function ImportantDatesPage() {
   const [reminderFilter, setReminderFilter] = useState<"all" | "reminders" | "no-reminders">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [recordLayout, setRecordLayout] = useState<"list" | "grid">("list");
+  const [recordLayout, setRecordLayout] = useState<RecordViewMode>("table");
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
 
@@ -1160,6 +1160,19 @@ function ImportantDatesPage() {
     setDateTo("");
   }
   function renderImportantDateCards(entries: ImportantDate[]) {
+    if (recordLayout === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Person</th><th>Note</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((entry) => <tr key={entry.id}>
+          <td data-label="Date">{dateLabel(entry.date)}</td>
+          <td data-label="Title"><strong>{entry.title}</strong></td>
+          <td data-label="Category">{categoryNames.get(entry.categoryId) ?? "Uncategorized"}</td>
+          <td data-label="Person">{entry.person || "—"}</td>
+          <td data-label="Note">{entry.note || "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
     return <div className={`important-date-list${recordLayout === "grid" ? " is-grid" : ""}`}>{entries.map((entry) => {
       const feeling = feelingById.get(entry.feelingId);
       return <Card className="important-date-card" key={entry.id}><div className="important-date-card-main"><div className="important-date-card-title"><strong>{entry.title}</strong><span>{[categoryNames.get(entry.categoryId), feeling?.name, entry.person && `For ${entry.person}`].filter(Boolean).join(" · ")}</span><span className="important-date-elapsed">{importantDateElapsed(entry.date, elapsedAt)}</span>{entry.note && <span className="important-date-note"><LinkifiedText>{entry.note}</LinkifiedText></span>}</div><div className="important-date-card-meta"><Badge>{dateLabel(entry.date)}</Badge>{entry.reminder && <Badge tone="green">Dashboard reminder</Badge>}{feeling && <Badge tone={feeling.sentiment === "Good" ? "green" : feeling.sentiment === "Bad" ? "amber" : "neutral"}>{feeling.sentiment}</Badge>}{entry.link && <a className="personal-document-link" href={activityLinkHref(entry.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={12} />Open link</a>}</div><div className="table-actions"><button className="icon-button" disabled={saving} aria-label={`Edit ${entry.title}`} onClick={() => setEditor(entry)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Delete ${entry.title}`} onClick={() => void deleteRecord(entry)}><Archive size={14} /></button></div></div></Card>;
@@ -1188,10 +1201,7 @@ function ImportantDatesPage() {
             <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
             <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
           </FilterDrawer>
-          <div className="important-date-layout-toggle" role="group" aria-label="Record layout">
-            <Button type="button" size="sm" variant={recordLayout === "list" ? "primary" : "outline"} aria-pressed={recordLayout === "list"} onClick={() => setRecordLayout("list")}>List</Button>
-            <Button type="button" size="sm" variant={recordLayout === "grid" ? "primary" : "outline"} aria-pressed={recordLayout === "grid"} onClick={() => setRecordLayout("grid")}>Grid</Button>
-          </div>
+          <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Important dates" />
           <Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge>
         </div>
         {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearDateFilters}>Clear search, filters & sorting</Button></div>}
@@ -3650,7 +3660,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   const [groupBy, setGroupBy] = useState<"date" | "category" | "status" | "none">("date");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [recordLayout, setRecordLayout] = useState<"list" | "grid">("list");
+  const [recordLayout, setRecordLayout] = useState<RecordViewMode>("table");
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [error, setError] = useState("");
@@ -3712,6 +3722,24 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
     setGroupBy("date");
   }
   function renderReminderCards(entries: Reminder[]) {
+    if (recordLayout === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Date</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((reminder) => <tr key={reminder.id}>
+          <td data-label="Date">{dateLabel(reminder.date)}</td>
+          <td data-label="Title"><strong>{reminder.title}</strong></td>
+          <td data-label="Category">{reminder.category || "General"}</td>
+          <td data-label="Status"><Badge tone={reminder.completed ? "green" : "neutral"}>{reminder.completed ? "Completed" : "Pending"}</Badge></td>
+          <td data-label="Details">{reminder.details || "—"}</td>
+          <td data-label="Actions"><div className="table-actions">
+            <button className={`check-button ${reminder.completed ? "checked" : ""}`} aria-label={reminder.completed ? `Mark ${reminder.title} as incomplete` : `Mark ${reminder.title} as complete`} onClick={() => onToggle(reminder)}>{reminder.completed && <Check size={12} />}</button>
+            <button className="icon-button" aria-label={`Edit ${reminder.title}`} onClick={() => setEditor(reminder)}><Pencil size={14} /></button>
+            <button className="icon-button" aria-label={`Copy ${reminder.title}`} onClick={() => { const { id, ...copy } = reminder; void id; onSave({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={14} /></button>
+            <button className="icon-button" aria-label={`Archive ${reminder.title}`} onClick={() => { if (window.confirm(`Move "${reminder.title}" to the archive?`)) onDelete(reminder.id); }}><Archive size={14} /></button>
+          </div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
     return <div className={`reminder-page-list${recordLayout === "grid" ? " reminder-grid-layout" : ""}`}>{entries.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />)}</div>;
   }
   return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Keep personal notes and dated reminders organized in one place." action={activeTab === "list" ? <Button onClick={() => setActiveTab("add")}><Plus size={15} />Add reminder</Button> : undefined} />
@@ -3740,10 +3768,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
         <Field label="From date"><DateInput aria-label="Filter reminders from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reminders to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       </FilterDrawer>
-      <div className="important-date-layout-toggle" role="group" aria-label="Reminder layout">
-        <Button type="button" size="sm" variant={recordLayout === "list" ? "primary" : "outline"} aria-pressed={recordLayout === "list"} onClick={() => setRecordLayout("list")}>List</Button>
-        <Button type="button" size="sm" variant={recordLayout === "grid" ? "primary" : "outline"} aria-pressed={recordLayout === "grid"} onClick={() => setRecordLayout("grid")}>Grid</Button>
-      </div>
+      <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Reminders" />
       <Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge>
     </div>
     {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearListOptions}>Clear search, filters & sorting</Button></div>}
@@ -3883,6 +3908,7 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
 }
 
 function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: ArchivedRecord[]; onRestore: (id: string) => void; onCopy: (id: string) => void; onDelete: (id: string) => void }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [search, setSearch] = useState("");
   const [collection, setCollection] = useState("All record types");
   const [from, setFrom] = useState("");
@@ -3906,8 +3932,15 @@ function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: Archiv
     return b.archivedAt.localeCompare(a.archivedAt);
   });
   return <><PageHeading eyebrow="Recover or permanently remove" title="Archive" subtitle="Deleted records are kept here until you restore them or permanently delete them. The encrypted credential vault is not included." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field><Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field></FilterDrawer><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
-    {sortedRecords.length ? <DateGroupedRecords items={sortedRecords} getDate={(record) => record.archivedAt.slice(0, 10)} title={(date) => `Archive · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(dateRecords) => <div className="reminder-page-list">{dateRecords.map((record) => {
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field><Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="Archive" /><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
+    {sortedRecords.length ? <DateGroupedRecords items={sortedRecords} getDate={(record) => record.archivedAt.slice(0, 10)} title={(date) => `Archive · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(dateRecords) => view === "table"
+      ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Label</th><th>Archived</th><th>Record types</th><th>Records</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{dateRecords.map((record) => {
+        const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) => Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
+        const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
+        const hasDocuments = (record.snapshot.documents?.length ?? 0) > 0;
+        return <tr key={record.id}><td data-label="Label"><strong>{record.label}</strong></td><td data-label="Archived">{new Date(record.archivedAt).toLocaleString()}</td><td data-label="Record types">{contents.join(", ") || "—"}</td><td data-label="Records">{count}</td><td data-label="Actions"><div className="table-actions"><Button size="sm" onClick={() => onRestore(record.id)}>Restore</Button>{!hasDocuments && <Button size="sm" variant="outline" onClick={() => onCopy(record.id)}>Copy</Button>}<Button size="sm" variant="outline" onClick={() => { if (window.confirm(`Permanently delete "${record.label}" from the archive? This cannot be undone.`)) onDelete(record.id); }}>Delete</Button></div></td></tr>;
+      })}</tbody></table></Card>
+      : <div className={`reminder-page-list${view === "grid" ? " reminder-grid-layout" : ""}`}>{dateRecords.map((record) => {
       const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) =>
         Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
       const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
@@ -9063,6 +9096,7 @@ function LearningPage({ records, onSave, onDelete }: {
   onSave: (record: Omit<LearningRecord, "id">, id?: string) => void;
   onDelete: (record: LearningRecord) => void;
 }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [editor, setEditor] = useState<LearningRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("All levels");
@@ -9106,6 +9140,21 @@ function LearningPage({ records, onSave, onDelete }: {
       {record.notes && <p className="learning-notes"><LinkifiedText>{record.notes}</LinkifiedText></p>}
     </Card>;
   }
+  function renderLearningRecords(entries: LearningRecord[]) {
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Title</th><th>Topic</th><th>Level</th><th>Status</th><th>Started</th><th>Completed</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((record) => <tr key={record.id}>
+          <td data-label="Title"><strong>{record.title}</strong></td><td data-label="Topic">{record.topic || "—"}</td>
+          <td data-label="Level">{record.level}</td><td data-label="Status">{record.status}</td>
+          <td data-label="Started">{record.startedDate ? dateLabel(record.startedDate) : "—"}</td>
+          <td data-label="Completed">{record.completedDate ? dateLabel(record.completedDate) : "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave({ ...copy, title: `${record.title} (copy)` }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
+    return <div className={`learning-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map(renderLearningRecord)}</div>;
+  }
 
   return <>
     <PageHeading eyebrow="Keep growing" title="Learning" subtitle="Capture what you are learning, track your progress from beginner to advanced, and keep useful resources close." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add learning</Button>} />
@@ -9120,11 +9169,12 @@ function LearningPage({ records, onSave, onDelete }: {
       <FilterDrawer label="Apply filters" activeCount={sortBy !== "status" ? 1 : 0}>
         <Field label="Sort by"><Select aria-label="Sort learning records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="status">Status</option><option value="title">Title</option><option value="started-newest">Start date (newest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Learning records" />
       <Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge>
     </div>
     {groupBy !== "none" && visible.length > 0 && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(false)}>Hide all</Button></div>}
-    {groupBy === "none" ? <div className="learning-list">{visible.map(renderLearningRecord)}</div>
-      : <div className="record-date-groups">{learningGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}><div className="learning-list">{group.records.map(renderLearningRecord)}</div></DevotionalRecordGroup>)}</div>}
+    {groupBy === "none" ? renderLearningRecords(visible)
+      : <div className="record-date-groups">{learningGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderLearningRecords(group.records)}</DevotionalRecordGroup>)}</div>}
     {!visible.length && <Card><EmptyState icon={<BookOpen size={18} />} title={records.length ? "No matching learning records" : "No learning records yet"} description={records.length ? "Try another search or filter." : "Add a skill or course you are learning to start your progress log."} /></Card>}
     {editor !== undefined && <LearningRecordModal key={editor?.id ?? "new-learning-record"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
@@ -9178,6 +9228,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   onDelete: (record: PromptRecord) => void;
   onCopy: (record: PromptRecord) => void;
 }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [editor, setEditor] = useState<PromptRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
@@ -9227,13 +9278,27 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
       <pre className="prompt-body">{record.prompt}</pre>
     </Card>;
   }
+  function renderPrompts(entries: PromptRecord[]) {
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Title</th><th>Category</th><th>Type</th><th>Tool</th><th>Description</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((record) => <tr key={record.id}>
+          <td data-label="Title"><strong>{record.title}</strong></td><td data-label="Category">{record.category || "—"}</td>
+          <td data-label="Type">{record.type || "—"}</td><td data-label="Tool">{record.tool || "—"}</td>
+          <td data-label="Description">{record.description || record.prompt.slice(0, 120)}</td>
+          <td data-label="Actions"><div className="table-actions"><Button size="sm" variant="outline" onClick={() => onCopy(record)}><Copy size={13} />Copy</Button><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${record.title}`} onClick={() => onSave({ ...record, title: `${record.title.slice(0, 113)} (copy)` })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
+    return <div className={`prompt-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map(renderPrompt)}</div>;
+  }
 
   return <>
     <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Browse prompts by category or prompt type, then search, filter, and copy them into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="AI prompts" /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
     {promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
-    <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="prompt-list">{group.records.map(renderPrompt)}</div></DevotionalRecordGroup>)}</div>
+    <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}>{renderPrompts(group.records)}</DevotionalRecordGroup>)}</div>
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
     {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
@@ -9389,6 +9454,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   onArchiveLog: (log: MindfulnessLog) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"habits" | "reflections">("habits");
+  const [view, setView] = useState<RecordViewMode>("table");
   const [habitEditor, setHabitEditor] = useState<MindfulHabit | null | undefined>(undefined);
   const [targetExtensionHabit, setTargetExtensionHabit] = useState<MindfulHabit | null>(null);
   const [logEditor, setLogEditor] = useState<MindfulnessLog | null | undefined>(undefined);
@@ -9538,7 +9604,40 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
       </div>
     </div>;
   }
+  function renderHabitRows(entries: MindfulHabit[]) {
+    if (view === "table") {
+      return <div className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Habit</th><th>Progress</th><th>Started</th><th>Check-in</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((habit) => {
+          const progress = habitProgress(habit);
+          const checked = isHabitCheckedOnTrackingDate(habit);
+          const canCheck = !!progress.startDate && trackingDate >= progress.startDate && trackingDate <= today() &&
+            (!progress.targetEndDate || trackingDate <= progress.targetEndDate) &&
+            !logs.some((log) => log.date === trackingDate && log.completedHabitIds.includes(habit.id));
+          return <tr key={habit.id}>
+            <td data-label="Habit"><strong>{habit.title}</strong>{habit.description && <div>{habit.description}</div>}</td>
+            <td data-label="Progress">{progress.completedCount} / {progress.targetDays ?? progress.elapsedDays} days ({progress.percent}%)</td>
+            <td data-label="Started">{progress.startDate ? dateLabel(progress.startDate) : "Not set"}</td>
+            <td data-label="Check-in"><label className="habit-day-check"><input type="checkbox" checked={checked} disabled={!canCheck} onChange={() => toggleHabitDate(habit)} /><span>{checked ? "Done" : "Done today"}</span></label></td>
+            <td data-label="Actions"><div className="table-actions"><button className="icon-button" disabled={progress.targetDays === 3650} aria-label={`Extend ${habit.title} target`} onClick={() => setTargetExtensionHabit(habit)}><Plus size={14} /></button><button className="icon-button" aria-label={`Edit ${habit.title}`} onClick={() => setHabitEditor(habit)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Duplicate ${habit.title}`} onClick={() => onSaveHabit({ ...habit, title: `${habit.title.slice(0, 113)} (copy)`, startDate: today(), completedDates: [] })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${habit.title}`} onClick={() => archiveHabit(habit)}><Archive size={14} /></button></div></td>
+          </tr>;
+        })}</tbody>
+      </table></div>;
+    }
+    return <div className={`education-entry-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map(renderHabitRow)}</div>;
+  }
   function renderReflectionCards(entries: MindfulnessLog[]) {
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Date</th><th>Emotion</th><th>Situation</th><th>Response / reflection</th><th>Habits practiced</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((log) => <tr key={log.id}>
+          <td data-label="Date">{dateLabel(log.date)}</td><td data-label="Emotion">{log.emotion} · {log.intensity}/5</td>
+          <td data-label="Situation">{log.trigger || "—"}</td><td data-label="Response / reflection">{[log.response, log.positiveAction, log.reflection].filter(Boolean).join(" · ") || "—"}</td>
+          <td data-label="Habits practiced">{log.completedHabitIds.map((id) => habitNames.get(id) ?? "Past habit").join(", ") || "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
     return <div className="mindful-log-list">{entries.map((log) => <Card className="mindful-log-card" key={log.id}>
       <div className="mindful-log-head"><div><h2>{dateLabel(log.date)}</h2><div className="mindful-log-badges"><Badge tone={log.emotion === "Anger" || log.emotion === "Frustration" || log.emotion === "Stress" ? "amber" : "green"}>{log.emotion}</Badge><Badge>Intensity {log.intensity}/5</Badge></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit reflection for ${log.date}`} onClick={() => setLogEditor(log)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy reflection for ${log.date}`} onClick={() => onSaveLog({ ...log, date: today() })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive reflection for ${log.date}`} onClick={() => archiveLog(log)}><Archive size={14} /></button></div></div>
       {log.trigger && <div className="mindful-log-section"><span>Situation</span><p>{log.trigger}</p></div>}
@@ -9567,13 +9666,14 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
         <FilterDrawer label="Apply filters" activeCount={habitSort !== "title" ? 1 : 0}>
           <Field label="Sort by"><Select aria-label="Sort habits" value={habitSort} onChange={(event) => setHabitSort(event.target.value)}><option value="title">Name</option><option value="started-newest">Start date (newest)</option></Select></Field>
         </FilterDrawer>
+        <RecordViewToggle value={view} onChange={setView} label="Habits" />
         <Badge>{visibleHabits.length} {visibleHabits.length === 1 ? "habit" : "habits"}</Badge>
       </div>
       <Card className="mindful-habits-card">
         <div className="toolbar habit-date-toolbar"><Field label="Track habits for"><DateInput required value={trackingDate} onValueChange={setTrackingDate} /></Field><span>Check a habit when you complete it on that date.</span></div>
         {visibleHabits.length ? habitGroupBy === "none"
-          ? <div className="education-entry-list">{visibleHabits.map(renderHabitRow)}</div>
-          : <div className="habit-checkin-groups">{habitGroups.map((group) => <section className="habit-checkin-group" key={group.key}><h3 className="shopping-record-group-title">{group.title}<span>{group.habits.length}</span></h3><div className="education-entry-list">{group.habits.map(renderHabitRow)}</div></section>)}</div>
+          ? renderHabitRows(visibleHabits)
+          : <div className="habit-checkin-groups">{habitGroups.map((group) => <section className="habit-checkin-group" key={group.key}><h3 className="shopping-record-group-title">{group.title}<span>{group.habits.length}</span></h3>{renderHabitRows(group.habits)}</section>)}</div>
           : <EmptyState icon={<Heart size={18} />} title={habits.length ? "No matching habits" : "No habits to track yet"} description={habits.length ? "Try another search or check-in filter." : "Add a repeatable habit to begin checking in each day."} />}
       </Card>
     </>}
@@ -9588,6 +9688,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
         <Field label="From date"><DateInput aria-label="Filter reflections from date" value={reflectionDateFrom} onValueChange={setReflectionDateFrom} max={reflectionDateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reflections to date" value={reflectionDateTo} onValueChange={setReflectionDateTo} min={reflectionDateFrom || undefined} /></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Reflections" />
       <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge>
     </div>
     {visibleLogs.length && reflectionGroupBy === "emotion" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(false)}>Hide all</Button></div>}
@@ -9625,6 +9726,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     notes: "",
   }]);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<RecordViewMode>("table");
   const [activityFilter, setActivityFilter] = useState("");
   const [daypartFilter, setDaypartFilter] = useState("");
   const [intensityFilter, setIntensityFilter] = useState("");
@@ -9807,7 +9909,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     const dateGroups = [...new Set(entries.map((log) => log.date))]
       .sort((a, b) => b.localeCompare(a))
       .map((date) => ({ date, logs: entries.filter((log) => log.date === date) }));
-    return <div className="exercise-day-list">{dateGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
+    return <div className={`exercise-day-list${view === "grid" ? " record-grid-layout" : view === "list" ? " record-list-layout" : ""}`}>{dateGroups.map(({ date, logs: dayLogs }) => <Card className="exercise-day-card" key={date}>
       <div className="exercise-day-head"><div><h2>{dateLabel(date)}</h2><p>{dayLogs.length} {dayLogs.length === 1 ? "activity" : "activities"} recorded</p></div><div className="table-actions"><Button size="sm" variant="outline" onClick={() => copyDay(date)}><Copy size={13} />Copy day</Button><Button size="sm" variant="outline" onClick={() => editDay(date)}><Pencil size={13} />Edit day</Button></div></div>
       <div className="table-card"><table className="data-table mobile-card-table">
         <thead><tr><th>Session</th><th>Activity</th><th>Duration / count</th><th>Intensity</th><th>Notes</th><th>Actions</th></tr></thead>
@@ -9886,6 +9988,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
         {[activityFilter, daypartFilter, intensityFilter, dateFrom, dateTo].some(Boolean) && <Button type="button" variant="outline" size="sm" onClick={() => { setActivityFilter(""); setDaypartFilter(""); setIntensityFilter(""); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
       </FilterDrawer>
       <Field className="exercise-group-control" label="Group by"><Select aria-label="Group exercise records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="activity">Activity</option><option value="daypart">Daypart</option><option value="none">No grouping</option></Select></Field>
+      <RecordViewToggle value={view} onChange={setView} label="Exercise records" />
       <Badge>{visibleDayGroups.length} {visibleDayGroups.length === 1 ? "day" : "days"} · {visibleLogs.length} {visibleLogs.length === 1 ? "activity" : "activities"}</Badge>
     </div>
     {visibleDayGroups.length && groupBy === "date" ? <DateGroupedRecords items={visibleDayGroups} getDate={(group) => group.date} title={(date) => `Exercise · ${dateLabel(date)}`}>{(dateGroups) => renderExerciseDayCards(dateGroups.flatMap((group) => group.logs))}</DateGroupedRecords>
@@ -10359,6 +10462,7 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
   onDelete: (session: TrainingSession) => void;
 }) {
   const [editor, setEditor] = useState<TrainingSession | null | undefined>(undefined);
+  const [view, setView] = useState<RecordViewMode>("table");
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState("All formats");
   const [courseFilter, setCourseFilter] = useState("All courses");
@@ -10388,7 +10492,19 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
       : [];
 
   function renderTrainingCards(entries: TrainingSession[]) {
-    return <div className="training-session-list">{entries.map((session) => <Card className="training-session-card" key={session.id}>
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Date</th><th>Course</th><th>Format</th><th>Topic / learning</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((session) => <tr key={session.id}>
+          <td data-label="Date">{dateLabel(session.date)}{session.startTime ? <div className="table-secondary">{session.startTime}{session.endTime ? `–${session.endTime}` : ""}</div> : null}</td>
+          <td data-label="Course"><div className="table-primary">{session.courseName}</div><div className="table-secondary">{session.institution || session.instructor || "—"}</div></td>
+          <td data-label="Format"><Badge>{session.mode}</Badge></td>
+          <td data-label="Topic / learning"><div className="table-primary">{session.topic || "Class session"}</div><div className="table-secondary"><LinkifiedText>{session.learned}</LinkifiedText></div></td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave({ ...copy, courseName: copyLabel(copy.courseName, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
+    return <div className={`training-session-list${view === "grid" ? " record-grid-layout" : " record-list-layout"}`}>{entries.map((session) => <Card className="training-session-card" key={session.id}>
       <div className="training-session-head"><div className="training-session-title"><div className="training-session-icon"><BookOpen size={16} /></div><div><h2>{session.courseName}</h2><p>{[session.institution, session.topic].filter(Boolean).join(" · ") || "Class session"}</p></div></div><div className="table-actions"><Badge>{session.mode}</Badge><button className="icon-button" aria-label={`Edit ${session.courseName} session on ${session.date}`} onClick={() => setEditor(session)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${session.courseName} session on ${session.date}`} onClick={() => { const { id, ...copy } = session; void id; onSave({ ...copy, courseName: copyLabel(copy.courseName, 160) }); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${session.courseName} session on ${session.date}`} onClick={() => onDelete(session)}><Archive size={14} /></button></div></div>
       <div className="training-session-meta"><span>{dateLabel(session.date)}{session.startTime ? ` · ${session.startTime}${session.endTime ? `–${session.endTime}` : ""}` : ""}</span>{session.instructor && <span>Instructor: {session.instructor}</span>}</div>
       <div className="training-session-learning"><strong>What I learned</strong><p><LinkifiedText>{session.learned}</LinkifiedText></p></div>
@@ -10406,7 +10522,7 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
       <Field label="From date"><DateInput aria-label="Filter training sessions from date" value={dateFrom} onValueChange={setDateFrom} /></Field>
       <Field label="To date"><DateInput aria-label="Filter training sessions to date" value={dateTo} onValueChange={setDateTo} /></Field>
       {[modeFilter !== "All formats", courseFilter !== "All courses", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setModeFilter("All formats"); setCourseFilter("All courses"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="training-group-control" label="Group by"><Select aria-label="Group training sessions" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="course">Course</option><option value="none">No grouping</option></Select></Field><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
+    </FilterDrawer><Field className="training-group-control" label="Group by"><Select aria-label="Group training sessions" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="course">Course</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Training sessions" /><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
     {visible.length ? groupBy === "date"
       ? <DateGroupedRecords items={visible} getDate={(session) => session.date} title={(date) => `Training sessions · ${dateLabel(date)}`}>{renderTrainingCards}</DateGroupedRecords>
       : groupBy === "none" ? renderTrainingCards(visible)
@@ -10762,6 +10878,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
 }) {
   const formatCurrency = useCurrencyFormatter();
   const [editor, setEditor] = useState<ElectricityReading | null | undefined>(undefined);
+  const [view, setView] = useState<RecordViewMode>("table");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All bills");
   const [meterFilter, setMeterFilter] = useState("All meters");
@@ -10791,8 +10908,8 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       <Card><span>Readings</span><strong>{readings.length}</strong></Card>
       <Card><span>Unpaid bills</span><strong>{formatCurrency(readings.filter((entry) => !entry.paid).reduce((sum, entry) => sum + (entry.billAmount ?? 0), 0))}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar electricity-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option></Select></Field><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
-    {grouped.size ? <div className="electricity-list">{[...grouped.entries()].sort((a, b) => sortBy === "meter-name"
+    <div className="toolbar filter-toolbar electricity-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Electricity readings" /><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
+    {grouped.size ? <div className={`electricity-list${view === "grid" ? " record-grid-layout" : ""}`}>{[...grouped.entries()].sort((a, b) => sortBy === "meter-name"
       ? a[1][0].meterName.localeCompare(b[1][0].meterName)
       : (sortBy === "reading-oldest" ? 1 : -1) * a[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, "").localeCompare(b[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, ""))).map(([key, entries]) => {
       const sorted = [...entries].sort((a, b) => a.readingDate.localeCompare(b.readingDate));
@@ -10800,7 +10917,24 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       const latest = allForMeter[allForMeter.length - 1];
       return <Card className="electricity-card" key={key}>
         <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><Zap size={17} /></div><div><h2 className="section-title">{latest.meterName}</h2><p className="section-description">{latest.location || "Location not specified"}</p></div></div><div className="electricity-meter-latest"><span>Latest reading</span><strong>{latest.meterReading.toLocaleString()} kWh</strong></div></div>
-        <DateGroupedRecords items={sortBy === "reading-oldest" ? sorted : [...sorted].reverse()} getDate={(entry) => groupBy === "month" ? entry.readingDate.slice(0, 7) : entry.readingDate} title={(date) => `Meter readings · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "reading-oldest" ? "oldest" : "newest"}>{(dateEntries) => <div className="electricity-record-list">{dateEntries.map((entry) => {
+        <DateGroupedRecords items={sortBy === "reading-oldest" ? sorted : [...sorted].reverse()} getDate={(entry) => groupBy === "month" ? entry.readingDate.slice(0, 7) : entry.readingDate} title={(date) => `Meter readings · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "reading-oldest" ? "oldest" : "newest"}>{(dateEntries) => view === "table"
+          ? <div className="table-card electricity-record-table"><table className="data-table">
+            <thead><tr><th>Date</th><th>Reading</th><th>Usage</th><th>Bill</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>{dateEntries.map((entry) => {
+              const index = allForMeter.findIndex((candidate) => candidate.id === entry.id);
+              const previous = index > 0 ? allForMeter[index - 1] : null;
+              const used = previous ? entry.meterReading - previous.meterReading : null;
+              return <tr key={entry.id}>
+                <td>{dateLabel(entry.readingDate)}{entry.periodStart || entry.periodEnd ? <div className="table-secondary">Period {entry.periodStart ? dateLabel(entry.periodStart) : "—"} – {entry.periodEnd ? dateLabel(entry.periodEnd) : "—"}</div> : null}</td>
+                <td>{entry.meterReading.toLocaleString()} kWh</td>
+                <td>{used === null ? "—" : `${used.toLocaleString()} kWh`}</td>
+                <td>{entry.billAmount === null ? "—" : formatCurrency(entry.billAmount)}</td>
+                <td><Badge tone={entry.paid ? "green" : "amber"}>{entry.paid ? "Paid" : "Unpaid"}</Badge></td>
+                <td><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => setEditor({ ...entry, id: "" })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.meterName} reading on ${entry.readingDate}`} onClick={() => deleteReading(entry)}><Archive size={13} /></button></div></td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+          : <div className={`electricity-record-list${view === "list" ? " record-list-layout" : ""}`}>{dateEntries.map((entry) => {
           const index = allForMeter.findIndex((candidate) => candidate.id === entry.id);
           const previous = index > 0 ? allForMeter[index - 1] : null;
           const used = previous ? entry.meterReading - previous.meterReading : null;
@@ -10924,6 +11058,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
 }) {
   const [accountEditor, setAccountEditor] = useState<SubscriptionAccount | null | undefined>(undefined);
   const [transactionEditor, setTransactionEditor] = useState<{ account: SubscriptionAccount; transaction: SubscriptionTransaction | null } | null>(null);
+  const [view, setView] = useState<RecordViewMode>("table");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All categories");
   const [statusFilter, setStatusFilter] = useState("All records");
@@ -11008,11 +11143,33 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
         <Field label="Transaction to"><DateInput aria-label="Transaction to date" value={transactionTo} onValueChange={setTransactionTo} min={transactionFrom || undefined} /></Field>
         <Field label="Sort transactions by"><Select aria-label="Sort subscription transactions" value={transactionSort} onChange={(event) => setTransactionSort(event.target.value)}><option value="newest">Date (newest)</option><option value="oldest">Date (oldest)</option><option value="amount-highest">Amount (highest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Subscriptions and bills" />
       <Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge>
     </div>
     {visible.length ? <div className="subscription-groups">{serviceGroups.map((group) => <section className="subscription-group" key={group.key}>
       <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>
-      <div className="subscription-list">{group.accounts.map((account) => {
+      {view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Service</th><th>Transaction</th><th>Date / due</th><th>Amount / status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{group.accounts.flatMap((account) => {
+          const sorted = account.transactions.filter((entry) =>
+            inTransactionDateRange(entry) && matchesTransactionStatus(entry))
+            .sort((a, b) => transactionSort === "oldest" ? a.transactionDate.localeCompare(b.transactionDate) :
+              transactionSort === "amount-highest" ? (b.amount ?? -1) - (a.amount ?? -1) || b.transactionDate.localeCompare(a.transactionDate) :
+                b.transactionDate.localeCompare(a.transactionDate));
+          const entries: (SubscriptionTransaction | null)[] = sorted.length ? sorted : [null];
+          return entries.map((entry) => <tr key={`${account.id}-${entry?.id ?? "no-transaction"}`}>
+            <td data-label="Service"><div className="table-primary">{account.name}</div><div className="table-secondary">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ") || "No service details"}</div></td>
+            <td data-label="Transaction"><div className="table-primary">{entry?.type ?? "No transactions"}</div><div className="table-secondary"><LinkifiedText>{[entry?.reference, entry?.notes, account.notes].filter(Boolean).join(" · ") || (entry ? "No additional details" : "")}</LinkifiedText></div></td>
+            <td data-label="Date / due">{entry ? dateLabel(entry.transactionDate) : "—"}{entry?.dueDate ? <div className="table-secondary">Due {dateLabel(entry.dueDate)}</div> : null}</td>
+            <td data-label="Amount / status">{entry ? <><div>{entry.amount !== null ? formatMoney(entry.amount, account.currency) : "Amount not recorded"}</div><Badge tone={entry.paid ? "green" : entry.dueDate && entry.dueDate < currentDate ? "amber" : "blue"}>{entry.paid ? "Paid" : entry.dueDate && entry.dueDate < currentDate ? "Overdue" : "Pending"}</Badge></> : "—"}</td>
+            <td data-label="Actions"><div className="table-actions">
+              {entry ? <><button className="icon-button" aria-label={`Edit ${entry.type} for ${account.name}`} onClick={() => setTransactionEditor({ account, transaction: entry })}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.type} for ${account.name}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveTransaction(account.id, copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.type} for ${account.name}`} onClick={() => archiveTransaction(account, entry)}><Archive size={13} /></button></> : <Button size="sm" variant="outline" onClick={() => setTransactionEditor({ account, transaction: null })}><Plus size={13} /> Transaction</Button>}
+              <button className="icon-button" aria-label={`Edit ${account.name}`} onClick={() => setAccountEditor(account)}><Pencil size={13} /></button>
+              <button className="icon-button" aria-label={`Archive ${account.name}`} onClick={() => archiveAccount(account)}><Archive size={13} /></button>
+            </div></td>
+          </tr>);
+        })}</tbody>
+      </table></Card> : <div className={`subscription-list${view === "grid" ? " record-grid-layout" : " record-list-layout"}`}>{group.accounts.map((account) => {
       const sorted = account.transactions.filter((entry) =>
         inTransactionDateRange(entry) && matchesTransactionStatus(entry))
         .sort((a, b) => transactionSort === "oldest" ? a.transactionDate.localeCompare(b.transactionDate) :
@@ -11034,7 +11191,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
         </details> : <p className="vehicle-empty">No transactions recorded yet.</p>}
         </div>
       </details>;
-      })}</div>
+      })}</div>}
     </section>)}</div> : <Card><EmptyState icon={<CalendarDays size={18} />} title={accounts.length ? "No matching services or bills" : "No subscriptions or bills yet"} description={accounts.length ? "Try another search or filter." : "Add a service first, then record its bills, recharges, bookings, and renewal dates."} /></Card>}
     {accountEditor !== undefined && <SubscriptionAccountModal key={accountEditor?.id ?? "new-subscription"} initial={accountEditor} onClose={() => setAccountEditor(undefined)} onSave={(account) => { onSaveAccount(account, accountEditor?.id); setAccountEditor(undefined); }} />}
     {transactionEditor && <SubscriptionTransactionModal key={transactionEditor.transaction?.id ?? `new-transaction-${transactionEditor.account.id}`} initial={transactionEditor.transaction} currency={transactionEditor.account.currency} onClose={() => setTransactionEditor(null)} onSave={(transaction) => { onSaveTransaction(transactionEditor.account.id, transaction, transactionEditor.transaction?.id); setTransactionEditor(null); }} />}
@@ -13117,6 +13274,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
   onSave: (record: Omit<IssueRecord, "id">, id?: string) => void;
   onDelete: (record: IssueRecord) => void;
 }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [editor, setEditor] = useState<IssueRecord | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [areaFilter, setAreaFilter] = useState("All areas");
@@ -13164,7 +13322,19 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
   }
 
   function renderIssueCards(entries: IssueRecord[]) {
-    return <div className="issues-list">{entries.map((record) => {
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Title</th><th>Area</th><th>Type</th><th>Priority</th><th>Status</th><th>Reported</th><th>Due</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((record) => <tr key={record.id}>
+          <td data-label="Title"><strong>{record.title}</strong></td><td data-label="Area">{record.area === "Other" ? record.customArea : record.area}</td>
+          <td data-label="Type">{record.kind}</td><td data-label="Priority">{record.priority}</td>
+          <td data-label="Status"><Select aria-label={`Status for ${record.title}`} value={record.status} onChange={(event) => onSave({ ...record, status: event.target.value as IssueStatus }, record.id)}><option>Open</option><option>In progress</option><option>Waiting</option><option>Resolved</option><option>Closed</option></Select></td>
+          <td data-label="Reported">{dateLabel(record.dateReported)}</td><td data-label="Due">{record.dueDate ? dateLabel(record.dueDate) : "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor(record)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void id; onSave(copy); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => deleteRecord(record)}><Archive size={13} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
+    return <div className={`issues-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map((record) => {
       const resolved = record.status === "Resolved" || record.status === "Closed";
       const overdue = Boolean(record.dueDate && record.dueDate < today() && !resolved);
       return <Card className="issue-card" key={record.id}>
@@ -13204,7 +13374,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
       <Field label="Reported from"><DateInput aria-label="Filter issues reported from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
       <Field label="Reported to"><DateInput aria-label="Filter issues reported to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       {[areaFilter !== "All areas", statusFilter !== "All statuses", kindFilter !== "All types", priorityFilter !== "All priorities", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setAreaFilter("All areas"); setStatusFilter("All statuses"); setKindFilter("All types"); setPriorityFilter("All priorities"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option></Select></Field><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Issues and maintenance" /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
     {visibleRecords.length ? groupBy === "date"
       ? <DateGroupedRecords items={visibleRecords} getDate={(record) => record.dateReported} title={(date) => `Reported · ${dateLabel(date)}`}>{renderIssueCards}</DateGroupedRecords>
       : <div className="issue-record-groups">{issueGroups.map((group) => <section key={group.title}><h2 className="shopping-record-group-title">{group.title}<span>{group.records.length}</span></h2>{renderIssueCards(group.records)}</section>)}</div>
@@ -13398,17 +13568,24 @@ function CareerSection({ title, description, icon, action, children }: {
   return <section className="career-section"><div className="career-section-head"><div><h2>{icon}{title}</h2><p>{description}</p></div>{action}</div>{children}</section>;
 }
 
-function CareerEntry({ title, subtitle, details, summaryDetails = [], description, link, onEdit, onCopy, onDelete }: {
+function CareerEntry({ title, subtitle, details, summaryDetails = [], description, link, view, onEdit, onCopy, onDelete }: {
   title: string;
   subtitle: string;
   details: string[];
   summaryDetails?: string[];
   description?: string;
   link?: string;
+  view: RecordViewMode;
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
 }) {
+  if (view === "table") return <tr>
+    <td data-label="Record"><div className="table-primary">{title}</div><div className="table-secondary">{subtitle || "—"}</div></td>
+    <td data-label="Summary">{summaryDetails.filter(Boolean).join(" · ") || "—"}</td>
+    <td data-label="Details"><div>{details.filter(Boolean).join(" · ") || "—"}</div>{description && <div className="table-secondary">{description}</div>}{link && <a className="career-card-link" href={activityLinkHref(link)} target="_blank" rel="noopener noreferrer">Open link</a>}</td>
+    <td data-label="Actions"><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${title}`} onClick={onEdit}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${title}`} onClick={onCopy}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${title}`} onClick={onDelete}><Archive size={13} /></button></div></td>
+  </tr>;
   return <details className="career-card career-row-card compact-details"><summary className="career-card-head compact-summary"><div><h3>{title}</h3>{subtitle && <p>{subtitle}</p>}</div>{summaryDetails.filter(Boolean).length > 0 && <div className="career-row-summary-details">{summaryDetails.filter(Boolean).map((detail, index) => <span key={`${index}-${detail}`}>{detail}</span>)}</div>}<div className="table-actions">
     <button type="button" className="icon-button" aria-label={`Edit ${title}`} onClick={(event) => { event.preventDefault(); onEdit(); }}><Pencil size={13} /></button>
     <button type="button" className="icon-button" aria-label={`Copy ${title}`} onClick={(event) => { event.preventDefault(); onCopy(); }}><Copy size={13} /></button>
@@ -13435,6 +13612,7 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   onDeleteSkill: (record: ProfessionalSkill) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<RecordViewMode>("table");
   const [activeSection, setActiveSection] = useState<"education" | "qualifications" | "experience" | "skills">("education");
   const [sortBy, setSortBy] = useState("recent");
   const [groupBy, setGroupBy] = useState("none");
@@ -13469,13 +13647,16 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   const careerGroupByLabel = activeSection === "education" ? "Status" : activeSection === "qualifications" ? "Issuer" : activeSection === "experience" ? "Company" : "Proficiency";
 
   function renderCareerGroups<T>(items: T[], getGroup: (entry: T) => string, renderEntry: (entry: T) => ReactNode, listClassName: string) {
-    if (groupBy === "none") return <div className={listClassName}>{items.map(renderEntry)}</div>;
+    const renderList = (entries: T[]) => view === "table"
+      ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Record</th><th>Summary</th><th>Details</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{entries.map(renderEntry)}</tbody></table></Card>
+      : <div className={`${listClassName}${view === "grid" ? " record-grid-layout" : " record-list-layout"}`}>{entries.map(renderEntry)}</div>;
+    if (groupBy === "none") return renderList(items);
     const groups = [...new Set(items.map((entry) => getGroup(entry) || "Unspecified"))]
       .sort((a, b) => a.localeCompare(b))
       .map((title) => ({ title, entries: items.filter((entry) => (getGroup(entry) || "Unspecified") === title) }));
     return <div className="career-record-groups">{groups.map((group) => <section key={group.title}>
       <h3 className="shopping-record-group-title">{group.title}<span>{group.entries.length}</span></h3>
-      <div className={listClassName}>{group.entries.map(renderEntry)}</div>
+      {renderList(group.entries)}
     </section>)}</div>;
   }
 
@@ -13502,24 +13683,24 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
       {activeSection !== "skills" && <Field label="Sort by"><Select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="recent">Most recent</option><option value="name">Name (A–Z)</option></Select></Field>}
       {activeSection !== "skills" && <><Field label="From month"><Input type="month" aria-label="Filter career records from month" value={fromMonth} max={toMonth || undefined} onChange={(event) => setFromMonth(event.target.value)} /></Field><Field label="To month"><Input type="month" aria-label="Filter career records to month" value={toMonth} min={fromMonth || undefined} onChange={(event) => setToMonth(event.target.value)} /></Field></>}
       {((activeSection === "education" && educationStatus !== "All statuses") || (activeSection === "experience" && experienceStatus !== "All roles") || (activeSection === "skills" && skillProficiency !== "All levels") || (activeSection !== "skills" && (fromMonth || toMonth)) || sortBy !== "recent") && <Button type="button" size="sm" variant="outline" onClick={() => { setEducationStatus("All statuses"); setExperienceStatus("All roles"); setSkillProficiency("All levels"); setFromMonth(""); setToMonth(""); setSortBy("recent"); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="career-group-control" label="Group by"><Select aria-label={`Group ${activeSection} records by`} value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="none">No grouping</option><option value="group">{careerGroupByLabel}</option></Select></Field><Badge>{activeSection === "education" ? filteredEducation.length : activeSection === "qualifications" ? filteredQualifications.length : activeSection === "experience" ? filteredExperience.length : filteredSkills.length} records</Badge></div>
+    </FilterDrawer><Field className="career-group-control" label="Group by"><Select aria-label={`Group ${activeSection} records by`} value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="none">No grouping</option><option value="group">{careerGroupByLabel}</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Education and career records" /><Badge>{activeSection === "education" ? filteredEducation.length : activeSection === "qualifications" ? filteredQualifications.length : activeSection === "experience" ? filteredExperience.length : filteredSkills.length} records</Badge></div>
     {totalItems === 0 && !query ? <Card><EmptyState icon={<Briefcase size={18} />} title="Start your professional profile" description="Add your education, qualifications, work history, and professional skills below." /></Card> : null}
     <div className="career-sections">
       {activeSection === "education" &&
       <CareerSection title="Education history" description={`${filteredEducation.length} ${filteredEducation.length === 1 ? "record" : "records"}`} icon={<GraduationCap size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "education", record: null })}><Plus size={13} /> Add education</Button>}>
-        {filteredEducation.length ? renderCareerGroups(filteredEducation, (entry) => entry.status, (entry) => <CareerEntry key={entry.id} title={entry.qualification} subtitle={entry.institution} summaryDetails={[[monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.status].filter(Boolean)} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveEducation({ ...copy, qualification: copyLabel(copy.qualification, 120) }); }} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />, "career-list career-row-list") : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search or date/status filters." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
+        {filteredEducation.length ? renderCareerGroups(filteredEducation, (entry) => entry.status, (entry) => <CareerEntry key={entry.id} view={view} title={entry.qualification} subtitle={entry.institution} summaryDetails={[[monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.status].filter(Boolean)} details={[entry.fieldOfStudy, entry.location, [monthYearLabel(entry.startDate), entry.status === "In progress" ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.grade, entry.status].filter(Boolean)} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "education", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveEducation({ ...copy, qualification: copyLabel(copy.qualification, 120) }); }} onDelete={() => confirmDelete(entry.qualification, () => onDeleteEducation(entry))} />, "career-list career-row-list") : <Card><EmptyState icon={<GraduationCap size={18} />} title={education.length ? "No matching education" : "No education added"} description={education.length ? "Try another search or date/status filters." : "Add colleges, degrees, diplomas, or other education."} /></Card>}
       </CareerSection>}
       {activeSection === "qualifications" &&
       <CareerSection title="Qualifications & certificates" description={`${filteredQualifications.length} ${filteredQualifications.length === 1 ? "record" : "records"}`} icon={<Award size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "qualification", record: null })}><Plus size={13} /> Add qualification</Button>}>
-        {filteredQualifications.length ? renderCareerGroups(filteredQualifications, (entry) => entry.issuer, (entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveQualification({ ...copy, name: copyLabel(copy.name, 160) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />, "career-list") : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search or date filters." : "Add professional certificates, licenses, and credentials."} /></Card>}
+        {filteredQualifications.length ? renderCareerGroups(filteredQualifications, (entry) => entry.issuer, (entry) => <CareerEntry key={entry.id} view={view} title={entry.name} subtitle={entry.issuer} details={[entry.credentialId ? `Credential ID: ${entry.credentialId}` : "", entry.issueDate ? `Issued ${dateLabel(entry.issueDate)}` : "", entry.expiryDate ? `Expires ${dateLabel(entry.expiryDate)}` : ""]} description={entry.notes} link={entry.link} onEdit={() => setEditor({ type: "qualification", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveQualification({ ...copy, name: copyLabel(copy.name, 160) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteQualification(entry))} />, "career-list") : <Card><EmptyState icon={<Award size={18} />} title={qualifications.length ? "No matching qualifications" : "No qualifications added"} description={qualifications.length ? "Try another search or date filters." : "Add professional certificates, licenses, and credentials."} /></Card>}
       </CareerSection>}
       {activeSection === "experience" &&
       <CareerSection title="Work history" description={`${filteredExperience.length} ${filteredExperience.length === 1 ? "role" : "roles"}`} icon={<Briefcase size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "experience", record: null })}><Plus size={13} /> Add work</Button>}>
-        {filteredExperience.length ? renderCareerGroups(filteredExperience, (entry) => entry.company, (entry) => <CareerEntry key={entry.id} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} summaryDetails={[[monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : entry.employmentType].filter(Boolean)} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveExperience({ ...copy, jobTitle: copyLabel(copy.jobTitle, 120) }); }} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />, "career-list career-row-list") : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search or date/role filters." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
+        {filteredExperience.length ? renderCareerGroups(filteredExperience, (entry) => entry.company, (entry) => <CareerEntry key={entry.id} view={view} title={entry.jobTitle} subtitle={`${entry.company}${entry.location ? ` · ${entry.location}` : ""}`} summaryDetails={[[monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : entry.employmentType].filter(Boolean)} details={[entry.employmentType, [monthYearLabel(entry.startDate), entry.current ? "Present" : monthYearLabel(entry.endDate)].filter(Boolean).join(" – "), entry.current ? "Current role" : ""].filter(Boolean)} description={[entry.summary, entry.skills ? `Skills: ${entry.skills}` : ""].filter(Boolean).join("\n")} onEdit={() => setEditor({ type: "experience", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveExperience({ ...copy, jobTitle: copyLabel(copy.jobTitle, 120) }); }} onDelete={() => confirmDelete(`${entry.jobTitle} at ${entry.company}`, () => onDeleteExperience(entry))} />, "career-list career-row-list") : <Card><EmptyState icon={<Briefcase size={18} />} title={experience.length ? "No matching work history" : "No work history added"} description={experience.length ? "Try another search or date/role filters." : "Record employers, roles, dates, achievements, and skills used."} /></Card>}
       </CareerSection>}
       {activeSection === "skills" &&
       <CareerSection title="Skills & languages" description={`${filteredSkills.length} ${filteredSkills.length === 1 ? "skill" : "skills"}`} icon={<Sparkles size={16} />} action={<Button variant="outline" onClick={() => setEditor({ type: "skill", record: null })}><Plus size={13} /> Add skill</Button>}>
-        {filteredSkills.length ? renderCareerGroups(filteredSkills, (entry) => entry.proficiency, (entry) => <CareerEntry key={entry.id} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveSkill({ ...copy, name: copyLabel(copy.name, 120) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />, "career-list") : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
+        {filteredSkills.length ? renderCareerGroups(filteredSkills, (entry) => entry.proficiency, (entry) => <CareerEntry key={entry.id} view={view} title={entry.name} subtitle={entry.category} details={[entry.proficiency, entry.yearsExperience !== null ? `${entry.yearsExperience} years` : ""]} description={entry.notes} onEdit={() => setEditor({ type: "skill", record: entry })} onCopy={() => { const { id, ...copy } = entry; void id; onSaveSkill({ ...copy, name: copyLabel(copy.name, 120) }); }} onDelete={() => confirmDelete(entry.name, () => onDeleteSkill(entry))} />, "career-list") : <Card><EmptyState icon={<Sparkles size={18} />} title={skills.length ? "No matching skills" : "No skills added"} description={skills.length ? "Try another search." : "Track technical, professional, and language skills with proficiency."} /></Card>}
       </CareerSection>}
     </div>
     {editor?.type === "education" && <PersonalEducationModal key={editor.record?.id ?? "new-personal-education"} initial={editor.record} onClose={() => setEditor(null)} onSave={(record) => { onSaveEducation(record, editor.record?.id); setEditor(null); }} />}
@@ -13605,6 +13786,7 @@ function FamilyPage({ members, onSave, onDelete }: {
   onSave: (member: Omit<FamilyMember, "id">, id?: string) => void;
   onDelete: (member: FamilyMember) => void;
 }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [editor, setEditor] = useState<FamilyMember | null | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [relationshipFilter, setRelationshipFilter] = useState("All relationships");
@@ -13636,15 +13818,24 @@ function FamilyPage({ members, onSave, onDelete }: {
       <Card><span>Other relatives</span><strong>{relativesCount}</strong></Card>
     </div>
     <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Daybook data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
-    <div className="toolbar filter-toolbar family-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer><Field className="family-group-control" label="Group by"><Select aria-label="Group family members" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="relationship">Relationship</option><option value="none">No grouping</option></Select></Field><Badge>{visibleMembers.length} {visibleMembers.length === 1 ? "member" : "members"}</Badge></div>
+    <div className="toolbar filter-toolbar family-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer><Field className="family-group-control" label="Group by"><Select aria-label="Group family members" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="relationship">Relationship</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Family members" /><Badge>{visibleMembers.length} {visibleMembers.length === 1 ? "member" : "members"}</Badge></div>
     {visibleMembers.length ? <div className="family-record-groups">{familyGroups.map((group) => <section key={group.title || "all-members"}>
       {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.members.length}</span></h2>}
-      <div className="family-list">{group.members.map((member) => <Card className="family-card" key={member.id}>
+      {view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Name</th><th>Relationship</th><th>Birth year</th><th>Residence</th><th>Contact</th><th>Education / work</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{group.members.map((member) => <tr key={member.id}>
+          <td data-label="Name"><strong>{member.name}</strong></td><td data-label="Relationship">{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}</td>
+          <td data-label="Birth year">{member.birthYear ?? "—"}</td><td data-label="Residence">{member.currentResidence || "—"}</td>
+          <td data-label="Contact">{[member.phone, member.email].filter(Boolean).join(" · ") || "—"}</td>
+          <td data-label="Education / work">{[member.education, member.institution, member.occupation, member.organization].filter(Boolean).join(" · ") || "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${member.name}`} onClick={() => { const { id, ...copy } = member; void id; onSave({ ...copy, name: copyLabel(copy.name, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${member.name}`} onClick={() => confirmDelete(member)}><Archive size={13} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card> : <div className={`family-list${view === "grid" ? " record-grid-layout" : ""}`}>{group.members.map((member) => <Card className="family-card" key={member.id}>
       <div className="family-card-head"><div className="family-card-title"><div className="family-avatar"><UsersRound size={17} /></div><div><h2>{member.name}</h2><p>{member.relationship}{member.relationshipDetail ? ` · ${member.relationshipDetail}` : ""}{member.birthYear ? ` · Born ${member.birthYear}` : ""}</p></div></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${member.name}`} onClick={() => setEditor(member)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${member.name}`} onClick={() => { const { id, ...copy } = member; void id; onSave({ ...copy, name: copyLabel(copy.name, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${member.name}`} onClick={() => confirmDelete(member)}><Archive size={13} /></button></div></div>
       <div className="family-details">{member.birthPlace && <div><span>Place of birth</span><strong>{member.birthPlace}</strong></div>}{member.currentResidence && <div><span>Current residence</span><strong>{member.currentResidence}</strong></div>}{member.education && <div><span>Education</span><strong>{member.education}{member.institution ? ` · ${member.institution}` : ""}</strong></div>}{member.occupation && <div><span>Occupation</span><strong>{member.occupation}{member.organization ? ` · ${member.organization}` : ""}</strong></div>}</div>
       {(member.phone || member.email) && <div className="family-contact">{member.phone && <span>Phone: {member.phone}</span>}{member.email && <a href={`mailto:${member.email}`}>Email: {member.email}</a>}</div>}
       {member.notes && <p className="family-notes"><LinkifiedText>{member.notes}</LinkifiedText></p>}
-      </Card>)}</div>
+      </Card>)}</div>}
     </section>)}</div> : <Card><EmptyState icon={<UsersRound size={18} />} title={members.length ? "No matching family members" : "Your family directory is empty"} description={members.length ? "Try another search or relationship filter." : "Add yourself, your spouse, children, and other relatives to start the family directory."} /></Card>}
     {editor !== undefined && <FamilyMemberModal key={editor?.id ?? "new-family-member"} initial={editor} onClose={() => setEditor(undefined)} onSave={(member) => { onSave(member, editor?.id); setEditor(undefined); }} />}
   </>;
@@ -13746,6 +13937,7 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
   const [editor, setEditor] = useState<{ initial: PersonalRecord | null } | null>(null);
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [view, setView] = useState<RecordViewMode>("table");
   const [operationError, setOperationError] = useState("");
   const [typeFilter, setTypeFilter] = useState("All records");
   const [holderFilter, setHolderFilter] = useState("All people");
@@ -13790,7 +13982,22 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
   }
 
   function renderPersonalRecords(entries: PersonalRecord[]) {
-    return <div className="personal-record-list">{entries.map((record) => {
+    if (view === "table") {
+      return <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Title</th><th>Type</th><th>Holder</th><th>Number</th><th>Due / renewal</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{entries.map((record) => <tr key={record.id}>
+          <td data-label="Title"><strong>{record.title}</strong></td><td data-label="Type">{record.type}</td>
+          <td data-label="Holder">{record.holder || "—"}</td><td data-label="Number">{maskedDocumentNumber(record.recordNumber) || "—"}</td>
+          <td data-label="Due / renewal">{record.dueDate ? dateLabel(record.dueDate) : "—"}</td>
+          <td data-label="Status"><Badge tone={dueLabel(record).tone}>{dueLabel(record).text}</Badge></td>
+          <td data-label="Actions"><div className="table-actions">{showArchived
+            ? <button className="icon-button" aria-label={`Restore ${record.title}`} onClick={() => void runAction(() => onRestore(record))}><ArrowDownToLine size={14} /></button>
+            : <><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => { const { id, ...copy } = record; void runAction(() => onSave({ ...copy, title: copyLabel(copy.title, 160) })); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${record.title}`} onClick={() => { if (window.confirm(`Move "${record.title}" to the archive?`)) void runAction(() => onDelete(record)); }}><Archive size={14} /></button></>}
+          </div></td>
+        </tr>)}</tbody>
+      </table></Card>;
+    }
+    return <div className={`personal-record-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map((record) => {
       const due = dueLabel(record);
       return <Card className="personal-record-card" key={record.id}>
         <div className="personal-record-head">        <div className="personal-record-title"><div className="personal-record-icon"><FileText size={17} /></div><div><h2>{record.title}</h2><p>{categories.find((category) => category.id === record.categoryId)?.name ?? record.type}{record.holder ? ` · ${record.holder}` : ""}{record.issuer ? ` · ${record.issuer}` : ""}</p></div></div><div className="personal-record-actions"><Badge tone={due.tone}>{due.text}</Badge>{!showArchived && <><button className="icon-button" aria-label={`Edit ${record.title}`} onClick={() => setEditor({ initial: record })}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${record.title}`} onClick={() => {
@@ -13816,7 +14023,7 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
     <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These records are stored in the assigned mydocumentsmanager database as readable text. Database administrators with service-role access can read them. Use the Documents screen to attach files in the existing private storage bucket; files are access-controlled, not end-to-end encrypted.</span></div>
     <nav className="document-subnav" aria-label="Personal document sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active records ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
     {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} past due` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
-    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(sourceRecords.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Due from"><DateInput aria-label="Due from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Due to"><DateInput aria-label="Due to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Due date (soonest)</option><option value="due-latest">Due date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="due">Due date</option><option value="month">Due month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(sourceRecords.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Due from"><DateInput aria-label="Due from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Due to"><DateInput aria-label="Due to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Due date (soonest)</option><option value="due-latest">Due date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="due">Due date</option><option value="month">Due month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Personal records" /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
     {operationError && <div className="alert alert-error" role="alert">{operationError}</div>}
     {visibleRecords.length ? groupBy === "type"
       ? [...new Set(visibleRecords.map((record) => record.type))].sort((a, b) => a.localeCompare(b)).map((type) => <section key={type}><h2 className="shopping-record-group-title">{type}<span>{visibleRecords.filter((record) => record.type === type).length}</span></h2>{renderPersonalRecords(visibleRecords.filter((record) => record.type === type))}</section>)
@@ -13977,7 +14184,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   const [minFileSizeMb, setMinFileSizeMb] = useState("");
   const [maxFileSizeMb, setMaxFileSizeMb] = useState("");
   const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived">("all");
-  const [view, setView] = useState<"grid" | "table" | "list">("grid");
+  const [view, setView] = useState<RecordViewMode>("table");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(12);
@@ -14497,6 +14704,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
   onSave: (account: BankAccount) => Promise<void>;
   onArchive: (account: BankAccount) => Promise<void>;
 }) {
+  const [view, setView] = useState<RecordViewMode>("table");
   const [search, setSearch] = useState("");
   const [bankFilter, setBankFilter] = useState("All banks");
   const [accountTypeFilter, setAccountTypeFilter] = useState("All account types");
@@ -14547,11 +14755,20 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       <FilterDrawer label="Apply filters" activeCount={balanceFilter === "All balances" ? 0 : 1}>
         <Field label="Balance"><Select aria-label="Filter accounts by balance status" value={balanceFilter} onChange={(event) => setBalanceFilter(event.target.value)}><option>All balances</option><option>Balance recorded</option><option>No balance recorded</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Bank accounts" />
       <Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge>
     </div>
     {filteredAccounts.length ? <div className="bank-account-groups">{groupedAccounts.map((group) => <section className="bank-account-group" key={group.key}>
       {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>}
-      <div className="credential-list">{group.accounts.map((account) => <details className="credential-card compact-details" key={account.id}>
+      {view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Bank</th><th>Holder</th><th>Type</th><th>Account number</th><th>Balance</th><th>Branch</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{group.accounts.map((account) => <tr key={account.id}>
+          <td data-label="Bank"><strong>{account.bankName}</strong></td><td data-label="Holder">{account.accountHolder}</td><td data-label="Type">{account.accountType}</td>
+          <td data-label="Account number"><span>{visibleAccountNumbers.has(account.id) ? account.accountNumber : `•••• •••• ${account.accountNumber.slice(-4)}`}</span><button type="button" className="icon-button" aria-label={visibleAccountNumbers.has(account.id) ? `Hide ${account.bankName} account number` : `Show ${account.bankName} account number`} onClick={() => setVisibleAccountNumbers((visible) => { const next = new Set(visible); if (next.has(account.id)) next.delete(account.id); else next.add(account.id); return next; })}>{visibleAccountNumbers.has(account.id) ? <EyeOff size={14} /> : <Eye size={14} />}</button></td>
+          <td data-label="Balance">{account.currentBalance == null ? "—" : `${new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(account.currentBalance)}${account.balanceAsOfDate ? ` · ${dateLabel(account.balanceAsOfDate)}` : ""}`}</td><td data-label="Branch">{account.branch || "—"}</td>
+          <td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={() => setEditor(account)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${account.bankName} bank account`} onClick={() => { if (window.confirm(`Create a copy of the ${account.bankName} bank account?`)) void onSave({ ...account, id: createId(), bankName: copyLabel(account.bankName, 120) }).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not copy the bank account.")); }}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${account.bankName} bank account`} onClick={() => { if (window.confirm(`Move the ${account.bankName} bank account to the Archive?`)) void onArchive(account).catch((caught: unknown) => setError(caught instanceof Error ? caught.message : "Could not archive the bank account.")); }}><Trash2 size={14} /></button></div></td>
+        </tr>)}</tbody>
+      </table></Card> : <div className={`credential-list${view === "grid" ? " record-grid-layout" : ""}`}>{group.accounts.map((account) => <details className="credential-card compact-details" key={account.id}>
       <summary className="credential-card-head compact-summary"><div className="credential-card-title"><div className="credential-icon"><Landmark size={17} /></div><div><h2>{account.bankName}</h2><p>{account.accountType} · {account.accountHolder}</p></div></div><div className="personal-record-actions">
         <button type="button" className="icon-button" aria-label={`Edit ${account.bankName} bank account`} onClick={(event) => { event.preventDefault(); setEditor(account); }}><Pencil size={14} /></button>
         <button type="button" className="icon-button" aria-label={`Copy ${account.bankName} bank account`} title="Create a separately editable copy" onClick={(event) => {
@@ -14589,7 +14806,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       {account.website && <a className="personal-document-link" href={activityLinkHref(account.website)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open bank website</a>}
       {account.notes && <p className="personal-record-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
       </div>
-    </details>)}</div>
+    </details>)}</div>}
     </section>)}</div> : <Card><EmptyState icon={<Landmark size={18} />} title={accounts.length ? "No matching bank accounts" : "No bank accounts saved"} description={accounts.length ? "Try adjusting the bank, account type, balance, or search filters." : "Add a bank account for quick reference."} /></Card>}
     {editor !== undefined && <DirectBankAccountModal key={editor?.id ?? "new-direct-bank-account"} initial={editor} onClose={() => setEditor(undefined)} onSave={onSave} />}
   </>;
@@ -14606,7 +14823,7 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
 }) {
   const [search, setSearch] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [view, setView] = useState<"grid" | "list" | "table">("grid");
+  const [view, setView] = useState<RecordViewMode>("table");
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);

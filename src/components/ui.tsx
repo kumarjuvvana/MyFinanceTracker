@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
-import { Filter, X } from "lucide-react";
+import { Filter, Grid2X2, List, Table2, X } from "lucide-react";
 import { activityLinkHref, isSafeActivityLink } from "../lib/data";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost" | "danger"; size?: "sm" | "md" };
@@ -10,6 +10,20 @@ export function Button({ variant = "primary", size = "md", className = "", ...pr
 
 export function Card({ children, className = "", ...props }: HTMLAttributes<HTMLElement>) {
   return <section className={`card ${className}`} {...props}>{children}</section>;
+}
+
+export type RecordViewMode = "grid" | "list" | "table";
+
+export function RecordViewToggle({ value, onChange, label }: {
+  value: RecordViewMode;
+  onChange: (value: RecordViewMode) => void;
+  label: string;
+}) {
+  return <div className="document-view-switch" role="group" aria-label={`${label} display mode`}>
+    <Button type="button" size="sm" variant={value === "grid" ? "primary" : "outline"} aria-pressed={value === "grid"} onClick={() => onChange("grid")}><Grid2X2 size={14} />Grid</Button>
+    <Button type="button" size="sm" variant={value === "list" ? "primary" : "outline"} aria-pressed={value === "list"} onClick={() => onChange("list")}><List size={14} />List</Button>
+    <Button type="button" size="sm" variant={value === "table" ? "primary" : "outline"} aria-pressed={value === "table"} onClick={() => onChange("table")}><Table2 size={14} />Table</Button>
+  </div>;
 }
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {

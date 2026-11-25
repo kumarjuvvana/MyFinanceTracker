@@ -1028,6 +1028,10 @@ body{background:#f3f5ef}
 .electricity-record-main>strong{font-size:11px;color:#414a42}
 .electricity-record-main>span,.electricity-record-main>small{font-size:10px;color:#858d83;line-height:1.45;overflow-wrap:anywhere}
 .electricity-record-main .badge{margin-left:5px;vertical-align:1px}
+.record-grid-layout{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));align-items:start;gap:14px}
+.record-list-layout{grid-template-columns:minmax(0,1fr);gap:0}
+.electricity-record-table{margin-top:12px;overflow-x:auto}
+.electricity-record-table .data-table{min-width:560px}
 .app-shell.dark .electricity-icon{background:#463c27;color:#e3c36f}
 .app-shell.dark .electricity-summary strong,.app-shell.dark .electricity-meter-latest strong,.app-shell.dark .electricity-record-main>strong{color:#e3e8e2}
 .app-shell.dark .electricity-summary span,.app-shell.dark .electricity-meter-latest span,.app-shell.dark .electricity-record-main>span,.app-shell.dark .electricity-record-main>small{color:#a7b0a7}

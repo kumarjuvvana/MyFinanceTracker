@@ -155,7 +155,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [data, setData] = useState<VehicleProfileData | null>(null);
   const [activeTable, setActiveTable] = useState<FleetPage>("overview");
   const [activeModule, setActiveModule] = useState<FleetModuleId>("overview");
-  const [vehicleView, setVehicleView] = useState<VehicleView>("grid");
+  const [vehicleView, setVehicleView] = useState<VehicleView>("table");
   const [vehicleStatus, setVehicleStatus] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
   const [vehicleManufacturer, setVehicleManufacturer] = useState("all");
