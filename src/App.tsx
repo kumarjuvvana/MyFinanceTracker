@@ -14146,9 +14146,13 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
 function DocumentViewer({ document, source, onClose }: { document: DocumentAttachment; source: string; onClose: () => void }) {
   const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
-  return <Modal title={document.title} onClose={onClose} wide><div className="document-viewer">
-    {isImage ? <img src={source} alt={document.title} /> : <iframe title={document.title} src={source} />}
-  </div></Modal>;
+  const isPdf = contentType === "application/pdf";
+  return <Modal title={document.title} onClose={onClose} wide>
+    {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
+    <div className="document-viewer">
+      {isImage ? <img src={source} alt={document.title} /> : <iframe title={document.title} src={source} />}
+    </div>
+  </Modal>;
 }
 
 function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate, createFileUrl, loadStorageUsage }: {
