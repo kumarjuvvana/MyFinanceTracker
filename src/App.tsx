@@ -10,6 +10,7 @@ import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, F
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { OfficeDocumentViewer } from "./components/OfficeDocumentViewer";
 import { PdfDocumentViewer } from "./components/PdfDocumentViewer";
+import { DocumentAnalysisPanel } from "./components/DocumentAnalysisPanel";
 import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
@@ -14218,7 +14219,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   const [dueTo, setDueTo] = useState("");
   const [minFileSizeMb, setMinFileSizeMb] = useState("");
   const [maxFileSizeMb, setMaxFileSizeMb] = useState("");
-  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived" | "analytics">("all");
+  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived" | "analytics" | "analyse">("all");
   const [view, setView] = useState<RecordViewMode>("table");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(0);
@@ -14517,10 +14518,12 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         ["favorites", "Favorites"],
         ["archived", "Archived"],
         ["analytics", "Analytics"],
+        ["analyse", "Analyse Documents Data"],
       ] as const).map(([id, label]) => <Button key={id} type="button" variant={section === id ? "primary" : "outline"} aria-pressed={section === id} onClick={() => { setSection(id); setPage(0); }}>{label}{id === "archived" ? ` (${archivedDocuments.length})` : ""}</Button>)}
       <Button type="button" variant="ghost" onClick={() => onNavigate("Personal documents")}>Personal documents</Button>
     </nav>
-    {section === "analytics" ? <>
+    {section === "analyse" ? <DocumentAnalysisPanel documents={documents} categories={categories} createFileUrl={createFileUrl} />
+      : section === "analytics" ? <>
       <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the private Storage bucket assigned to mydocumentsmanager. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
         <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
         {storageError && <p className="document-storage-warning" role="status">Actual storage usage could not be measured: {storageError}</p>}
