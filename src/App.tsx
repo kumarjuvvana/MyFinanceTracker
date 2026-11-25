@@ -2,12 +2,13 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type F
 import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell, History,
   ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
-  Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Menu, Palette, Pencil, PlayCircle,
+  Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Maximize2, Menu, Minimize2, Palette, Pencil, PlayCircle,
   ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical, Grid2X2, List, Table2,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, Select, type RecordViewMode } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
+import { PdfDocumentViewer } from "./components/PdfDocumentViewer";
 import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
@@ -14144,13 +14145,21 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
 }
 
 function DocumentViewer({ document, source, onClose }: { document: DocumentAttachment; source: string; onClose: () => void }) {
+  const [fullscreen, setFullscreen] = useState(false);
   const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";
-  return <Modal title={document.title} onClose={onClose} wide>
-    {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
-    <div className="document-viewer">
-      {isImage ? <img src={source} alt={document.title} /> : <iframe title={document.title} src={source} />}
+  return <Modal title={document.title} onClose={onClose} wide fullscreen={fullscreen}>
+    <div className="document-preview-actions">
+      {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
+      <Button type="button" size="sm" variant="outline" aria-pressed={fullscreen} onClick={() => setFullscreen((current) => !current)}>
+        {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}{fullscreen ? "Restore preview" : "Enlarge preview"}
+      </Button>
+    </div>
+    <div className={`document-viewer${isPdf ? " document-viewer-pdf" : ""}`}>
+      {isPdf ? <PdfDocumentViewer source={source} />
+        : isImage ? <img src={source} alt={document.title} />
+          : <iframe title={document.title} src={source} />}
     </div>
   </Modal>;
 }
