@@ -4460,7 +4460,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
       return;
     }
     if (file.size > MAX_DOCUMENT_FILE_BYTES) {
-      setError("Choose an image no larger than 10 MB.");
+      setError("Choose an image no larger than 13 MB.");
       return;
     }
     setImportBusy(true);
@@ -8073,7 +8073,7 @@ function PrivateImageField({ label, storagePath, onChange }: {
       return;
     }
     if (file.size > MAX_DOCUMENT_FILE_BYTES) {
-      setError("Choose an image no larger than 10 MB.");
+      setError("Choose an image no larger than 13 MB.");
       return;
     }
     setError("");
@@ -8099,7 +8099,7 @@ function PrivateImageField({ label, storagePath, onChange }: {
       {storagePath && <Button type="button" variant="outline" disabled={uploading} onClick={() => onChange("")}>Remove image</Button>}
       {uploading && <LoaderCircle size={15} className="spin" aria-label="Uploading image" />}
     </div>
-    <small className="section-description">Private Supabase storage · PNG, JPG, or WEBP · up to 10 MB.</small>
+    <small className="section-description">Private Supabase storage · PNG, JPG, or WEBP · up to 13 MB.</small>
     {error && <span className="field-error" role="alert">{error}</span>}
   </Field>;
 }
@@ -14091,11 +14091,11 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       return;
     }
     if (file && file.size > MAX_DOCUMENT_FILE_BYTES) {
-      setError("Choose a file no larger than 10 MB.");
+      setError("Choose a file no larger than 13 MB.");
       return;
     }
     if (file && file.size > 5 * 1024 * 1024 &&
-      !window.confirm(`${file.name} is ${formatFileSize(file.size)}. Upload this large file to private Supabase Storage? Each file is limited to 10 MB.`)) {
+      !window.confirm(`${file.name} is ${formatFileSize(file.size)}. Upload this large file to private Supabase Storage? Each file is limited to 13 MB.`)) {
       setError("Upload cancelled. Choose a smaller file or confirm the large-file upload.");
       return;
     }
@@ -14135,7 +14135,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       <Field label="Due date (optional)"><DateInput aria-label="Due date" value={dueDate} onValueChange={setDueDate} min={issueDate || undefined} /></Field>
       <Field className="full" label="Tags (comma separated)"><Input maxLength={500} placeholder="Optional" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <label className="document-favorite-toggle"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /> Add to favorites</label>
-      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 10 MB per file."}</span></Field>
+      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 13 MB per file."}</span></Field>
       {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>

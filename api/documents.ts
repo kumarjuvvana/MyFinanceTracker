@@ -7,6 +7,7 @@ import {
   deleteStoredDocument,
   ensurePrivateBucket,
   measureBucketUsage,
+  requirePrivateBucket,
   resolveDocumentStorageCredentials,
   validateStorageCredentials,
 } from "../server/documentStorage.js";
@@ -94,6 +95,11 @@ async function storageRequest(path: string, init?: RequestInit): Promise<Respons
     throw new Error(message);
   }
   return response;
+}
+
+async function ensureLegacyBucketFileLimit(): Promise<void> {
+  const { baseUrl, key } = credentials();
+  await requirePrivateBucket({ baseUrl, key, bucket: BUCKET });
 }
 
 function encodedPath(path: string) {
@@ -251,6 +257,7 @@ export default async function documentsHandler(request: ApiRequest, response: Ap
         return;
       }
 
+      await ensureLegacyBucketFileLimit();
       const { baseUrl } = credentials();
       const signedResponse = await storageRequest(`object/sign/${BUCKET}/${encodedPath(path)}`, {
         method: "POST",
@@ -290,10 +297,11 @@ export default async function documentsHandler(request: ApiRequest, response: Ap
       const sizeBytes = "sizeBytes" in body && typeof body.sizeBytes === "number" ? body.sizeBytes : NaN;
       if (!fileType || fileName.length > 255 ||
         !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_DOCUMENT_FILE_BYTES) {
-        respond(response, 400, { error: "Choose a supported document or image no larger than 10 MB." });
+        respond(response, 400, { error: "Choose a supported document or image no larger than 13 MB." });
         return;
       }
 
+      await ensureLegacyBucketFileLimit();
       const path = `documents/${randomUUID()}.${fileType.extension.slice(1)}`;
       const uploadResponse = await storageRequest(`object/upload/sign/${BUCKET}/${encodedPath(path)}`, {
         method: "POST",
@@ -315,6 +323,7 @@ export default async function documentsHandler(request: ApiRequest, response: Ap
         respond(response, 400, { error: "The document storage path is invalid." });
         return;
       }
+      await ensureLegacyBucketFileLimit();
       await storageRequest(`object/${BUCKET}`, {
         method: "DELETE",
         body: JSON.stringify([{ name: path }]),

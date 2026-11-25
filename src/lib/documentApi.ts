@@ -1,4 +1,4 @@
-import { getDocumentFileType } from "./documentFiles";
+import { getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles";
 
 export interface UploadPreparation {
   uploadUrl: string;
@@ -171,8 +171,8 @@ export async function uploadProfileDocumentFile(
   if (!getDocumentFileType(file.name)) {
     throw new Error("Choose a PDF, image, text, spreadsheet, presentation, or Word document.");
   }
-  if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-    throw new Error("Choose a file larger than 0 bytes and no larger than 10 MB.");
+  if (file.size <= 0 || file.size > MAX_DOCUMENT_FILE_BYTES) {
+    throw new Error("Choose a file larger than 0 bytes and no larger than 13 MB.");
   }
   const payload = await profileStorageRequest({
     action: "profile-upload",

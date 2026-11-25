@@ -106,10 +106,36 @@ export function encodeStoragePath(path: string): string {
 }
 
 export async function requirePrivateBucket(credentials: DocumentStorageCredentials): Promise<void> {
-  const response = await storageRequest(credentials, `bucket/${encodeURIComponent(credentials.bucket)}`);
-  const bucket: unknown = await response.json();
+  const bucketPath = `bucket/${encodeURIComponent(credentials.bucket)}`;
+  const getBucket = async (): Promise<unknown> => {
+    const response = await storageRequest(credentials, bucketPath);
+    return response.json();
+  };
+  let bucket: unknown = await getBucket();
   if (typeof bucket !== "object" || bucket === null || !("public" in bucket) || bucket.public !== false) {
     throw new Error(`The "${credentials.bucket}" bucket must be private. Update it in Supabase Storage settings.`);
+  }
+
+  const currentLimit = "file_size_limit" in bucket
+    ? bucket.file_size_limit
+    : "fileSizeLimit" in bucket
+      ? bucket.fileSizeLimit
+      : undefined;
+  if (Number(currentLimit) === MAX_DOCUMENT_FILE_BYTES) return;
+
+  await storageRequest(credentials, bucketPath, {
+    method: "PUT",
+    body: JSON.stringify({ file_size_limit: MAX_DOCUMENT_FILE_BYTES }),
+  });
+  bucket = await getBucket();
+  const updatedLimit = typeof bucket === "object" && bucket !== null && "file_size_limit" in bucket
+    ? bucket.file_size_limit
+    : typeof bucket === "object" && bucket !== null && "fileSizeLimit" in bucket
+      ? bucket.fileSizeLimit
+      : undefined;
+  if (typeof bucket !== "object" || bucket === null || !("public" in bucket) ||
+    bucket.public !== false || Number(updatedLimit) !== MAX_DOCUMENT_FILE_BYTES) {
+    throw new Error(`Could not set the private "${credentials.bucket}" bucket limit to 13 MB.`);
   }
 }
 
@@ -171,13 +197,14 @@ export async function ensurePrivateBucket(credentials: DocumentStorageCredential
   if (typeof bucket !== "object" || bucket === null || !("public" in bucket) || bucket.public !== false) {
     throw new Error(`The "${credentials.bucket}" bucket must be private. Update it in Supabase Storage settings.`);
   }
+  await requirePrivateBucket(credentials);
 }
 
 export async function createSignedUpload(credentials: DocumentStorageCredentials, fileName: string, sizeBytes: number) {
   const fileType = getDocumentFileType(fileName);
   if (!fileType || fileName.length > 255 ||
     !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_DOCUMENT_FILE_BYTES) {
-    throw new Error("Choose a supported document or image no larger than 10 MB.");
+    throw new Error("Choose a supported document or image no larger than 13 MB.");
   }
   await requirePrivateBucket(credentials);
   const path = `documents/${randomUUID()}.${fileType.extension.slice(1)}`;

@@ -3,7 +3,7 @@ import pg from "pg";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { loadUnlockedDatabaseConnectionProfile, loadUnlockedDatabaseConnectionProfiles } from "../server/databaseConnections.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
-import { isDocumentStoragePath } from "../src/lib/documentFiles.js";
+import { isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "../src/lib/documentFiles.js";
 import { getProfileStorageCredentials, measureBucketUsage } from "../server/documentStorage.js";
 
 const { Client, Pool } = pg;
@@ -519,7 +519,7 @@ async function mutateSavedProfileDocumentModules(body: Record<string, unknown>, 
     const storagePath = record.storagePath;
     if (typeof storagePath !== "string" || (storagePath !== "" && !isDocumentStoragePath(storagePath)) ||
       typeof record.sizeBytes !== "number" || !Number.isSafeInteger(record.sizeBytes) ||
-      record.sizeBytes < 0 || record.sizeBytes > 10 * 1024 * 1024 ||
+      record.sizeBytes < 0 || record.sizeBytes > MAX_DOCUMENT_FILE_BYTES ||
       record.contentHash !== undefined && (typeof record.contentHash !== "string" || !/^[0-9a-f]{64}$/i.test(record.contentHash))) {
       respond(response, 400, { error: "The document attachment path or file size is invalid." });
       return;

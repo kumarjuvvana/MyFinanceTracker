@@ -9,6 +9,7 @@ const requiredEnvironment = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "DATABASE_CONNECTION_VAULT_PASSPHRASE",
 ];
+const MAX_DOCUMENT_FILE_BYTES = 13 * 1024 * 1024;
 if (requiredEnvironment.some((name) => !process.env[name])) {
   throw new Error("Set the original Supabase settings and database-vault passphrase in ignored .env.local.");
 }
@@ -134,7 +135,7 @@ async function ensureTargetBucket(profile) {
         id: profile.storageBucket,
         name: profile.storageBucket,
         public: false,
-        file_size_limit: 10 * 1024 * 1024,
+        file_size_limit: MAX_DOCUMENT_FILE_BYTES,
       }),
     });
     if (!response.ok) {
@@ -148,6 +149,26 @@ async function ensureTargetBucket(profile) {
   }
   if (!bucket || bucket.public !== false) {
     throw new Error("The target bucket must be private before copying files.");
+  }
+  const currentLimit = bucket.file_size_limit ?? bucket.fileSizeLimit;
+  if (Number(currentLimit) !== MAX_DOCUMENT_FILE_BYTES) {
+    const response = await targetStorageRequest(
+      profile,
+      `bucket/${encodeURIComponent(profile.storageBucket)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_size_limit: MAX_DOCUMENT_FILE_BYTES }),
+      },
+    );
+    if (!response.ok) {
+      throw new Error(`Could not set the target bucket limit: ${await targetStorageError(response)}.`);
+    }
+    bucket = await getTargetBucket(profile);
+    if (!bucket || bucket.public !== false ||
+      Number(bucket.file_size_limit ?? bucket.fileSizeLimit) !== MAX_DOCUMENT_FILE_BYTES) {
+      throw new Error("Could not verify the target private bucket limit of 13 MB.");
+    }
   }
 }
 

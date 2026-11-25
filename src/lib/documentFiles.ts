@@ -1,4 +1,4 @@
-export const MAX_DOCUMENT_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_DOCUMENT_FILE_BYTES = 13 * 1024 * 1024;
 export const DOCUMENT_FILE_TYPES = {
   ".pdf": "application/pdf",
   ".png": "image/png",
