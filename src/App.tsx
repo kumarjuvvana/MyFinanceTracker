@@ -14168,6 +14168,24 @@ function DocumentViewer({ document, source, onClose }: { document: DocumentAttac
   </Modal>;
 }
 
+function DocumentAnalyticsChart({ title, subtitle, entries, formatValue }: {
+  title: string;
+  subtitle: string;
+  entries: { label: string; value: number }[];
+  formatValue: (value: number) => string;
+}) {
+  const maxValue = Math.max(0, ...entries.map((entry) => entry.value));
+  return <Card className="document-analytics-chart-card">
+    <div><h3>{title}</h3><p>{subtitle}</p></div>
+    {entries.length ? <div className="document-analytics-chart" role="list" aria-label={title}>
+      {entries.map((entry) => <div className="document-analytics-row" key={entry.label} role="listitem">
+        <div className="document-analytics-row-label"><span>{entry.label}</span><strong>{formatValue(entry.value)}</strong></div>
+        <div className="document-analytics-bar-track"><span style={{ width: `${maxValue ? entry.value / maxValue * 100 : 0}%` }} /></div>
+      </div>)}
+    </div> : <p className="document-analytics-empty">No matching document data yet.</p>}
+  </Card>;
+}
+
 function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate, createFileUrl, loadStorageUsage }: {
   documents: DocumentAttachment[];
   categories: DocumentCategory[];
@@ -14200,7 +14218,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   const [dueTo, setDueTo] = useState("");
   const [minFileSizeMb, setMinFileSizeMb] = useState("");
   const [maxFileSizeMb, setMaxFileSizeMb] = useState("");
-  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived">("all");
+  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived" | "analytics">("all");
   const [view, setView] = useState<RecordViewMode>("table");
   const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(0);
@@ -14333,6 +14351,37 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       bytes: categoryDocuments.reduce((total, document) => total + document.sizeBytes, 0),
     };
   });
+  const storageByFileType = [...documents.filter((document) => document.storagePath).reduce((groups, document) => {
+    const type = documentCategory(document);
+    groups.set(type, (groups.get(type) ?? 0) + document.sizeBytes);
+    return groups;
+  }, new Map<string, number>())]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+  const activeByCategory = [...activeDocuments.reduce((groups, document) => {
+    const label = categories.find((category) => category.id === document.categoryId)?.name ?? "Uncategorized";
+    groups.set(label, (groups.get(label) ?? 0) + 1);
+    return groups;
+  }, new Map<string, number>())]
+    .map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+  const dueStatusCounts = [
+    { label: "Archived", value: archivedDocuments.length },
+    { label: "Past due", value: expiredCount },
+    { label: "Due within 30 days", value: dueSoonCount },
+    { label: "Valid", value: dueDocuments.filter((document) => daysUntil(document.dueDate ?? "") > 30).length },
+    { label: "No due date", value: activeDocuments.length - dueDocuments.length },
+  ].filter((entry) => entry.value > 0);
+  const uploadActivity = Array.from({ length: 6 }, (_, index) => {
+    const month = new Date(new Date().getFullYear(), new Date().getMonth() - (5 - index), 1);
+    const key = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+    return {
+      label: month.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+      value: documents.filter((document) => document.uploadedAt.slice(0, 7) === key).length,
+    };
+  });
   function exportCurrentReport() {
     const csv = exportCsvRows(visible.map((document) => ({
       documentName: document.title,
@@ -14460,12 +14509,6 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       <Card><span>Categories</span><strong>{categories.length}</strong><small>Available categories</small></Card>
       <Card><span>Added this month</span><strong>{addedThisMonth}</strong><small>Based on document upload date</small></Card>
     </div>
-    <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the private Storage bucket assigned to mydocumentsmanager. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
-      <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
-      {storageError && <p className="document-storage-warning" role="status">Actual storage usage could not be measured: {storageError}</p>}
-      {storageUsage?.capacityBytes ? <div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)}%` }} /></div> : null}
-      {storageUsage?.largestFiles.length ? <div className="document-largest-files"><strong>Largest files</strong>{storageUsage.largestFiles.slice(0, 5).map((file) => <div key={`${file.name}-${file.sizeBytes}`}><span>{file.name}</span><b>{formatFileSize(file.sizeBytes)}</b></div>)}</div> : null}
-    </Card>
     <nav className="document-subnav" aria-label="Document sections">
       {([
         ["all", "All documents"],
@@ -14473,10 +14516,26 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         ["due", "Due tracker"],
         ["favorites", "Favorites"],
         ["archived", "Archived"],
+        ["analytics", "Analytics"],
       ] as const).map(([id, label]) => <Button key={id} type="button" variant={section === id ? "primary" : "outline"} aria-pressed={section === id} onClick={() => { setSection(id); setPage(0); }}>{label}{id === "archived" ? ` (${archivedDocuments.length})` : ""}</Button>)}
       <Button type="button" variant="ghost" onClick={() => onNavigate("Personal documents")}>Personal documents</Button>
     </nav>
-    {section === "categories" ? <>
+    {section === "analytics" ? <>
+      <Card className="document-storage-summary"><div className="card-head"><div><h2 className="section-title">Storage analytics</h2><p className="section-description">Actual object sizes in the private Storage bucket assigned to mydocumentsmanager. Bucket capacity is not exposed by the configured Storage API.</p></div><Database size={16} /></div>
+        <div className="document-storage-stats"><span>Actual bucket usage: <strong>{storageUsage ? formatFileSize(storageUsage.usedBytes) : storageLoading ? "Loading…" : "Unavailable"}</strong></span><span>{storageUsage ? `${storageUsage.objectCount} objects` : ""}</span><span>Document records track {formatFileSize(totalStoredBytes)}</span>{storageUsage && <span>Measured {new Date(storageUsage.measuredAt).toLocaleString()}</span>}</div>
+        {storageError && <p className="document-storage-warning" role="status">Actual storage usage could not be measured: {storageError}</p>}
+        {storageUsage?.capacityBytes ? <div className="document-storage-track" role="progressbar" aria-valuenow={Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.min(100, storageUsage.usedBytes / storageUsage.capacityBytes * 100)}%` }} /></div> : null}
+        {storageUsage?.largestFiles.length ? <div className="document-largest-files"><strong>Largest files</strong>{storageUsage.largestFiles.slice(0, 5).map((file) => <div key={`${file.name}-${file.sizeBytes}`}><span>{file.name}</span><b>{formatFileSize(file.sizeBytes)}</b></div>)}</div> : null}
+      </Card>
+      <p className="document-analytics-note">Charts below use document records and their recorded file sizes. The bucket total above is measured directly and may include objects not linked to a document record.</p>
+      <div className="document-analytics-grid">
+        <DocumentAnalyticsChart title="Storage by file type" subtitle="Recorded file sizes · largest eight formats" entries={storageByFileType} formatValue={formatFileSize} />
+        <DocumentAnalyticsChart title="Active documents by category" subtitle="Document count · largest eight categories" entries={activeByCategory} formatValue={(value) => `${value} ${value === 1 ? "document" : "documents"}`} />
+        <DocumentAnalyticsChart title="Document due status" subtitle="Active records are grouped by due status; archived records are separate" entries={dueStatusCounts} formatValue={(value) => `${value} ${value === 1 ? "document" : "documents"}`} />
+        <DocumentAnalyticsChart title="Recent additions" subtitle="Documents added each month · last six months" entries={uploadActivity} formatValue={(value) => `${value} ${value === 1 ? "document" : "documents"}`} />
+      </div>
+      {storageUsage?.largestFiles.length ? <Card className="document-largest-files"><strong>Largest files in the bucket</strong>{storageUsage.largestFiles.slice(0, 10).map((file) => <div key={`${file.name}-${file.sizeBytes}`}><span>{file.name}</span><b>{formatFileSize(file.sizeBytes)}</b></div>)}</Card> : null}
+    </> : section === "categories" ? <>
       <div className="document-category-heading"><div><h2 className="section-title">Document categories</h2><p className="section-description">Categories organize existing records; unclassified documents stay uncategorized.</p></div><div className="document-category-actions"><Button variant="outline" onClick={exportCategoryReport}><Download size={14} />Export CSV</Button><Button onClick={() => setCategoryEditor(true)}><Plus size={14} />Create category</Button></div></div>
       <div className="document-category-grid">{categoriesView.map(({ category, count, bytes }) => <Card className="document-category-card" key={category.id}><div className="document-category-color" style={{ backgroundColor: category.color }} /><div><h3>{category.name}</h3><p>{category.description || "No description"}</p><small>{count} {count === 1 ? "document" : "documents"} · {formatFileSize(bytes)}</small></div></Card>)}</div>
     </> : <>
