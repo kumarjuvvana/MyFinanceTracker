@@ -3,6 +3,7 @@ import {
   AlertTriangle, BarChart3, Car, Database, Download, Fuel, Gauge, Printer, Route, ShieldCheck, Wrench,
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, Field, Input, Select } from "./ui";
+import { VehicleMarketValuePanel } from "./VehicleMarketValuePanel";
 import {
   VEHICLE_PROFILE_TABLES,
   type VehicleProfileData,
@@ -30,7 +31,7 @@ const FUEL_QUANTITY_COLUMNS = ["fuel_quantity", "quantity", "litres", "liters", 
 const FUEL_COST_COLUMNS = ["total_cost", "fuel_cost", "cost", "amount"];
 const SERVICE_COST_COLUMNS = ["cost", "amount", "service_cost", "total_cost"];
 const EXPENSE_COST_COLUMNS = ["amount", "cost", "total_cost"];
-const VALUE_COLUMNS = ["current_value", "market_value", "purchase_value", "vehicle_value", "acquisition_cost"];
+const VALUE_COLUMNS = ["market_value", "current_value", "purchase_value", "vehicle_value", "acquisition_cost"];
 const BLUE = "#2563EB";
 const TEAL = "#0D9488";
 const AMBER = "#F59E0B";
@@ -148,9 +149,10 @@ function HorizontalBars({ items, format = formatNumber, onSelect }: {
   </button>)}</div>;
 }
 
-export function VehicleFleetIntelligence({ data, onOpenTable }: {
+export function VehicleFleetIntelligence({ data, onOpenTable, onSaveMarketValue }: {
   data: VehicleProfileData;
   onOpenTable: (table: VehicleProfileTableName) => void;
+  onSaveMarketValue: (vehicle: VehicleProfileRow, value: number | null) => Promise<void>;
 }) {
   const [period, setPeriod] = useState("all");
   const [fromDate, setFromDate] = useState("");
@@ -223,8 +225,11 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
   const serviceCost = services.reduce((sum, row) => sum + (asNumber(firstValue(row, SERVICE_COST_COLUMNS)) ?? 0), 0);
   const expenseCost = expenses.reduce((sum, row) => sum + (asNumber(firstValue(row, EXPENSE_COST_COLUMNS)) ?? 0), 0);
   const fleetValueColumn = tables.get("vehicles")?.columns.find((column) => VALUE_COLUMNS.includes(column.name));
-  const fleetValue = fleetValueColumn
-    ? selectedVehicles.reduce((sum, vehicle) => sum + (asNumber(vehicle[fleetValueColumn.name]) ?? 0), 0)
+  const recordedVehicleValues = fleetValueColumn
+    ? selectedVehicles.map((vehicle) => asNumber(vehicle[fleetValueColumn.name])).filter((value): value is number => value !== null)
+    : [];
+  const fleetValue = recordedVehicleValues.length
+    ? recordedVehicleValues.reduce((sum, value) => sum + value, 0)
     : null;
   const latestOdometer = odometer.reduce((maximum, row) => Math.max(maximum, asNumber(firstValue(row, ["reading", "odometer", "odometer_reading"])) ?? 0), 0);
   const hasOdometerData = (tables.get("odometer_logs")?.columns ?? []).some((column) => ["reading", "odometer", "odometer_reading"].includes(column.name));
@@ -404,6 +409,11 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
       <Kpi icon={<Gauge size={17} />} label="Latest odometer" value={hasOdometerData ? `${formatNumber(latestOdometer)} km` : "Unavailable"} note={`${odometer.length} odometer records`} color="#0F766E" />
       <Kpi icon={<AlertTriangle size={17} />} label="Due in 30 days" value={String(dueItems.length)} note="Alerts, certificates & insurance" color={dueItems.length ? AMBER : "#16A34A"} />
     </div>
+    <VehicleMarketValuePanel
+      vehicles={selectedVehicles}
+      marketValueColumnAvailable={(tables.get("vehicles")?.columns ?? []).some((column) => column.name.toLocaleLowerCase() === "market_value")}
+      onSave={onSaveMarketValue}
+    />
     <p className="fleet-data-note">Fuel, services, and expense totals are shown separately; they may overlap in the source records and are not combined into a potentially double-counted total. No previous-period comparison or availability percentage is shown because the profile does not provide verified status history.</p>
 
     <div className="fleet-chart-grid">

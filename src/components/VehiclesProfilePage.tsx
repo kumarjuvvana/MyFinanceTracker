@@ -367,6 +367,44 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
     }
   }
 
+  async function saveMarketValue(vehicle: VehicleProfileRow, value: number | null) {
+    if (!selectedProfileId) throw new Error("Select the saved RiderTracker profile before saving a market value.");
+    const vehiclesTable = data?.tables.find((table) => table.name === "vehicles");
+    if (!vehiclesTable?.columns.some((column) => column.name.toLocaleLowerCase() === "market_value")) {
+      throw new Error("The market_value column is not available in the RiderTracker vehicles table.");
+    }
+    const vehicleId = Number(vehicle.id);
+    if (!Number.isSafeInteger(vehicleId) || vehicleId < 1) {
+      throw new Error("This vehicle does not have a valid ID and its market value cannot be saved.");
+    }
+
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await mutateSavedProfileVehicleRecord(
+        selectedProfileId,
+        passphrase,
+        "vehicles",
+        "update",
+        { market_value: value },
+        vehicleId,
+      );
+      setData((current) => current ? {
+        ...current,
+        tables: current.tables.map((table) => table.name === "vehicles"
+          ? {
+            ...table,
+            rows: table.rows.map((row) => String(row.id) === String(result.row.id) ? result.row : row),
+          }
+          : table),
+      } : current);
+      setNotice(`Market value saved to RiderTracker for ${vehicleDisplayName(result.row)}.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function deleteRecord(table: VehicleProfileTable, row: VehicleProfileRow) {
     const recordId = Number(row.id);
     if (!selectedProfileId) {
@@ -596,7 +634,11 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
         })}
       </nav>
       {activeTable === "fleet-intelligence"
-        ? <VehicleFleetIntelligence data={data} onOpenTable={(table) => openFleetEntry(table)} />
+        ? <VehicleFleetIntelligence
+          data={data}
+          onOpenTable={(table) => openFleetEntry(table)}
+          onSaveMarketValue={saveMarketValue}
+        />
         : activeTable === "overview" ? <>
         <section className="rider-fleet-overview" aria-labelledby="fleet-overview-heading">
           <div className="rider-fleet-overview-heading"><div><p className="eyebrow">Operational snapshot</p><h2 id="fleet-overview-heading">Fleet overview</h2><p>Live totals from the selected RiderTracker database profile.</p></div><Button type="button" variant="outline" onClick={() => openFleetEntry("reports", "reports")}><BarChart3 size={14} />Open reports</Button></div>

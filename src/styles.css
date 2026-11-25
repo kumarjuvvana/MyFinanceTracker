@@ -1187,6 +1187,17 @@ body{background:#f3f5ef}
 .fleet-card-head h3{margin:0;color:#142d4e;font-size:12px;font-weight:750}
 .fleet-card-head p{margin:4px 0 0;color:#64748b;font-size:9px;line-height:1.45}
 .fleet-card-icon{display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:9px;background:#eff6ff;color:#2563eb}
+.fleet-market-card{padding:15px;border:1px solid #dce5ef}
+.fleet-market-list{display:grid}
+.fleet-market-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid #e8edf3}
+.fleet-market-details{display:grid;gap:4px;min-width:0}
+.fleet-market-details>strong{color:#142d4e;font-size:10px}
+.fleet-market-details>small{color:#64748b;font-size:9px;line-height:1.45}
+.fleet-market-editor{display:flex;align-items:center;gap:8px;flex:none}
+.fleet-market-editor .field{width:min(190px,32vw)}
+.fleet-market-error{color:#b91c1c;font-size:9px;line-height:1.45}
+.fleet-market-error[role="status"]{margin:0 0 8px;padding:8px 10px;border:1px solid #fde4b3;border-radius:8px;background:#fffbeb;color:#854d0e}
+.fleet-market-empty{margin:0;color:#64748b;font-size:10px}
 .fleet-bars{display:grid;gap:10px;padding:4px 0}
 .fleet-bar-row{display:grid;grid-template-columns:minmax(70px,110px) minmax(40px,1fr) minmax(60px,auto);align-items:center;gap:9px;width:100%;padding:0;border:0;background:transparent;text-align:left}
 button.fleet-bar-row{cursor:pointer}
@@ -1239,6 +1250,13 @@ button.fleet-bar-row:disabled{cursor:default}
 .fleet-footer-note>svg{flex:none;color:#f59e0b}
 .app-shell.dark .fleet-dashboard{color:#e2e8f0}
 .app-shell.dark .fleet-header,.app-shell.dark .fleet-kpi,.app-shell.dark .fleet-chart-card,.app-shell.dark .fleet-insights-card,.app-shell.dark .fleet-report-card{border-color:#334155;background:#172333}
+.app-shell.dark .fleet-market-card,.app-shell.design-modern-dark .fleet-market-card,.app-shell.design-premium-fintech .fleet-market-card{border-color:var(--fleet-line);background:var(--fleet-card);color:var(--fleet-ink)}
+.app-shell.dark .fleet-market-row,.app-shell.design-modern-dark .fleet-market-row,.app-shell.design-premium-fintech .fleet-market-row{border-color:var(--fleet-line)}
+.app-shell.dark .fleet-market-details>strong,.app-shell.design-modern-dark .fleet-market-details>strong,.app-shell.design-premium-fintech .fleet-market-details>strong{color:var(--fleet-ink)}
+.app-shell.dark .fleet-market-details>small,.app-shell.design-modern-dark .fleet-market-details>small,.app-shell.design-premium-fintech .fleet-market-details>small,
+.app-shell.dark .fleet-market-empty,.app-shell.design-modern-dark .fleet-market-empty,.app-shell.design-premium-fintech .fleet-market-empty{color:var(--fleet-muted)}
+.app-shell.dark .fleet-market-error,.app-shell.design-modern-dark .fleet-market-error,.app-shell.design-premium-fintech .fleet-market-error{color:#fca5a5}
+.app-shell.dark .fleet-market-error[role="status"],.app-shell.design-modern-dark .fleet-market-error[role="status"],.app-shell.design-premium-fintech .fleet-market-error[role="status"]{border-color:#78541a;background:#332a18;color:#fde68a}
 .app-shell.dark .fleet-header h2,.app-shell.dark .fleet-filter-heading h3,.app-shell.dark .fleet-report-head h3,.app-shell.dark .fleet-card-head h3,.app-shell.dark .fleet-kpi>strong{color:#e2e8f0}
 .app-shell.dark .fleet-header>div>p:last-child,.app-shell.dark .fleet-filter-heading p,.app-shell.dark .fleet-report-head p,.app-shell.dark .fleet-card-head p,.app-shell.dark .fleet-kpi-label,.app-shell.dark .fleet-kpi>small{color:#94a3b8}
 .app-shell.dark .fleet-bar-row>span:first-child,.app-shell.dark .fleet-bar-row>strong,.app-shell.dark .fleet-due-row>div>strong,.app-shell.dark .fleet-insight>span{color:#cbd5e1}
@@ -1266,6 +1284,9 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .fleet-insight .badge-amber{background:#713f12;color:#fde68a}
 @media(max-width:650px){
   .fleet-header,.fleet-report-head{align-items:flex-start;flex-direction:column}
+  .fleet-market-row{align-items:flex-start;flex-direction:column}
+  .fleet-market-editor{width:100%}
+  .fleet-market-editor .field{flex:1;width:auto}
   .fleet-header h2{font-size:19px}
   .fleet-report-controls{align-items:stretch;flex-direction:column}
   .fleet-report-controls>.field-wrap,.fleet-report-controls .search-wrap{width:100%}
