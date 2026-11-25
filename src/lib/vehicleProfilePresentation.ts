@@ -35,3 +35,28 @@ export function vehicleTypeLabel(value: unknown): string {
   if (/^(bike|motorbike|motorcycle|scooter)$/.test(normalized) || /two wheeler|2 wheeler/.test(normalized)) return "Bike";
   return label;
 }
+
+export function isUserIdColumn(column: { name: string }): boolean {
+  return column.name.toLocaleLowerCase() === "user_id";
+}
+
+export function monthTargetLabel(value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const month = Number(value);
+  if (!Number.isInteger(month) || month < 1 || month > 12) return undefined;
+  return new Intl.DateTimeFormat(undefined, { month: "long" }).format(new Date(2020, month - 1, 1));
+}
+
+export function fleetCategoryLabel(tableName: string, columnName: string, value: unknown): string | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const code = String(value).trim();
+  if (!/^\d+$/.test(code)) return undefined;
+  const table = tableName.toLocaleLowerCase();
+  const column = columnName.toLocaleLowerCase();
+  if (table === "fuel_consumptions" && column === "fuel_type") {
+    return ({ "1": "Petrol", "2": "Diesel" } as Record<string, string>)[code] ?? `Fuel type ${code}`;
+  }
+  if (table === "expenses" && column === "expense_type") return `Expense type ${code}`;
+  if (table === "certificates" && column === "certificate_type") return `Certificate type ${code}`;
+  return undefined;
+}

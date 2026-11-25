@@ -4,7 +4,7 @@ import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input,
 import { loadSavedProfileVehicleData, mutateSavedProfileVehicleRecord, type VehicleProfileColumn, type VehicleProfileData, type VehicleProfileRow, type VehicleProfileTable, type VehicleProfileTableName } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
-import { vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
+import { fleetCategoryLabel, isUserIdColumn, monthTargetLabel, vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
 import { VehicleFleetIntelligence } from "./VehicleFleetIntelligence";
 
 const TABLE_LABELS: Record<VehicleProfileTableName, string> = {
@@ -79,6 +79,10 @@ function isTechnicalTimestampColumn(column: VehicleProfileColumn): boolean {
   return ["created_at", "updated_at", "created_on", "updated_on", "modified_at", "last_updated_at"].includes(name);
 }
 
+function isHiddenFleetDisplayColumn(tableName: VehicleProfileTableName | undefined, column: VehicleProfileColumn): boolean {
+  return isUserIdColumn(column) || (tableName === "alerts" && column.name.toLocaleLowerCase() === "alert_type");
+}
+
 function displayProfileValue(row: VehicleProfileRow, column: VehicleProfileColumn, vehicles: VehicleProfileRow[] = []): string {
   const value = row[column.name];
   if (value === null || value === undefined || value === "") return "—";
@@ -86,6 +90,13 @@ function displayProfileValue(row: VehicleProfileRow, column: VehicleProfileColum
   if (column.dataType === "date") return formatProfileDate(value);
   if (column.dataType.startsWith("timestamp")) return formatProfileDate(value, true);
   return rowValue(value);
+}
+
+function displayFleetTableValue(row: VehicleProfileRow, column: VehicleProfileColumn, vehicles: VehicleProfileRow[], tableName: VehicleProfileTableName): string {
+  if (tableName === "monthly_targets" && column.name.toLocaleLowerCase() === "month") {
+    return monthTargetLabel(row[column.name]) ?? displayProfileValue(row, column, vehicles);
+  }
+  return fleetCategoryLabel(tableName, column.name, row[column.name]) ?? displayProfileValue(row, column, vehicles);
 }
 
 function currencyValue(value: number): string {
@@ -479,17 +490,20 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const fieldFilter = filterValue.trim().toLocaleLowerCase();
   const matchingRows = (activeTableData?.rows ?? []).filter((row) => {
     const matchesSearch = !searchTerm || (activeTableData?.columns ?? [])
-      .filter((column) => !activeTableData?.primaryKey.includes(column.name))
+      .filter((column) => !activeTableData?.primaryKey.includes(column.name) && !isHiddenFleetDisplayColumn(activeTableData?.name, column))
       .some((column) => {
         const value = column.name.toLocaleLowerCase() === "vehicle_id"
           ? vehicleNameForId(vehicles, row[column.name])
           : activeTable === "vehicles" && vehicleTypeColumn?.name === column.name
             ? vehicleTypeLabel(row[column.name])
-            : rowValue(row[column.name]);
+            : activeTableData ? displayFleetTableValue(row, column, vehicles, activeTableData.name) : rowValue(row[column.name]);
         return value.toLocaleLowerCase().includes(searchTerm);
       });
     const cell = filterColumn ? row[filterColumn] : undefined;
-    const filterText = cell === null || cell === undefined ? "" : rowValue(cell).toLocaleLowerCase();
+    const filterDefinition = activeTableData?.columns.find((column) => column.name === filterColumn);
+    const filterText = cell === null || cell === undefined ? "" : filterDefinition && activeTableData
+      ? displayFleetTableValue(row, filterDefinition, vehicles, activeTableData.name).toLocaleLowerCase()
+      : rowValue(cell).toLocaleLowerCase();
     const matchesField = !fieldFilter || !filterColumn || (filterMatch === "exact" ? filterText === fieldFilter : filterText.includes(fieldFilter));
     const matchesRelatedVehicle = relatedVehicleId === "all" || (activeTable === "vehicles"
       ? String(row.id) === relatedVehicleId
@@ -504,7 +518,8 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const relatedVehicleFilterAvailable = Boolean(activeTableData) &&
     (activeTable === "vehicles" || Boolean(activeTableData?.columns.some((column) => column.name.toLocaleLowerCase() === "vehicle_id")));
   const visibleRecordColumns = activeTableData?.columns.filter((column) =>
-    !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)) ?? [];
+    !activeTableData.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column) &&
+    !isHiddenFleetDisplayColumn(activeTableData.name, column)) ?? [];
   const selectedSortColumn = visibleRecordColumns.find((column) => column.name === sortColumn) ?? visibleRecordColumns[0];
   const sortedRows = selectedSortColumn
     ? [...matchingRows].sort((left, right) => {
@@ -697,7 +712,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
             <div className="search-wrap"><Input aria-label={`Search ${TABLE_LABELS[activeTableData.name]}`} placeholder={`Search ${TABLE_LABELS[activeTableData.name].toLocaleLowerCase()}...`} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
             {relatedVehicleFilterAvailable && <Field label="Vehicle name"><Select value={relatedVehicleId} onChange={(event) => { setRelatedVehicleId(event.target.value); setPage(0); }}><option value="all">All vehicles</option>{vehicles.map((vehicle) => <option key={String(vehicle.id)} value={String(vehicle.id)}>{vehicleDisplayName(vehicle)}</option>)}</Select></Field>}
             <FilterDrawer activeCount={activeFilterCount} label={`Filter and sort ${TABLE_LABELS[activeTableData.name]}`} closeOnChange={false}>
-              <Field label="Filter field"><Select value={filterColumn} onChange={(event) => { setFilterColumn(event.target.value); setPage(0); }}><option value="">Choose a field</option>{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && column.name.toLocaleLowerCase() !== "vehicle_id").map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+              <Field label="Filter field"><Select value={filterColumn} onChange={(event) => { setFilterColumn(event.target.value); setPage(0); }}><option value="">Choose a field</option>{activeTableData.columns.filter((column) => !activeTableData.primaryKey.includes(column.name) && column.name.toLocaleLowerCase() !== "vehicle_id" && !isHiddenFleetDisplayColumn(activeTableData.name, column)).map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
               <Field label="Filter value"><Input value={filterValue} onChange={(event) => { setFilterValue(event.target.value); setPage(0); }} placeholder="Enter a value" /></Field>
               <Field label="Match"><Select value={filterMatch} onChange={(event) => { setFilterMatch(event.target.value as "contains" | "exact"); setPage(0); }}><option value="contains">Contains</option><option value="exact">Exact match</option></Select></Field>
               <Field label="Sort by"><Select value={selectedSortColumn?.name ?? ""} onChange={(event) => { setSortColumn(event.target.value); setPage(0); }}>{visibleRecordColumns.map((column) => <option value={column.name} key={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
@@ -721,18 +736,18 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
             <Badge>{matchingRows.length} {matchingRows.length === 1 ? "record" : "records"}</Badge>
           </div>
           {pageRows.length ? vehicleView === "table"
-            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{visibleRecordColumns.map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{visibleRecordColumns.map((column) => <td key={column.name}>{displayProfileValue(row, column, vehicles)}</td>)}<td><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></td></tr>)}</tbody></table></div>
+            ? <div className="rider-fleet-table-wrap"><table className="rider-fleet-table"><thead><tr>{visibleRecordColumns.map((column) => <th key={column.name}>{columnLabel(column.name)}</th>)}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageRows.map((row) => <tr key={String(row.id)}>{visibleRecordColumns.map((column) => <td key={column.name}>{displayFleetTableValue(row, column, vehicles, activeTableData.name)}</td>)}<td><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></td></tr>)}</tbody></table></div>
             : vehicleView === "list"
               ? <div className="rider-fleet-data-list">{pageRows.map((row) => {
                 const summaryColumns = visibleRecordColumns.slice(0, 3);
                 return <article className="rider-fleet-data-list-row" key={String(row.id)}>
-                  <div><h3>{profileRecordTitle(activeTableData.name, row, vehicles)}</h3><div>{summaryColumns.map((column) => <span key={column.name}><strong>{columnLabel(column.name)}:</strong> {displayProfileValue(row, column, vehicles)}</span>)}</div></div>
+                  <div><h3>{profileRecordTitle(activeTableData.name, row, vehicles)}</h3><div>{summaryColumns.map((column) => <span key={column.name}><strong>{columnLabel(column.name)}:</strong> {displayFleetTableValue(row, column, vehicles, activeTableData.name)}</span>)}</div></div>
                   <VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} />
                 </article>;
               })}</div>
               : <div className="rider-fleet-data-grid">{pageRows.map((row) => <article className="database-row" key={String(row.id)}>
                 <div className="database-row-head"><strong>{profileRecordTitle(activeTableData.name, row, vehicles)}</strong><VehicleRecordActions entityLabel={TABLE_LABELS[activeTableData.name].toLocaleLowerCase()} row={row} busy={busy} onView={(record) => setViewingRecord({ table: activeTableData, row: record })} onEdit={(record) => setEditor({ table: activeTableData, row: record, mode: "edit" })} onCopy={(record) => setEditor({ table: activeTableData, row: record, mode: "copy" })} onDelete={(record) => void deleteRecord(activeTableData, record)} /></div>
-                <div className="database-fields">{visibleRecordColumns.map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayProfileValue(row, column, vehicles)}</pre></div>)}</div>
+                <div className="database-fields">{visibleRecordColumns.map((column) => <div key={column.name}><span>{columnLabel(column.name)}</span><pre>{displayFleetTableValue(row, column, vehicles, activeTableData.name)}</pre></div>)}</div>
                 {activeTableData.columns.some(isTechnicalTimestampColumn) && <details className="fleet-technical-details"><summary>Technical details</summary><div>{activeTableData.columns.filter(isTechnicalTimestampColumn).map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column, vehicles)}</strong></p>)}</div></details>}
               </article>)}</div>
             : <EmptyState icon={<Database size={18} />} title={searchTerm || fieldFilter ? "No matching records" : "No records yet"} description={searchTerm || fieldFilter ? "Try changing the search or field filter." : `Add the first record to ${TABLE_LABELS[activeTableData.name]}.`} />}
@@ -864,7 +879,7 @@ function VehicleRegistryView({
     .filter((column, index, list): column is VehicleProfileColumn => Boolean(column) && list.findIndex((entry) => entry?.name === column?.name) === index);
   const tableColumns = vehicleColumns.length
     ? vehicleColumns
-    : (table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column));
+    : (table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column) && !isUserIdColumn(column));
   const displayVehicleColumn = (row: VehicleProfileRow, column: VehicleProfileColumn) =>
     typeColumn?.name === column.name ? vehicleTypeLabel(row[column.name]) : displayProfileValue(row, column, vehicles);
   const countValue = table?.totalRows ?? "0";
@@ -890,10 +905,10 @@ function VehicleRegistryView({
           {typeColumn && <Field label="Vehicle type"><Select value={vehicleType} onChange={(event) => onVehicleTypeChange(event.target.value)}><option value="all">All types</option>{typeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
           {manufacturerColumn && <Field label="Manufacturer"><Select value={vehicleManufacturer} onChange={(event) => onVehicleManufacturerChange(event.target.value)}><option value="all">All manufacturers</option>{manufacturerOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
           {purchaseColumn && <Field label="Purchase year"><Select value={vehicleYear} onChange={(event) => onVehicleYearChange(event.target.value)}><option value="all">All years</option>{yearOptions.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field>}
-          <Field label="Filter field"><Select value={filterColumn} onChange={(event) => onFilterColumnChange(event.target.value)}><option value="">Any field</option>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && column.name !== typeColumn?.name).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+          <Field label="Filter field"><Select value={filterColumn} onChange={(event) => onFilterColumnChange(event.target.value)}><option value="">Any field</option>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && column.name !== typeColumn?.name && !isUserIdColumn(column)).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
           <Field label="Field value"><Input value={filterValue} onChange={(event) => onFilterValueChange(event.target.value)} placeholder="Enter a value" /></Field>
           <Field label="Match"><Select value={filterMatch} onChange={(event) => onFilterMatchChange(event.target.value as "contains" | "exact")}><option value="contains">Contains</option><option value="exact">Exact match</option></Select></Field>
-          <Field label="Sort by"><Select value={sortColumn} onChange={(event) => onSortColumnChange(event.target.value)}>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name)).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
+          <Field label="Sort by"><Select value={sortColumn} onChange={(event) => onSortColumnChange(event.target.value)}>{(table?.columns ?? []).filter((column) => !table?.primaryKey.includes(column.name) && !isUserIdColumn(column)).map((column) => <option key={column.name} value={column.name}>{columnLabel(column.name)}</option>)}</Select></Field>
           <Field label="Sort order"><Select value={sortDirection} onChange={(event) => onSortDirectionChange(event.target.value as "asc" | "desc")}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
           <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>Clear filters</Button>
         </FilterDrawer>
@@ -991,7 +1006,7 @@ function ProfileRecordDetailsDialog({ row, table, vehicles, onClose, onEdit }: {
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="modal modal-wide rider-fleet-details-dialog" role="dialog" aria-modal="true" aria-labelledby="vehicle-details-title">
       <div className="modal-head"><div><p className="eyebrow">{TABLE_LABELS[table.name]} record</p><h2 id="vehicle-details-title">{title}</h2></div><button type="button" className="icon-button" aria-label={`Close ${TABLE_LABELS[table.name]} details`} onClick={onClose}><X size={18} /></button></div>
-      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{table.name === "vehicles" && findProfileColumn(table, ["vehicle_type", "type", "category", "vehicle_category"])?.name === column.name ? vehicleTypeLabel(row[column.name]) : displayProfileValue(row, column, vehicles)}</dd></div>)}</dl>
+      <dl className="rider-fleet-detail-fields">{columns.filter((column) => !table.primaryKey.includes(column.name) && !isTechnicalTimestampColumn(column) && !isHiddenFleetDisplayColumn(table.name, column)).map((column) => <div key={column.name}><dt>{columnLabel(column.name)}</dt><dd>{table.name === "vehicles" && findProfileColumn(table, ["vehicle_type", "type", "category", "vehicle_category"])?.name === column.name ? vehicleTypeLabel(row[column.name]) : displayFleetTableValue(row, column, vehicles, table.name)}</dd></div>)}</dl>
       {technicalColumns.length > 0 && <details className="fleet-technical-details"><summary>Technical details</summary><div>{technicalColumns.map((column) => <p key={column.name}><span>{columnLabel(column.name)}</span><strong>{displayProfileValue(row, column, vehicles)}</strong></p>)}</div></details>}
       <div className="modal-actions"><Button type="button" variant="outline" onClick={onClose}>Close</Button><Button type="button" onClick={onEdit}><Pencil size={14} />Edit {table.name === "vehicles" ? "vehicle" : "record"}</Button></div>
     </section>

@@ -9,7 +9,7 @@ import {
   type VehicleProfileRow,
   type VehicleProfileTableName,
 } from "../lib/databaseApi";
-import { vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
+import { fleetCategoryLabel, isUserIdColumn, monthTargetLabel, vehicleDisplayName, vehicleNameForId, vehicleTypeLabel } from "../lib/vehicleProfilePresentation";
 
 const LABELS: Record<VehicleProfileTableName, string> = {
   vehicles: "Vehicles",
@@ -297,7 +297,7 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     row,
   })).filter((item) => {
     const term = search.trim().toLocaleLowerCase();
-    const searchableColumns = (reportTable?.columns ?? []).filter((column) => !reportTable?.primaryKey.includes(column.name) && !column.name.endsWith("_at"));
+    const searchableColumns = (reportTable?.columns ?? []).filter((column) => !reportTable?.primaryKey.includes(column.name) && !column.name.endsWith("_at") && !isUserIdColumn(column));
     const matchesSearch = !term || searchableColumns.some((column) => {
       const value = column.name.toLocaleLowerCase() === "vehicle_id"
         ? vehicleNameForId(vehiclesAll, item.row[column.name])
@@ -317,13 +317,15 @@ export function VehicleFleetIntelligence({ data, onOpenTable }: {
     const matchesColumn = !filterValue || Boolean(reportFilterColumn) && fieldValue.includes(filterValue);
     return matchesSearch && matchesColumn;
   });
-  const allReportColumns = reportTable?.columns.filter((column) => !reportTable.primaryKey.includes(column.name) && !column.name.endsWith("_at")) ?? [];
+  const allReportColumns = reportTable?.columns.filter((column) => !reportTable.primaryKey.includes(column.name) && !column.name.endsWith("_at") && !isUserIdColumn(column)) ?? [];
   const reportColumnLabel = (name: string) => name.toLocaleLowerCase() === "vehicle_id" ? "Vehicle" : humanize(name);
   const reportColumnValue = (row: VehicleProfileRow, name: string) => name.toLocaleLowerCase() === "vehicle_id"
     ? vehicleNameForId(vehiclesAll, row[name])
-    : reportSource === "vehicles" && categoryColumn?.name === name
-      ? vehicleTypeLabel(row[name])
-      : row[name];
+    : reportSource === "monthly_targets" && name.toLocaleLowerCase() === "month"
+      ? monthTargetLabel(row[name]) ?? row[name]
+      : fleetCategoryLabel(reportSource, name, row[name]) ?? (reportSource === "vehicles" && categoryColumn?.name === name
+        ? vehicleTypeLabel(row[name])
+        : row[name]);
   const reportColumns = visibleColumns.length
     ? allReportColumns.filter((column) => visibleColumns.includes(column.name))
     : allReportColumns;
