@@ -640,6 +640,7 @@ body{background:#f3f5ef}
 .document-table{width:100%;border-collapse:collapse;min-width:850px;background:var(--panel,#fff)}
 .document-table th,.document-table td{padding:11px 12px;border-bottom:1px solid var(--panel-line,#e8ece6);text-align:left;font-size:11px;vertical-align:middle}
 .document-table th{color:var(--muted,#94a3b8);font-size:10px;font-weight:700;white-space:nowrap}
+.document-table th:last-child{text-align:center}
 .document-table td strong,.document-table td small{display:block}
 .document-table td small{margin-top:4px;color:var(--muted,#94a3b8);font-size:10px}
 .document-table tbody tr:last-child td{border-bottom:0}
