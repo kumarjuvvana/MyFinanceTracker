@@ -24,6 +24,13 @@ export function getDocumentFileType(fileName: string): { extension: DocumentFile
   return contentType ? { extension, contentType } : null;
 }
 
+export function canPreviewDocumentContentType(contentType: string): boolean {
+  return contentType === DOCUMENT_FILE_TYPES[".pdf"] ||
+    contentType.startsWith("image/") ||
+    contentType === DOCUMENT_FILE_TYPES[".docx"] ||
+    contentType === DOCUMENT_FILE_TYPES[".xlsx"];
+}
+
 export function isDocumentStoragePath(value: string): boolean {
   const extensionPattern = Object.keys(DOCUMENT_FILE_TYPES).map((extension) => extension.slice(1)).join("|");
   return new RegExp(`^documents/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(?:${extensionPattern})$`, "i").test(value);

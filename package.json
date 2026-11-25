@@ -19,7 +19,10 @@
     "documents:storage-migrate": "node scripts/migrate-document-storage.mjs"
   },
   "dependencies": {
+    "@e965/xlsx": "^0.20.3",
+    "dompurify": "^3.5.0",
     "lucide-react": "^0.468.0",
+    "mammoth": "^1.13.0",
     "pdfjs-dist": "^4.10.38",
     "pg": "^8.23.1",
     "pgsql-ast-parser": "^12.0.2",

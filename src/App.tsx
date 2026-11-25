@@ -8,13 +8,14 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, Select, type RecordViewMode } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
+import { OfficeDocumentViewer } from "./components/OfficeDocumentViewer";
 import { PdfDocumentViewer } from "./components/PdfDocumentViewer";
 import { activityLinkHref, createId, exportCsv, exportCsvRows, formatCurrency as formatMoney, isSafeActivityLink, isSafeExternalLink, monthKey, normalizeTrackerData, STORAGE_KEY, today, validateData } from "./lib/data";
 import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, signIn, signOut, validateAccessPassword } from "./lib/dataApi";
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
 import { deleteDocumentFile, uploadDocumentFile, type DocumentStorageUsage } from "./lib/documentApi";
-import { DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
+import { canPreviewDocumentContentType, DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, loadSavedProfilesHostingUsage, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SavedProfileHostingUsage, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
 import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
@@ -14149,6 +14150,8 @@ function DocumentViewer({ document, source, onClose }: { document: DocumentAttac
   const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";
+  const isDocx = contentType === DOCUMENT_FILE_TYPES[".docx"];
+  const isXlsx = contentType === DOCUMENT_FILE_TYPES[".xlsx"];
   return <Modal title={document.title} onClose={onClose} wide fullscreen={fullscreen}>
     <div className="document-preview-actions">
       {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
@@ -14156,8 +14159,9 @@ function DocumentViewer({ document, source, onClose }: { document: DocumentAttac
         {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}{fullscreen ? "Restore preview" : "Enlarge preview"}
       </Button>
     </div>
-    <div className={`document-viewer${isPdf ? " document-viewer-pdf" : ""}`}>
+    <div className={`document-viewer${isPdf ? " document-viewer-pdf" : ""}${isDocx || isXlsx ? " document-viewer-office" : ""}`}>
       {isPdf ? <PdfDocumentViewer source={source} />
+        : isDocx || isXlsx ? <OfficeDocumentViewer source={source} format={isDocx ? "docx" : "xlsx"} />
         : isImage ? <img src={source} alt={document.title} />
           : <iframe title={document.title} src={source} />}
     </div>
@@ -14391,7 +14395,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         const format = document.documentType || documentCategory(document);
         const hasFile = Boolean(document.storagePath);
         const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
-        const canPreview = hasFile && (contentType === "application/pdf" || contentType.startsWith("image/"));
+        const canPreview = hasFile && canPreviewDocumentContentType(contentType);
         return <tr key={document.id}>
           <td><strong>{document.title}</strong>{document.referenceNumber && <small>Ref. {maskedDocumentNumber(document.referenceNumber)}</small>}</td>
           <td>{category?.name ?? "Uncategorized"}</td><td>{document.personName || "—"}</td>
@@ -14422,7 +14426,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       const category = categories.find((entry) => entry.id === document.categoryId);
       const due = dueStatus(document.dueDate);
       const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
-      const canPreview = hasFile && (contentType === "application/pdf" || contentType.startsWith("image/"));
+      const canPreview = hasFile && canPreviewDocumentContentType(contentType);
       return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><div className="document-card-heading"><h2>{document.title}</h2>{document.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div><div className="document-meta-badges">{category && <Badge>{category.name}</Badge>}<Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></div><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.documentType && <small>{document.documentType}{document.referenceNumber ? ` · Ref. ${maskedDocumentNumber(document.referenceNumber)}` : ""}</small>}{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}{document.dueDate ? ` · Due ${dateLabel(document.dueDate)}` : ""}</small>{(document.createdAt || document.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{document.createdAt && <p><strong>Created</strong><span>{new Date(document.createdAt).toLocaleString()}</span></p>}{document.updatedAt && <p><strong>Updated</strong><span>{new Date(document.updatedAt).toLocaleString()}</span></p>}</details>}</div></div><div className="document-card-actions">
         {canPreview && <Button variant="outline" onClick={() => void openDocumentFile(document)}><Eye size={14} />View</Button>}
         {hasFile && <Button variant="outline" onClick={() => void openDocumentFile(document, true)}><Download size={14} />Download</Button>}
@@ -14513,7 +14517,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
           <span className="document-calendar-date">{day.getDate()}</span>
           {dayDocuments.map((document) => {
             const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
-            const canPreview = contentType === "application/pdf" || contentType.startsWith("image/");
+            const canPreview = canPreviewDocumentContentType(contentType);
             return document.storagePath && canPreview
               ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document)}>{document.title}</button>
               : document.storagePath
