@@ -95,7 +95,9 @@ export async function storageRequest(
     },
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(`Supabase Storage request failed (HTTP ${response.status}).`);
+  if (!response.ok) {
+    throw new Error(`Supabase Storage request failed (${await storageResponseError(response)}).`);
+  }
   return response;
 }
 
@@ -209,8 +211,14 @@ export async function createSignedDocumentUrl(
   if (typeof result !== "object" || result === null || !("signedURL" in result) || typeof result.signedURL !== "string") {
     throw new Error("Supabase did not return a temporary document link.");
   }
-  const signedUrl = new URL(result.signedURL, `${credentials.baseUrl}/storage/v1`);
-  if (signedUrl.origin !== credentials.baseUrl) throw new Error("Supabase returned an invalid private document link.");
+  const signedURL = result.signedURL;
+  const signedPath = signedURL.startsWith("/storage/v1/")
+    ? signedURL
+    : `/storage/v1${signedURL.startsWith("/") ? signedURL : `/${signedURL}`}`;
+  const signedUrl = /^https?:\/\//i.test(signedURL) ? new URL(signedURL) : new URL(signedPath, credentials.baseUrl);
+  if (signedUrl.origin !== credentials.baseUrl || !signedUrl.pathname.startsWith("/storage/v1/object/sign/")) {
+    throw new Error("Supabase returned an invalid private document link.");
+  }
   return signedUrl.toString();
 }
 
