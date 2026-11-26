@@ -2639,12 +2639,12 @@ function ReportPagination({ count, page, onPageChange, pageSize = REPORT_PAGE_SI
     <span>Page {page + 1} of {pages} · {count} records</span>
     <Button type="button" size="sm" variant="outline" disabled={page + 1 >= pages} onClick={() => onPageChange(page + 1)}>Next <ChevronRight size={13} /></Button>
     {onPageSizeChange && <>
-      <Field label="Rows per page"><Select aria-label="Rows per page" value={[10, 25, 50, 100, 200].includes(pageSize) ? String(pageSize) : "custom"} onChange={(event) => {
+      <div className="report-page-size"><Select aria-label="Rows per page" value={[10, 25, 50, 100, 200].includes(pageSize) ? String(pageSize) : "custom"} onChange={(event) => {
         const nextSize = event.target.value === "custom" ? 15 : Number(event.target.value);
         setCustomPageSizeText(String(nextSize));
         onPageSizeChange(nextSize);
-      }}>{[10, 25, 50, 100, 200].map((size) => <option value={size} key={size}>{size}</option>)}<option value="custom">Custom</option></Select></Field>
-      {![10, 25, 50, 100, 200].includes(pageSize) && <Field label="Custom rows"><Input type="number" min="1" max="500" step="1" aria-label="Custom rows per page" value={customPageSizeText} onChange={(event) => {
+      }}>{[10, 25, 50, 100, 200].map((size) => <option value={size} key={size}>{size}</option>)}<option value="custom">Custom</option></Select></div>
+      {![10, 25, 50, 100, 200].includes(pageSize) && <div className="report-page-size"><Input type="number" min="1" max="500" step="1" aria-label="Custom rows per page" value={customPageSizeText} onChange={(event) => {
         const value = event.target.value;
         setCustomPageSizeText(value);
         const size = Number(value);
@@ -2652,7 +2652,7 @@ function ReportPagination({ count, page, onPageChange, pageSize = REPORT_PAGE_SI
       }} onBlur={() => {
         const size = Number(customPageSizeText);
         if (!Number.isInteger(size) || size < 1 || size > 500) setCustomPageSizeText(String(pageSize));
-      }} /></Field>}
+      }} /></div>}
     </>}
   </div>;
 }
@@ -14986,7 +14986,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     </div></Card>}
     {pageDocuments.length ? renderDocuments(pageDocuments)
       : <Card><EmptyState icon={<FileDown size={18} />} title={visible.length || viewDocuments.length ? "No matching documents" : section === "archived" ? "No archived documents" : section === "favorites" ? "No favorite documents" : "No documents uploaded yet"} description={visible.length || viewDocuments.length ? "Try changing the search or filters." : "Add a document record now and attach a file later if you prefer."} /></Card>}
-    {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Field label="Rows per page"><Select value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select></Field><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
+    {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Select aria-label="Rows per page" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
     </>}
     {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
     {viewer && <DocumentViewer document={viewer.document} source={viewer.source} onClose={() => setViewer(null)} />}

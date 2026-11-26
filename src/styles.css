@@ -647,9 +647,13 @@ body{background:#f3f5ef}
 .document-table tbody tr:last-child td{border-bottom:0}
 .document-table .document-card-actions{width:auto;flex-wrap:nowrap}
 .document-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0;color:var(--muted,#94a3b8);font-size:11px}
-.document-pagination .field-wrap{display:flex;align-items:center;gap:8px}
 .document-pagination .field{min-width:72px}
 .document-pagination>div{display:flex;gap:7px}
+.report-pagination .report-page-size{display:flex;align-items:center}
+.report-pagination .report-page-size .field{height:30px;font-size:10px}
+.compact-report-pagination>.report-page-size{min-width:0}
+.compact-report-pagination>.report-page-size .field{width:76px;min-width:76px;padding:0 8px}
+.document-pagination>.field{width:76px;min-width:76px}
 .document-category-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:18px 0}
 .document-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .document-category-card{display:flex;align-items:flex-start;gap:12px}
