@@ -2546,13 +2546,15 @@ function isWithinReportDateRange(date: string, from: string, to: string): boolea
 }
 
 const REPORT_PAGE_SIZE = 25;
+const COOKING_PAGE_SIZE = 10;
 
-function ReportPagination({ count, page, onPageChange }: {
+function ReportPagination({ count, page, onPageChange, pageSize = REPORT_PAGE_SIZE }: {
   count: number;
   page: number;
   onPageChange: (page: number) => void;
+  pageSize?: number;
 }) {
-  const pages = Math.ceil(count / REPORT_PAGE_SIZE);
+  const pages = Math.ceil(count / pageSize);
   if (pages <= 1) return null;
   return <div className="report-pagination">
     <Button type="button" size="sm" variant="outline" disabled={page === 0} onClick={() => onPageChange(page - 1)}><ChevronLeft size={13} /> Previous</Button>
@@ -2561,8 +2563,8 @@ function ReportPagination({ count, page, onPageChange }: {
   </div>;
 }
 
-function pageRecords<T>(records: readonly T[], page: number): T[] {
-  return records.slice(page * REPORT_PAGE_SIZE, (page + 1) * REPORT_PAGE_SIZE);
+function pageRecords<T>(records: readonly T[], page: number, pageSize = REPORT_PAGE_SIZE): T[] {
+  return records.slice(page * pageSize, (page + 1) * pageSize);
 }
 
 function InvestmentReports({ data, initialFilters, onSaveView, onOpenPage }: {
@@ -12327,11 +12329,14 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete,
   const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [editor, setEditor] = useState<CookingInventoryItem | null | undefined>(undefined);
   const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [page, setPage] = useState(0);
   const [actionError, setActionError] = useState("");
   const query = search.trim().toLocaleLowerCase();
   const visibleItems = items.filter((item) =>
     !query || [item.name, item.category, ...item.measures.map((measure) => measure.unit)].some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.name.localeCompare(b.name));
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visibleItems.length / COOKING_PAGE_SIZE) - 1));
+  const pageItems = pageRecords(visibleItems, currentPage, COOKING_PAGE_SIZE);
   const formatCurrency = useCurrencyFormatter();
 
   return <>
@@ -12339,16 +12344,16 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete,
     <div className="alert"><CookingPot size={15} style={{ flex: "none", marginTop: 1 }} /><span>Kitchen stock is saved separately. Stock is deducted from actual ingredient quantities recorded in daily cooking logs, not from recipe templates.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {actionError && <div className="alert alert-error" role="alert">{actionError}</div>}
-    <div className="toolbar filter-toolbar cooking-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search kitchen stock" placeholder="Search vegetables, spices, units..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><RecordViewToggle value={view} onChange={setView} label="Kitchen stock" screen="cooking-stock" settings={{ search }} /><Badge>{items.length} items</Badge><Badge>{saving ? "Saving…" : "Saved to Supabase"}</Badge></div>
+    <div className="toolbar filter-toolbar cooking-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search kitchen stock" placeholder="Search vegetables, spices, units..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div><RecordViewToggle value={view} onChange={setView} label="Kitchen stock" screen="cooking-stock" settings={{ search }} /><Badge>{items.length} items</Badge><Badge>{saving ? "Saving…" : "Saved to Supabase"}</Badge></div>
     {loading ? <Card><p className="section-description">Loading kitchen stock…</p></Card> :
-      visibleItems.length ? view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Measures and stock</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleItems.map((item) => <tr key={item.id}>
+      visibleItems.length ? view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Measures and stock</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageItems.map((item) => <tr key={item.id}>
         <td><div className="table-primary">{item.name}</div><div className="table-secondary">{item.category || "Uncategorized"}</div></td>
         <td>{item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => {
           const unitPrice = cookingMeasurePrice(item, measure);
           return <div key={measure.id}><strong>{measure.unit}</strong><span>On hand: {measure.stockQuantity ?? "Not set"}</span><span>Price / unit: {unitPrice === null ? "Not set" : formatCurrency(unitPrice)}</span><AddCookingStockButton item={item} measure={measure} disabled={loading || saving} onAdd={onAddStock} /></div>;
         })}</div> : <span className="table-secondary">No measures or prices added</span>}</td>
         <td><div className="table-actions"><Button type="button" size="sm" variant="outline" onClick={() => setEditor(item)}><Pencil size={13} />Edit</Button><Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => void onSave([...items, { ...item, id: createId(), name: copyLabel(item.name, 120), measures: item.measures.map((measure) => ({ ...measure, id: createId() })) }]).catch((caught: unknown) => setActionError(caught instanceof Error ? caught.message : "Could not copy this stock item."))}><Copy size={13} />Copy</Button><Button type="button" size="sm" variant="outline" onClick={() => onDelete(item)}><Trash2 size={13} />Remove</Button></div></td>
-      </tr>)}</tbody></table></Card> : <div className={`cooking-inventory-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{visibleItems.map((item) => <details className="compact-details cooking-inventory-card" key={item.id}>
+      </tr>)}</tbody></table></Card> : <div className={`cooking-inventory-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{pageItems.map((item) => <details className="compact-details cooking-inventory-card" key={item.id}>
         <summary className="compact-summary cooking-inventory-card-head"><div><h3>{item.name}</h3>{item.category && <Badge>{item.category}</Badge>}<span className="cooking-inventory-summary-meta">{item.measures.length} measure{item.measures.length === 1 ? "" : "s"}</span></div></summary>
         <div className="cooking-inventory-expanded">
         {item.measures.length ? <div className="cooking-inventory-measure-list">{item.measures.map((measure) => {
@@ -12368,6 +12373,7 @@ function CookingInventoryPage({ items, loading, saving, error, onSave, onDelete,
           <Button type="button" size="sm" variant="outline" onClick={() => onDelete(item)}><Trash2 size={13} />Remove</Button>
         </div></div>
       </details>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={items.length ? "No matching kitchen stock" : "Kitchen stock is empty"} description={items.length ? "Try another search." : "Add vegetables, spices, seeds, or other cooking-only ingredients."} /></Card>}
+    {!loading && visibleItems.length > 0 && <ReportPagination count={visibleItems.length} page={currentPage} pageSize={COOKING_PAGE_SIZE} onPageChange={setPage} />}
     {editor !== undefined && <CookingInventoryModal key={editor?.id ?? "new-kitchen-stock"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (item) => {
       const next = editor ? items.map((entry) => entry.id === item.id ? item : entry) : [...items, item];
       await onSave(next);
@@ -13017,6 +13023,9 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
   const [recipeView, setRecipeView] = useState<RecordViewMode>(() => savedViewMode(savedRecipeView));
   const [logView, setLogView] = useState<RecordViewMode>(() => savedViewMode(savedLogView));
   const [usageView, setUsageView] = useState<RecordViewMode>(() => savedViewMode(savedUsageView));
+  const [recipePage, setRecipePage] = useState(0);
+  const [logPage, setLogPage] = useState(0);
+  const [usagePage, setUsagePage] = useState(0);
   const [recipeDishTypeFilter, setRecipeDishTypeFilter] = useState(() => savedRecipeView.recipeDishTypeFilter ?? "All meal types");
   const [recipeCuisineFilter, setRecipeCuisineFilter] = useState(() => savedRecipeView.recipeCuisineFilter ?? "All cuisines");
   const [recipeGroupBy, setRecipeGroupBy] = useState(() => savedScreenSetting(savedRecipeView, "groupBy", "dishType", ["dishType", "cuisine", "none"]));
@@ -13122,28 +13131,34 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
     (logRatingFilter === "All ratings" || (logRatingFilter === "No rating" ? log.rating === null : log.rating === Number(logRatingFilter))) &&
     (!logQuery || [log.date, log.occasion, log.learning, log.notes, ...log.dishes.map((dish) => dish.name)].some((value) => value.toLocaleLowerCase().includes(logQuery))))
     .sort((a, b) => b.date.localeCompare(a.date));
+  const visibleUsage = inventoryUsage.filter((entry) => !usageMonth || entry.date.startsWith(usageMonth));
+  const currentRecipePage = Math.min(recipePage, Math.max(0, Math.ceil(visibleRecipes.length / COOKING_PAGE_SIZE) - 1));
+  const currentLogPage = Math.min(logPage, Math.max(0, Math.ceil(visibleLogs.length / COOKING_PAGE_SIZE) - 1));
+  const currentUsagePage = Math.min(usagePage, Math.max(0, Math.ceil(visibleUsage.length / COOKING_PAGE_SIZE) - 1));
+  const pageRecipes = pageRecords(visibleRecipes, currentRecipePage, COOKING_PAGE_SIZE);
+  const pageLogs = pageRecords(visibleLogs, currentLogPage, COOKING_PAGE_SIZE);
+  const pageUsage = pageRecords(visibleUsage, currentUsagePage, COOKING_PAGE_SIZE);
   const recipeGroups = recipeGroupBy === "none"
-    ? [{ key: "all-recipes", title: "", recipes: visibleRecipes }]
-    : [...new Set(visibleRecipes.map((recipe) => recipeGroupBy === "cuisine" ? recipe.cuisine || "Unspecified cuisine" : recipe.dishType || "Unspecified meal type"))]
+    ? [{ key: "all-recipes", title: "", recipes: pageRecipes }]
+    : [...new Set(pageRecipes.map((recipe) => recipeGroupBy === "cuisine" ? recipe.cuisine || "Unspecified cuisine" : recipe.dishType || "Unspecified meal type"))]
       .sort((a, b) => a.localeCompare(b))
       .map((title) => ({
         key: title,
         title,
-        recipes: visibleRecipes.filter((recipe) => (recipeGroupBy === "cuisine" ? recipe.cuisine || "Unspecified cuisine" : recipe.dishType || "Unspecified meal type") === title),
+        recipes: pageRecipes.filter((recipe) => (recipeGroupBy === "cuisine" ? recipe.cuisine || "Unspecified cuisine" : recipe.dishType || "Unspecified meal type") === title),
       }));
   const cookingLogGroups = logGroupBy === "month"
-    ? [...new Set(visibleLogs.map((log) => log.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a))
+    ? [...new Set(pageLogs.map((log) => log.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a))
       .map((month) => ({
         key: month,
         title: new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${month}-01T00:00:00`)),
-        logs: visibleLogs.filter((log) => log.date.startsWith(month)),
+        logs: pageLogs.filter((log) => log.date.startsWith(month)),
       }))
     : logGroupBy === "occasion"
-      ? [...new Set(visibleLogs.map((log) => log.occasion || "No occasion"))].sort((a, b) => a.localeCompare(b))
-        .map((title) => ({ key: title, title, logs: visibleLogs.filter((log) => (log.occasion || "No occasion") === title) }))
-      : [{ key: "all-logs", title: "", logs: visibleLogs }];
+      ? [...new Set(pageLogs.map((log) => log.occasion || "No occasion"))].sort((a, b) => a.localeCompare(b))
+        .map((title) => ({ key: title, title, logs: pageLogs.filter((log) => (log.occasion || "No occasion") === title) }))
+      : [{ key: "all-logs", title: "", logs: pageLogs }];
   const todayCount = logs.filter((log) => log.date === today()).length;
-  const visibleUsage = inventoryUsage.filter((entry) => !usageMonth || entry.date.startsWith(usageMonth));
 
   function renderCookingRecipeCards(entries: CookingRecipe[]) {
     if (recipeView === "table") return <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Recipe</th><th>Meal type</th><th>Cuisine</th><th>Servings</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{entries.map((recipe) => <tr key={recipe.id}>
@@ -13193,23 +13208,23 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
     {inventoryError && <div className="alert alert-error" role="alert">{inventoryError}</div>}
     {activeTab === "planner" && <CookingPlanner plans={plans} recipes={recipes} inventory={inventory} logs={logs} stockSaving={inventorySaving} onAddStock={addCookingStock} onSavePlan={onSavePlan} onCopyPlan={onCopyPlan} onDeletePlan={onDeletePlan} onEditRecipe={(recipe) => setRecipeEditor(recipe)} onSaveLog={saveAndRefreshLog} />}
     {(activeTab === "recipes" || activeTab === "logs") && <div className="toolbar filter-toolbar cooking-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={activeTab === "recipes" ? recipeSearch : logSearch} onChange={(event) => activeTab === "recipes" ? setRecipeSearch(event.target.value) : setLogSearch(event.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input aria-label={activeTab === "recipes" ? "Search cooking recipes" : "Search daily cooking logs"} placeholder={activeTab === "recipes" ? "Search recipes, ingredients, or cuisine..." : "Search dishes, occasions, or journal..."} value={activeTab === "recipes" ? recipeSearch : logSearch} onChange={(event) => { if (activeTab === "recipes") { setRecipeSearch(event.target.value); setRecipePage(0); } else { setLogSearch(event.target.value); setLogPage(0); } }} /></div>
       <FilterDrawer activeCount={activeTab === "recipes"
         ? [recipeDishTypeFilter !== "All meal types", recipeCuisineFilter !== "All cuisines"].filter(Boolean).length
         : [logDateFrom, logDateTo, logOccasionFilter !== "All occasions", logRatingFilter !== "All ratings"].filter(Boolean).length}>
         {activeTab === "recipes" ? <>
-          <Field label="Meal type"><Select aria-label="Filter recipes by meal type" value={recipeDishTypeFilter} onChange={(event) => setRecipeDishTypeFilter(event.target.value)}><option>All meal types</option>{[...new Set(recipes.map((recipe) => recipe.dishType).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((type) => <option key={type}>{type}</option>)}</Select></Field>
-          <Field label="Cuisine"><Select aria-label="Filter recipes by cuisine" value={recipeCuisineFilter} onChange={(event) => setRecipeCuisineFilter(event.target.value)}><option>All cuisines</option>{[...new Set(recipes.map((recipe) => recipe.cuisine).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((cuisine) => <option key={cuisine}>{cuisine}</option>)}</Select></Field>
-          {[recipeDishTypeFilter !== "All meal types", recipeCuisineFilter !== "All cuisines"].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setRecipeDishTypeFilter("All meal types"); setRecipeCuisineFilter("All cuisines"); }}>Clear filters</Button>}
+          <Field label="Meal type"><Select aria-label="Filter recipes by meal type" value={recipeDishTypeFilter} onChange={(event) => { setRecipeDishTypeFilter(event.target.value); setRecipePage(0); }}><option>All meal types</option>{[...new Set(recipes.map((recipe) => recipe.dishType).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((type) => <option key={type}>{type}</option>)}</Select></Field>
+          <Field label="Cuisine"><Select aria-label="Filter recipes by cuisine" value={recipeCuisineFilter} onChange={(event) => { setRecipeCuisineFilter(event.target.value); setRecipePage(0); }}><option>All cuisines</option>{[...new Set(recipes.map((recipe) => recipe.cuisine).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((cuisine) => <option key={cuisine}>{cuisine}</option>)}</Select></Field>
+          {[recipeDishTypeFilter !== "All meal types", recipeCuisineFilter !== "All cuisines"].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setRecipeDishTypeFilter("All meal types"); setRecipeCuisineFilter("All cuisines"); setRecipePage(0); }}>Clear filters</Button>}
         </> : <>
-          <Field label="From date"><DateInput aria-label="Filter cooking logs from date" value={logDateFrom} onValueChange={setLogDateFrom} max={logDateTo || undefined} /></Field>
-          <Field label="To date"><DateInput aria-label="Filter cooking logs to date" value={logDateTo} onValueChange={setLogDateTo} min={logDateFrom || undefined} /></Field>
-          <Field label="Occasion"><Select aria-label="Filter logs by occasion" value={logOccasionFilter} onChange={(event) => setLogOccasionFilter(event.target.value)}><option>All occasions</option>{[...new Set(logs.map((log) => log.occasion).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((occasion) => <option key={occasion}>{occasion}</option>)}</Select></Field>
-          <Field label="Rating"><Select aria-label="Filter logs by rating" value={logRatingFilter} onChange={(event) => setLogRatingFilter(event.target.value)}><option>All ratings</option><option>No rating</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></Select></Field>
-          {[logDateFrom, logDateTo, logOccasionFilter !== "All occasions", logRatingFilter !== "All ratings"].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setLogDateFrom(""); setLogDateTo(""); setLogOccasionFilter("All occasions"); setLogRatingFilter("All ratings"); }}>Clear filters</Button>}
+          <Field label="From date"><DateInput aria-label="Filter cooking logs from date" value={logDateFrom} onValueChange={(value) => { setLogDateFrom(value); setLogPage(0); }} max={logDateTo || undefined} /></Field>
+          <Field label="To date"><DateInput aria-label="Filter cooking logs to date" value={logDateTo} onValueChange={(value) => { setLogDateTo(value); setLogPage(0); }} min={logDateFrom || undefined} /></Field>
+          <Field label="Occasion"><Select aria-label="Filter logs by occasion" value={logOccasionFilter} onChange={(event) => { setLogOccasionFilter(event.target.value); setLogPage(0); }}><option>All occasions</option>{[...new Set(logs.map((log) => log.occasion).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((occasion) => <option key={occasion}>{occasion}</option>)}</Select></Field>
+          <Field label="Rating"><Select aria-label="Filter logs by rating" value={logRatingFilter} onChange={(event) => { setLogRatingFilter(event.target.value); setLogPage(0); }}><option>All ratings</option><option>No rating</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></Select></Field>
+          {[logDateFrom, logDateTo, logOccasionFilter !== "All occasions", logRatingFilter !== "All ratings"].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setLogDateFrom(""); setLogDateTo(""); setLogOccasionFilter("All occasions"); setLogRatingFilter("All ratings"); setLogPage(0); }}>Clear filters</Button>}
         </>}
       </FilterDrawer>
-      <Field className="cooking-group-control" label="Group by"><Select aria-label={activeTab === "recipes" ? "Group recipes by" : "Group cooking logs by"} value={activeTab === "recipes" ? recipeGroupBy : logGroupBy} onChange={(event) => activeTab === "recipes" ? setRecipeGroupBy(event.target.value) : setLogGroupBy(event.target.value)}>
+      <Field className="cooking-group-control" label="Group by"><Select aria-label={activeTab === "recipes" ? "Group recipes by" : "Group cooking logs by"} value={activeTab === "recipes" ? recipeGroupBy : logGroupBy} onChange={(event) => { if (activeTab === "recipes") { setRecipeGroupBy(event.target.value); setRecipePage(0); } else { setLogGroupBy(event.target.value); setLogPage(0); } }}>
         {activeTab === "recipes" ? <><option value="dishType">Meal type</option><option value="cuisine">Cuisine</option><option value="none">No grouping</option></> : <><option value="date">Date</option><option value="month">Month</option><option value="occasion">Occasion</option><option value="none">No grouping</option></>}
       </Select></Field>
       <RecordViewToggle value={activeTab === "recipes" ? recipeView : logView} onChange={(nextView) => activeTab === "recipes" ? setRecipeView(nextView) : setLogView(nextView)} label={activeTab === "recipes" ? "Recipe book" : "Daily cooking log"} screen={activeTab === "recipes" ? "cooking-recipes" : "cooking-logs"} settings={activeTab === "recipes"
@@ -13219,12 +13234,12 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
     </div>}
     {activeTab === "stock" && <CookingInventoryPage items={inventory} loading={inventoryLoading} saving={inventorySaving} error={inventoryError} onSave={saveInventory} onDelete={deleteInventoryItem} onAddStock={addCookingStock} />}
     {activeTab === "usage" && <section className="cooking-section cooking-records">
-      <div className="devotional-section-head"><div><h2><History size={15} /> Stock usage history</h2><p>Recipe ingredient usage by cooking-log date. Editing or removing a log reconciles the recorded stock use.</p></div><Field label="Month"><Input type="month" value={usageMonth} onChange={(event) => setUsageMonth(event.target.value)} /></Field><RecordViewToggle value={usageView} onChange={setUsageView} label="Stock usage" screen="cooking-usage" settings={{ month: usageMonth }} /></div>
+      <div className="devotional-section-head"><div><h2><History size={15} /> Stock usage history</h2><p>Recipe ingredient usage by cooking-log date. Editing or removing a log reconciles the recorded stock use.</p></div><Field label="Month"><Input type="month" value={usageMonth} onChange={(event) => { setUsageMonth(event.target.value); setUsagePage(0); }} /></Field><RecordViewToggle value={usageView} onChange={setUsageView} label="Stock usage" screen="cooking-usage" settings={{ month: usageMonth }} /></div>
       {inventoryLoading ? <Card><p className="section-description">Loading stock usage…</p></Card> :
-        visibleUsage.length ? usageView === "table" ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Kitchen item</th><th>Dish</th><th>Quantity used</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleUsage.map((entry, index) => {
+        visibleUsage.length ? usageView === "table" ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Kitchen item</th><th>Dish</th><th>Quantity used</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{pageUsage.map((entry, index) => {
           const sourceLog = logs.find((log) => log.id === entry.logId);
           return <tr key={`${entry.logId}-${entry.recipeId}-${entry.inventoryMeasureId}-${index}`}><td>{dateLabel(entry.date)}</td><td>{entry.itemName}</td><td>{entry.recipeName}</td><td><Badge tone="amber">−{entry.quantity} {entry.unit}</Badge></td><td>{sourceLog ? <Button type="button" size="sm" variant="outline" onClick={() => setLogEditor(sourceLog)}><Pencil size={13} />Edit cooking log</Button> : <span className="table-secondary">Log unavailable</span>}</td></tr>;
-        })}</tbody></table></Card> : <DateGroupedRecords items={visibleUsage} getDate={(entry) => entry.date} title={(date) => `Stock usage · ${dateLabel(date)}`}>{(dateUsage) => <div className={`cooking-list ${usageView === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{dateUsage.map((entry, index) => {
+        })}</tbody></table></Card> : <DateGroupedRecords items={pageUsage} getDate={(entry) => entry.date} title={(date) => `Stock usage · ${dateLabel(date)}`}>{(dateUsage) => <div className={`cooking-list ${usageView === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{dateUsage.map((entry, index) => {
           const sourceLog = logs.find((log) => log.id === entry.logId);
           return <details className="compact-details cooking-usage-card" key={`${entry.logId}-${entry.recipeId}-${entry.inventoryMeasureId}-${index}`}>
             <summary className="compact-summary cooking-usage-top"><div><strong>{entry.itemName}</strong><span>{dateLabel(entry.date)} · {entry.recipeName}</span></div><Badge tone="amber">−{entry.quantity} {entry.unit}</Badge></summary>
@@ -13234,21 +13249,24 @@ function CookingPage({ recipes, logs, plans, onSaveRecipe, onDeleteRecipe, onSav
           </details>;
         })}</div>}</DateGroupedRecords> :
         <Card><EmptyState icon={<History size={18} />} title="No stock usage recorded" description={usageMonth ? "No linked ingredients were actually used in this month." : "Usage is recorded when a daily cooking log is saved with actual quantities for linked kitchen-stock ingredients."} /></Card>}
+      {!inventoryLoading && visibleUsage.length > 0 && <ReportPagination count={visibleUsage.length} page={currentUsagePage} pageSize={COOKING_PAGE_SIZE} onPageChange={setUsagePage} />}
     </section>}
     {activeTab === "recipes" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><CookingPot size={15} /> Recipe book</h2><p>{visibleRecipes.length} {visibleRecipes.length === 1 ? "item" : "items"}</p></div></div>
         {visibleRecipes.length ? <div className="cooking-record-groups">{recipeGroups.map((group) => <section key={group.key}>
           {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.recipes.length}</span></h2>}
           {renderCookingRecipeCards(group.recipes)}
         </section>)}</div> : <Card><EmptyState icon={<CookingPot size={18} />} title={recipes.length ? "No matching recipes or items" : "Your recipe book is empty"} description={recipes.length ? "Try another search or meal type." : "Save a curry, other dish, juice, or drink to get started."} /></Card>}
+      <ReportPagination count={visibleRecipes.length} page={currentRecipePage} pageSize={COOKING_PAGE_SIZE} onPageChange={setRecipePage} />
     </section>}
     {activeTab === "logs" && <section className="cooking-section cooking-records"><div className="devotional-section-head"><div><h2><Utensils size={15} /> Daily cooking log</h2><p>{visibleLogs.length} {visibleLogs.length === 1 ? "day" : "days"} recorded</p></div></div>
-        {visibleLogs.length ? logView === "table" ? renderCookingLogCards(visibleLogs) : logGroupBy === "date"
-          ? <DateGroupedRecords items={visibleLogs} getDate={(log) => log.date} title={(date) => `Cooking logs · ${dateLabel(date)}`}>{renderCookingLogCards}</DateGroupedRecords>
+        {visibleLogs.length ? logView === "table" ? renderCookingLogCards(pageLogs) : logGroupBy === "date"
+          ? <DateGroupedRecords items={pageLogs} getDate={(log) => log.date} title={(date) => `Cooking logs · ${dateLabel(date)}`}>{renderCookingLogCards}</DateGroupedRecords>
           : <div className="cooking-record-groups">{cookingLogGroups.map((group) => <section key={group.key}>
             {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.logs.length}</span></h2>}
             {renderCookingLogCards(group.logs)}
           </section>)}</div>
           : <Card><EmptyState icon={<Utensils size={18} />} title={logs.length ? "No matching daily logs" : "No cooking days logged yet"} description={logs.length ? "Try another search or filter." : "Record prepared dishes, drinks, what you learned, and how it turned out."} /></Card>}
+      <ReportPagination count={visibleLogs.length} page={currentLogPage} pageSize={COOKING_PAGE_SIZE} onPageChange={setLogPage} />
     </section>}
     {recipeEditor !== undefined && <CookingRecipeModal key={recipeEditor?.id ?? "new-cooking-recipe"} initial={recipeEditor} inventory={inventory} onClose={() => setRecipeEditor(undefined)} onSave={(recipe) => { onSaveRecipe(recipe, recipeEditor?.id); setRecipeEditor(undefined); }} />}
     {logEditor !== undefined && <CookingLogModal key={logEditor?.id ?? "new-cooking-log"} initial={logEditor} recipes={recipes} inventory={inventory} stockSaving={inventorySaving} onAddStock={addCookingStock} onClose={() => setLogEditor(undefined)} onSave={(log) => saveAndRefreshLog(log, logEditor?.id)} />}

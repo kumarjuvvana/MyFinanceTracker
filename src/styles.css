@@ -1137,6 +1137,9 @@ body{background:#f3f5ef}
 .cooking-record-groups,.issue-record-groups,.family-record-groups,.career-record-groups{display:grid;gap:14px;min-width:0}
 .cooking-record-groups>section,.issue-record-groups>section,.family-record-groups>section,.career-record-groups>section{display:grid;gap:10px;min-width:0}
 .cooking-group-control,.issues-group-control,.career-group-control,.family-group-control,.vehicle-group-control,.electricity-group-control,.personal-document-group-control{width:min(100%,180px);margin:0}
+.cooking-filter-toolbar .cooking-group-control{display:flex;align-items:center;gap:8px;flex:none;width:auto}
+.cooking-filter-toolbar .cooking-group-control .field-label{white-space:nowrap}
+.cooking-filter-toolbar .cooking-group-control>.field{width:180px}
 .vehicle-record-groups{display:grid;gap:14px;min-width:0}
 .vehicle-record-groups>section{display:grid;gap:10px;min-width:0}
 .vehicle-profile-report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px;margin:14px 0}
@@ -1310,6 +1313,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .cooking-plan-record-groups>section{display:grid;gap:8px;min-width:0}
 .cooking-list{display:grid;gap:10px}
 .cooking-recipe-list{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));align-items:start}
+.cooking-recipe-list.record-list-layout{grid-template-columns:minmax(0,1fr)}
 .cooking-card{min-width:0;padding:14px}
 .cooking-card h3{margin:4px 0;font:700 13px Manrope,sans-serif;color:#303830;overflow-wrap:anywhere}
 .cooking-card p{margin:10px 0 0;font-size:11px;line-height:1.55;color:#667066;white-space:pre-wrap;overflow-wrap:anywhere}
