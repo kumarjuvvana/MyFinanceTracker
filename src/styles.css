@@ -134,14 +134,21 @@ button{cursor:pointer}
 .app-shell.dark .danger-card .settings-icon{background:#392726;color:#f0aaa0}
 .preference-toggle{margin-top:12px}
 .connector-card{max-width:760px}
-.database-connections-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:14px}
-.database-connections-layout>.connector-card:last-child{grid-column:1/-1}
+.database-connections-page{display:grid;gap:14px}
+.database-connections-page>.page-head{margin-bottom:4px}
+.database-connections-page>.alert{margin:0}
+.database-connections-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:16px}
+.database-connections-layout>.connector-card{max-width:none;min-width:0}
+.database-connections-layout>.connector-card:nth-child(3){grid-column:1/-1}
 .database-connections-layout>.database-browser{grid-column:1/-1}
-.database-connection-list{display:grid;margin-top:12px}
-.database-connection-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border)}
+.database-connections-page .connector-actions{margin:0;flex-wrap:wrap}
+.database-connection-list{display:grid;margin-top:4px}
+.database-connection-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 4px;border-top:1px solid var(--border)}
 .database-connection-row>div:first-child{min-width:0}
 .database-connection-row strong{overflow-wrap:anywhere}
 .database-connection-row p{margin:5px 0 0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.database-connection-row>.table-actions{flex:none}
+.database-storage-section{padding-top:14px;border-top:1px solid var(--border)}
 .gmail-authorization{display:grid;justify-items:start;gap:12px;margin:12px 0}
 .gmail-authorization .alert{margin:0}
 .connector-actions{display:flex;align-items:center;gap:8px;margin:16px 0}
@@ -859,9 +866,21 @@ body{background:#f3f5ef}
 .app-shell.dark .database-object>pre{background:#202720;border-color:#343d35}
 .app-shell.dark .database-sql-preview,.app-shell.dark .database-sql-result-table th{background:#202720;border-color:#343d35;color:#d4ddd4}
 .app-shell.dark .database-sql-result,.app-shell.dark .database-sql-result-table th,.app-shell.dark .database-sql-result-table td{border-color:#343d35}
+.database-connections-page .database-table-select{align-items:flex-end;gap:12px;padding:12px;border:1px solid var(--border,#eef0ec);border-radius:12px;background:var(--surface)}
+.database-connections-page .database-table-select .field-wrap{flex:1;min-width:0;margin:0}
+.database-connections-page .database-column-list{margin-top:14px;padding:12px;border:1px solid var(--border,#eef0ec);border-radius:12px;background:var(--surface)}
+.database-connections-page .database-row-list{gap:10px;margin-top:12px}
+.database-connections-page .database-row{overflow:hidden;border:1px solid var(--border,#eef0ec);border-radius:12px;background:var(--surface)}
+.database-connections-page .database-row-head{padding:10px 12px;border-bottom:1px solid var(--border,#eef0ec);background:var(--surface-subtle,#f8f9f7)}
+.database-connections-page .database-fields{grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:0;margin-top:0}
+.database-connections-page .database-fields>div{padding:10px 12px;border:0;border-bottom:1px solid var(--border,#eef0ec);border-radius:0}
+.database-connections-page .database-pagination{margin-top:12px;border-color:var(--border,#eef0ec)}
+.app-shell.dark .database-connections-page .database-row-head{background:#202720;border-color:#343d35}
 @media(max-width:600px){
   .database-table-select{align-items:flex-start;flex-direction:column}
   .database-table-select .field-wrap{width:100%}
+  .database-connections-page .database-table-select{align-items:flex-start;flex-direction:column}
+  .database-connections-page .database-table-select .field-wrap{width:100%}
   .database-fields{grid-template-columns:minmax(0,1fr)}
   .database-row-head{align-items:flex-start;flex-direction:column}
 }

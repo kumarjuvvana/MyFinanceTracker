@@ -322,7 +322,7 @@ export function DatabaseConnectionsPage() {
     setNotice("Downloaded the encrypted local config. It still requires the vault passphrase to unlock.");
   }
 
-  return <>
+  return <div className="database-connections-page">
     <div className="page-head"><div><p className="eyebrow">Data & tools</p><h1 className="page-title">Database connections</h1><p className="page-subtitle">Save encrypted connection profiles and map them to modules for later integration.</p></div></div>
     <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>These assignments do not change existing modules or move, overwrite, or delete their data. Database manager can connect to a saved profile directly; other modules need their own integration before using a profile. The app still needs its existing server settings to access this shared profile store.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
@@ -347,7 +347,7 @@ export function DatabaseConnectionsPage() {
               <Field label="Module / screen names (comma-separated)"><Input maxLength={4000} placeholder="e.g. Vehicles, Payments, Documents" value={modules} onChange={(event) => setModules(event.target.value)} /></Field>
               <Field className="full" label="Supabase PostgreSQL connection URI"><div className="credential-secret-field"><Input type={showConnectionString ? "text" : "password"} autoComplete="off" maxLength={2000} required placeholder="postgresql://user:password@host:5432/database" value={connectionString} onChange={(event) => { setConnectionString(event.target.value); setTestedFingerprint(""); }} /><button type="button" className="icon-button" aria-label={showConnectionString ? "Hide connection URI" : "Show connection URI"} title={showConnectionString ? "Hide connection URI" : "Show connection URI"} onClick={() => setShowConnectionString((visible) => !visible)}>{showConnectionString ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></Field>
               <Field className="full" label="Optional Supabase database CA certificate (PEM)"><textarea className="field textarea" rows={3} maxLength={20000} autoComplete="off" placeholder="Paste the certificate only if TLS verification fails." value={caCertificate} onChange={(event) => { setCaCertificate(event.target.value); setTestedFingerprint(""); }} /></Field>
-              <div className="full"><h3 className="section-title">Supabase Storage for this profile</h3><p className="section-description">For mydocumentsmanager, enter the new Supabase project URL and secret key (or legacy service-role key). The key is included only in the encrypted profile vault and used by the server to access a private bucket. Other modules continue using their existing storage configuration.</p></div>
+              <div className="full database-storage-section"><h3 className="section-title">Supabase Storage for this profile</h3><p className="section-description">For mydocumentsmanager, enter the new Supabase project URL and secret key (or legacy service-role key). The key is included only in the encrypted profile vault and used by the server to access a private bucket. Other modules continue using their existing storage configuration.</p></div>
               <Field className="full" label="Supabase project URL"><Input type="url" autoComplete="url" maxLength={300} placeholder="https://your-project.supabase.co" value={storageUrl} onChange={(event) => { setStorageUrl(event.target.value); setTestedStorageFingerprint(""); }} /><span className="section-description">A project URL ending in /rest/v1 is accepted and saved as the project origin.</span></Field>
               <Field label="Private bucket name"><Input autoComplete="off" maxLength={63} placeholder="mydocumentsmanager-documents" value={storageBucket} onChange={(event) => { setStorageBucket(event.target.value); setTestedStorageFingerprint(""); }} /></Field>
               <Field label="Supabase secret key (or legacy service-role key)"><div className="credential-secret-field"><Input type={showStorageServiceRoleKey ? "text" : "password"} autoComplete="new-password" maxLength={4096} value={storageServiceRoleKey} onChange={(event) => { setStorageServiceRoleKey(event.target.value); setTestedStorageFingerprint(""); }} /><button type="button" className="icon-button" aria-label={showStorageServiceRoleKey ? "Hide secret key" : "Show secret key"} title={showStorageServiceRoleKey ? "Hide secret key" : "Show secret key"} onClick={() => setShowStorageServiceRoleKey((visible) => !visible)}>{showStorageServiceRoleKey ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></Field>
@@ -378,5 +378,5 @@ export function DatabaseConnectionsPage() {
             </>}
           </Card>}
         </div>}
-  </>;
+  </div>;
 }
