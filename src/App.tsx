@@ -248,15 +248,17 @@ function DevotionalRecordGroup({ title, count, expandAll, expansionRevision, chi
     {expanded && <div className="devotional-date-group-content">{children}</div>}
   </section>;
 }
-function DateGroupedRecords<T>({ items, getDate, title, groupOrder = "newest", children }: {
+function DateGroupedRecords<T>({ items, getDate, title, groupOrder = "newest", grouped = true, children }: {
   items: readonly T[];
   getDate: (item: T) => string | undefined;
   title: (date: string) => string;
   groupOrder?: "newest" | "oldest";
+  grouped?: boolean;
   children: (records: T[], date: string) => ReactNode;
 }) {
   const [expandAll, setExpandAll] = useState(false);
   const [expansionRevision, setExpansionRevision] = useState(0);
+  if (!grouped) return <>{children([...items], "")}</>;
   const groupedRecords = groupByDate(items, getDate);
   const groups = groupOrder === "oldest" ? groupedRecords.reverse() : groupedRecords;
   function setGroupsExpanded(expanded: boolean) {
@@ -999,6 +1001,8 @@ function ImportantDatesPage() {
   const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
   const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
   const [recordLayout, setRecordLayout] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
 
@@ -1144,9 +1148,11 @@ function ImportantDatesPage() {
     .sort((a, b) => sortOrder === "title"
       ? a.title.localeCompare(b.title, undefined, { sensitivity: "base" }) || b.date.localeCompare(a.date)
       : (sortOrder === "newest" ? -1 : 1) * (a.date.localeCompare(b.date) || a.title.localeCompare(b.title)));
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / pageSize) - 1));
+  const pageVisible = pageRecords(visible, currentPage, pageSize);
   const groupedVisible = (() => {
     const groups = new Map<string, { title: string; records: ImportantDate[] }>();
-    for (const entry of visible) {
+    for (const entry of pageVisible) {
       const group = groupBy === "date" ? entry.date
         : groupBy === "category" ? entry.categoryId
           : groupBy === "person" ? entry.person.trim().toLocaleLowerCase() || "__no_person"
@@ -1177,6 +1183,7 @@ function ImportantDatesPage() {
     setReminderFilter("all");
     setDateFrom("");
     setDateTo("");
+    setPage(0);
   }
   function renderImportantDateCards(entries: ImportantDate[]) {
     if (recordLayout === "table") {
@@ -1220,16 +1227,18 @@ function ImportantDatesPage() {
             <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
             <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
           </FilterDrawer>
-          <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Important dates" screen="important-dates" settings={{ search, sortOrder, groupBy, dateFilterCategory, dateFilterFeeling, reminderFilter, dateFrom, dateTo }} />
+          <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Important dates" screen="important-dates" settings={{ search, sortOrder, groupBy, dateFilterCategory, dateFilterFeeling, reminderFilter, dateFrom, dateTo, pageSize: String(pageSize) }} />
           <Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge>
         </div>
         {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearDateFilters}>Clear search, filters & sorting</Button></div>}
+        {visible.length > 0 && <ReportPagination count={visible.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="compact-report-pagination" />}
         {visible.length ? <>
           {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(false)}>Hide all</Button></div>}
-          {groupBy === "none" ? renderImportantDateCards(visible) : <div className="record-date-groups">{groupedVisible.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>
+          {groupBy === "none" ? renderImportantDateCards(pageVisible) : <div className="record-date-groups">{groupedVisible.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>
             {renderImportantDateCards(group.records)}
           </DevotionalRecordGroup>)}</div>}
         </> : <Card><EmptyState icon={<CalendarDays size={18} />} title={records.length ? "No matching important dates" : "No important dates yet"} description={records.length ? "Try a different search or clear the current filters." : "Add a milestone, important purchase, or personal date to start your timeline."} /></Card>}
+        {visible.length > 0 && <ReportPagination count={visible.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="compact-report-pagination" />}
       </>}
       {activeTab === "categories" && <Card className="important-date-master"><div><h2 className="section-title">Date categories</h2><p className="section-description">Organize events such as education, career, family, and purchases.</p></div><form className="important-date-master-add" onSubmit={(event) => void addCategory(event)}><Input aria-label="New date category" maxLength={80} placeholder="New category name" value={categoryDraft} onChange={(event) => setCategoryDraft(event.target.value)} /><Button type="submit" disabled={saving || !categoryDraft.trim()}><Plus size={14} />Add category</Button></form><div className="master-entry-list">{categories.map((category) => <div className="master-entry" key={category.id}><div className="recent-info"><div className="recent-name">{category.name}</div><div className="recent-meta">{records.filter((entry) => entry.categoryId === category.id).length} important dates</div></div><button className="icon-button" disabled={saving} aria-label={`Rename ${category.name}`} onClick={() => void renameCategory(category)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${category.name}`} onClick={() => void deleteCategory(category)}><Archive size={14} /></button></div>)}</div></Card>}
       {activeTab === "feelings" && <Card className="important-date-master"><div><h2 className="section-title">Good / bad life tags</h2><p className="section-description">Edit the labels and tone used to describe how an event felt.</p></div><form className="important-date-master-add important-date-feeling-add" onSubmit={(event) => void addFeeling(event)}><Input aria-label="New life tag" maxLength={60} placeholder="New life tag" value={feelingDraft} onChange={(event) => setFeelingDraft(event.target.value)} /><Select aria-label="New life tag sentiment" value={feelingSentiment} onChange={(event) => setFeelingSentiment(event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><Button type="submit" disabled={saving || !feelingDraft.trim()}><Plus size={14} />Add tag</Button></form><div className="master-entry-list">{feelings.map((feeling) => <div className="important-date-feeling-row" key={feeling.id}><div className="recent-info"><div className="recent-name">{feeling.name}</div><div className="recent-meta">{records.filter((entry) => entry.feelingId === feeling.id).length} dates use this tag</div></div><Select aria-label={`Sentiment for ${feeling.name}`} disabled={saving} value={feeling.sentiment} onChange={(event) => void changeFeeling(feeling, event.target.value as ImportantDateFeeling["sentiment"])}><option>Good</option><option>Bad</option><option>Mixed</option></Select><button className="icon-button" disabled={saving} aria-label={`Rename ${feeling.name}`} onClick={() => void editFeeling(feeling)}><Pencil size={14} /></button><button className="icon-button" disabled={saving} aria-label={`Remove ${feeling.name}`} onClick={() => void deleteFeeling(feeling)}><Archive size={14} /></button></div>)}</div></Card>}
@@ -4092,6 +4101,7 @@ function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: Archiv
   const [from, setFrom] = useState(() => savedView.from ?? "");
   const [to, setTo] = useState(() => savedView.to ?? "");
   const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "date-newest", ["date-newest", "date-oldest", "label", "records"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "type", "none"]));
   const collections = [...new Set(records.flatMap((record) =>
     Object.entries(record.snapshot).flatMap(([key, rows]) => Array.isArray(rows) && rows.length ? [key] : [])))].sort();
   const sortedRecords = [...records].filter((record) => {
@@ -4110,8 +4120,19 @@ function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: Archiv
     return b.archivedAt.localeCompare(a.archivedAt);
   });
   return <><PageHeading eyebrow="Recover or permanently remove" title="Archive" subtitle="Deleted records are kept here until you restore them or permanently delete them. The encrypted credential vault is not included." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field><Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="Archive" screen="archive" settings={{ search, collection, from, to, sortBy }} /><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
-    {sortedRecords.length ? <DateGroupedRecords items={sortedRecords} getDate={(record) => record.archivedAt.slice(0, 10)} title={(date) => `Archive · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(dateRecords) => view === "table"
+    <div className="toolbar filter-toolbar compact-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest", groupBy !== "date"].filter(Boolean).length} label="Archive filters">
+        <Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field>
+        <Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
+        <Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group archived records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Archived date</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field>
+      </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Archive" screen="archive" settings={{ search, collection, from, to, sortBy, groupBy }} />
+      <Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge>
+    </div>
+    {sortedRecords.length ? <DateGroupedRecords items={sortedRecords} getDate={(record) => groupBy === "date" ? record.archivedAt.slice(0, 10) : Object.entries(record.snapshot).find(([, rows]) => Array.isArray(rows) && rows.length)?.[0] ?? "Other"} title={(key) => groupBy === "date" ? `Archive · ${dateLabel(key)}` : key} groupOrder={groupBy === "date" && sortBy === "date-oldest" ? "oldest" : "newest"} grouped={groupBy !== "none"}>{(dateRecords) => view === "table"
       ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Label</th><th>Archived</th><th>Record types</th><th>Records</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{dateRecords.map((record) => {
         const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) => Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
         const count = Object.values(record.snapshot).reduce((total, rows) => total + (Array.isArray(rows) ? rows.length : 0), 0);
@@ -5729,12 +5750,16 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [newAssetType, setNewAssetType] = useState<AssetType>("Other");
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<"All types" | "Stocks" | "Bank accounts" | AssetType>("All types");
+  const assetViewScreen = `asset-manager-${activeType.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const savedAssetView = useSavedScreenView(assetViewScreen);
   const [draftVisibleTypes, setDraftVisibleTypes] = useState<AssetManagerVisibleType[]>(savedVisibleTypes);
   const [draftHiddenItems, setDraftHiddenItems] = useState<NonNullable<TrackerPreferences["assetManagerHiddenItems"]>>(savedHiddenItems);
-  const [sortBy, setSortBy] = useState<"name" | "value-highest" | "value-lowest">("name");
-  const [groupBy, setGroupBy] = useState<"none" | "type" | "institution" | "currency">("none");
-  const [filterCurrency, setFilterCurrency] = useState<"All currencies" | Currency>("All currencies");
-  const [valueFilter, setValueFilter] = useState<"all" | "recorded" | "missing">("all");
+  const [sortBy, setSortBy] = useState<"name" | "value-highest" | "value-lowest">(() => savedScreenSetting(savedAssetView, "sortBy", "name", ["name", "value-highest", "value-lowest"]));
+  const [groupBy, setGroupBy] = useState<"none" | "type" | "institution" | "currency">(() => savedScreenSetting(savedAssetView, "groupBy", "none", ["none", "type", "institution", "currency"]));
+  const [filterCurrency, setFilterCurrency] = useState<"All currencies" | Currency>(() => savedAssetView.filterCurrency === "All currencies" || CURRENCIES.includes(savedAssetView.filterCurrency as Currency) ? savedAssetView.filterCurrency as "All currencies" | Currency : "All currencies");
+  const [valueFilter, setValueFilter] = useState<"all" | "recorded" | "missing">(() => savedScreenSetting(savedAssetView, "valueFilter", "all", ["all", "recorded", "missing"]));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedAssetView));
+  const [page, setPage] = useState(0);
   const [savingTypes, setSavingTypes] = useState(false);
   const [typePreferenceMessage, setTypePreferenceMessage] = useState("");
   const [typePreferenceError, setTypePreferenceError] = useState("");
@@ -5755,6 +5780,15 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [trackStockPriceHistory, setTrackStockPriceHistory] = useState(false);
   const savedTypesKey = savedVisibleTypes.join("|");
   const savedHiddenItemsKey = JSON.stringify(savedHiddenItems);
+  useEffect(() => {
+    setSearch(savedAssetView.search ?? "");
+    setSortBy(savedScreenSetting<"name" | "value-highest" | "value-lowest">(savedAssetView, "sortBy", "name", ["name", "value-highest", "value-lowest"]));
+    setGroupBy(savedScreenSetting<"none" | "type" | "institution" | "currency">(savedAssetView, "groupBy", "none", ["none", "type", "institution", "currency"]));
+    setFilterCurrency(savedAssetView.filterCurrency === "All currencies" || CURRENCIES.includes(savedAssetView.filterCurrency as Currency) ? savedAssetView.filterCurrency as "All currencies" | Currency : "All currencies");
+    setValueFilter(savedScreenSetting<"all" | "recorded" | "missing">(savedAssetView, "valueFilter", "all", ["all", "recorded", "missing"]));
+    setPageSize(savedPageSize(savedAssetView));
+    setPage(0);
+  }, [activeType, savedAssetView]);
   useEffect(() => {
     setDraftVisibleTypes(savedVisibleTypes);
     setDraftHiddenItems(savedHiddenItems);
@@ -5863,6 +5897,14 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       a.currentValue ?? latestVehicleValuation(a)?.currentValue,
       b.currentValue ?? latestVehicleValuation(b)?.currentValue,
     ));
+  const assetPageCount = activeType === "Stocks" ? visibleStocks.length
+    : activeType === "Bank accounts" ? visibleBankAccounts.length
+      : activeType === "Vehicle" ? visibleVehicles.length : visible.length;
+  const currentAssetPage = Math.min(page, Math.max(0, Math.ceil(assetPageCount / pageSize) - 1));
+  const pagedAssets = pageRecords(visible, currentAssetPage, pageSize);
+  const pagedStocks = pageRecords(visibleStocks, currentAssetPage, pageSize);
+  const pagedBankAccounts = pageRecords(visibleBankAccounts, currentAssetPage, pageSize);
+  const pagedVehicles = pageRecords(visibleVehicles, currentAssetPage, pageSize);
   function groupRecords<T>(records: T[], getLabel: (record: T) => string) {
     const groups = new Map<string, T[]>();
     for (const record of records) {
@@ -5873,19 +5915,19 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([label, entries]) => ({ key: label || "all", label, records: entries }));
   }
-  const visibleGroups = groupRecords(visible, (asset) => groupBy === "type" ? asset.type
+  const visibleGroups = groupRecords(pagedAssets, (asset) => groupBy === "type" ? asset.type
     : groupBy === "institution" ? asset.institution || "No institution"
       : groupBy === "currency" ? asset.currency
         : "");
-  const visibleStockGroups = groupRecords(visibleStocks, (stock) => groupBy === "type" ? "Stocks"
+  const visibleStockGroups = groupRecords(pagedStocks, (stock) => groupBy === "type" ? "Stocks"
     : groupBy === "institution" ? stock.broker || "No broker"
       : groupBy === "currency" ? latestStockQuotes.get(stock.id)?.currency ?? "No quote"
         : "");
-  const visibleBankGroups = groupRecords(visibleBankAccounts, (account) => groupBy === "type" ? account.accountType
+  const visibleBankGroups = groupRecords(pagedBankAccounts, (account) => groupBy === "type" ? account.accountType
     : groupBy === "institution" ? account.bankName
       : groupBy === "currency" ? "INR"
         : "");
-  const visibleVehicleGroups = groupRecords(visibleVehicles, (vehicle) => groupBy === "type" ? "Vehicles"
+  const visibleVehicleGroups = groupRecords(pagedVehicles, (vehicle) => groupBy === "type" ? "Vehicles"
     : groupBy === "institution" ? vehicle.make || "No make"
       : groupBy === "currency" ? "INR"
         : "");
@@ -6684,21 +6726,21 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
             : assets.filter((asset) => asset.type === type && isAssetItemVisible(asset)).length;
         const label = type === "All types" ? "All" : type === "Gold savings scheme" ? "Gold schemes"
           : type === "Vehicle" ? "Vehicles" : type === "Insurance" ? "Insurances" : type;
-        return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => setActiveType(type)}>{label}<span>{count}</span></button>;
+        return <button key={type} type="button" role="tab" aria-selected={activeType === type} onClick={() => { setActiveType(type); setPage(0); }}>{label}<span>{count}</span></button>;
       })}
     </div>
-    <div className="toolbar filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : activeType === "Vehicle" ? "Search vehicles" : activeType === "Insurance" ? "Search insurance policies" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : activeType === "Vehicle" ? "Search vehicle, make, model, registration..." : activeType === "Insurance" ? "Search policy, insurer, reference, tags..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+    <div className="toolbar filter-toolbar compact-filter-toolbar">
+      <div className="search-wrap"><Search size={15} /><Input aria-label={activeType === "Stocks" ? "Search stocks" : activeType === "Bank accounts" ? "Search bank accounts" : activeType === "Vehicle" ? "Search vehicles" : activeType === "Insurance" ? "Search insurance policies" : "Search assets"} placeholder={activeType === "Stocks" ? "Search symbol, company, exchange, broker..." : activeType === "Bank accounts" ? "Search bank, account type, branch..." : activeType === "Vehicle" ? "Search vehicle, make, model, registration..." : activeType === "Insurance" ? "Search policy, insurer, reference, tags..." : "Search name, provider, reference, tags..."} value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
       <FilterDrawer
         label="Filters, sorting & grouping"
         closeOnChange={false}
         closeOnButtonClick={false}
         activeCount={(filterCurrency !== "All currencies" ? 1 : 0) + (valueFilter !== "all" ? 1 : 0) + (sortBy !== "name" ? 1 : 0) + (groupBy !== "none" ? 1 : 0)}
       >
-        <Field label="Currency"><Select aria-label="Filter assets by currency" value={filterCurrency} onChange={(event) => setFilterCurrency(event.target.value as "All currencies" | Currency)}><option>All currencies</option>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
-        <Field label="Current value"><Select aria-label="Filter assets by current value" value={valueFilter} onChange={(event) => setValueFilter(event.target.value as typeof valueFilter)}><option value="all">All records</option><option value="recorded">Value recorded</option><option value="missing">Value not recorded</option></Select></Field>
-        <Field label="Sort by"><Select aria-label="Sort asset records" value={sortBy} onChange={(event) => setSortBy(event.target.value as typeof sortBy)}><option value="name">Name (A–Z)</option><option value="value-highest">Current value (highest)</option><option value="value-lowest">Current value (lowest)</option></Select></Field>
-        <Field label="Group by"><Select aria-label="Group assets" value={groupBy} onChange={(event) => setGroupBy(event.target.value as typeof groupBy)}><option value="none">No grouping</option><option value="type">Asset type</option><option value="institution">Institution</option><option value="currency">Currency</option></Select></Field>
+        <Field label="Currency"><Select aria-label="Filter assets by currency" value={filterCurrency} onChange={(event) => { setFilterCurrency(event.target.value as "All currencies" | Currency); setPage(0); }}><option>All currencies</option>{CURRENCIES.map((currency) => <option key={currency}>{currency}</option>)}</Select></Field>
+        <Field label="Current value"><Select aria-label="Filter assets by current value" value={valueFilter} onChange={(event) => { setValueFilter(event.target.value as typeof valueFilter); setPage(0); }}><option value="all">All records</option><option value="recorded">Value recorded</option><option value="missing">Value not recorded</option></Select></Field>
+        <Field label="Sort by"><Select aria-label="Sort asset records" value={sortBy} onChange={(event) => { setSortBy(event.target.value as typeof sortBy); setPage(0); }}><option value="name">Name (A–Z)</option><option value="value-highest">Current value (highest)</option><option value="value-lowest">Current value (lowest)</option></Select></Field>
+        <Field label="Group by"><Select aria-label="Group assets" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setPage(0); }}><option value="none">No grouping</option><option value="type">Asset type</option><option value="institution">Institution</option><option value="currency">Currency</option></Select></Field>
         <div className="asset-type-preferences">
           <h3 className="section-title">Asset types shown</h3>
           <p className="section-description">Choose asset classes and individual records to include in tabs and totals. New records are included by default. Changes are saved to the shared Supabase preferences when you choose Save.</p>
@@ -6797,8 +6839,10 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           <Button type="button" disabled={savingTypes || (!hasUnsavedTypeChanges && !hasUnsavedItemChanges)} onClick={() => void saveVisibleTypes()}>{savingTypes ? "Saving..." : "Save asset and item selection"}</Button>
         </div>
       </FilterDrawer>
+      <SaveScreenViewButton screen={assetViewScreen} settings={{ search, filterCurrency, valueFilter, sortBy, groupBy, pageSize: String(pageSize) }} label={`${activeType} asset filters, grouping, and pagination`} />
       <Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge>
     </div>
+    {assetPageCount > 0 && <ReportPagination count={assetPageCount} page={currentAssetPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="compact-report-pagination" />}
     {activeType === "Bank accounts" && <div className="alert">Balances are the saved snapshots from Bank accounts, not live bank balances. Only accounts with a recorded balance are included in totals.</div>}
     {activeType === "Bank accounts" && visibleBankTotals.reportedAccounts > 0 && <div className="asset-total-list"><Card className="asset-total-card"><div><span>Reported balances · INR</span><strong>{formatAmount(visibleBankTotals.balance, "INR")}</strong></div><div><span>Accounts with a balance</span><strong>{visibleBankTotals.reportedAccounts} of {visibleBankAccounts.length}</strong></div></Card></div>}
     {activeType === "Vehicle" && <div className="alert">Vehicles use the same records as the Vehicles menu. Edit vehicle details and purchase/current values from either screen; Add vehicle value saves a dated valuation snapshot. The current estimate contributes to your INR asset total.</div>}
@@ -7061,6 +7105,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       })}</div>
     </section>)}
     {activeType !== "Stocks" && activeType !== "Bank accounts" && activeType !== "Vehicle" && !visible.length && <Card><EmptyState icon={<Wallet size={18} />} title={activeType === "Insurance" ? "No insurance policies recorded yet" : assets.length ? "No matching assets" : "No assets recorded yet"} description={activeType === "Insurance" ? "Add one record for each policy. Sum assured is kept separate from any current fund or surrender value." : assets.length ? "Try a different search or asset tab." : "Add an asset with its name and type; all other details can be added later."} /></Card>}
+    {assetPageCount > 0 && <ReportPagination count={assetPageCount} page={currentAssetPage} pageSize={pageSize} onPageChange={setPage} className="compact-report-pagination" />}
     {vehicleEditor && <VehicleModal key={vehicleEditor.id} initial={vehicleEditor} onClose={() => setVehicleEditor(null)} onSave={(vehicle) => { onSaveVehicle(vehicle, vehicleEditor.id); setVehicleEditor(null); }} />}
     {editor !== undefined && <AssetModal key={editor?.id ?? `new-asset-${newAssetType}`} initial={editor} defaultType={newAssetType} vehicles={vehicles} onClose={() => setEditor(undefined)} onSave={(asset) => { onSave(asset, editor?.id); setEditor(undefined); }} onSaveVehicleValuation={(vehicleId, valuation) => { onSaveVehicleValuation(vehicleId, valuation); setEditor(undefined); }} onOpenVehicles={onOpenVehicles} />}
   </>;
@@ -9430,6 +9475,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
   const [typeFilter, setTypeFilter] = useState(() => savedView.typeFilter ?? "All types");
   const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "title", ["title", "category", "tool"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "category", ["category", "type", "none"]));
   const [expandAllGroups, setExpandAllGroups] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const categories = [...new Set(records.map((record) => record.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -9443,12 +9489,12 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
       sortBy === "tool" ? a.tool.localeCompare(b.tool) || a.title.localeCompare(b.title) :
         a.title.localeCompare(b.title));
   const groupsByKey = new Map<string, { title: string; records: PromptRecord[] }>();
-  for (const record of visible) {
+  for (const record of groupBy === "none" ? [] : visible) {
     const category = record.category.trim();
     const type = record.type.trim();
-    const key = category ? `category:${category.toLocaleLowerCase()}` :
-      type ? `type:${type.toLocaleLowerCase()}` : "uncategorized";
-    const title = category ? category : type ? `Type · ${type}` : "Uncategorized";
+    const key = groupBy === "category" ? category ? `category:${category.toLocaleLowerCase()}` : "uncategorized"
+      : type ? `type:${type.toLocaleLowerCase()}` : "Unspecified type";
+    const title = groupBy === "category" ? category || "Uncategorized" : type || "Unspecified type";
     const group = groupsByKey.get(key) ?? { title, records: [] };
     group.records.push(record);
     groupsByKey.set(key, group);
@@ -9492,9 +9538,9 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   return <>
     <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Browse prompts by category or prompt type, then search, filter, and copy them into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer>    <RecordViewToggle value={view} onChange={setView} label="AI prompts" screen="ai-prompts" settings={{ search, categoryFilter, typeFilter, sortBy }} /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
-    {promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
-    <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}>{renderPrompts(group.records)}</DevotionalRecordGroup>)}</div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0) + (groupBy !== "category" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field><Field label="Group by"><Select aria-label="Group AI prompts" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="category">Category</option><option value="type">Type</option><option value="none">No grouping</option></Select></Field></FilterDrawer>    <RecordViewToggle value={view} onChange={setView} label="AI prompts" screen="ai-prompts" settings={{ search, categoryFilter, typeFilter, sortBy, groupBy }} /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    {groupBy !== "none" && promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
+    {groupBy === "none" ? renderPrompts(visible) : <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}>{renderPrompts(group.records)}</DevotionalRecordGroup>)}</div>}
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
     {editor !== undefined && <PromptRecordModal key={editor?.id ?? "new-ai-prompt"} initial={editor} onClose={() => setEditor(undefined)} onSave={(record) => { onSave(record, editor?.id); setEditor(undefined); }} />}
   </>;
@@ -11084,7 +11130,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   const [search, setSearch] = useState(() => savedView.search ?? "");
   const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All bills");
   const [meterFilter, setMeterFilter] = useState(() => savedView.meterFilter ?? "All meters");
-  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month", "none"]));
   const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
   const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
   const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "reading-newest", ["reading-newest", "reading-oldest", "meter-name"]));
@@ -11110,7 +11156,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       <Card><span>Readings</span><strong>{readings.length}</strong></Card>
       <Card><span>Unpaid bills</span><strong>{formatCurrency(readings.filter((entry) => !entry.paid).reduce((sum, entry) => sum + (entry.billAmount ?? 0), 0))}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar electricity-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Electricity readings" screen="electricity" settings={{ search, statusFilter, meterFilter, groupBy, dateFrom, dateTo, sortBy }} /><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
+    <div className="toolbar filter-toolbar electricity-filter-toolbar compact-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0) + (groupBy !== "date" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Electricity readings" screen="electricity" settings={{ search, statusFilter, meterFilter, groupBy, dateFrom, dateTo, sortBy }} /><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
     {grouped.size ? <div className={`electricity-list${view === "grid" ? " record-grid-layout" : ""}`}>{[...grouped.entries()].sort((a, b) => sortBy === "meter-name"
       ? a[1][0].meterName.localeCompare(b[1][0].meterName)
       : (sortBy === "reading-oldest" ? 1 : -1) * a[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, "").localeCompare(b[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, ""))).map(([key, entries]) => {
@@ -11119,7 +11165,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       const latest = allForMeter[allForMeter.length - 1];
       return <Card className="electricity-card" key={key}>
         <div className="vehicle-card-head"><div className="vehicle-heading"><div className="electricity-icon"><Zap size={17} /></div><div><h2 className="section-title">{latest.meterName}</h2><p className="section-description">{latest.location || "Location not specified"}</p></div></div><div className="electricity-meter-latest"><span>Latest reading</span><strong>{latest.meterReading.toLocaleString()} kWh</strong></div></div>
-        <DateGroupedRecords items={sortBy === "reading-oldest" ? sorted : [...sorted].reverse()} getDate={(entry) => groupBy === "month" ? entry.readingDate.slice(0, 7) : entry.readingDate} title={(date) => `Meter readings · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "reading-oldest" ? "oldest" : "newest"}>{(dateEntries) => view === "table"
+        <DateGroupedRecords items={sortBy === "reading-oldest" ? sorted : [...sorted].reverse()} getDate={(entry) => groupBy === "month" ? entry.readingDate.slice(0, 7) : entry.readingDate} title={(date) => `Meter readings · ${groupBy === "month" ? new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(new Date(`${date}-01T00:00:00`)) : dateLabel(date)}`} groupOrder={sortBy === "reading-oldest" ? "oldest" : "newest"} grouped={groupBy !== "none"}>{(dateEntries) => view === "table"
           ? <div className="table-card electricity-record-table"><table className="data-table">
             <thead><tr><th>Date</th><th>Reading</th><th>Usage</th><th>Bill</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{dateEntries.map((entry) => {
@@ -11265,8 +11311,8 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   const [search, setSearch] = useState(() => savedView.search ?? "");
   const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
   const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All records");
-  const [serviceGroupBy, setServiceGroupBy] = useState(() => savedScreenSetting(savedView, "serviceGroupBy", "category", ["category", "provider"]));
-  const [transactionGroupBy, setTransactionGroupBy] = useState(() => savedScreenSetting(savedView, "transactionGroupBy", "month", ["month", "date"]));
+  const [serviceGroupBy, setServiceGroupBy] = useState(() => savedScreenSetting(savedView, "serviceGroupBy", "category", ["category", "provider", "none"]));
+  const [transactionGroupBy, setTransactionGroupBy] = useState(() => savedScreenSetting(savedView, "transactionGroupBy", "month", ["month", "date", "none"]));
   const [transactionFrom, setTransactionFrom] = useState(() => savedView.transactionFrom ?? "");
   const [transactionTo, setTransactionTo] = useState(() => savedView.transactionTo ?? "");
   const [transactionSort, setTransactionSort] = useState(() => savedScreenSetting(savedView, "transactionSort", "newest", ["newest", "oldest", "amount-highest"]));
@@ -11296,13 +11342,14 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
     const matchesDateRange = (!transactionFrom && !transactionTo) || account.transactions.some(inTransactionDateRange);
     return matchesText && matchesCategory && matchesStatus && matchesDateRange;
   }).sort((a, b) => a.name.localeCompare(b.name));
-  const serviceGroups = [...new Set(visible.map((account) => serviceGroupBy === "provider" ? account.provider || "No provider" : account.category))]
-    .sort((a, b) => a.localeCompare(b))
-    .map((title) => ({
+  const serviceGroups = serviceGroupBy === "none" ? [{ key: "all", title: "", accounts: visible }] :
+    [...new Set(visible.map((account) => serviceGroupBy === "provider" ? account.provider || "No provider" : account.category))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((title) => ({
       key: title,
       title,
       accounts: visible.filter((account) => (serviceGroupBy === "provider" ? account.provider || "No provider" : account.category) === title),
-    }));
+      }));
 
   function archiveAccount(account: SubscriptionAccount) {
     if (window.confirm(`Move "${account.name}" and its transaction history to the archive?`)) onArchiveAccount(account);
@@ -11338,8 +11385,8 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       <div className="shopping-quick-filters">
         <Field label="Category"><Select aria-label="Filter by service category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{(["Mobile", "Electricity", "Gas", "Internet", "Streaming", "Tickets", "Other"] as SubscriptionCategory[]).map((value) => <option key={value}>{value}</option>)}</Select></Field>
         <Field label="Payment status"><Select aria-label="Filter by payment status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All records</option><option>Pending</option><option>Overdue</option><option>Due soon</option><option>Paid</option></Select></Field>
-        <Field label="Group services"><Select aria-label="Group services by" value={serviceGroupBy} onChange={(event) => setServiceGroupBy(event.target.value)}><option value="category">Category</option><option value="provider">Provider</option></Select></Field>
-        <Field label="Payment history"><Select aria-label="Group payment history by" value={transactionGroupBy} onChange={(event) => setTransactionGroupBy(event.target.value)}><option value="month">Month</option><option value="date">Date</option></Select></Field>
+        <Field label="Group services"><Select aria-label="Group services by" value={serviceGroupBy} onChange={(event) => setServiceGroupBy(event.target.value)}><option value="category">Category</option><option value="provider">Provider</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Payment history"><Select aria-label="Group payment history by" value={transactionGroupBy} onChange={(event) => setTransactionGroupBy(event.target.value)}><option value="month">Month</option><option value="date">Date</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={Number(Boolean(transactionFrom)) + Number(Boolean(transactionTo)) + Number(transactionSort !== "newest")}>
         <Field label="Transaction from"><DateInput aria-label="Transaction from date" value={transactionFrom} onValueChange={setTransactionFrom} max={transactionTo || undefined} /></Field>
@@ -11350,7 +11397,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
       <Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge>
     </div>
     {visible.length ? <div className="subscription-groups">{serviceGroups.map((group) => <section className="subscription-group" key={group.key}>
-      <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>
+      {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.accounts.length}</span></h2>}
       {view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table">
         <thead><tr><th>Service</th><th>Transaction</th><th>Date / due</th><th>Amount / status</th><th><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{group.accounts.flatMap((account) => {
@@ -11384,7 +11431,9 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
         <summary className="subscription-card-summary compact-summary"><div className="vehicle-heading"><div className="electricity-icon"><CalendarDays size={17} /></div><div><h2 className="section-title">{account.name}</h2><p className="section-description">{[account.category, account.provider, account.billingType, account.accountReference].filter(Boolean).join(" · ")}</p></div></div><div className="subscription-card-due">{nextDue ? <><span>{nextDue.dueDate < currentDate ? "Overdue" : "Next due"}</span><strong>{dateLabel(nextDue.dueDate)}</strong></> : <span>{sorted.length ? `${sorted.length} transactions` : "No transactions"}</span>}</div><div className="table-actions"><Button variant="outline" onClick={(event) => { event.preventDefault(); setTransactionEditor({ account, transaction: null }); }}><Plus size={13} /> Transaction</Button><button className="icon-button" aria-label={`Edit ${account.name}`} onClick={(event) => { event.preventDefault(); setAccountEditor(account); }}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${account.name} as a new service`} title="Copy service without transaction history" onClick={(event) => { event.preventDefault(); onSaveAccount({ name: copyLabel(account.name, 120), category: account.category, provider: account.provider, billingType: account.billingType, currency: account.currency, accountReference: account.accountReference, notes: account.notes }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${account.name}`} onClick={(event) => { event.preventDefault(); archiveAccount(account); }}><Archive size={13} /></button></div></summary>
         <div className="compact-details-body">{account.notes && <p className="subscription-card-notes"><LinkifiedText>{account.notes}</LinkifiedText></p>}
         {sorted.length ? <details className="subscription-transactions compact-details"><summary className="subscription-transactions-summary compact-summary"><strong>Transaction history</strong><span>{sorted.length} {sorted.length === 1 ? "record" : "records"} · latest {dateLabel([...sorted].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))[0].transactionDate)}</span></summary>
-          {transactionGroupBy === "date"
+          {transactionGroupBy === "none"
+            ? renderTransactionRows(account, sorted)
+            : transactionGroupBy === "date"
             ? <DateGroupedRecords items={sorted} getDate={(entry) => entry.transactionDate} title={(date) => `Transactions · ${dateLabel(date)}`} groupOrder={transactionSort === "oldest" ? "oldest" : "newest"}>{(dateEntries) => renderTransactionRows(account, dateEntries)}</DateGroupedRecords>
             : <div className="record-date-groups">{transactionGroups.map((key) => {
               const entries = sorted.filter((entry) => monthKey(entry.transactionDate) === key);
@@ -11777,20 +11826,22 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   onDeleteRequest: (request: PrayerRequest) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"readings" | "reflections" | "prayers" | "resources" | "songs" | "calendar" | "daily-prayers">("readings");
+  const devotionalScreen = `devotional-${activeTab}`;
+  const savedView = useSavedScreenView(devotionalScreen);
   const [progressMonth, setProgressMonth] = useState(() => monthKey(today()));
   const [selectedProgressDate, setSelectedProgressDate] = useState("");
   const [showReadingStreak, setShowReadingStreak] = useState(false);
-  const [sortOrder, setSortOrder] = useState<DevotionalSortOrder>("newest");
-  const [groupBy, setGroupBy] = useState<"date" | "none" | "type" | "title">("date");
-  const [calendarGroupBy, setCalendarGroupBy] = useState<"date" | "type">("date");
+  const [sortOrder, setSortOrder] = useState<DevotionalSortOrder>(() => savedScreenSetting(savedView, "sortOrder", "newest", ["newest", "oldest", "title"]));
+  const [groupBy, setGroupBy] = useState<"date" | "none" | "type" | "title">(() => savedScreenSetting(savedView, "groupBy", activeTab === "songs" ? "title" : "date", ["date", "none", "type", "title"]));
+  const [calendarGroupBy, setCalendarGroupBy] = useState<"date" | "type" | "none">(() => savedScreenSetting(savedView, "calendarGroupBy", "date", ["date", "type", "none"]));
   const [expandAllGroups, setExpandAllGroups] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
-  const [calendarTypeFilter, setCalendarTypeFilter] = useState("All record types");
-  const [bookFilter, setBookFilter] = useState("All books");
-  const [resourceSourceFilter, setResourceSourceFilter] = useState("All sources");
-  const [prayerPeriodFilter, setPrayerPeriodFilter] = useState("All periods");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [calendarTypeFilter, setCalendarTypeFilter] = useState(() => savedView.calendarTypeFilter ?? "All record types");
+  const [bookFilter, setBookFilter] = useState(() => savedView.bookFilter ?? "All books");
+  const [resourceSourceFilter, setResourceSourceFilter] = useState(() => savedView.resourceSourceFilter ?? "All sources");
+  const [prayerPeriodFilter, setPrayerPeriodFilter] = useState(() => savedView.prayerPeriodFilter ?? "All periods");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
   const [readingEditorDate, setReadingEditorDate] = useState(today());
   const [dailyPrayerEditorDate, setDailyPrayerEditorDate] = useState(today());
   const [entryEditorDate, setEntryEditorDate] = useState(today());
@@ -11801,8 +11852,25 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
   const [resourceEditor, setResourceEditor] = useState<DevotionalResource | null | undefined>(undefined);
   const [songEditor, setSongEditor] = useState<DevotionalSong | null | undefined>(undefined);
   const [requestEditor, setRequestEditor] = useState<PrayerRequest | null | undefined>(undefined);
-  const [requestFilter, setRequestFilter] = useState("Ongoing");
-  const [search, setSearch] = useState("");
+  const [requestFilter, setRequestFilter] = useState(() => savedView.requestFilter ?? "Ongoing");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    setSortOrder(savedScreenSetting<DevotionalSortOrder>(savedView, "sortOrder", "newest", ["newest", "oldest", "title"]));
+    setGroupBy(savedScreenSetting<"date" | "none" | "type" | "title">(savedView, "groupBy", activeTab === "songs" ? "title" : "date", ["date", "none", "type", "title"]));
+    setCalendarGroupBy(savedScreenSetting<"date" | "type" | "none">(savedView, "calendarGroupBy", "date", ["date", "type", "none"]));
+    setSearch(savedView.search ?? "");
+    setDateFrom(savedView.dateFrom ?? "");
+    setDateTo(savedView.dateTo ?? "");
+    setBookFilter(savedView.bookFilter ?? "All books");
+    setResourceSourceFilter(savedView.resourceSourceFilter ?? "All sources");
+    setPrayerPeriodFilter(savedView.prayerPeriodFilter ?? "All periods");
+    setRequestFilter(savedView.requestFilter ?? "Ongoing");
+    setCalendarTypeFilter(savedView.calendarTypeFilter ?? "All record types");
+    setPageSize(savedPageSize(savedView));
+    setPage(0);
+  }, [activeTab, savedView]);
   function changeDevotionalTab(tab: typeof activeTab) {
     if (tab === "songs") setGroupBy("title");
     else if (activeTab === "songs" && groupBy === "title") setGroupBy("date");
@@ -11926,11 +11994,21 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     matchesDateFilter(record.date) &&
     (!query || `${record.type} ${record.title} ${record.summary}`.toLocaleLowerCase().includes(query)));
   const sortedCalendarRecordItems = sortDevotionalRecords(calendarRecordItems, (record) => record.date, (record) => record.title, sortOrder);
+  const activeRecordCount = activeTab === "readings" ? sortedReadings.length
+    : activeTab === "reflections" ? sortedEntries.length
+      : activeTab === "prayers" ? sortedRequests.length
+        : activeTab === "resources" ? sortedResources.length
+          : activeTab === "songs" ? sortedSongs.length
+            : activeTab === "daily-prayers" ? sortedPrayerLogs.length : sortedCalendarRecordItems.length;
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(activeRecordCount / pageSize) - 1));
+  const pagedCalendarRecords = pageRecords(sortedCalendarRecordItems, currentPage, pageSize);
   const calendarRecordGroups = calendarGroupBy === "date"
-    ? groupByDate(sortedCalendarRecordItems, (record) => record.date).map(({ date, records }) => ({ title: dateLabel(date), records }))
-    : ["Bible readings", "Daily prayers", "Bible reflections", "Prayer requests"]
-      .filter((type) => calendarRecordItems.some((record) => record.type === type))
-      .map((type) => ({ title: type, records: sortedCalendarRecordItems.filter((record) => record.type === type) }));
+    ? groupByDate(pagedCalendarRecords, (record) => record.date).map(({ date, records }) => ({ title: dateLabel(date), records }))
+    : calendarGroupBy === "none"
+      ? [{ title: "All calendar records", records: pagedCalendarRecords }]
+      : ["Bible readings", "Daily prayers", "Bible reflections", "Prayer requests"]
+        .filter((type) => pagedCalendarRecords.some((record) => record.type === type))
+        .map((type) => ({ title: type, records: pagedCalendarRecords.filter((record) => record.type === type) }));
   const sortedReadingDates = [...progressReadingDays.keys()].sort();
   const completedReadingDates = sortedReadingDates.filter((date) => date <= today());
   const latestReadingDate = completedReadingDates[completedReadingDates.length - 1];
@@ -12014,7 +12092,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
       <Button variant={activeTab === "daily-prayers" ? "primary" : "outline"} aria-pressed={activeTab === "daily-prayers"} onClick={() => changeDevotionalTab("daily-prayers")}><Heart size={14} />Daily prayers<Badge>{dailyPrayerLogs.length}</Badge></Button>
       <Button variant={activeTab === "calendar" ? "primary" : "outline"} aria-pressed={activeTab === "calendar"} onClick={() => changeDevotionalTab("calendar")}><CalendarDays size={14} />Calendar</Button>
     </nav>
-    <div className="toolbar filter-toolbar devotional-toolbar">
+    <div className="toolbar filter-toolbar devotional-toolbar compact-filter-toolbar">
       <div className="search-wrap"><Search size={15} /><Input aria-label="Search devotional journal" placeholder="Search Scripture, reflections, prayers, songs, resources..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
       <FilterDrawer label="Search & display filters" activeCount={(dateFrom ? 1 : 0) + (dateTo ? 1 : 0) +
         (activeTab === "calendar" ? (calendarTypeFilter !== "All record types" ? 1 : 0) + (calendarGroupBy !== "date" ? 1 : 0) : (groupBy !== "date" ? 1 : 0)) +
@@ -12023,7 +12101,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
         (activeTab === "daily-prayers" && prayerPeriodFilter !== "All periods" ? 1 : 0) +
         (activeTab === "prayers" && requestFilter !== "Ongoing" ? 1 : 0) + (sortOrder !== "newest" ? 1 : 0)}>
         {activeTab === "calendar"
-          ? <Field label="Group calendar records by"><Select aria-label="Group calendar records by" value={calendarGroupBy} onChange={(event) => setCalendarGroupBy(event.target.value as "date" | "type")}><option value="date">Date</option><option value="type">Record type (tab)</option></Select></Field>
+          ? <Field label="Group calendar records by"><Select aria-label="Group calendar records by" value={calendarGroupBy} onChange={(event) => setCalendarGroupBy(event.target.value as "date" | "type" | "none")}><option value="date">Date</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field>
           : <Field label="Group records by"><Select aria-label="Group devotional records by" value={groupBy} onChange={(event) => setGroupBy(event.target.value as "date" | "none" | "type" | "title")}><option value="date">Date</option><option value="type">{activeTab === "readings" ? "Book" : activeTab === "prayers" ? "Status" : activeTab === "resources" ? "Source" : activeTab === "songs" ? "Language" : activeTab === "daily-prayers" ? "Period" : "Scripture reference"}</option>{activeTab === "songs" && <option value="title">Title</option>}<option value="none">No grouping</option></Select></Field>}
         <Field label="Sort by"><Select aria-label="Sort devotional records" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as DevotionalSortOrder)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="title">Title A–Z</option></Select></Field>
         <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
@@ -12034,26 +12112,28 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
         {activeTab === "calendar" && <Field label="Record type"><Select aria-label="Filter calendar record type" value={calendarTypeFilter} onChange={(event) => setCalendarTypeFilter(event.target.value)}><option>All record types</option><option>Bible readings</option><option>Daily prayers</option><option>Bible reflections</option><option>Prayer requests</option></Select></Field>}
         {activeTab === "prayers" && <Field label="Request status"><Select aria-label="Filter prayer requests" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)}><option>Ongoing</option><option>Answered</option><option>All requests</option></Select></Field>}
       </FilterDrawer>
+      <SaveScreenViewButton screen={devotionalScreen} settings={{ search, sortOrder, groupBy, calendarGroupBy, dateFrom, dateTo, bookFilter, resourceSourceFilter, prayerPeriodFilter, requestFilter, calendarTypeFilter, pageSize: String(pageSize) }} label={`${activeTab} filters, grouping, and pagination`} />
+      {activeRecordCount > 0 && <ReportPagination count={activeRecordCount} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="compact-report-pagination" />}
       <div className="devotional-group-actions">
         <Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(true)}>Show all</Button>
         <Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(false)}>Hide all</Button>
       </div>
     </div>
     {activeTab === "readings" && <section className="devotional-reading-section"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Daily Bible reading</h2><p>{visibleReadings.length} {visibleReadings.length === 1 ? "reading" : "readings"} recorded</p></div></div>
-      {visibleReadings.length ? <div className="devotional-date-groups">{dateGroups(sortedReadings, (reading) => reading.date, (reading) => reading.fromBook).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} · readings` : date ? `Readings · ${dateLabel(date)}` : "All readings"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-reading-list">{records.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
+      {visibleReadings.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedReadings, currentPage, pageSize), (reading) => reading.date, (reading) => reading.fromBook).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} · readings` : date ? `Readings · ${dateLabel(date)}` : "All readings"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-reading-list">{records.map((reading) => <Card className="devotional-card devotional-reading-card" key={reading.id}>
         <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{dateLabel(reading.date)}</span>}<h3>{reading.fromBook} {reading.fromChapterNumber}:{reading.fromVerseNumber} – {reading.toBook} {reading.toChapterNumber}:{reading.toVerseNumber}</h3><span className="devotional-date">{reading.fromTestament}{reading.fromChapterName ? ` · ${reading.fromChapterName}` : ""} → {reading.toTestament}{reading.toChapterName ? ` · ${reading.toChapterName}` : ""}</span><a className="devotional-resource-link" href={`https://www.biblegateway.com/passage/?search=${encodeURIComponent(`${reading.fromBook} ${reading.fromChapterNumber}:${reading.fromVerseNumber}-${reading.toBook} ${reading.toChapterNumber}:${reading.toVerseNumber}`)}&version=WEB`} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open passage (WEB)</a></div><div className="table-actions"><button className="icon-button" aria-label="Edit daily Bible reading" onClick={() => setReadingEditor(reading)}><Pencil size={13} /></button><button className="icon-button" aria-label="Copy daily Bible reading" onClick={() => { const { id, ...copy } = reading; void id; onSaveReading({ ...copy, notes: copyLabel(copy.notes || "Bible reading", 5000) }); }}><Copy size={13} /></button><button className="icon-button" aria-label="Archive daily Bible reading" onClick={() => confirmDeleteReading(reading)}><Archive size={13} /></button></div></div>
         {reading.people && <p><strong>People in the verses:</strong> <LinkifiedText>{reading.people}</LinkifiedText></p>}
         {reading.notes && <p><strong>Comments / notes:</strong> <LinkifiedText>{reading.notes}</LinkifiedText></p>}
       </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={readings.length ? "No matching Bible readings" : "No daily Bible readings yet"} description={readings.length ? "Try another search." : "Record a date and the Scripture range you read."} /></Card>}
     </section>}
     {activeTab === "reflections" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><BookOpen size={15} /> Bible reflections</h2><p>{visibleEntries.length} {visibleEntries.length === 1 ? "entry" : "entries"}</p></div></div>
-        {visibleEntries.length ? <div className="devotional-date-groups">{dateGroups(sortedEntries, (entry) => entry.date, (entry) => entry.scriptureReference).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? date : date ? `Reflections · ${dateLabel(date)}` : "All reflections"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((entry) => <Card className="devotional-card" key={entry.id}>
+        {visibleEntries.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedEntries, currentPage, pageSize), (entry) => entry.date, (entry) => entry.scriptureReference).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? date : date ? `Reflections · ${dateLabel(date)}` : "All reflections"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((entry) => <Card className="devotional-card" key={entry.id}>
           <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{dateLabel(entry.date)}</span>}<h3>{entry.scriptureReference}</h3></div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry.scriptureReference}`} onClick={() => setEntryEditor(entry)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${entry.scriptureReference}`} onClick={() => { const { id, ...copy } = entry; void id; onSaveEntry({ ...copy, scriptureReference: copyLabel(copy.scriptureReference, 120) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${entry.scriptureReference}`} onClick={() => confirmDeleteEntry(entry)}><Archive size={13} /></button></div></div>
           {entry.takeaway && <p><strong>Message:</strong> <LinkifiedText>{entry.takeaway}</LinkifiedText></p>}{entry.reflection && <p><strong>Reflection:</strong> <LinkifiedText>{entry.reflection}</LinkifiedText></p>}{entry.prayerNotes && <p><strong>Prayer:</strong> <LinkifiedText>{entry.prayerNotes}</LinkifiedText></p>}
         </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<BookOpen size={18} />} title={entries.length ? "No matching reflections" : "No Bible reflections yet"} description={entries.length ? "Try another search." : "Save a Scripture reference and your thoughts about it."} /></Card>}
     </section>}
     {activeTab === "prayers" && <section className="devotional-section devotional-tab-panel"><div className="devotional-section-head"><div><h2><Heart size={15} /> Prayer requests</h2><p>{ongoingCount} ongoing · {answeredCount} answered</p></div></div>
-        {visibleRequests.length ? <div className="devotional-date-groups">{dateGroups(sortedRequests, (request) => request.dateAdded, (request) => request.status).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} requests` : date ? `Requests added · ${dateLabel(date)}` : "All requests"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((request) => <Card className="devotional-card" key={request.id}>
+        {visibleRequests.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedRequests, currentPage, pageSize), (request) => request.dateAdded, (request) => request.status).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} requests` : date ? `Requests added · ${dateLabel(date)}` : "All requests"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((request) => <Card className="devotional-card" key={request.id}>
           <div className="devotional-card-head"><div><Badge tone={request.status === "Answered" ? "green" : "amber"}>{request.status}</Badge><h3>{request.title}</h3><span className="devotional-date">Added {dateLabel(request.dateAdded)}{request.answeredDate ? ` · Answered ${dateLabel(request.answeredDate)}` : ""}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit prayer request: ${request.title}`} onClick={() => setRequestEditor(request)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy prayer request: ${request.title}`} onClick={() => { const { id, ...copy } = request; void id; onSaveRequest({ ...copy, title: copyLabel(copy.title, 160) }); }}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive prayer request: ${request.title}`} onClick={() => confirmDeleteRequest(request)}><Archive size={13} /></button></div></div>
           {request.details && <p><LinkifiedText>{request.details}</LinkifiedText></p>}
           <Button size="sm" variant="outline" onClick={() => onSaveRequest({
@@ -12064,7 +12144,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
         </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={requests.length ? "No matching prayer requests" : "No prayer requests yet"} description={requests.length ? "Try another search or status filter." : "Add a request to keep it in your prayer list."} /></Card>}
     </section>}
     {activeTab === "resources" && <section className="devotional-resource-section" ><div className="devotional-section-head"><div><h2><PlayCircle size={15} /> Music, media & other resources</h2><p>{visibleResources.length} {visibleResources.length === 1 ? "resource" : "resources"} · audio, video, songs, sermons, Scripture study, and more</p></div></div>
-      {visibleResources.length ? <div className="devotional-date-groups">{dateGroups(sortedResources, (resource) => resource.dateAdded, (resource) => resource.source).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} resources` : groupBy === "date" ? (date ? `Resources · ${dateLabel(date)}` : "Date not recorded") : "All resources"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-resource-list">{records.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
+      {visibleResources.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedResources, currentPage, pageSize), (resource) => resource.dateAdded, (resource) => resource.source).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} resources` : groupBy === "date" ? (date ? `Resources · ${dateLabel(date)}` : "Date not recorded") : "All resources"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-resource-list">{records.map((resource) => <Card className="devotional-resource-card" key={resource.id}>
       <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{resource.dateAdded ? dateLabel(resource.dateAdded) : "Date not recorded"}</span>}<h3>{resource.title}</h3>{resource.source && <span className="devotional-date">Source: {resource.source}</span>}</div><div className="table-actions"><button className="icon-button" aria-label={`Edit ${resource.title}`} onClick={() => setResourceEditor(resource)}><Pencil size={13} /></button><button className="icon-button" aria-label={`Copy ${resource.title}`} onClick={() => onSaveResource({ ...resource, dateAdded: resource.dateAdded ?? today(), title: copyLabel(resource.title, 160) })}><Copy size={13} /></button><button className="icon-button" aria-label={`Archive ${resource.title}`} onClick={() => confirmDeleteResource(resource)}><Archive size={13} /></button></div></div>
         {resource.description && <p><LinkifiedText>{resource.description}</LinkifiedText></p>}
         <a className="devotional-resource-link" href={activityLinkHref(resource.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open resource in new tab</a>
@@ -12072,7 +12152,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     </section>}
     {activeTab === "songs" && <section className="devotional-section devotional-tab-panel">
       <div className="devotional-section-head"><div><h2><Music2 size={15} /> Song lyrics</h2><p>{visibleSongs.length} {visibleSongs.length === 1 ? "song" : "songs"} saved</p></div></div>
-      {visibleSongs.length ? <div className="devotional-date-groups">{dateGroups(sortedSongs, (song) => song.date, (song) => groupBy === "title" ? song.title : song.language || "Language not set").map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "title" ? date : groupBy === "type" ? `${date} songs` : date ? dateLabel(date) : "All songs"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((song) => <Card className="devotional-card devotional-song-card" key={song.id}>
+      {visibleSongs.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedSongs, currentPage, pageSize), (song) => song.date, (song) => groupBy === "title" ? song.title : song.language || "Language not set").map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "title" ? date : groupBy === "type" ? `${date} songs` : date ? dateLabel(date) : "All songs"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((song) => <Card className="devotional-card devotional-song-card" key={song.id}>
         <div className="devotional-card-head"><div>{groupBy !== "date" && <span className="devotional-date">{dateLabel(song.date)}</span>}<h3>{song.title}</h3><span className="devotional-date">{[song.language, song.author && `Author: ${song.author}`, song.bibleReference && `Bible: ${song.bibleReference}`].filter(Boolean).join(" · ") || "Song details not provided"}</span></div><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${song.title}`} onClick={() => setSongEditor(song)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label={`Copy ${song.title}`} onClick={() => onSaveSong({ ...song, title: copyLabel(song.title, 160) })}><Copy size={13} /></button><button type="button" className="icon-button" aria-label={`Archive ${song.title}`} onClick={() => confirmDeleteSong(song)}><Archive size={13} /></button></div></div>
         {song.lyrics && <p className="devotional-song-lyrics">{song.lyrics}</p>}
         {song.link && <a className="devotional-resource-link" href={activityLinkHref(song.link)} target="_blank" rel="noopener noreferrer"><ExternalLink size={13} /> Open song link</a>}
@@ -12080,7 +12160,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
     </section>}
     {activeTab === "daily-prayers" && <section className="devotional-section devotional-tab-panel">
       <div className="devotional-section-head"><div><h2><Heart size={15} /> Daily prayer tracker</h2><p>{visibleDailyPrayerLogs.length} {visibleDailyPrayerLogs.length === 1 ? "prayer" : "prayers"} recorded · {new Set(dailyPrayerLogs.map((log) => log.date)).size} days tracked</p></div></div>
-      {visibleDailyPrayerLogs.length ? <div className="devotional-date-groups">{dateGroups(sortedPrayerLogs, (log) => log.date, (log) => log.period).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} prayers` : date ? `Prayers · ${dateLabel(date)}` : "All prayers"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
+      {visibleDailyPrayerLogs.length ? <div className="devotional-date-groups">{dateGroups(pageRecords(sortedPrayerLogs, currentPage, pageSize), (log) => log.date, (log) => log.period).map(({ date, records }, index) => <DevotionalRecordGroup key={date || `all-${index}`} title={groupBy === "type" ? `${date} prayers` : date ? `Prayers · ${dateLabel(date)}` : "All prayers"} count={records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}><div className="devotional-list">{records.map((log) => <Card className="devotional-card devotional-prayer-log-card" key={log.id}>
         <div className="devotional-card-head"><div><span className="devotional-date">{groupBy !== "date" ? `${dateLabel(log.date)} · ` : ""}{log.period}{log.time ? ` · ${timeLabel(log.time)}` : ""}</span><h3>{log.prayerType}{log.prayerNotes.endsWith(" (copy)") ? " (copy)" : ""}</h3></div><div className="table-actions"><button type="button" className="icon-button" aria-label="Edit daily prayer" onClick={() => setDailyPrayerEditor(log)}><Pencil size={13} /></button><button type="button" className="icon-button" aria-label="Copy daily prayer" onClick={() => { const { id, ...copy } = log; void id; onSaveDailyPrayerLog({ ...copy, prayerNotes: copyLabel(copy.prayerNotes || copy.prayerType, 5000) }); }}><Copy size={13} /></button><button type="button" className="icon-button" aria-label="Archive daily prayer" onClick={() => confirmDeleteDailyPrayer(log)}><Archive size={13} /></button></div></div>
         <p><LinkifiedText>{log.prayerNotes}</LinkifiedText></p>
       </Card>)}</div></DevotionalRecordGroup>)}</div> : <Card><EmptyState icon={<Heart size={18} />} title={dailyPrayerLogs.length ? "No matching daily prayers" : "No daily prayers recorded"} description={dailyPrayerLogs.length ? "Try another search." : "Record a prayer by date, time of day, type, and notes."} /></Card>}
@@ -12154,6 +12234,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
         {selectedProgressDate && selectedDateActivityCount === 0 && <Card><EmptyState icon={<BookOpen size={18} />} title="No devotional records on this date" description="Use the buttons above to add a reading, prayer, reflection, or request." /></Card>}
       </section>
     </section>}
+    {activeRecordCount > 0 && <ReportPagination count={activeRecordCount} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="compact-report-pagination" />}
     {entryEditor !== undefined && <DevotionalEntryModal key={entryEditor?.id ?? "new-devotional"} initial={entryEditor} initialDate={entryEditorDate} onClose={() => setEntryEditor(undefined)} onSave={(entry) => { onSaveEntry(entry, entryEditor?.id); setEntryEditor(undefined); }} />}
     {readingEditor !== undefined && <DailyBibleReadingModal key={readingEditor?.id ?? "new-daily-bible-reading"} initial={readingEditor} initialDate={readingEditorDate} onClose={() => setReadingEditor(undefined)} onSave={(reading) => { onSaveReading(reading, readingEditor?.id); setReadingEditor(undefined); }} />}
     {dailyPrayerEditor !== undefined && <DailyPrayerLogModal key={dailyPrayerEditor?.id ?? "new-daily-prayer"} initial={dailyPrayerEditor} initialDate={dailyPrayerEditorDate} onClose={() => setDailyPrayerEditor(undefined)} onSave={(log) => { onSaveDailyPrayerLog(log, dailyPrayerEditor?.id); setDailyPrayerEditor(undefined); }} />}
@@ -13542,7 +13623,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
   const [priorityFilter, setPriorityFilter] = useState(() => savedView.priorityFilter ?? "All priorities");
   const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
   const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
-  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "status", "area", "type"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "status", "area", "type", "none"]));
   const formatCurrency = useCurrencyFormatter();
   const query = search.trim().toLocaleLowerCase();
   const activeCount = records.filter((record) => record.status !== "Resolved" && record.status !== "Closed").length;
@@ -13633,8 +13714,8 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
       <Field label="Reported from"><DateInput aria-label="Filter issues reported from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
       <Field label="Reported to"><DateInput aria-label="Filter issues reported to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       {[areaFilter !== "All areas", statusFilter !== "All statuses", kindFilter !== "All types", priorityFilter !== "All priorities", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setAreaFilter("All areas"); setStatusFilter("All statuses"); setKindFilter("All types"); setPriorityFilter("All priorities"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Issues and maintenance" screen="issues-maintenance" settings={{ search, areaFilter, statusFilter, kindFilter, priorityFilter, dateFrom, dateTo, groupBy }} /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
-    {visibleRecords.length ? groupBy === "date"
+    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Issues and maintenance" screen="issues-maintenance" settings={{ search, areaFilter, statusFilter, kindFilter, priorityFilter, dateFrom, dateTo, groupBy }} /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    {visibleRecords.length ? groupBy === "none" ? renderIssueCards(visibleRecords) : groupBy === "date"
       ? <DateGroupedRecords items={visibleRecords} getDate={(record) => record.dateReported} title={(date) => `Reported · ${dateLabel(date)}`}>{renderIssueCards}</DateGroupedRecords>
       : <div className="issue-record-groups">{issueGroups.map((group) => <section key={group.title}><h2 className="shopping-record-group-title">{group.title}<span>{group.records.length}</span></h2>{renderIssueCards(group.records)}</section>)}</div>
       : <Card><EmptyState icon={<Wrench size={18} />} title={records.length ? "No matching records" : "Nothing to track yet"} description={records.length ? "Try changing the search or filters." : "Add a personal or work issue, household repair, vehicle service, or any task you want to follow."} /></Card>}
@@ -15160,6 +15241,9 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
   const [search, setSearch] = useState(() => savedView.search ?? "");
   const [showArchived, setShowArchived] = useState(() => savedView.showArchived === "true");
   const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "category", ["category", "provider", "none"]));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);
@@ -15174,6 +15258,16 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
       record.notes, ...record.tags, ...record.additionalFields.flatMap((field) => [field.label, field.value])]
       .some((value) => value.toLocaleLowerCase().includes(query)))
     .sort((a, b) => a.provider.localeCompare(b.provider));
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(filteredRecords.length / pageSize) - 1));
+  const pageRecordsForView = pageRecords(filteredRecords, currentPage, pageSize);
+  const credentialGroups = groupBy === "none" ? [] : [...new Set(pageRecordsForView.map((record) =>
+    groupBy === "category" ? record.category || "Uncategorized" : record.provider || "Unnamed provider"))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((title) => ({
+      title,
+      records: pageRecordsForView.filter((record) =>
+        (groupBy === "category" ? record.category || "Uncategorized" : record.provider || "Unnamed provider") === title),
+    }));
 
   function togglePassword(record: CredentialRecord) {
     setVisiblePasswords((visible) => {
@@ -15234,10 +15328,10 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
     </details>;
   }
 
-  function renderCredentialTable() {
+  function renderCredentialTable(entries: CredentialRecord[]) {
     return <div className="credential-table-wrap"><table className="data-table document-table credential-table">
       <thead><tr><th>Provider</th><th>Category</th><th>Username</th><th>Password</th><th>Website</th><th>Actions</th></tr></thead>
-      <tbody>{filteredRecords.map((record) => <tr key={record.id}>
+      <tbody>{entries.map((record) => <tr key={record.id}>
         <td><details className="credential-table-disclosure"><summary><strong>{record.provider}</strong><span>Details</span></summary>{renderCredentialDetails(record)}</details></td>
         <td>{record.category || "—"}</td>
         <td>{record.username || "—"}</td>
@@ -15287,13 +15381,19 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
     <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored as readable records in the assigned mydocumentsmanager database and are not included in Daybook JSON backups. Database administrators with service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
     {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
     {error && <div className="alert alert-error" role="alert">{error}</div>}
-    <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><RecordViewToggle value={view} onChange={setView} label="Account credentials" screen="account-credentials" settings={{ search, showArchived: String(showArchived) }} /><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
+    <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => { setShowArchived(false); setPage(0); }}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => { setShowArchived(true); setPage(0); }}>Archived ({archivedRecords.length})</Button></nav>
+    <div className="toolbar filter-toolbar compact-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div><Field className="compact-group-control" label="Group by"><Select aria-label="Group account credentials" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setPage(0); }}><option value="category">Category</option><option value="provider">Provider</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Account credentials" screen="account-credentials" settings={{ search, showArchived: String(showArchived), groupBy, pageSize: String(pageSize) }} /><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
+    {filteredRecords.length > 0 && <ReportPagination count={filteredRecords.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="compact-report-pagination" />}
     {filteredRecords.length
-      ? view === "table"
-        ? renderCredentialTable()
-        : <div className={view === "grid" ? "credential-grid" : "credential-list"}>{filteredRecords.map(renderCredentialCard)}</div>
+      ? groupBy === "none"
+        ? view === "table"
+          ? renderCredentialTable(pageRecordsForView)
+          : <div className={view === "grid" ? "credential-grid" : "credential-list"}>{pageRecordsForView.map(renderCredentialCard)}</div>
+        : <div className="credential-groups">{credentialGroups.map((group) => <section key={group.title}><h2 className="shopping-record-group-title">{group.title}<span>{group.records.length}</span></h2>{view === "table"
+          ? renderCredentialTable(group.records)
+          : <div className={view === "grid" ? "credential-grid" : "credential-list"}>{group.records.map(renderCredentialCard)}</div>}</section>)}</div>
       : <Card><EmptyState icon={<KeyRound size={18} />} title={visibleSource.length ? "No matching accounts" : showArchived ? "No archived account credentials" : "No account credentials saved"} description={visibleSource.length ? "Try another search." : "Add account details for quick reference."} /></Card>}
+    {filteredRecords.length > 0 && <ReportPagination count={filteredRecords.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="compact-report-pagination" />}
     {editor !== undefined && <CredentialModal key={editor?.id ?? "new-direct-credential"} initial={editor} onClose={() => setEditor(undefined)} onSave={async (record) => {
       await onSave({ ...record, id: editor?.id ?? createId() });
     }} />}
