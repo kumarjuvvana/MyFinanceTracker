@@ -3,10 +3,10 @@ import {
   Archive, ArrowDownToLine, ArrowLeftRight, Award, Bell, BarChart3, BookOpen, Briefcase, CalendarDays, Car, Check, CheckCircle2, Dumbbell, History,
   ChevronDown, ChevronLeft, ChevronRight, ClipboardList, Clock3, Database, Download,
   Copy, Eye, EyeOff, ExternalLink, FileDown, FileJson2, FileText, Filter, GraduationCap, KeyRound, Landmark, LayoutDashboard, Leaf, ListChecks, LockKeyhole, Mail, MapPin, Maximize2, Menu, Minimize2, Palette, Pencil, PlayCircle,
-  ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical, Grid2X2, List, Table2,
+  ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
-import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, Select, type RecordViewMode } from "./components/ui";
+import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, ScreenViewPreferencesContext, Select, type RecordViewMode, useSavedScreenView } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { OfficeDocumentViewer } from "./components/OfficeDocumentViewer";
 import { PdfDocumentViewer } from "./components/PdfDocumentViewer";
@@ -80,6 +80,21 @@ import {
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
 const PREFERENCES_KEY = "daybook-shopping-preferences";
+function savedScreenSetting<T extends string>(
+  settings: Record<string, string>,
+  key: string,
+  fallback: T,
+  allowed?: readonly T[],
+): T {
+  const value = settings[key];
+  if (value === undefined) return fallback;
+  if (allowed && !allowed.some((option) => option === value)) return fallback;
+  return value as T;
+}
+function savedViewMode(settings: Record<string, string>): RecordViewMode {
+  const view = settings.view;
+  return view === "grid" || view === "list" || view === "table" ? view : "table";
+}
 const FONT_FAMILY_LABELS: Record<FontFamily, string> = {
   system: "System UI",
   inter: "Inter",
@@ -960,6 +975,7 @@ function ImportantDateModal({ initial, categories, feelings, onClose, onSave }: 
 }
 
 function ImportantDatesPage() {
+  const savedView = useSavedScreenView("important-dates");
   const [records, setRecords] = useState<ImportantDate[]>([]);
   const [categories, setCategories] = useState<ImportantDateCategory[]>([]);
   const [feelings, setFeelings] = useState<ImportantDateFeeling[]>([]);
@@ -973,16 +989,16 @@ function ImportantDatesPage() {
   const [categoryDraft, setCategoryDraft] = useState("");
   const [feelingDraft, setFeelingDraft] = useState("");
   const [feelingSentiment, setFeelingSentiment] = useState<ImportantDateFeeling["sentiment"]>("Good");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
   const [elapsedAt, setElapsedAt] = useState(() => new Date());
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "title">("newest");
-  const [groupBy, setGroupBy] = useState<"date" | "category" | "person" | "feeling" | "none">("date");
-  const [dateFilterCategory, setDateFilterCategory] = useState("all");
-  const [dateFilterFeeling, setDateFilterFeeling] = useState("all");
-  const [reminderFilter, setReminderFilter] = useState<"all" | "reminders" | "no-reminders">("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [recordLayout, setRecordLayout] = useState<RecordViewMode>("table");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "title">(() => savedScreenSetting(savedView, "sortOrder", "newest", ["newest", "oldest", "title"]));
+  const [groupBy, setGroupBy] = useState<"date" | "category" | "person" | "feeling" | "none">(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "category", "person", "feeling", "none"]));
+  const [dateFilterCategory, setDateFilterCategory] = useState(() => savedView.dateFilterCategory ?? "all");
+  const [dateFilterFeeling, setDateFilterFeeling] = useState(() => savedView.dateFilterFeeling ?? "all");
+  const [reminderFilter, setReminderFilter] = useState<"all" | "reminders" | "no-reminders">(() => savedScreenSetting(savedView, "reminderFilter", "all", ["all", "reminders", "no-reminders"]));
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [recordLayout, setRecordLayout] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
 
@@ -1204,7 +1220,7 @@ function ImportantDatesPage() {
             <Field label="From date"><DateInput aria-label="Filter from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
             <Field label="To date"><DateInput aria-label="Filter to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
           </FilterDrawer>
-          <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Important dates" />
+          <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Important dates" screen="important-dates" settings={{ search, sortOrder, groupBy, dateFilterCategory, dateFilterFeeling, reminderFilter, dateFrom, dateTo }} />
           <Badge>{visible.length} {visible.length === 1 ? "date" : "dates"}</Badge>
         </div>
         {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearDateFilters}>Clear search, filters & sorting</Button></div>}
@@ -3650,20 +3666,21 @@ function ReminderModal({ initial, categories, onClose, onSave }: {
 }
 
 function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete, onToggle }: { reminders: Reminder[]; categories: string[]; onSave: (reminder: Omit<Reminder, "id">, id?: string) => void; onDelete: (id: string) => void; onToggle: (reminder: Reminder) => void }) {
+  const savedView = useSavedScreenView("reminders");
   const [activeTab, setActiveTab] = useState<"list" | "add">("list");
   const [editor, setEditor] = useState<Reminder | null | undefined>(undefined);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(today());
   const [category, setCategory] = useState("General");
   const [details, setDetails] = useState("");
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All categories");
-  const [statusFilter, setStatusFilter] = useState("All reminders");
-  const [sortOrder, setSortOrder] = useState<"date-ascending" | "date-descending" | "title" | "category">("date-ascending");
-  const [groupBy, setGroupBy] = useState<"date" | "category" | "status" | "none">("date");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [recordLayout, setRecordLayout] = useState<RecordViewMode>("table");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All reminders");
+  const [sortOrder, setSortOrder] = useState<"date-ascending" | "date-descending" | "title" | "category">(() => savedScreenSetting(savedView, "sortOrder", "date-ascending", ["date-ascending", "date-descending", "title", "category"]));
+  const [groupBy, setGroupBy] = useState<"date" | "category" | "status" | "none">(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "category", "status", "none"]));
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [recordLayout, setRecordLayout] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [error, setError] = useState("");
@@ -3771,7 +3788,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
         <Field label="From date"><DateInput aria-label="Filter reminders from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reminders to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       </FilterDrawer>
-      <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Reminders" />
+      <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Reminders" screen="reminders" settings={{ search, categoryFilter, statusFilter, sortOrder, groupBy, dateFrom, dateTo }} />
       <Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge>
     </div>
     {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearListOptions}>Clear search, filters & sorting</Button></div>}
@@ -3911,12 +3928,13 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
 }
 
 function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: ArchivedRecord[]; onRestore: (id: string) => void; onCopy: (id: string) => void; onDelete: (id: string) => void }) {
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [collection, setCollection] = useState("All record types");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [sortBy, setSortBy] = useState("date-newest");
+  const savedView = useSavedScreenView("archive");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [collection, setCollection] = useState(() => savedView.collection ?? "All record types");
+  const [from, setFrom] = useState(() => savedView.from ?? "");
+  const [to, setTo] = useState(() => savedView.to ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "date-newest", ["date-newest", "date-oldest", "label", "records"]));
   const collections = [...new Set(records.flatMap((record) =>
     Object.entries(record.snapshot).flatMap(([key, rows]) => Array.isArray(rows) && rows.length ? [key] : [])))].sort();
   const sortedRecords = [...records].filter((record) => {
@@ -3935,7 +3953,7 @@ function ArchivePage({ records, onRestore, onCopy, onDelete }: { records: Archiv
     return b.archivedAt.localeCompare(a.archivedAt);
   });
   return <><PageHeading eyebrow="Recover or permanently remove" title="Archive" subtitle="Deleted records are kept here until you restore them or permanently delete them. The encrypted credential vault is not included." />
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field><Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="Archive" /><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search archive" placeholder="Search archived labels or record types..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[collection !== "All record types", Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}><Field label="Record type"><Select aria-label="Filter archive by record type" value={collection} onChange={(event) => setCollection(event.target.value)}><option>All record types</option>{collections.map((name) => <option key={name}>{name}</option>)}</Select></Field><Field label="Archived from"><DateInput className="filter-date" aria-label="Archived from date" value={from} onValueChange={setFrom} /></Field><Field label="Archived to"><DateInput className="filter-date" aria-label="Archived to date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort archived records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Archived (newest)</option><option value="date-oldest">Archived (oldest)</option><option value="label">Label (A–Z)</option><option value="records">Record count</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="Archive" screen="archive" settings={{ search, collection, from, to, sortBy }} /><Badge>{sortedRecords.length} {sortedRecords.length === 1 ? "archive item" : "archive items"}</Badge></div>
     {sortedRecords.length ? <DateGroupedRecords items={sortedRecords} getDate={(record) => record.archivedAt.slice(0, 10)} title={(date) => `Archive · ${dateLabel(date)}`} groupOrder={sortBy === "date-oldest" ? "oldest" : "newest"}>{(dateRecords) => view === "table"
       ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Label</th><th>Archived</th><th>Record types</th><th>Records</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{dateRecords.map((record) => {
         const contents = Object.entries(record.snapshot).flatMap(([collection, rows]) => Array.isArray(rows) && rows.length ? [`${rows.length} ${collection}`] : []);
@@ -9099,13 +9117,14 @@ function LearningPage({ records, onSave, onDelete }: {
   onSave: (record: Omit<LearningRecord, "id">, id?: string) => void;
   onDelete: (record: LearningRecord) => void;
 }) {
-  const [view, setView] = useState<RecordViewMode>("table");
+  const savedView = useSavedScreenView("learning");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [editor, setEditor] = useState<LearningRecord | null | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [levelFilter, setLevelFilter] = useState("All levels");
-  const [statusFilter, setStatusFilter] = useState("All statuses");
-  const [sortBy, setSortBy] = useState("status");
-  const [groupBy, setGroupBy] = useState("topic");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [levelFilter, setLevelFilter] = useState(() => savedView.levelFilter ?? "All levels");
+  const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All statuses");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "status", ["status", "title", "started-newest"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "topic", ["topic", "status", "none"]));
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const query = search.trim().toLocaleLowerCase();
@@ -9172,7 +9191,7 @@ function LearningPage({ records, onSave, onDelete }: {
       <FilterDrawer label="Apply filters" activeCount={sortBy !== "status" ? 1 : 0}>
         <Field label="Sort by"><Select aria-label="Sort learning records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="status">Status</option><option value="title">Title</option><option value="started-newest">Start date (newest)</option></Select></Field>
       </FilterDrawer>
-      <RecordViewToggle value={view} onChange={setView} label="Learning records" />
+      <RecordViewToggle value={view} onChange={setView} label="Learning records" screen="learning" settings={{ search, levelFilter, statusFilter, sortBy, groupBy }} />
       <Badge>{visible.length} {visible.length === 1 ? "topic" : "topics"}</Badge>
     </div>
     {groupBy !== "none" && visible.length > 0 && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setLearningGroupsExpanded(false)}>Hide all</Button></div>}
@@ -9231,12 +9250,13 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   onDelete: (record: PromptRecord) => void;
   onCopy: (record: PromptRecord) => void;
 }) {
-  const [view, setView] = useState<RecordViewMode>("table");
+  const savedView = useSavedScreenView("ai-prompts");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [editor, setEditor] = useState<PromptRecord | null | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All categories");
-  const [typeFilter, setTypeFilter] = useState("All types");
-  const [sortBy, setSortBy] = useState("title");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [typeFilter, setTypeFilter] = useState(() => savedView.typeFilter ?? "All types");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "title", ["title", "category", "tool"]));
   const [expandAllGroups, setExpandAllGroups] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const categories = [...new Set(records.map((record) => record.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -9299,7 +9319,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
   return <>
     <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Browse prompts by category or prompt type, then search, filter, and copy them into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
     <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer><RecordViewToggle value={view} onChange={setView} label="AI prompts" /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field></FilterDrawer>    <RecordViewToggle value={view} onChange={setView} label="AI prompts" screen="ai-prompts" settings={{ search, categoryFilter, typeFilter, sortBy }} /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
     {promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
     <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}>{renderPrompts(group.records)}</DevotionalRecordGroup>)}</div>
     {!visible.length && <Card><EmptyState icon={<Sparkles size={18} />} title={records.length ? "No matching prompts" : "No saved prompts yet"} description={records.length ? "Try another search or filter." : "Add a reusable prompt and copy it whenever you need it."} /></Card>}
@@ -9456,23 +9476,26 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
   onSaveLog: (log: Omit<MindfulnessLog, "id">, id?: string) => void;
   onArchiveLog: (log: MindfulnessLog) => void;
 }) {
+  const savedHabitView = useSavedScreenView("mind-habits");
+  const savedReflectionView = useSavedScreenView("mind-reflections");
   const [activeTab, setActiveTab] = useState<"habits" | "reflections">("habits");
-  const [view, setView] = useState<RecordViewMode>("table");
+  const [habitView, setHabitView] = useState<RecordViewMode>(() => savedViewMode(savedHabitView));
+  const [reflectionView, setReflectionView] = useState<RecordViewMode>(() => savedViewMode(savedReflectionView));
   const [habitEditor, setHabitEditor] = useState<MindfulHabit | null | undefined>(undefined);
   const [targetExtensionHabit, setTargetExtensionHabit] = useState<MindfulHabit | null>(null);
   const [logEditor, setLogEditor] = useState<MindfulnessLog | null | undefined>(undefined);
-  const [trackingDate, setTrackingDate] = useState(today());
-  const [search, setSearch] = useState("");
-  const [emotionFilter, setEmotionFilter] = useState("All emotions");
-  const [reflectionDateFrom, setReflectionDateFrom] = useState("");
-  const [reflectionDateTo, setReflectionDateTo] = useState("");
-  const [reflectionGroupBy, setReflectionGroupBy] = useState("date");
+  const [trackingDate, setTrackingDate] = useState(() => savedHabitView.trackingDate ?? today());
+  const [search, setSearch] = useState(() => savedReflectionView.search ?? "");
+  const [emotionFilter, setEmotionFilter] = useState(() => savedReflectionView.emotionFilter ?? "All emotions");
+  const [reflectionDateFrom, setReflectionDateFrom] = useState(() => savedReflectionView.dateFrom ?? "");
+  const [reflectionDateTo, setReflectionDateTo] = useState(() => savedReflectionView.dateTo ?? "");
+  const [reflectionGroupBy, setReflectionGroupBy] = useState(() => savedScreenSetting(savedReflectionView, "groupBy", "date", ["date", "emotion", "none"]));
   const [reflectionGroupsExpanded, setExpandReflectionGroups] = useState(false);
   const [reflectionGroupRevision, setReflectionGroupRevision] = useState(0);
-  const [habitSearch, setHabitSearch] = useState("");
-  const [habitSort, setHabitSort] = useState("title");
-  const [habitStatusFilter, setHabitStatusFilter] = useState("All check-ins");
-  const [habitGroupBy, setHabitGroupBy] = useState("status");
+  const [habitSearch, setHabitSearch] = useState(() => savedHabitView.search ?? "");
+  const [habitSort, setHabitSort] = useState(() => savedScreenSetting(savedHabitView, "sortBy", "title", ["title", "started-newest"]));
+  const [habitStatusFilter, setHabitStatusFilter] = useState(() => savedHabitView.statusFilter ?? "All check-ins");
+  const [habitGroupBy, setHabitGroupBy] = useState(() => savedScreenSetting(savedHabitView, "groupBy", "status", ["status", "none"]));
   const query = search.trim().toLocaleLowerCase();
   const habitQuery = habitSearch.trim().toLocaleLowerCase();
   const visibleLogs = [...logs]
@@ -9608,7 +9631,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
     </div>;
   }
   function renderHabitRows(entries: MindfulHabit[]) {
-    if (view === "table") {
+    if (habitView === "table") {
       return <div className="table-card"><table className="data-table mobile-card-table">
         <thead><tr><th>Habit</th><th>Progress</th><th>Started</th><th>Check-in</th><th><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{entries.map((habit) => {
@@ -9627,10 +9650,10 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
         })}</tbody>
       </table></div>;
     }
-    return <div className={`education-entry-list${view === "grid" ? " record-grid-layout" : ""}`}>{entries.map(renderHabitRow)}</div>;
+    return <div className={`education-entry-list${habitView === "grid" ? " record-grid-layout" : ""}`}>{entries.map(renderHabitRow)}</div>;
   }
   function renderReflectionCards(entries: MindfulnessLog[]) {
-    if (view === "table") {
+    if (reflectionView === "table") {
       return <Card className="table-card"><table className="data-table mobile-card-table">
         <thead><tr><th>Date</th><th>Emotion</th><th>Situation</th><th>Response / reflection</th><th>Habits practiced</th><th><span className="sr-only">Actions</span></th></tr></thead>
         <tbody>{entries.map((log) => <tr key={log.id}>
@@ -9669,7 +9692,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
         <FilterDrawer label="Apply filters" activeCount={habitSort !== "title" ? 1 : 0}>
           <Field label="Sort by"><Select aria-label="Sort habits" value={habitSort} onChange={(event) => setHabitSort(event.target.value)}><option value="title">Name</option><option value="started-newest">Start date (newest)</option></Select></Field>
         </FilterDrawer>
-        <RecordViewToggle value={view} onChange={setView} label="Habits" />
+        <RecordViewToggle value={habitView} onChange={setHabitView} label="Habits" screen="mind-habits" settings={{ search: habitSearch, statusFilter: habitStatusFilter, groupBy: habitGroupBy, sortBy: habitSort, trackingDate }} />
         <Badge>{visibleHabits.length} {visibleHabits.length === 1 ? "habit" : "habits"}</Badge>
       </div>
       <Card className="mindful-habits-card">
@@ -9691,7 +9714,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
         <Field label="From date"><DateInput aria-label="Filter reflections from date" value={reflectionDateFrom} onValueChange={setReflectionDateFrom} max={reflectionDateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reflections to date" value={reflectionDateTo} onValueChange={setReflectionDateTo} min={reflectionDateFrom || undefined} /></Field>
       </FilterDrawer>
-      <RecordViewToggle value={view} onChange={setView} label="Reflections" />
+      <RecordViewToggle value={reflectionView} onChange={setReflectionView} label="Reflections" screen="mind-reflections" settings={{ search, emotionFilter, groupBy: reflectionGroupBy, dateFrom: reflectionDateFrom, dateTo: reflectionDateTo }} />
       <Badge>{visibleLogs.length} {visibleLogs.length === 1 ? "reflection" : "reflections"}</Badge>
     </div>
     {visibleLogs.length && reflectionGroupBy === "emotion" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setReflectionGroupsExpanded(false)}>Hide all</Button></div>}
@@ -9714,6 +9737,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
   onArchive: (log: MorningExerciseLog) => void;
   onSaveActivities: (activities: string[], rename?: { previousName: string; nextName: string }) => void;
 }) {
+  const savedView = useSavedScreenView("morning-exercise");
   type ExerciseRowDraft = Omit<MorningExerciseLog, "id" | "date"> & { id?: string };
   const [activeTab, setActiveTab] = useState<"log" | "records" | "activities">("records");
   const [exerciseDate, setExerciseDate] = useState(today);
@@ -9728,14 +9752,14 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
     intensity: "Moderate",
     notes: "",
   }]);
-  const [search, setSearch] = useState("");
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [activityFilter, setActivityFilter] = useState("");
-  const [daypartFilter, setDaypartFilter] = useState("");
-  const [intensityFilter, setIntensityFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("date");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [activityFilter, setActivityFilter] = useState(() => savedView.activityFilter ?? "");
+  const [daypartFilter, setDaypartFilter] = useState(() => savedView.daypartFilter ?? "");
+  const [intensityFilter, setIntensityFilter] = useState(() => savedView.intensityFilter ?? "");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "activity", "daypart", "none"]));
   const [newActivity, setNewActivity] = useState("");
   const [editingActivity, setEditingActivity] = useState<string | null>(null);
   const [activityDraft, setActivityDraft] = useState("");
@@ -9991,7 +10015,7 @@ function MorningExercisePage({ logs, activities, onSave, onArchive, onSaveActivi
         {[activityFilter, daypartFilter, intensityFilter, dateFrom, dateTo].some(Boolean) && <Button type="button" variant="outline" size="sm" onClick={() => { setActivityFilter(""); setDaypartFilter(""); setIntensityFilter(""); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
       </FilterDrawer>
       <Field className="exercise-group-control" label="Group by"><Select aria-label="Group exercise records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="activity">Activity</option><option value="daypart">Daypart</option><option value="none">No grouping</option></Select></Field>
-      <RecordViewToggle value={view} onChange={setView} label="Exercise records" />
+      <RecordViewToggle value={view} onChange={setView} label="Exercise records" screen="morning-exercise" settings={{ search, activityFilter, daypartFilter, intensityFilter, dateFrom, dateTo, groupBy }} />
       <Badge>{visibleDayGroups.length} {visibleDayGroups.length === 1 ? "day" : "days"} · {visibleLogs.length} {visibleLogs.length === 1 ? "activity" : "activities"}</Badge>
     </div>
     {visibleDayGroups.length && groupBy === "date" ? <DateGroupedRecords items={visibleDayGroups} getDate={(group) => group.date} title={(date) => `Exercise · ${dateLabel(date)}`}>{(dateGroups) => renderExerciseDayCards(dateGroups.flatMap((group) => group.logs))}</DateGroupedRecords>
@@ -10464,14 +10488,15 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
   onSave: (session: Omit<TrainingSession, "id">, id?: string) => void;
   onDelete: (session: TrainingSession) => void;
 }) {
+  const savedView = useSavedScreenView("training-classes");
   const [editor, setEditor] = useState<TrainingSession | null | undefined>(undefined);
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [modeFilter, setModeFilter] = useState("All formats");
-  const [courseFilter, setCourseFilter] = useState("All courses");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("date");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [modeFilter, setModeFilter] = useState(() => savedView.modeFilter ?? "All formats");
+  const [courseFilter, setCourseFilter] = useState(() => savedView.courseFilter ?? "All courses");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month", "course", "none"]));
   const query = search.trim().toLocaleLowerCase();
   const visible = sessions
     .filter((session) => modeFilter === "All formats" || session.mode === modeFilter)
@@ -10525,7 +10550,7 @@ function TrainingClassesPage({ sessions, onSave, onDelete }: {
       <Field label="From date"><DateInput aria-label="Filter training sessions from date" value={dateFrom} onValueChange={setDateFrom} /></Field>
       <Field label="To date"><DateInput aria-label="Filter training sessions to date" value={dateTo} onValueChange={setDateTo} /></Field>
       {[modeFilter !== "All formats", courseFilter !== "All courses", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setModeFilter("All formats"); setCourseFilter("All courses"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="training-group-control" label="Group by"><Select aria-label="Group training sessions" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="course">Course</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Training sessions" /><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
+    </FilterDrawer><Field className="training-group-control" label="Group by"><Select aria-label="Group training sessions" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="course">Course</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Training sessions" screen="training-classes" settings={{ search, modeFilter, courseFilter, dateFrom, dateTo, groupBy }} /><Badge>{visible.length} {visible.length === 1 ? "session" : "sessions"}</Badge></div>
     {visible.length ? groupBy === "date"
       ? <DateGroupedRecords items={visible} getDate={(session) => session.date} title={(date) => `Training sessions · ${dateLabel(date)}`}>{renderTrainingCards}</DateGroupedRecords>
       : groupBy === "none" ? renderTrainingCards(visible)
@@ -10879,16 +10904,17 @@ function ElectricityPage({ readings, onSave, onDelete }: {
   onSave: (reading: Omit<ElectricityReading, "id">, id?: string) => void;
   onDelete: (reading: ElectricityReading) => void;
 }) {
+  const savedView = useSavedScreenView("electricity");
   const formatCurrency = useCurrencyFormatter();
   const [editor, setEditor] = useState<ElectricityReading | null | undefined>(undefined);
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All bills");
-  const [meterFilter, setMeterFilter] = useState("All meters");
-  const [groupBy, setGroupBy] = useState("date");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [sortBy, setSortBy] = useState("reading-newest");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All bills");
+  const [meterFilter, setMeterFilter] = useState(() => savedView.meterFilter ?? "All meters");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month"]));
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "reading-newest", ["reading-newest", "reading-oldest", "meter-name"]));
   const query = search.trim().toLocaleLowerCase();
   const meterKey = (entry: ElectricityReading) =>
     `${entry.meterName.trim().toLocaleLowerCase()}\u0000${entry.location.trim().toLocaleLowerCase()}`;
@@ -10911,7 +10937,7 @@ function ElectricityPage({ readings, onSave, onDelete }: {
       <Card><span>Readings</span><strong>{readings.length}</strong></Card>
       <Card><span>Unpaid bills</span><strong>{formatCurrency(readings.filter((entry) => !entry.paid).reduce((sum, entry) => sum + (entry.billAmount ?? 0), 0))}</strong></Card>
     </div>
-    <div className="toolbar filter-toolbar electricity-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Electricity readings" /><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
+    <div className="toolbar filter-toolbar electricity-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search electricity meters" placeholder="Search meter, location, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Electricity filters" activeCount={(statusFilter === "All bills" ? 0 : 1) + (meterFilter === "All meters" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "reading-newest" ? 1 : 0)}><Field label="Meter"><Select aria-label="Filter readings by meter" value={meterFilter} onChange={(event) => setMeterFilter(event.target.value)}><option>All meters</option>{[...new Map(readings.map((entry) => [meterKey(entry), entry])).entries()].sort((a, b) => a[1].meterName.localeCompare(b[1].meterName)).map(([key, entry]) => <option key={key} value={key}>{entry.meterName}{entry.location ? ` · ${entry.location}` : ""}</option>)}</Select></Field><Field label="Bill status"><Select aria-label="Filter electricity bills" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All bills</option><option>Unpaid</option><option>Paid</option></Select></Field><Field label="Reading from"><DateInput aria-label="Readings from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Reading to"><DateInput aria-label="Readings to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort electricity readings" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="reading-newest">Reading date (newest)</option><option value="reading-oldest">Reading date (oldest)</option><option value="meter-name">Meter name</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setMeterFilter("All meters"); setStatusFilter("All bills"); setDateFrom(""); setDateTo(""); setSortBy("reading-newest"); }}>Clear filters</Button></FilterDrawer><Field className="electricity-group-control" label="Group by"><Select aria-label="Group electricity readings" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Meter / reading date</option><option value="month">Meter / month</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Electricity readings" screen="electricity" settings={{ search, statusFilter, meterFilter, groupBy, dateFrom, dateTo, sortBy }} /><Badge>{visible.length} {visible.length === 1 ? "reading" : "readings"}</Badge></div>
     {grouped.size ? <div className={`electricity-list${view === "grid" ? " record-grid-layout" : ""}`}>{[...grouped.entries()].sort((a, b) => sortBy === "meter-name"
       ? a[1][0].meterName.localeCompare(b[1][0].meterName)
       : (sortBy === "reading-oldest" ? 1 : -1) * a[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, "").localeCompare(b[1].reduce((latest, entry) => entry.readingDate > latest ? entry.readingDate : latest, ""))).map(([key, entries]) => {
@@ -11059,17 +11085,18 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
   onSaveTransaction: (accountId: string, transaction: Omit<SubscriptionTransaction, "id">, id?: string) => void;
   onArchiveTransaction: (accountId: string, transaction: SubscriptionTransaction) => void;
 }) {
+  const savedView = useSavedScreenView("subscriptions-bills");
   const [accountEditor, setAccountEditor] = useState<SubscriptionAccount | null | undefined>(undefined);
   const [transactionEditor, setTransactionEditor] = useState<{ account: SubscriptionAccount; transaction: SubscriptionTransaction | null } | null>(null);
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All categories");
-  const [statusFilter, setStatusFilter] = useState("All records");
-  const [serviceGroupBy, setServiceGroupBy] = useState("category");
-  const [transactionGroupBy, setTransactionGroupBy] = useState("month");
-  const [transactionFrom, setTransactionFrom] = useState("");
-  const [transactionTo, setTransactionTo] = useState("");
-  const [transactionSort, setTransactionSort] = useState("newest");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All records");
+  const [serviceGroupBy, setServiceGroupBy] = useState(() => savedScreenSetting(savedView, "serviceGroupBy", "category", ["category", "provider"]));
+  const [transactionGroupBy, setTransactionGroupBy] = useState(() => savedScreenSetting(savedView, "transactionGroupBy", "month", ["month", "date"]));
+  const [transactionFrom, setTransactionFrom] = useState(() => savedView.transactionFrom ?? "");
+  const [transactionTo, setTransactionTo] = useState(() => savedView.transactionTo ?? "");
+  const [transactionSort, setTransactionSort] = useState(() => savedScreenSetting(savedView, "transactionSort", "newest", ["newest", "oldest", "amount-highest"]));
   const query = search.trim().toLocaleLowerCase();
   const currentDate = today();
   const upcomingDate = dateAfterDays(30);
@@ -11146,7 +11173,7 @@ function SubscriptionsPage({ accounts, onSaveAccount, onArchiveAccount, onSaveTr
         <Field label="Transaction to"><DateInput aria-label="Transaction to date" value={transactionTo} onValueChange={setTransactionTo} min={transactionFrom || undefined} /></Field>
         <Field label="Sort transactions by"><Select aria-label="Sort subscription transactions" value={transactionSort} onChange={(event) => setTransactionSort(event.target.value)}><option value="newest">Date (newest)</option><option value="oldest">Date (oldest)</option><option value="amount-highest">Amount (highest)</option></Select></Field>
       </FilterDrawer>
-      <RecordViewToggle value={view} onChange={setView} label="Subscriptions and bills" />
+      <RecordViewToggle value={view} onChange={setView} label="Subscriptions and bills" screen="subscriptions-bills" settings={{ search, categoryFilter, statusFilter, serviceGroupBy, transactionGroupBy, transactionFrom, transactionTo, transactionSort }} />
       <Badge>{visible.length} {visible.length === 1 ? "service" : "services"}</Badge>
     </div>
     {visible.length ? <div className="subscription-groups">{serviceGroups.map((group) => <section className="subscription-group" key={group.key}>
@@ -13277,16 +13304,17 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
   onSave: (record: Omit<IssueRecord, "id">, id?: string) => void;
   onDelete: (record: IssueRecord) => void;
 }) {
-  const [view, setView] = useState<RecordViewMode>("table");
+  const savedView = useSavedScreenView("issues-maintenance");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [editor, setEditor] = useState<IssueRecord | null | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [areaFilter, setAreaFilter] = useState("All areas");
-  const [statusFilter, setStatusFilter] = useState("All statuses");
-  const [kindFilter, setKindFilter] = useState("All types");
-  const [priorityFilter, setPriorityFilter] = useState("All priorities");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("date");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [areaFilter, setAreaFilter] = useState(() => savedView.areaFilter ?? "All areas");
+  const [statusFilter, setStatusFilter] = useState(() => savedView.statusFilter ?? "All statuses");
+  const [kindFilter, setKindFilter] = useState(() => savedView.kindFilter ?? "All types");
+  const [priorityFilter, setPriorityFilter] = useState(() => savedView.priorityFilter ?? "All priorities");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "status", "area", "type"]));
   const formatCurrency = useCurrencyFormatter();
   const query = search.trim().toLocaleLowerCase();
   const activeCount = records.filter((record) => record.status !== "Resolved" && record.status !== "Closed").length;
@@ -13377,7 +13405,7 @@ function IssuesMaintenancePage({ records, onSave, onDelete }: {
       <Field label="Reported from"><DateInput aria-label="Filter issues reported from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
       <Field label="Reported to"><DateInput aria-label="Filter issues reported to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       {[areaFilter !== "All areas", statusFilter !== "All statuses", kindFilter !== "All types", priorityFilter !== "All priorities", dateFrom, dateTo].some(Boolean) && <Button type="button" size="sm" variant="outline" onClick={() => { setAreaFilter("All areas"); setStatusFilter("All statuses"); setKindFilter("All types"); setPriorityFilter("All priorities"); setDateFrom(""); setDateTo(""); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Issues and maintenance" /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    </FilterDrawer><Field className="issues-group-control" label="Group by"><Select aria-label="Group issues and maintenance records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Reported date</option><option value="status">Status</option><option value="area">Area</option><option value="type">Record type</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Issues and maintenance" screen="issues-maintenance" settings={{ search, areaFilter, statusFilter, kindFilter, priorityFilter, dateFrom, dateTo, groupBy }} /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
     {visibleRecords.length ? groupBy === "date"
       ? <DateGroupedRecords items={visibleRecords} getDate={(record) => record.dateReported} title={(date) => `Reported · ${dateLabel(date)}`}>{renderIssueCards}</DateGroupedRecords>
       : <div className="issue-record-groups">{issueGroups.map((group) => <section key={group.title}><h2 className="shopping-record-group-title">{group.title}<span>{group.records.length}</span></h2>{renderIssueCards(group.records)}</section>)}</div>
@@ -13614,16 +13642,17 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
   onSaveSkill: (record: Omit<ProfessionalSkill, "id">, id?: string) => void;
   onDeleteSkill: (record: ProfessionalSkill) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [activeSection, setActiveSection] = useState<"education" | "qualifications" | "experience" | "skills">("education");
-  const [sortBy, setSortBy] = useState("recent");
-  const [groupBy, setGroupBy] = useState("none");
-  const [fromMonth, setFromMonth] = useState("");
-  const [toMonth, setToMonth] = useState("");
-  const [educationStatus, setEducationStatus] = useState("All statuses");
-  const [experienceStatus, setExperienceStatus] = useState("All roles");
-  const [skillProficiency, setSkillProficiency] = useState("All levels");
+  const savedView = useSavedScreenView("education-career");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [activeSection, setActiveSection] = useState<"education" | "qualifications" | "experience" | "skills">(() => savedScreenSetting(savedView, "activeSection", "education", ["education", "qualifications", "experience", "skills"]));
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "recent", ["recent", "name"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "none", ["none", "group"]));
+  const [fromMonth, setFromMonth] = useState(() => savedView.fromMonth ?? "");
+  const [toMonth, setToMonth] = useState(() => savedView.toMonth ?? "");
+  const [educationStatus, setEducationStatus] = useState(() => savedView.educationStatus ?? "All statuses");
+  const [experienceStatus, setExperienceStatus] = useState(() => savedView.experienceStatus ?? "All roles");
+  const [skillProficiency, setSkillProficiency] = useState(() => savedView.skillProficiency ?? "All levels");
   const [editor, setEditor] = useState<{ type: "education"; record: PersonalEducationRecord | null } | { type: "qualification"; record: ProfessionalQualification | null } | { type: "experience"; record: WorkExperience | null } | { type: "skill"; record: ProfessionalSkill | null } | null>(null);
   const query = search.trim().toLocaleLowerCase();
   const matches = (...values: string[]) => !query || values.some((value) => value.toLocaleLowerCase().includes(query));
@@ -13686,7 +13715,7 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
       {activeSection !== "skills" && <Field label="Sort by"><Select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="recent">Most recent</option><option value="name">Name (A–Z)</option></Select></Field>}
       {activeSection !== "skills" && <><Field label="From month"><Input type="month" aria-label="Filter career records from month" value={fromMonth} max={toMonth || undefined} onChange={(event) => setFromMonth(event.target.value)} /></Field><Field label="To month"><Input type="month" aria-label="Filter career records to month" value={toMonth} min={fromMonth || undefined} onChange={(event) => setToMonth(event.target.value)} /></Field></>}
       {((activeSection === "education" && educationStatus !== "All statuses") || (activeSection === "experience" && experienceStatus !== "All roles") || (activeSection === "skills" && skillProficiency !== "All levels") || (activeSection !== "skills" && (fromMonth || toMonth)) || sortBy !== "recent") && <Button type="button" size="sm" variant="outline" onClick={() => { setEducationStatus("All statuses"); setExperienceStatus("All roles"); setSkillProficiency("All levels"); setFromMonth(""); setToMonth(""); setSortBy("recent"); }}>Clear filters</Button>}
-    </FilterDrawer><Field className="career-group-control" label="Group by"><Select aria-label={`Group ${activeSection} records by`} value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="none">No grouping</option><option value="group">{careerGroupByLabel}</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Education and career records" /><Badge>{activeSection === "education" ? filteredEducation.length : activeSection === "qualifications" ? filteredQualifications.length : activeSection === "experience" ? filteredExperience.length : filteredSkills.length} records</Badge></div>
+    </FilterDrawer><Field className="career-group-control" label="Group by"><Select aria-label={`Group ${activeSection} records by`} value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="none">No grouping</option><option value="group">{careerGroupByLabel}</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Education and career records" screen="education-career" settings={{ search, activeSection, sortBy, groupBy, fromMonth, toMonth, educationStatus, experienceStatus, skillProficiency }} /><Badge>{activeSection === "education" ? filteredEducation.length : activeSection === "qualifications" ? filteredQualifications.length : activeSection === "experience" ? filteredExperience.length : filteredSkills.length} records</Badge></div>
     {totalItems === 0 && !query ? <Card><EmptyState icon={<Briefcase size={18} />} title="Start your professional profile" description="Add your education, qualifications, work history, and professional skills below." /></Card> : null}
     <div className="career-sections">
       {activeSection === "education" &&
@@ -13789,11 +13818,12 @@ function FamilyPage({ members, onSave, onDelete }: {
   onSave: (member: Omit<FamilyMember, "id">, id?: string) => void;
   onDelete: (member: FamilyMember) => void;
 }) {
-  const [view, setView] = useState<RecordViewMode>("table");
+  const savedView = useSavedScreenView("family");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [editor, setEditor] = useState<FamilyMember | null | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [relationshipFilter, setRelationshipFilter] = useState("All relationships");
-  const [groupBy, setGroupBy] = useState("relationship");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [relationshipFilter, setRelationshipFilter] = useState(() => savedView.relationshipFilter ?? "All relationships");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "relationship", ["relationship", "none"]));
   const query = search.trim().toLocaleLowerCase();
   const childrenCount = members.filter((member) => member.relationship === "Child").length;
   const relativesCount = members.filter((member) => !["Self", "Spouse", "Child"].includes(member.relationship)).length;
@@ -13821,7 +13851,7 @@ function FamilyPage({ members, onSave, onDelete }: {
       <Card><span>Other relatives</span><strong>{relativesCount}</strong></Card>
     </div>
     <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Daybook data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
-    <div className="toolbar filter-toolbar family-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer><Field className="family-group-control" label="Group by"><Select aria-label="Group family members" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="relationship">Relationship</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Family members" /><Badge>{visibleMembers.length} {visibleMembers.length === 1 ? "member" : "members"}</Badge></div>
+    <div className="toolbar filter-toolbar family-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer><Field className="family-group-control" label="Group by"><Select aria-label="Group family members" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="relationship">Relationship</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Family members" screen="family" settings={{ search, relationshipFilter, groupBy }} /><Badge>{visibleMembers.length} {visibleMembers.length === 1 ? "member" : "members"}</Badge></div>
     {visibleMembers.length ? <div className="family-record-groups">{familyGroups.map((group) => <section key={group.title || "all-members"}>
       {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.members.length}</span></h2>}
       {view === "table" ? <Card className="table-card"><table className="data-table mobile-card-table">
@@ -13937,17 +13967,18 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
   onDelete: (record: PersonalRecord) => Promise<void>;
   onRestore: (record: PersonalRecord) => Promise<void>;
 }) {
+  const savedView = useSavedScreenView("personal-documents");
   const [editor, setEditor] = useState<{ initial: PersonalRecord | null } | null>(null);
-  const [search, setSearch] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
-  const [view, setView] = useState<RecordViewMode>("table");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [showArchived, setShowArchived] = useState(() => savedView.showArchived === "true");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [operationError, setOperationError] = useState("");
-  const [typeFilter, setTypeFilter] = useState("All records");
-  const [holderFilter, setHolderFilter] = useState("All people");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [groupBy, setGroupBy] = useState("due");
-  const [sortBy, setSortBy] = useState("due-soon");
+  const [typeFilter, setTypeFilter] = useState(() => savedView.typeFilter ?? "All records");
+  const [holderFilter, setHolderFilter] = useState(() => savedView.holderFilter ?? "All people");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "due", ["due", "month", "type", "none"]));
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "due-soon", ["due-soon", "due-latest", "title"]));
   const sourceRecords = showArchived ? archivedRecords : records;
   const visibleRecords = sourceRecords
     .filter((record) => typeFilter === "All records" || record.type === typeFilter)
@@ -14026,7 +14057,7 @@ function PersonalRecordsPage({ records, archivedRecords, categories, onSave, onD
     <div className="alert"><FileText size={15} style={{ flex: "none", marginTop: 1 }} /><span>These records are stored in the assigned mydocumentsmanager database as readable text. Database administrators with service-role access can read them. Use the Documents screen to attach files in the existing private storage bucket; files are access-controlled, not end-to-end encrypted.</span></div>
     <nav className="document-subnav" aria-label="Personal document sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active records ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
     {(expiredCount > 0 || dueSoonCount > 0) && <div className="personal-due-summary" role="status"><Bell size={16} /><span>{expiredCount > 0 ? `${expiredCount} past due` : ""}{expiredCount > 0 && dueSoonCount > 0 ? " · " : ""}{dueSoonCount > 0 ? `${dueSoonCount} due soon` : ""}. Review the dates below.</span></div>}
-    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(sourceRecords.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Due from"><DateInput aria-label="Due from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Due to"><DateInput aria-label="Due to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Due date (soonest)</option><option value="due-latest">Due date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="due">Due date</option><option value="month">Due month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Personal records" /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
+    <div className="toolbar filter-toolbar personal-document-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search personal records" placeholder="Search title, holder, number..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={(typeFilter === "All records" ? 0 : 1) + (holderFilter === "All people" ? 0 : 1) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (sortBy !== "due-soon" ? 1 : 0)}><Field label="Record type"><Select aria-label="Filter personal records" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All records</option><option>Identity</option><option>Insurance</option><option>License</option><option>Certificate</option><option>Other</option></Select></Field><Field label="Person"><Select aria-label="Filter personal records by person" value={holderFilter} onChange={(event) => setHolderFilter(event.target.value)}><option>All people</option>{[...new Set(sourceRecords.map((record) => record.holder.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)).map((holder) => <option key={holder}>{holder}</option>)}</Select></Field><Field label="Due from"><DateInput aria-label="Due from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field><Field label="Due to"><DateInput aria-label="Due to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field><Field label="Sort by"><Select aria-label="Sort personal records" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="due-soon">Due date (soonest)</option><option value="due-latest">Due date (latest)</option><option value="title">Title (A–Z)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setTypeFilter("All records"); setHolderFilter("All people"); setDateFrom(""); setDateTo(""); setSortBy("due-soon"); }}>Clear filters</Button></FilterDrawer><Field className="personal-document-group-control" label="Group by"><Select aria-label="Group personal records" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="due">Due date</option><option value="month">Due month</option><option value="type">Record type</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Personal records" screen="personal-documents" settings={{ search, showArchived: String(showArchived), typeFilter, holderFilter, dateFrom, dateTo, groupBy, sortBy }} /><Badge>{visibleRecords.length} {visibleRecords.length === 1 ? "record" : "records"}</Badge></div>
     {operationError && <div className="alert alert-error" role="alert">{operationError}</div>}
     {visibleRecords.length ? groupBy === "type"
       ? [...new Set(visibleRecords.map((record) => record.type))].sort((a, b) => a.localeCompare(b)).map((type) => <section key={type}><h2 className="shopping-record-group-title">{type}<span>{visibleRecords.filter((record) => record.type === type).length}</span></h2>{renderPersonalRecords(visibleRecords.filter((record) => record.type === type))}</section>)
@@ -14203,25 +14234,26 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   createFileUrl: (storagePath: string, downloadName?: string) => Promise<string>;
   loadStorageUsage: () => Promise<DocumentStorageUsage>;
 }) {
+  const savedView = useSavedScreenView("documents");
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
   const [viewer, setViewer] = useState<{ document: DocumentAttachment; source: string } | null>(null);
   const [categoryEditor, setCategoryEditor] = useState(false);
-  const [search, setSearch] = useState("");
-  const [personFilter, setPersonFilter] = useState("All people");
-  const [typeFilter, setTypeFilter] = useState("All file types");
-  const [documentTypeFilter, setDocumentTypeFilter] = useState("All document types");
-  const [categoryFilter, setCategoryFilter] = useState("All categories");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [issueFrom, setIssueFrom] = useState("");
-  const [issueTo, setIssueTo] = useState("");
-  const [dueFrom, setDueFrom] = useState("");
-  const [dueTo, setDueTo] = useState("");
-  const [minFileSizeMb, setMinFileSizeMb] = useState("");
-  const [maxFileSizeMb, setMaxFileSizeMb] = useState("");
-  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived" | "analytics" | "analyse">("all");
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [sortBy, setSortBy] = useState("newest");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [personFilter, setPersonFilter] = useState(() => savedView.personFilter ?? "All people");
+  const [typeFilter, setTypeFilter] = useState(() => savedView.typeFilter ?? "All file types");
+  const [documentTypeFilter, setDocumentTypeFilter] = useState(() => savedView.documentTypeFilter ?? "All document types");
+  const [categoryFilter, setCategoryFilter] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
+  const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
+  const [issueFrom, setIssueFrom] = useState(() => savedView.issueFrom ?? "");
+  const [issueTo, setIssueTo] = useState(() => savedView.issueTo ?? "");
+  const [dueFrom, setDueFrom] = useState(() => savedView.dueFrom ?? "");
+  const [dueTo, setDueTo] = useState(() => savedView.dueTo ?? "");
+  const [minFileSizeMb, setMinFileSizeMb] = useState(() => savedView.minFileSizeMb ?? "");
+  const [maxFileSizeMb, setMaxFileSizeMb] = useState(() => savedView.maxFileSizeMb ?? "");
+  const [section, setSection] = useState<"all" | "categories" | "due" | "favorites" | "archived" | "analytics" | "analyse">(() => savedScreenSetting(savedView, "section", "all", ["all", "categories", "due", "favorites", "archived", "analytics", "analyse"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "newest", ["newest", "oldest", "title", "due", "size", "category"]));
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(12);
   const [calendarMonth, setCalendarMonth] = useState(() => {
@@ -14559,11 +14591,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         <Field label="Sort by"><Select aria-label="Sort documents" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="newest">Date added (newest)</option><option value="oldest">Date added (oldest)</option><option value="title">Name (A–Z)</option><option value="due">Due date</option><option value="size">File size</option><option value="category">Category</option></Select></Field>
         <Button type="button" size="sm" variant="outline" onClick={() => { setPersonFilter("All people"); setTypeFilter("All file types"); setDocumentTypeFilter("All document types"); setCategoryFilter("All categories"); setDateFrom(""); setDateTo(""); setIssueFrom(""); setIssueTo(""); setDueFrom(""); setDueTo(""); setMinFileSizeMb(""); setMaxFileSizeMb(""); setSortBy("newest"); setPage(0); }}>Clear filters</Button>
       </FilterDrawer>
-      <div className="document-view-switch" role="group" aria-label="Document display mode">
-        <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={14} />Grid</Button>
-        <Button type="button" variant={view === "table" ? "primary" : "outline"} aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 size={14} />Table</Button>
-        <Button type="button" variant={view === "list" ? "primary" : "outline"} aria-pressed={view === "list"} onClick={() => setView("list")}><List size={14} />List</Button>
-      </div>
+      <RecordViewToggle value={view} onChange={setView} label="Documents" screen="documents" settings={{ search, personFilter, typeFilter, documentTypeFilter, categoryFilter, dateFrom, dateTo, issueFrom, issueTo, dueFrom, dueTo, minFileSizeMb, maxFileSizeMb, section, sortBy }} />
       <Button type="button" variant="outline" onClick={exportCurrentReport}><Download size={14} />Export CSV</Button>
       <Badge>{visible.length} {visible.length === 1 ? "document" : "documents"}</Badge>
     </div>
@@ -14782,12 +14810,13 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
   onSave: (account: BankAccount) => Promise<void>;
   onArchive: (account: BankAccount) => Promise<void>;
 }) {
-  const [view, setView] = useState<RecordViewMode>("table");
-  const [search, setSearch] = useState("");
-  const [bankFilter, setBankFilter] = useState("All banks");
-  const [accountTypeFilter, setAccountTypeFilter] = useState("All account types");
-  const [balanceFilter, setBalanceFilter] = useState("All balances");
-  const [groupBy, setGroupBy] = useState("bank");
+  const savedView = useSavedScreenView("bank-accounts");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [bankFilter, setBankFilter] = useState(() => savedView.bankFilter ?? "All banks");
+  const [accountTypeFilter, setAccountTypeFilter] = useState(() => savedView.accountTypeFilter ?? "All account types");
+  const [balanceFilter, setBalanceFilter] = useState(() => savedView.balanceFilter ?? "All balances");
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "bank", ["bank", "accountType", "none"]));
   const [visibleAccountNumbers, setVisibleAccountNumbers] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<BankAccount | null | undefined>(undefined);
   const [error, setError] = useState("");
@@ -14833,7 +14862,7 @@ function BankAccountsPage({ accounts, onNavigate, onSave, onArchive }: {
       <FilterDrawer label="Apply filters" activeCount={balanceFilter === "All balances" ? 0 : 1}>
         <Field label="Balance"><Select aria-label="Filter accounts by balance status" value={balanceFilter} onChange={(event) => setBalanceFilter(event.target.value)}><option>All balances</option><option>Balance recorded</option><option>No balance recorded</option></Select></Field>
       </FilterDrawer>
-      <RecordViewToggle value={view} onChange={setView} label="Bank accounts" />
+      <RecordViewToggle value={view} onChange={setView} label="Bank accounts" screen="bank-accounts" settings={{ search, bankFilter, accountTypeFilter, balanceFilter, groupBy }} />
       <Badge>{filteredAccounts.length} {filteredAccounts.length === 1 ? "bank account" : "bank accounts"}</Badge>
     </div>
     {filteredAccounts.length ? <div className="bank-account-groups">{groupedAccounts.map((group) => <section className="bank-account-group" key={group.key}>
@@ -14899,9 +14928,10 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
   onRestore: (record: CredentialRecord) => Promise<void>;
   onImportLegacy: (credentials: CredentialRecord[], banks: BankAccount[]) => Promise<void>;
 }) {
-  const [search, setSearch] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
-  const [view, setView] = useState<RecordViewMode>("table");
+  const savedView = useSavedScreenView("account-credentials");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [showArchived, setShowArchived] = useState(() => savedView.showArchived === "true");
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [editor, setEditor] = useState<CredentialRecord | null | undefined>(undefined);
   const [importOpen, setImportOpen] = useState(false);
@@ -15030,11 +15060,7 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
     {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>Archived ({archivedRecords.length})</Button></nav>
-    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="document-view-switch" role="group" aria-label="Account credential display mode">
-      <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} onClick={() => setView("grid")}><Grid2X2 size={14} />Grid</Button>
-      <Button type="button" variant={view === "list" ? "primary" : "outline"} aria-pressed={view === "list"} onClick={() => setView("list")}><List size={14} />List</Button>
-      <Button type="button" variant={view === "table" ? "primary" : "outline"} aria-pressed={view === "table"} onClick={() => setView("table")}><Table2 size={14} />Table</Button>
-    </div><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
+    <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search account credentials" placeholder="Search provider, username, tags, notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><RecordViewToggle value={view} onChange={setView} label="Account credentials" screen="account-credentials" settings={{ search, showArchived: String(showArchived) }} /><Badge>{filteredRecords.length} {filteredRecords.length === 1 ? "account" : "accounts"}</Badge></div>
     {filteredRecords.length
       ? view === "table"
         ? renderCredentialTable()
@@ -16880,6 +16906,26 @@ export default function App() {
       }),
     }));
   }
+  async function saveScreenView(screen: string, settings: Record<string, string>) {
+    try {
+      await persistPreferenceUpdate((previous) => ({
+        ...previous,
+        preferences: {
+          ...DEFAULT_TRACKER_PREFERENCES,
+          ...previous.preferences,
+          dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+          savedScreenViews: {
+            ...previous.preferences?.savedScreenViews,
+            [screen]: settings,
+          },
+        },
+      }));
+      setNotice("Default filters, sorting, and display saved to Supabase.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save this screen's default view to Supabase.");
+      throw caught;
+    }
+  }
   function restoreArchivedRecord(id: string) {
     update((previous) => {
       const archived = (previous.archivedRecords ?? []).find((entry) => entry.id === id);
@@ -18147,7 +18193,7 @@ export default function App() {
       })}
     />,
   };
-  return <CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} design-${designTheme ?? "legacy"} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
+  return <ScreenViewPreferencesContext.Provider value={{ views: preferences.savedScreenViews ?? {}, save: saveScreenView }}><CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} design-${designTheme ?? "legacy"} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
     <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
       <div className="nav-label">YOUR SPACE</div><nav className={`nav-list ${groupMenus ? "nav-list-grouped" : ""}`} aria-label="Main navigation">{menuGroups.map(({ group, entries }) => {
@@ -18169,5 +18215,5 @@ export default function App() {
     <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.filter(({ name }) => ["Dashboard", "Shopping list", "Shopping trips", "Purchase history"].includes(name)).map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
     {modal === "add" && <ItemModal products={data.products ?? []} onClose={() => setModal(null)} onSave={addItem} />}
     {modal === "trip" && <TripModal data={data} onClose={() => setModal(null)} onSave={saveTrip} />}
-  </div></CurrencyContext.Provider>;
+  </div></CurrencyContext.Provider></ScreenViewPreferencesContext.Provider>;
 }

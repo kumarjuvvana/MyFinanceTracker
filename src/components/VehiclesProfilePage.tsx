@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, BarChart3, Bell, Car, ChevronDown, Copy, Database, Eye, Fuel, Gauge, Grid2X2, LayoutDashboard, List, LockKeyhole, Pencil, Plus, RefreshCw, Search, ShieldCheck, Table2, Trash2, Wallet, Wrench, X } from "lucide-react";
-import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input, Select } from "./ui";
+import { AlertTriangle, BarChart3, Bell, Car, ChevronDown, Copy, Database, Eye, Fuel, Gauge, LayoutDashboard, LockKeyhole, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, Wallet, Wrench, X } from "lucide-react";
+import { Badge, Button, Card, DateInput, EmptyState, Field, FilterDrawer, Input, RecordViewToggle, Select, useSavedScreenView } from "./ui";
 import { loadSavedProfileVehicleData, mutateSavedProfileVehicleRecord, type VehicleProfileColumn, type VehicleProfileData, type VehicleProfileRow, type VehicleProfileTable, type VehicleProfileTableName } from "../lib/databaseApi";
 import { loadDatabaseConnectionVault } from "../lib/databaseConnectionsApi";
 import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } from "../lib/databaseConnectionProfiles";
@@ -166,7 +166,10 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [data, setData] = useState<VehicleProfileData | null>(null);
   const [activeTable, setActiveTable] = useState<FleetPage>("overview");
   const [activeModule, setActiveModule] = useState<FleetModuleId>("overview");
-  const [vehicleView, setVehicleView] = useState<VehicleView>("table");
+  const screenId = `vehicles-profile-${activeTable.replace(/_/g, "-")}`;
+  const savedView = useSavedScreenView(screenId);
+  const [vehicleView, setVehicleView] = useState<VehicleView>(() =>
+    savedView.view === "grid" || savedView.view === "list" || savedView.view === "table" ? savedView.view : "table");
   const [vehicleStatus, setVehicleStatus] = useState("all");
   const [vehicleType, setVehicleType] = useState("all");
   const [vehicleManufacturer, setVehicleManufacturer] = useState("all");
@@ -188,6 +191,22 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
   const [filterMatch, setFilterMatch] = useState<"contains" | "exact">("contains");
   const [sortColumn, setSortColumn] = useState("id");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  useEffect(() => {
+    setVehicleView(savedView.view === "grid" || savedView.view === "list" || savedView.view === "table" ? savedView.view : "table");
+    setSearch(savedView.search ?? "");
+    setFilterColumn(savedView.filterColumn ?? "");
+    setFilterValue(savedView.filterValue ?? "");
+    setFilterMatch(savedView.filterMatch === "exact" ? "exact" : "contains");
+    setSortColumn(savedView.sortColumn ?? "id");
+    setSortDirection(savedView.sortDirection === "desc" ? "desc" : "asc");
+    setRelatedVehicleId(savedView.relatedVehicleId ?? "all");
+    setVehicleStatus(savedView.vehicleStatus ?? "all");
+    setVehicleType(savedView.vehicleType ?? "all");
+    setVehicleManufacturer(savedView.vehicleManufacturer ?? "all");
+    setVehicleYear(savedView.vehicleYear ?? "all");
+    setPage(0);
+  }, [screenId, savedView]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const sessionResumeAttempted = useRef(false);
@@ -770,11 +789,7 @@ export function VehiclesProfilePage({ localView }: { localView: ReactNode }) {
                 setPage(0);
               }}>Clear filters</Button>
             </FilterDrawer>
-            <div className="rider-fleet-view-toggle" role="group" aria-label={`${TABLE_LABELS[activeTableData.name]} display mode`}>
-              <Button type="button" variant={vehicleView === "grid" ? "primary" : "outline"} aria-pressed={vehicleView === "grid"} aria-label="Card grid view" title="Card grid view" onClick={() => setVehicleView("grid")}><Grid2X2 size={15} /><span>Grid</span></Button>
-              <Button type="button" variant={vehicleView === "table" ? "primary" : "outline"} aria-pressed={vehicleView === "table"} aria-label="Table view" title="Table view" onClick={() => setVehicleView("table")}><Table2 size={15} /><span>Table</span></Button>
-              <Button type="button" variant={vehicleView === "list" ? "primary" : "outline"} aria-pressed={vehicleView === "list"} aria-label="Compact list view" title="Compact list view" onClick={() => setVehicleView("list")}><List size={15} /><span>List</span></Button>
-            </div>
+            <RecordViewToggle value={vehicleView} onChange={setVehicleView} label={TABLE_LABELS[activeTableData.name]} screen={screenId} settings={{ search, filterColumn, filterValue, filterMatch, sortColumn, sortDirection, relatedVehicleId, vehicleStatus, vehicleType, vehicleManufacturer, vehicleYear }} />
             <Badge>{matchingRows.length} {matchingRows.length === 1 ? "record" : "records"}</Badge>
           </div>
           {pageRows.length ? vehicleView === "table"
@@ -954,11 +969,7 @@ function VehicleRegistryView({
           <Field label="Sort order"><Select value={sortDirection} onChange={(event) => onSortDirectionChange(event.target.value as "asc" | "desc")}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
           <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>Clear filters</Button>
         </FilterDrawer>
-        <div className="rider-fleet-view-toggle" role="group" aria-label="Vehicle display mode">
-          <Button type="button" variant={view === "grid" ? "primary" : "outline"} aria-pressed={view === "grid"} aria-label="Card grid view" title="Card grid view" onClick={() => onViewChange("grid")}><Grid2X2 size={15} /><span>Grid</span></Button>
-          <Button type="button" variant={view === "table" ? "primary" : "outline"} aria-pressed={view === "table"} aria-label="Table view" title="Table view" onClick={() => onViewChange("table")}><Table2 size={15} /><span>Table</span></Button>
-          <Button type="button" variant={view === "list" ? "primary" : "outline"} aria-pressed={view === "list"} aria-label="Compact list view" title="Compact list view" onClick={() => onViewChange("list")}><List size={15} /><span>List</span></Button>
-        </div>
+        <RecordViewToggle value={view} onChange={onViewChange} label="Vehicle registry" screen="vehicles-profile-vehicles" settings={{ search, vehicleStatus, vehicleType, vehicleManufacturer, vehicleYear, relatedVehicleId, filterColumn, filterValue, filterMatch, sortColumn, sortDirection }} />
         <Badge>{totalRows} {totalRows === 1 ? "vehicle" : "vehicles"}</Badge>
       </div>
       {!table

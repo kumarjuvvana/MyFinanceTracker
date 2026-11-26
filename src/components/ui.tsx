@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
-import { Filter, Grid2X2, List, Table2, X } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { Check, Filter, Grid2X2, List, Save, Table2, X } from "lucide-react";
 import { activityLinkHref, isSafeActivityLink } from "../lib/data";
+import type { TrackerPreferences } from "../types";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "outline" | "ghost" | "danger"; size?: "sm" | "md" };
 
@@ -14,15 +15,47 @@ export function Card({ children, className = "", ...props }: HTMLAttributes<HTML
 
 export type RecordViewMode = "grid" | "list" | "table";
 
-export function RecordViewToggle({ value, onChange, label }: {
+type ScreenViewSettings = NonNullable<TrackerPreferences["savedScreenViews"]>[string];
+const EMPTY_SCREEN_VIEW_SETTINGS: ScreenViewSettings = {};
+
+export const ScreenViewPreferencesContext = createContext<{
+  views: NonNullable<TrackerPreferences["savedScreenViews"]>;
+  save: (screen: string, settings: ScreenViewSettings) => Promise<void>;
+}>({
+  views: {},
+  save: async () => { throw new Error("Screen view preferences are unavailable."); },
+});
+
+export function useSavedScreenView(screen: string): ScreenViewSettings {
+  return useContext(ScreenViewPreferencesContext).views[screen] ?? EMPTY_SCREEN_VIEW_SETTINGS;
+}
+
+export function RecordViewToggle({ value, onChange, label, screen, settings }: {
   value: RecordViewMode;
   onChange: (value: RecordViewMode) => void;
   label: string;
+  screen?: string;
+  settings?: ScreenViewSettings;
 }) {
+  const { save } = useContext(ScreenViewPreferencesContext);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  async function saveDefaultView() {
+    if (!screen || !settings || saving) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      await save(screen, { ...settings, view: value });
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
   return <div className="document-view-switch" role="group" aria-label={`${label} display mode`}>
     <Button type="button" size="sm" variant={value === "grid" ? "primary" : "outline"} aria-pressed={value === "grid"} onClick={() => onChange("grid")}><Grid2X2 size={14} />Grid</Button>
     <Button type="button" size="sm" variant={value === "list" ? "primary" : "outline"} aria-pressed={value === "list"} onClick={() => onChange("list")}><List size={14} />List</Button>
     <Button type="button" size="sm" variant={value === "table" ? "primary" : "outline"} aria-pressed={value === "table"} onClick={() => onChange("table")}><Table2 size={14} />Table</Button>
+    {screen && settings && <Button type="button" size="sm" variant="outline" aria-label={`Save ${label} view as default`} title={`Save ${label} filters, sorting, and display as your default`} disabled={saving} onClick={() => void saveDefaultView().catch(() => undefined)}>{saved ? <Check size={14} /> : <Save size={14} />}{saving ? "Saving…" : saved ? "Saved" : "Save default"}</Button>}
   </div>;
 }
 

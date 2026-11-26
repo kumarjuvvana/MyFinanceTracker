@@ -1258,6 +1258,7 @@ export interface TrackerPreferences {
   assetManagerHiddenItems?: Partial<Record<AssetManagerVisibleType, string[]>>;
   monthlyShoppingBudget?: number;
   savedReportViews?: SavedReportView[];
+  savedScreenViews?: Record<string, Record<string, string>>;
   forecastSavingsGoal?: ForecastSavingsGoal;
 }
 

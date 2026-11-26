@@ -309,6 +309,13 @@ export function validateData(value: unknown): value is TrackerData {
           Number.isFinite(preferences.monthlyShoppingBudget) &&
           preferences.monthlyShoppingBudget >= 0)) &&
       (preferences.savedReportViews === undefined || isValidSavedReportViews(preferences.savedReportViews)) &&
+      (preferences.savedScreenViews === undefined || (isRecord(preferences.savedScreenViews) &&
+        Object.entries(preferences.savedScreenViews).length <= 60 &&
+        Object.entries(preferences.savedScreenViews).every(([screen, settings]) =>
+          /^[a-z0-9-]{1,80}$/.test(screen) && isRecord(settings) &&
+          Object.entries(settings).length <= 40 &&
+          Object.entries(settings).every(([key, setting]) =>
+            /^[a-zA-Z0-9-]{1,80}$/.test(key) && typeof setting === "string" && setting.length <= 2048)))) &&
       (preferences.forecastSavingsGoal === undefined || isValidForecastSavingsGoal(preferences.forecastSavingsGoal)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
