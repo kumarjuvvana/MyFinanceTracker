@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Download, FileText, LoaderCircle, ScanText } from "lucide-react";
 import { Button, Card, Select } from "./ui";
 import { canExtractDocumentText, extractDocumentText, identifyDocumentKeyFindings, type DocumentKeyFindings } from "../lib/documentTextExtraction";
-import type { DocumentAttachment, DocumentCategory } from "../types";
+import { getDocumentAttachments } from "../lib/documentFiles";
+import type { DocumentAttachment, DocumentCategory, DocumentFileAttachment } from "../types";
 
 interface DocumentAnalysisResult {
   document: DocumentAttachment;
+  attachment: DocumentFileAttachment;
   text: string;
   findings: DocumentKeyFindings;
   warnings: string[];
@@ -26,8 +28,10 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
   const matchingDocuments = selectedCategory === "all"
     ? documents
     : documents.filter((document) => document.categoryId === selectedCategory);
-  const attachedDocuments = matchingDocuments.filter((document) => Boolean(document.storagePath));
-  const supportedDocuments = attachedDocuments.filter((document) => canExtractDocumentText(document.fileName));
+  const attachedFiles = matchingDocuments.flatMap((document) =>
+    getDocumentAttachments(document).map((attachment) => ({ document, attachment })));
+  const supportedFiles = attachedFiles.filter(({ attachment }) => canExtractDocumentText(attachment.fileName));
+  const documentsWithFiles = new Set(attachedFiles.map(({ document }) => document.id)).size;
 
   async function analyseCategory() {
     if (!selectedCategory) return;
@@ -36,16 +40,17 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
     setResults([]);
     const analysed: DocumentAnalysisResult[] = [];
     try {
-      for (let index = 0; index < supportedDocuments.length; index += 1) {
-        const document = supportedDocuments[index];
-        setProgress(`Reading ${index + 1} of ${supportedDocuments.length}: ${document.fileName}`);
+      for (let index = 0; index < supportedFiles.length; index += 1) {
+        const { document, attachment } = supportedFiles[index];
+        setProgress(`Reading ${index + 1} of ${supportedFiles.length}: ${attachment.fileName}`);
         try {
-          const source = await createFileUrl(document.storagePath);
+          const source = await createFileUrl(attachment.storagePath);
           const response = await fetch(source);
           if (!response.ok) throw new Error(`The private file could not be downloaded (HTTP ${response.status}).`);
-          const extraction = await extractDocumentText(document.fileName, await response.arrayBuffer());
+          const extraction = await extractDocumentText(attachment.fileName, await response.arrayBuffer());
           analysed.push({
             document,
+            attachment,
             text: extraction.text,
             findings: identifyDocumentKeyFindings(extraction.text),
             warnings: extraction.warnings,
@@ -53,6 +58,7 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
         } catch (caught) {
           analysed.push({
             document,
+            attachment,
             text: "",
             findings: { companyReferences: [], roleDetails: [], employmentDates: [], salaryDetails: [], otherTerms: [] },
             warnings: [],
@@ -70,8 +76,8 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
   }
 
   function downloadReport() {
-    const report = results.map(({ document, findings, warnings, error: documentError }) => [
-      `DOCUMENT: ${document.title} (${document.fileName})`,
+    const report = results.map(({ document, attachment, findings, warnings, error: documentError }) => [
+      `DOCUMENT: ${document.title} (${attachment.fileName})`,
       documentError ? `Analysis error: ${documentError}` : "",
       ...Object.entries({
         "Possible company / employer references": findings.companyReferences,
@@ -116,8 +122,8 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
           {categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
         </Select>
       </label>
-      {selectedCategory && <p className="section-description">{matchingDocuments.length} {matchingDocuments.length === 1 ? "document" : "documents"} in this selection · {supportedDocuments.length} supported files{attachedDocuments.length > supportedDocuments.length ? ` · ${attachedDocuments.length - supportedDocuments.length} unsupported formats` : ""}{matchingDocuments.length > attachedDocuments.length ? ` · ${matchingDocuments.length - attachedDocuments.length} without a file` : ""}</p>}
-      <Button type="button" onClick={() => void analyseCategory()} disabled={!selectedCategory || !supportedDocuments.length || busy}>
+      {selectedCategory && <p className="section-description">{matchingDocuments.length} {matchingDocuments.length === 1 ? "document" : "documents"} in this selection · {supportedFiles.length} supported files{attachedFiles.length > supportedFiles.length ? ` · ${attachedFiles.length - supportedFiles.length} unsupported formats` : ""}{matchingDocuments.length > documentsWithFiles ? ` · ${matchingDocuments.length - documentsWithFiles} without a file` : ""}</p>}
+      <Button type="button" onClick={() => void analyseCategory()} disabled={!selectedCategory || !supportedFiles.length || busy}>
         {busy ? <><LoaderCircle size={14} className="spin" />Analysing…</> : <><ScanText size={14} />Analyse selected documents</>}
       </Button>
       {progress && <p className="document-analysis-progress" role="status">{progress}</p>}
@@ -125,8 +131,8 @@ export function DocumentAnalysisPanel({ documents, categories, createFileUrl }: 
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {results.length > 0 && <div className="document-analysis-results-heading"><div><h2 className="section-title">Analysis results</h2><p className="section-description">Possible matches only—verify details against the original documents.</p></div>
       <Button type="button" variant="outline" onClick={downloadReport}><Download size={14} />Download text report</Button></div>}
-    <div className="document-analysis-results">{results.map((result) => <Card className="document-analysis-result" key={result.document.id}>
-      <div className="document-analysis-result-title"><FileText size={16} /><div><h3>{result.document.title}</h3><p>{result.document.fileName}{result.document.isArchived ? " · Archived" : ""}</p></div></div>
+    <div className="document-analysis-results">{results.map((result) => <Card className="document-analysis-result" key={`${result.document.id}-${result.attachment.id}`}>
+      <div className="document-analysis-result-title"><FileText size={16} /><div><h3>{result.document.title}</h3><p>{result.attachment.fileName}{result.document.isArchived ? " · Archived" : ""}</p></div></div>
       {result.error ? <p className="document-analysis-error" role="alert">{result.error}</p> : <>
         {findingGroups.map(({ key, label }) => result.findings[key].length > 0 && <section className="document-analysis-findings" key={key}>
           <h4>{label}</h4><ul>{result.findings[key].map((line, index) => <li key={`${key}-${index}`}>{line}</li>)}</ul>

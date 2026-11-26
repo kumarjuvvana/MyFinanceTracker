@@ -1,4 +1,7 @@
+import type { DocumentAttachment, DocumentFileAttachment } from "../types";
+
 export const MAX_DOCUMENT_FILE_BYTES = 13 * 1024 * 1024;
+export const MAX_DOCUMENT_ATTACHMENTS = 100;
 export const DOCUMENT_FILE_TYPES = {
   ".pdf": "application/pdf",
   ".png": "image/png",
@@ -18,6 +21,33 @@ export const DOCUMENT_FILE_TYPES = {
 } as const;
 
 export type DocumentFileExtension = keyof typeof DOCUMENT_FILE_TYPES;
+
+export function getDocumentAttachments(document: Pick<DocumentAttachment,
+  "attachments" | "fileName" | "contentType" | "sizeBytes" | "storagePath" | "contentHash">): DocumentFileAttachment[] {
+  if (document.attachments?.length) return document.attachments;
+  if (!document.storagePath) return [];
+  return [{
+    id: document.storagePath,
+    fileName: document.fileName,
+    contentType: document.contentType,
+    sizeBytes: document.sizeBytes,
+    storagePath: document.storagePath,
+    ...(document.contentHash ? { contentHash: document.contentHash } : {}),
+  }];
+}
+
+export function isDocumentFileAttachment(value: unknown): value is DocumentFileAttachment {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const file = value as Record<string, unknown>;
+  const fileType = typeof file.fileName === "string" ? getDocumentFileType(file.fileName) : null;
+  return typeof file.id === "string" && file.id.length > 0 && file.id.length <= 200 &&
+    typeof file.fileName === "string" && file.fileName.length > 0 && file.fileName.length <= 255 &&
+    Boolean(fileType) && typeof file.contentType === "string" && fileType?.contentType === file.contentType &&
+    typeof file.sizeBytes === "number" && Number.isSafeInteger(file.sizeBytes) &&
+    file.sizeBytes > 0 && file.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
+    typeof file.storagePath === "string" && isDocumentStoragePath(file.storagePath) &&
+    (file.contentHash === undefined || typeof file.contentHash === "string" && /^[0-9a-f]{64}$/i.test(file.contentHash));
+}
 
 export function getDocumentFileType(fileName: string): { extension: DocumentFileExtension; contentType: string } | null {
   const extension = `.${fileName.split(".").pop()?.toLocaleLowerCase() ?? ""}` as DocumentFileExtension;

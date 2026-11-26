@@ -1030,6 +1030,15 @@ export interface PersonalRecord {
   updatedAt?: string;
 }
 
+export interface DocumentFileAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  storagePath: string;
+  contentHash?: string;
+}
+
 export interface DocumentAttachment {
   id: string;
   title: string;
@@ -1041,6 +1050,7 @@ export interface DocumentAttachment {
   storagePath: string;
   uploadedAt: string;
   contentHash?: string;
+  attachments?: DocumentFileAttachment[];
   externalLink?: string;
   categoryId?: string;
   documentType?: string;

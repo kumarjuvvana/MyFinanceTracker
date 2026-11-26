@@ -3,7 +3,7 @@ import pg from "pg";
 import { isAuthenticated, isSameOrigin } from "../src/lib/dataAuth.js";
 import { loadUnlockedDatabaseConnectionProfile, loadUnlockedDatabaseConnectionProfiles } from "../server/databaseConnections.js";
 import { inspectSqlStatement, sqlConfirmationPhrase } from "./databaseSql.js";
-import { isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "../src/lib/documentFiles.js";
+import { isDocumentFileAttachment, isDocumentStoragePath, MAX_DOCUMENT_ATTACHMENTS, MAX_DOCUMENT_FILE_BYTES } from "../src/lib/documentFiles.js";
 import { getProfileStorageCredentials, measureBucketUsage } from "../server/documentStorage.js";
 
 const { Client, Pool } = pg;
@@ -520,7 +520,9 @@ async function mutateSavedProfileDocumentModules(body: Record<string, unknown>, 
     if (typeof storagePath !== "string" || (storagePath !== "" && !isDocumentStoragePath(storagePath)) ||
       typeof record.sizeBytes !== "number" || !Number.isSafeInteger(record.sizeBytes) ||
       record.sizeBytes < 0 || record.sizeBytes > MAX_DOCUMENT_FILE_BYTES ||
-      record.contentHash !== undefined && (typeof record.contentHash !== "string" || !/^[0-9a-f]{64}$/i.test(record.contentHash))) {
+      record.contentHash !== undefined && (typeof record.contentHash !== "string" || !/^[0-9a-f]{64}$/i.test(record.contentHash)) ||
+      record.attachments !== undefined && (!Array.isArray(record.attachments) || record.attachments.length > MAX_DOCUMENT_ATTACHMENTS ||
+        !record.attachments.every(isDocumentFileAttachment))) {
       respond(response, 400, { error: "The document attachment path or file size is invalid." });
       return;
     }
@@ -571,14 +573,16 @@ async function mutateSavedProfileDocumentModules(body: Record<string, unknown>, 
       );
     } else {
       const existing = await client.query(
-        `select record->>'isArchived' as archived${collection === "documents" ? ", record->>'storagePath' as storage_path" : ""}
+        `select record->>'isArchived' as archived${collection === "documents"
+          ? ", record->>'storagePath' as storage_path, case when jsonb_typeof(record->'attachments') = 'array' then jsonb_array_length(record->'attachments') else 0 end as attachment_count"
+          : ""}
          from public.${table} where id = $1 for update`,
         [id],
       );
       if (existing.rowCount !== 1 || existing.rows[0].archived !== "true") {
         throw new Error("Only archived records can be permanently deleted.");
       }
-      if (collection === "documents" && existing.rows[0].storage_path) {
+      if (collection === "documents" && (existing.rows[0].storage_path || existing.rows[0].attachment_count > 0)) {
         throw new Error("Detach the uploaded file before permanently deleting this record. The stored object is retained.");
       }
       result = await client.query(`delete from public.${table} where id = $1 returning id`, [id]);

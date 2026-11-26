@@ -16,7 +16,7 @@ import { checkSession, loadSharedData, saveSharedData, saveSharedPreferences, si
 import { loadCookingInventory, saveCookingInventory } from "./lib/cookingInventoryApi";
 import { loadImportantDates, saveImportantDates } from "./lib/importantDatesApi";
 import { deleteDocumentFile, uploadDocumentFile, type DocumentStorageUsage } from "./lib/documentApi";
-import { canPreviewDocumentContentType, DOCUMENT_FILE_TYPES, getDocumentFileType, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
+import { canPreviewDocumentContentType, DOCUMENT_FILE_TYPES, getDocumentAttachments, getDocumentFileType, MAX_DOCUMENT_ATTACHMENTS, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, loadSavedProfilesHostingUsage, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SavedProfileHostingUsage, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
 import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
@@ -28,6 +28,7 @@ import { decryptDatabaseConnectionProfiles, type DatabaseConnectionProfile } fro
 import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransactionCandidate, type GmailTransactionDirection } from "./lib/gmailTransactions";
 import type { BankTransaction } from "./types";
 import type { EncryptedVault } from "./types";
+import type { DocumentFileAttachment } from "./types";
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type DocumentCategory, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { DESIGN_THEMES, type DesignTheme } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
@@ -825,7 +826,10 @@ function Dashboard({ data, documentModulesData, widgets, onPage }: { data: Track
       emptyMessage: documentModulesData ? "No documents uploaded yet." : "Open Documents to connect and load its records.",
       entries: [...(documentModulesData?.documents ?? [])].filter((document) => document.isArchived !== true)
         .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 4)
-        .map((document) => ({ title: document.title, detail: [document.personName, document.fileName].filter(Boolean).join(" · ") })),
+        .map((document) => ({
+          title: document.title,
+          detail: [document.personName, getDocumentAttachments(document).map((attachment) => attachment.fileName).join(", ")].filter(Boolean).join(" · "),
+        })),
     },
     devotional: {
       title: "Devotional", page: "Devotional", emptyMessage: "No devotional entries, Bible readings, songs, daily prayers, or prayer requests recorded yet.",
@@ -14446,6 +14450,12 @@ type DocumentDetails = Pick<DocumentAttachment, "title" | "personName" | "notes"
   isFavorite?: boolean;
 };
 
+type DocumentAttachmentDraft = {
+  id: string;
+  existing?: DocumentFileAttachment;
+  file?: File;
+};
+
 function formatFileSize(sizeBytes: number): string {
   if (sizeBytes <= 0) return "0 B";
   if (sizeBytes < 1024 * 1024) return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
@@ -14456,7 +14466,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   initial: DocumentAttachment | null;
   categories: DocumentCategory[];
   onClose: () => void;
-  onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
+  onSave: (details: DocumentDetails, attachments: DocumentAttachmentDraft[], id?: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [personName, setPersonName] = useState(initial?.personName ?? "");
@@ -14470,7 +14480,10 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
   const [tagsText, setTagsText] = useState(initial?.tags?.join(", ") ?? "");
   const [isFavorite, setIsFavorite] = useState(initial?.isFavorite ?? false);
-  const [file, setFile] = useState<File | undefined>();
+  const [attachmentDrafts, setAttachmentDrafts] = useState<DocumentAttachmentDraft[]>(() => {
+    const existing = initial ? getDocumentAttachments(initial).map((attachment) => ({ id: attachment.id, existing: attachment })) : [];
+    return existing.length ? existing : [{ id: createId() }];
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const accept = [...Object.keys(DOCUMENT_FILE_TYPES), "text/csv", "text/plain"].join(",");
@@ -14486,16 +14499,23 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       setError("Enter a valid HTTP, HTTPS, FTP, or local path link to the document.");
       return;
     }
-    if (file && !getDocumentFileType(file.name)) {
-      setError("Choose a PDF, image, CSV, text, spreadsheet, presentation, or Word document.");
+    const newFiles = attachmentDrafts.flatMap((attachment) => attachment.file ? [attachment.file] : []);
+    const retainedAttachments = attachmentDrafts.filter((attachment) => !attachment.file && attachment.existing).length;
+    if (newFiles.length + retainedAttachments > MAX_DOCUMENT_ATTACHMENTS) {
+      setError(`A document can have at most ${MAX_DOCUMENT_ATTACHMENTS} attachments.`);
       return;
     }
-    if (file && file.size > MAX_DOCUMENT_FILE_BYTES) {
-      setError("Choose a file no larger than 13 MB.");
+    if (newFiles.some((file) => !getDocumentFileType(file.name))) {
+      setError("Choose PDF, image, CSV, text, spreadsheet, presentation, or Word files.");
       return;
     }
-    if (file && file.size > 5 * 1024 * 1024 &&
-      !window.confirm(`${file.name} is ${formatFileSize(file.size)}. Upload this large file to private Supabase Storage? Each file is limited to 13 MB.`)) {
+    if (newFiles.some((file) => file.size > MAX_DOCUMENT_FILE_BYTES)) {
+      setError("Each attachment must be no larger than 13 MB.");
+      return;
+    }
+    const largeFiles = newFiles.filter((file) => file.size > 5 * 1024 * 1024);
+    if (largeFiles.length &&
+      !window.confirm(`Upload ${largeFiles.map((file) => `${file.name} (${formatFileSize(file.size)})`).join(", ")} to private Supabase Storage? Each file is limited to 13 MB.`)) {
       setError("Upload cancelled. Choose a smaller file or confirm the large-file upload.");
       return;
     }
@@ -14514,7 +14534,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
         dueDate,
         tags: [...new Set(tagsText.split(",").map((tag) => tag.trim()).filter(Boolean))],
         isFavorite,
-      }, file, initial?.id);
+      }, attachmentDrafts, initial?.id);
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The document could not be saved.");
@@ -14535,22 +14555,43 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       <Field label="Due date (optional)"><DateInput aria-label="Due date" value={dueDate} onValueChange={setDueDate} min={issueDate || undefined} /></Field>
       <Field className="full" label="Tags (comma separated)"><Input maxLength={500} placeholder="Optional" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <label className="document-favorite-toggle"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /> Add to favorites</label>
-      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Supported: PDF, images, CSV (.csv), plain text (.txt, .text), Word, Excel, PowerPoint, and RTF. Maximum 13 MB per file."}</span></Field>
-      {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
+      <div className="document-attachments-picker full">
+        <div className="document-attachments-heading"><span className="field-label">Attachments</span><Button type="button" size="sm" variant="outline" disabled={attachmentDrafts.length >= MAX_DOCUMENT_ATTACHMENTS} onClick={() => setAttachmentDrafts((current) => [...current, { id: createId() }])}><Plus size={13} />Add file</Button></div>
+        <div className="document-attachment-drafts">{attachmentDrafts.map((attachment, index) => <div className="document-attachment-draft" key={attachment.id}>
+          <div className="document-attachment-draft-file">
+            <input className="field document-file-input" type="file" accept={accept} aria-label={`Choose attachment ${index + 1}`} onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              if (!file) return;
+              setAttachmentDrafts((current) => current.map((entry) => entry.id === attachment.id ? { id: entry.id, file } : entry));
+            }} />
+            {attachment.file && <span className="section-description">Selected: {attachment.file.name} · {formatFileSize(attachment.file.size)}</span>}
+            {!attachment.file && attachment.existing && <span className="section-description">Current: {attachment.existing.fileName} · {formatFileSize(attachment.existing.sizeBytes)}</span>}
+          </div>
+          <button type="button" className="icon-button" aria-label={`Remove attachment row ${index + 1}`} title="Remove attachment" onClick={() =>
+            setAttachmentDrafts((current) => current.filter((entry) => entry.id !== attachment.id))
+          }><Trash2 size={14} /></button>
+        </div>)}</div>
+        <span className="section-description">Supported: PDF, images, CSV (.csv), plain text (.txt, .text), Word, Excel, PowerPoint, and RTF. Maximum 13 MB per file. Existing attachments stay unless their rows are removed.</span>
+      </div>
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
     </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
   </Modal>;
 }
 
-function DocumentViewer({ document, source, onClose }: { document: DocumentAttachment; source: string; onClose: () => void }) {
+function DocumentViewer({ document, attachment, source, onClose }: {
+  document: DocumentAttachment;
+  attachment: DocumentFileAttachment;
+  source: string;
+  onClose: () => void;
+}) {
   const [fullscreen, setFullscreen] = useState(false);
-  const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+  const contentType = attachment.contentType || getDocumentFileType(attachment.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";
   const isDocx = contentType === DOCUMENT_FILE_TYPES[".docx"];
   const isXlsx = contentType === DOCUMENT_FILE_TYPES[".xlsx"];
-  return <Modal title={document.title} onClose={onClose} wide fullscreen={fullscreen}>
+  return <Modal title={`${document.title} · ${attachment.fileName}`} onClose={onClose} wide fullscreen={fullscreen}>
     <div className="document-preview-actions">
       {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
       <Button type="button" size="sm" variant="outline" aria-pressed={fullscreen} onClick={() => setFullscreen((current) => !current)}>
@@ -14588,21 +14629,21 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   documents: DocumentAttachment[];
   categories: DocumentCategory[];
   totalStoredBytes: number;
-  onSave: (details: DocumentDetails, file: File | undefined, id?: string) => Promise<void>;
+  onSave: (details: DocumentDetails, attachments: DocumentAttachmentDraft[], id?: string) => Promise<void>;
   onSaveCategory: (category: DocumentCategory) => Promise<void>;
   onCopy: (document: DocumentAttachment) => Promise<void>;
   onArchive: (document: DocumentAttachment) => Promise<void>;
   onRestore: (document: DocumentAttachment) => Promise<void>;
   onDelete: (document: DocumentAttachment) => Promise<void>;
   onToggleFavorite: (document: DocumentAttachment) => Promise<void>;
-  onRemoveFile: (document: DocumentAttachment) => Promise<void>;
+  onRemoveFile: (document: DocumentAttachment, attachmentId?: string) => Promise<void>;
   onNavigate: (page: Page) => void;
   createFileUrl: (storagePath: string, downloadName?: string) => Promise<string>;
   loadStorageUsage: () => Promise<DocumentStorageUsage>;
 }) {
   const savedView = useSavedScreenView("documents");
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
-  const [viewer, setViewer] = useState<{ document: DocumentAttachment; source: string } | null>(null);
+  const [viewer, setViewer] = useState<{ document: DocumentAttachment; attachment: DocumentFileAttachment; source: string } | null>(null);
   const [categoryEditor, setCategoryEditor] = useState(false);
   const [search, setSearch] = useState(() => savedView.search ?? "");
   const [personFilter, setPersonFilter] = useState(() => savedView.personFilter ?? "All people");
@@ -14645,15 +14686,25 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     return () => { active = false; };
   }, []);
 
-  function documentCategory(document: DocumentAttachment): string {
-    const extension = getDocumentFileType(document.fileName)?.extension;
+  function fileCategory(fileName: string): string {
+    const extension = getDocumentFileType(fileName)?.extension;
     if (extension === ".pdf") return "PDF";
     if (extension === ".png" || extension === ".jpg" || extension === ".jpeg" || extension === ".webp") return "Images";
     if (extension === ".csv" || extension === ".xls" || extension === ".xlsx") return "Spreadsheets";
     if (extension === ".doc" || extension === ".docx" || extension === ".rtf") return "Documents";
     if (extension === ".ppt" || extension === ".pptx") return "Presentations";
-    if (extension === ".txt") return "Text";
-    return document.externalLink ? "External links" : "No file";
+    if (extension === ".txt" || extension === ".text") return "Text";
+    return "Other";
+  }
+  function documentCategories(document: DocumentAttachment): string[] {
+    const fileCategories = [...new Set(getDocumentAttachments(document).map((attachment) => fileCategory(attachment.fileName)))];
+    return fileCategories.length ? fileCategories : [document.externalLink ? "External links" : "No file"];
+  }
+  function documentCategory(document: DocumentAttachment): string {
+    return documentCategories(document)[0];
+  }
+  function documentFileSize(document: DocumentAttachment): number {
+    return getDocumentAttachments(document).reduce((total, attachment) => total + attachment.sizeBytes, 0);
   }
   function dueStatus(value: string | undefined): { label: string; tone: "amber" | "green" | "neutral" } {
     if (!value) return { label: "No due date", tone: "neutral" };
@@ -14671,7 +14722,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       setOperationError(caught instanceof Error ? caught.message : "The document operation could not be completed.");
     }
   }
-  async function openDocumentFile(document: DocumentAttachment, download = false) {
+  async function openDocumentFile(document: DocumentAttachment, attachment: DocumentFileAttachment, download = false) {
     let downloadWindow: Window | null = null;
     if (download) {
       downloadWindow = window.open("about:blank", "_blank");
@@ -14683,9 +14734,9 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     }
     await runAction(async () => {
       try {
-        const source = await createFileUrl(document.storagePath, download ? document.fileName : undefined);
+        const source = await createFileUrl(attachment.storagePath, download ? attachment.fileName : undefined);
         if (download && downloadWindow) downloadWindow.location.replace(source);
-        else setViewer({ document, source });
+        else setViewer({ document, attachment, source });
       } catch (caught) {
         downloadWindow?.close();
         throw caught;
@@ -14708,15 +14759,15 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       : section === "due"
         ? dueDocuments
         : activeDocuments;
-  const documentTypes = [...new Set(viewDocuments.map(documentCategory))].sort((a, b) => a.localeCompare(b));
+  const documentTypes = [...new Set(viewDocuments.flatMap(documentCategories))].sort((a, b) => a.localeCompare(b));
   const metadataDocumentTypes = [...new Set(viewDocuments.map((document) => document.documentType?.trim()).filter((value): value is string => Boolean(value)))]
     .sort((a, b) => a.localeCompare(b));
   const minFileSizeBytes = minFileSizeMb ? Number(minFileSizeMb) * 1024 * 1024 : null;
   const maxFileSizeBytes = maxFileSizeMb ? Number(maxFileSizeMb) * 1024 * 1024 : null;
   const visible = viewDocuments.filter((document) =>
-    `${document.title} ${document.personName} ${document.fileName} ${document.externalLink ?? ""} ${document.notes} ${document.referenceNumber ?? ""} ${document.issuingAuthority ?? ""} ${document.documentType ?? ""} ${(document.tags ?? []).join(" ")} ${categories.find((category) => category.id === document.categoryId)?.name ?? ""}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
+    `${document.title} ${document.personName} ${getDocumentAttachments(document).map((attachment) => attachment.fileName).join(" ")} ${document.externalLink ?? ""} ${document.notes} ${document.referenceNumber ?? ""} ${document.issuingAuthority ?? ""} ${document.documentType ?? ""} ${(document.tags ?? []).join(" ")} ${categories.find((category) => category.id === document.categoryId)?.name ?? ""}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()) &&
     (personFilter === "All people" || document.personName === personFilter) &&
-    (typeFilter === "All file types" || documentCategory(document) === typeFilter) &&
+    (typeFilter === "All file types" || documentCategories(document).includes(typeFilter)) &&
     (documentTypeFilter === "All document types" || document.documentType === documentTypeFilter) &&
     (categoryFilter === "All categories" || document.categoryId === categoryFilter) &&
     (!dateFrom || document.uploadedAt.slice(0, 10) >= dateFrom) && (!dateTo || document.uploadedAt.slice(0, 10) <= dateTo) &&
@@ -14724,11 +14775,11 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     (!issueTo || Boolean(document.issueDate && document.issueDate <= issueTo)) &&
     (!dueFrom || Boolean(document.dueDate && document.dueDate >= dueFrom)) &&
     (!dueTo || Boolean(document.dueDate && document.dueDate <= dueTo)) &&
-    (minFileSizeBytes === null || document.sizeBytes >= minFileSizeBytes) &&
-    (maxFileSizeBytes === null || document.sizeBytes <= maxFileSizeBytes))
+    (minFileSizeBytes === null || documentFileSize(document) >= minFileSizeBytes) &&
+    (maxFileSizeBytes === null || documentFileSize(document) <= maxFileSizeBytes))
     .sort((a, b) => sortBy === "title" ? a.title.localeCompare(b.title)
       : sortBy === "due" ? (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
-        : sortBy === "size" ? b.sizeBytes - a.sizeBytes
+        : sortBy === "size" ? documentFileSize(b) - documentFileSize(a)
           : sortBy === "category" ? (categories.find((category) => category.id === a.categoryId)?.name ?? "").localeCompare(categories.find((category) => category.id === b.categoryId)?.name ?? "")
             : (sortBy === "oldest" ? 1 : -1) * a.uploadedAt.localeCompare(b.uploadedAt));
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
@@ -14747,12 +14798,14 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     return {
       category,
       count: categoryDocuments.length,
-      bytes: categoryDocuments.reduce((total, document) => total + document.sizeBytes, 0),
+      bytes: categoryDocuments.reduce((total, document) => total + documentFileSize(document), 0),
     };
   });
-  const storageByFileType = [...documents.filter((document) => document.storagePath).reduce((groups, document) => {
-    const type = documentCategory(document);
-    groups.set(type, (groups.get(type) ?? 0) + document.sizeBytes);
+  const storageByFileType = [...documents.flatMap((document) => getDocumentAttachments(document).map((attachment) => ({
+    type: fileCategory(attachment.fileName),
+    sizeBytes: attachment.sizeBytes,
+  }))).reduce((groups, attachment) => {
+    groups.set(attachment.type, (groups.get(attachment.type) ?? 0) + attachment.sizeBytes);
     return groups;
   }, new Map<string, number>())]
     .map(([label, value]) => ({ label, value }))
@@ -14787,9 +14840,9 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       category: categories.find((category) => category.id === document.categoryId)?.name ?? "",
       person: document.personName,
       documentNumber: document.referenceNumber ?? "",
-      fileName: document.fileName,
+      fileName: getDocumentAttachments(document).map((attachment) => attachment.fileName).join("; "),
       fileType: document.documentType || documentCategory(document),
-      sizeBytes: document.sizeBytes,
+      sizeBytes: documentFileSize(document),
       addedDate: document.uploadedAt.slice(0, 10),
       issueDate: document.issueDate ?? "",
       dueDate: document.dueDate ?? "",
@@ -14840,23 +14893,20 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       </tr></thead><tbody>{entries.map((document) => {
         const category = categories.find((entry) => entry.id === document.categoryId);
         const due = dueStatus(document.dueDate);
-        const format = document.documentType || documentCategory(document);
-        const hasFile = Boolean(document.storagePath);
-        const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
-        const canPreview = hasFile && canPreviewDocumentContentType(contentType);
+        const attachments = getDocumentAttachments(document);
+        const format = document.documentType || documentCategories(document).join(", ");
+        const hasFile = attachments.length > 0;
         return <tr key={document.id}>
           <td><strong>{document.title}</strong>{document.referenceNumber && <small>Ref. {maskedDocumentNumber(document.referenceNumber)}</small>}</td>
           <td>{category?.name ?? "Uncategorized"}</td><td>{document.personName || "—"}</td>
-          <td>{format}{document.storagePath ? ` · ${formatFileSize(document.sizeBytes)}` : ""}</td>
+          <td>{format}{hasFile && <div className="document-attachment-file-list">{attachments.map((attachment) => <button type="button" key={attachment.id} onClick={() => void openDocumentFile(document, attachment, true)}>{attachment.fileName} · {formatFileSize(attachment.sizeBytes)}</button>)}</div>}</td>
           <td>{dateLabel(document.uploadedAt.slice(0, 10))}</td><td>{document.dueDate ? dateLabel(document.dueDate) : "—"}</td>
           <td><Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></td>
           <td><div className="document-card-actions">
-            {canPreview && <Button size="sm" variant="outline" onClick={() => void openDocumentFile(document)}>View</Button>}
-          {document.storagePath && <Button size="sm" variant="outline" onClick={() => void openDocumentFile(document, true)}>Download</Button>}
           {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">Open link</a>}
             <button type="button" className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
-          {hasFile && <button type="button" className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} onClick={() => {
-            if (window.confirm(`Detach the uploaded file for "${document.title}"? The stored file will be retained.`)) void runAction(() => onRemoveFile(document));
+          {hasFile && <button type="button" className="icon-button" aria-label={`Detach all uploaded files from ${document.title}`} onClick={() => {
+            if (window.confirm(`Detach all uploaded files from "${document.title}"? The stored files will be retained.`)) void runAction(() => onRemoveFile(document));
           }}><Trash2 size={14} /></button>}
           {!document.isArchived && <><button type="button" className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button><button type="button" className="icon-button" aria-label={`Copy record for ${document.title}`} onClick={() => void runAction(() => onCopy(document))}><Copy size={14} /></button></>}
           {document.isArchived ? <><button type="button" className="icon-button" aria-label={`Restore ${document.title}`} onClick={() => void runAction(() => onRestore(document))}><ArrowDownToLine size={14} /></button><button type="button" className="icon-button" aria-label={`Delete ${document.title} permanently`} disabled={hasFile} title={hasFile ? "Detach the file first; the stored object will be retained" : "Delete permanently"} onClick={() => {
@@ -14870,29 +14920,33 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       })}</tbody></table></div>;
     }
     return <div className={`document-list ${view === "grid" ? "document-grid" : "document-compact-list"}`}>{entries.map((document) => {
-      const hasFile = Boolean(document.storagePath);
+      const attachments = getDocumentAttachments(document);
+      const hasFile = attachments.length > 0;
       const category = categories.find((entry) => entry.id === document.categoryId);
       const due = dueStatus(document.dueDate);
-      const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
-      const canPreview = hasFile && canPreviewDocumentContentType(contentType);
-      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><div className="document-card-heading"><h2>{document.title}</h2>{document.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div><div className="document-meta-badges">{category && <Badge>{category.name}</Badge>}<Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></div><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${document.fileName} · ${formatFileSize(document.sizeBytes)}` : document.externalLink ? "External link" : "No file attached"}</p>{document.documentType && <small>{document.documentType}{document.referenceNumber ? ` · Ref. ${maskedDocumentNumber(document.referenceNumber)}` : ""}</small>}{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}{document.dueDate ? ` · Due ${dateLabel(document.dueDate)}` : ""}</small>{(document.createdAt || document.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{document.createdAt && <p><strong>Created</strong><span>{new Date(document.createdAt).toLocaleString()}</span></p>}{document.updatedAt && <p><strong>Updated</strong><span>{new Date(document.updatedAt).toLocaleString()}</span></p>}</details>}</div></div><div className="document-card-actions">
-        {canPreview && <Button variant="outline" onClick={() => void openDocumentFile(document)}><Eye size={14} />View</Button>}
-        {hasFile && <Button variant="outline" onClick={() => void openDocumentFile(document, true)}><Download size={14} />Download</Button>}
+      return <Card className="document-card" key={document.id}><div className="document-card-main"><div className="document-icon"><FileText size={18} /></div><div className="document-card-info"><div className="document-card-heading"><h2>{document.title}</h2>{document.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div><div className="document-meta-badges">{category && <Badge>{category.name}</Badge>}<Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></div><p>{document.personName ? `For ${document.personName} · ` : ""}{hasFile ? `${attachments.length} attached ${attachments.length === 1 ? "file" : "files"} · ${formatFileSize(documentFileSize(document))}` : document.externalLink ? "External link" : "No file attached"}</p>{document.documentType && <small>{document.documentType}{document.referenceNumber ? ` · Ref. ${maskedDocumentNumber(document.referenceNumber)}` : ""}</small>}{document.notes && <div className="document-notes"><LinkifiedText>{document.notes}</LinkifiedText></div>}<small>Added {dateLabel(document.uploadedAt.slice(0, 10))}{document.dueDate ? ` · Due ${dateLabel(document.dueDate)}` : ""}</small>{(document.createdAt || document.updatedAt) && <details className="document-technical-details"><summary>Technical details</summary>{document.createdAt && <p><strong>Created</strong><span>{new Date(document.createdAt).toLocaleString()}</span></p>}{document.updatedAt && <p><strong>Updated</strong><span>{new Date(document.updatedAt).toLocaleString()}</span></p>}</details>}</div></div><div className="document-card-actions">
         {document.externalLink && <a className="button button-outline document-download" href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />Open link</a>}
         <button className="icon-button" aria-label={`${document.isFavorite ? "Remove" : "Add"} ${document.title} ${document.isFavorite ? "from" : "to"} favorites`} title={document.isFavorite ? "Remove favorite" : "Add to favorites"} onClick={() => void runAction(() => onToggleFavorite(document))}><Star size={14} fill={document.isFavorite ? "currentColor" : "none"} /></button>
-        {hasFile && <button className="icon-button" aria-label={`Detach uploaded file from ${document.title}`} title="Detach uploaded file" onClick={() => {
-          if (window.confirm(`Detach the uploaded file from "${document.title}"? The stored file will be retained to preserve migrated source records.`)) void runAction(() => onRemoveFile(document));
+        {hasFile && <button className="icon-button" aria-label={`Detach all uploaded files from ${document.title}`} title="Detach all uploaded files" onClick={() => {
+          if (window.confirm(`Detach all uploaded files from "${document.title}"? The stored files will be retained to preserve migrated source records.`)) void runAction(() => onRemoveFile(document));
         }}><Trash2 size={14} /></button>}
         <button className="icon-button" aria-label={`Edit ${document.title}`} onClick={() => setEditor({ initial: document })}><Pencil size={14} /></button>
         <button className="icon-button" aria-label={`Copy record for ${document.title}`} title="Create a record without copying the uploaded file" onClick={() => void runAction(() => onCopy(document))}><Copy size={14} /></button>
         {document.isArchived
           ? <><button className="icon-button" aria-label={`Restore ${document.title}`} onClick={() => void runAction(() => onRestore(document))}><ArrowDownToLine size={14} /></button><button className="icon-button" aria-label={`Delete ${document.title} permanently`} title={hasFile ? "Remove the file first before deleting this record" : "Delete permanently"} disabled={hasFile} onClick={() => {
-            if (window.confirm(`Permanently delete the archived record "${document.title}"? The stored file, if previously detached, will remain in the private bucket.`)) void runAction(() => onDelete(document));
+            if (window.confirm(`Permanently delete the archived record "${document.title}"? Its detached files, if any, will remain in the private bucket.`)) void runAction(() => onDelete(document));
           }}><Trash2 size={14} /></button></>
           : <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => {
             if (window.confirm(`Move "${document.title}" to the archive? Its uploaded file will remain stored.`)) void runAction(() => onArchive(document));
           }}><Archive size={14} /></button>}
-      </div></Card>;
+      </div>{hasFile && <div className="document-card-attachments">{attachments.map((attachment) => {
+        const contentType = attachment.contentType || getDocumentFileType(attachment.fileName)?.contentType || "";
+        const canPreview = canPreviewDocumentContentType(contentType);
+        return <div className="document-card-attachment" key={attachment.id}><span><FileText size={13} />{attachment.fileName} · {formatFileSize(attachment.sizeBytes)}</span><div>
+          {canPreview && <button type="button" className="icon-button" aria-label={`View ${attachment.fileName}`} title="View file" onClick={() => void openDocumentFile(document, attachment)}><Eye size={14} /></button>}
+          <button type="button" className="icon-button" aria-label={`Download ${attachment.fileName}`} title="Download file" onClick={() => void openDocumentFile(document, attachment, true)}><Download size={14} /></button>
+        </div></div>;
+      })}</div>}</Card>;
     })}</div>;
   }
 
@@ -14971,12 +15025,13 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         return <div className={`document-calendar-day${day.getMonth() === calendarMonth.getMonth() ? "" : " outside-month"}`} key={key}>
           <span className="document-calendar-date">{day.getDate()}</span>
           {dayDocuments.map((document) => {
-            const contentType = document.contentType || getDocumentFileType(document.fileName)?.contentType || "";
+            const attachment = getDocumentAttachments(document)[0];
+            const contentType = attachment?.contentType || getDocumentFileType(attachment?.fileName ?? "")?.contentType || "";
             const canPreview = canPreviewDocumentContentType(contentType);
-            return document.storagePath && canPreview
-              ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document)}>{document.title}</button>
-              : document.storagePath
-                ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document, true)}>{document.title}</button>
+            return attachment && canPreview
+              ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document, attachment)}>{document.title}</button>
+              : attachment
+                ? <button type="button" key={document.id} title={document.title} onClick={() => void openDocumentFile(document, attachment, true)}>{document.title}</button>
                 : document.externalLink
               ? <a key={document.id} title={document.title} href={activityLinkHref(document.externalLink)} target="_blank" rel="noopener noreferrer">{document.title}</a>
               : <span className="document-calendar-event" key={document.id} title={document.title}>{document.title}</span>;
@@ -14989,7 +15044,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Select aria-label="Rows per page" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
     </>}
     {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
-    {viewer && <DocumentViewer document={viewer.document} source={viewer.source} onClose={() => setViewer(null)} />}
+    {viewer && <DocumentViewer document={viewer.document} attachment={viewer.attachment} source={viewer.source} onClose={() => setViewer(null)} />}
     {categoryEditor && <Modal title="Create document category" onClose={() => setCategoryEditor(false)}>
       <form onSubmit={(event) => void saveCategory(event)}><div className="form-grid">
         <Field className="full" label="Category name"><Input autoFocus required maxLength={60} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} /></Field>
@@ -17331,11 +17386,14 @@ export default function App() {
   async function permanentlyDeleteArchivedRecord(id: string) {
     const archived = data?.archivedRecords?.find((entry) => entry.id === id);
     if (!archived) return;
-    const archivedPaths = (archived.snapshot.documents ?? []).map((document) => document.storagePath).filter(Boolean);
+    const archivedPaths = (archived.snapshot.documents ?? []).flatMap((document) =>
+      getDocumentAttachments(document).map((attachment) => attachment.storagePath));
     const referencedPaths = new Set([
-      ...(data?.documents ?? []).map((document) => document.storagePath).filter(Boolean),
+      ...(data?.documents ?? []).flatMap((document) =>
+        getDocumentAttachments(document).map((attachment) => attachment.storagePath)),
       ...(data?.archivedRecords ?? []).filter((entry) => entry.id !== id)
-        .flatMap((entry) => entry.snapshot.documents ?? []).map((document) => document.storagePath).filter(Boolean),
+        .flatMap((entry) => entry.snapshot.documents ?? [])
+        .flatMap((document) => getDocumentAttachments(document).map((attachment) => attachment.storagePath)),
     ]);
     try {
       for (const path of new Set(archivedPaths.filter((entry) => !referencedPaths.has(entry)))) {
@@ -18446,62 +18504,112 @@ export default function App() {
     Documents: <DocumentModulesDatabaseGate onDataChange={setDocumentModulesData}>{({ data: moduleData, mutate, uploadFile, deleteFile, createFileUrl, loadStorageUsage }) => {
       const allModuleDocuments = moduleData.documents;
       const documents = allModuleDocuments.filter((document) => document.isArchived !== true);
-      const totalBytes = [...new Map(allModuleDocuments.filter((document) => document.storagePath)
-        .map((document) => [document.storagePath, document])).values()]
-        .reduce((total, document) => total + document.sizeBytes, 0);
+      const uniqueFiles = new Map<string, DocumentFileAttachment>();
+      allModuleDocuments.forEach((document) => getDocumentAttachments(document).forEach((attachment) => {
+        uniqueFiles.set(attachment.storagePath, attachment);
+      }));
+      const totalBytes = [...uniqueFiles.values()].reduce((total, attachment) => total + attachment.sizeBytes, 0);
 
-      async function saveModuleDocument(details: DocumentDetails, file: File | undefined, id?: string): Promise<void> {
+      async function saveModuleDocument(details: DocumentDetails, drafts: DocumentAttachmentDraft[], id?: string): Promise<void> {
         const existing = id ? documents.find((document) => document.id === id) : undefined;
-        const contentHash = file
-          ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())))
-            .map((byte) => byte.toString(16).padStart(2, "0")).join("")
-          : "";
-        const matchingFile = contentHash
-          ? allModuleDocuments.find((document) => document.contentHash === contentHash && document.storagePath)
-          : undefined;
-        const uploaded = file && !matchingFile ? await uploadFile(file) : null;
-        const next: DocumentAttachment = {
-          ...(existing ?? {
-            id: id ?? createId(),
-            fileName: "",
-            contentType: "",
-            sizeBytes: 0,
-            storagePath: "",
-            uploadedAt: new Date().toISOString(),
-          }),
-          ...details,
-          ...(file ? {
-            fileName: file?.name ?? "",
-            contentType: matchingFile?.contentType ?? uploaded?.contentType ?? "",
-            sizeBytes: file?.size ?? 0,
-            storagePath: matchingFile?.storagePath ?? uploaded?.storagePath ?? "",
-            contentHash,
-          } : {}),
-        };
+        const attachments: DocumentFileAttachment[] = [];
+        const uploadedPaths: string[] = [];
+        let reusedFile = false;
         try {
+          for (const draft of drafts) {
+            if (!draft.file) {
+              if (draft.existing) attachments.push(draft.existing);
+              continue;
+            }
+            const fileType = getDocumentFileType(draft.file.name);
+            if (!fileType) throw new Error(`The file format for "${draft.file.name}" is not supported.`);
+            const contentHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await draft.file.arrayBuffer())))
+              .map((byte) => byte.toString(16).padStart(2, "0")).join("");
+            if (attachments.some((attachment) => attachment.contentHash === contentHash)) continue;
+            const matchingFile = [
+              ...attachments,
+              ...allModuleDocuments.flatMap(getDocumentAttachments),
+            ].find((attachment) => attachment.contentHash === contentHash);
+            if (matchingFile) {
+              reusedFile = true;
+              attachments.push({
+                id: createId(),
+                fileName: draft.file.name,
+                contentType: fileType.contentType,
+                sizeBytes: draft.file.size,
+                storagePath: matchingFile.storagePath,
+                contentHash,
+              });
+              continue;
+            }
+            const uploaded = await uploadFile(draft.file);
+            uploadedPaths.push(uploaded.storagePath);
+            attachments.push({
+              id: createId(),
+              fileName: draft.file.name,
+              contentType: uploaded.contentType,
+              sizeBytes: draft.file.size,
+              storagePath: uploaded.storagePath,
+              contentHash,
+            });
+          }
+          const primaryAttachment = attachments[0];
+          const next: DocumentAttachment = {
+            ...(existing ?? {
+              id: id ?? createId(),
+              fileName: "",
+              contentType: "",
+              sizeBytes: 0,
+              storagePath: "",
+              uploadedAt: new Date().toISOString(),
+            }),
+            ...details,
+            attachments,
+            fileName: primaryAttachment?.fileName ?? "",
+            contentType: primaryAttachment?.contentType ?? "",
+            sizeBytes: primaryAttachment?.sizeBytes ?? 0,
+            storagePath: primaryAttachment?.storagePath ?? "",
+            contentHash: primaryAttachment?.contentHash,
+          };
           await mutate({ collection: "documents", action: "upsert", record: next });
         } catch (caught) {
-          if (uploaded?.storagePath) {
+          const cleanupErrors: string[] = [];
+          for (const storagePath of uploadedPaths) {
             try {
-              await deleteFile(uploaded.storagePath);
+              await deleteFile(storagePath);
             } catch (cleanupError) {
-              const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
-              const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : "The new uploaded file could not be removed.";
-              throw new Error(`${saveMessage} Cleanup also failed: ${cleanupMessage}`);
+              cleanupErrors.push(cleanupError instanceof Error ? cleanupError.message : "An uploaded file could not be removed.");
             }
+          }
+          if (cleanupErrors.length) {
+            const saveMessage = caught instanceof Error ? caught.message : "The document record could not be saved.";
+            throw new Error(`${saveMessage} Cleanup failed: ${cleanupErrors.join(" ")}`);
           }
           throw caught;
         }
-        if (existing?.storagePath && uploaded?.storagePath && existing.storagePath !== uploaded.storagePath) {
-          setNotice("The document was updated. Its previous uploaded file was retained to preserve migrated source records.");
+        const nextPaths = new Set(attachments.map((attachment) => attachment.storagePath));
+        if (existing && getDocumentAttachments(existing).some((attachment) => !nextPaths.has(attachment.storagePath))) {
+          setNotice("Removed attachments were detached from this document and retained in private storage to preserve source references.");
         }
-        if (matchingFile) setNotice(`Reused an existing stored file for "${details.title}"; no duplicate file was uploaded.`);
+        if (reusedFile) setNotice(`Reused existing stored file content for "${details.title}" where possible.`);
       }
 
-      async function removeModuleDocumentFile(document: DocumentAttachment) {
-        const withoutFile = { ...document, fileName: "", contentType: "", sizeBytes: 0, storagePath: "", contentHash: undefined };
+      async function removeModuleDocumentFile(document: DocumentAttachment, attachmentId?: string) {
+        const attachments = attachmentId
+          ? getDocumentAttachments(document).filter((attachment) => attachment.id !== attachmentId)
+          : [];
+        const primaryAttachment = attachments[0];
+        const withoutFile = {
+          ...document,
+          attachments,
+          fileName: primaryAttachment?.fileName ?? "",
+          contentType: primaryAttachment?.contentType ?? "",
+          sizeBytes: primaryAttachment?.sizeBytes ?? 0,
+          storagePath: primaryAttachment?.storagePath ?? "",
+          contentHash: primaryAttachment?.contentHash,
+        };
         await mutate({ collection: "documents", action: "upsert", record: withoutFile });
-        setNotice("The file was detached from this record and retained in private storage to preserve source references.");
+        setNotice(`Attachment${attachmentId ? "" : "s"} detached from this record and retained in private storage to preserve source references.`);
       }
 
       return <DocumentManager
@@ -18519,6 +18627,7 @@ export default function App() {
               ...copy,
               id: createId(),
               title: copyLabel(copy.title, 160),
+              attachments: [],
               fileName: "",
               contentType: "",
               sizeBytes: 0,

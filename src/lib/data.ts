@@ -1,6 +1,6 @@
 import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DESIGN_THEMES } from "../types.js";
-import { DOCUMENT_FILE_TYPES, isDocumentStoragePath, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
+import { DOCUMENT_FILE_TYPES, isDocumentFileAttachment, isDocumentStoragePath, MAX_DOCUMENT_ATTACHMENTS, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
 export const STORAGE_KEY = "daybook-shopping-tracker";
 export const STORAGE_VERSION = 1;
@@ -936,6 +936,8 @@ export function validateData(value: unknown): value is TrackerData {
     typeof entry.contentType === "string" && (entry.contentType === "" || Object.values(DOCUMENT_FILE_TYPES).some((type) => type === entry.contentType)) &&
     typeof entry.sizeBytes === "number" && Number.isInteger(entry.sizeBytes) && entry.sizeBytes >= 0 && entry.sizeBytes <= MAX_DOCUMENT_FILE_BYTES &&
     typeof entry.storagePath === "string" && (entry.storagePath === "" || isDocumentStoragePath(entry.storagePath)) &&
+    (entry.attachments === undefined || Array.isArray(entry.attachments) && entry.attachments.length <= MAX_DOCUMENT_ATTACHMENTS &&
+      entry.attachments.every(isDocumentFileAttachment)) &&
     typeof entry.uploadedAt === "string" && !Number.isNaN(Date.parse(entry.uploadedAt)) &&
     (entry.externalLink === undefined || (typeof entry.externalLink === "string" && entry.externalLink.length <= 2048 && isSafeExternalLink(entry.externalLink))) &&
     ((entry.storagePath !== "" && entry.fileName.length > 0 && entry.contentType !== "" && entry.sizeBytes > 0) ||
