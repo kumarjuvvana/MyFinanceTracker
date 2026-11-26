@@ -1902,6 +1902,9 @@ button.fleet-bar-row:disabled{cursor:default}
 .document-attachment-drafts{display:grid;gap:7px}
 .document-attachment-draft{display:flex;align-items:flex-start;gap:8px;padding:8px;border:1px solid var(--panel-line,#e8ece6);border-radius:8px}
 .document-attachment-draft-file{display:grid;flex:1;gap:5px;min-width:0}
+.document-attachment-current{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
+.document-attachment-current>.field{flex:1;min-width:150px}
+.document-attachment-rename-error{flex-basis:100%;color:#b4534b;font-size:10px}
 .document-attachment-draft .icon-button{flex:none}
 .document-card-attachments{display:flex;flex:1 0 100%;align-items:center;width:100%;padding-left:50px}
 .document-attachments-link{display:inline-flex;align-items:center;gap:5px;padding:3px 0;border:0;background:transparent;color:var(--user-accent);font:inherit;font-size:11px;font-weight:600;text-align:left;cursor:pointer}

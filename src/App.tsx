@@ -14462,11 +14462,12 @@ function formatFileSize(sizeBytes: number): string {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function DocumentModal({ initial, categories, onClose, onSave }: {
+function DocumentModal({ initial, categories, onClose, onSave, onRenameAttachment }: {
   initial: DocumentAttachment | null;
   categories: DocumentCategory[];
   onClose: () => void;
   onSave: (details: DocumentDetails, attachments: DocumentAttachmentDraft[], id?: string) => Promise<void>;
+  onRenameAttachment: (document: DocumentAttachment, attachmentId: string, fileName: string) => Promise<void>;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [personName, setPersonName] = useState(initial?.personName ?? "");
@@ -14486,7 +14487,40 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [renamingAttachmentId, setRenamingAttachmentId] = useState<string | null>(null);
+  const [renameFileName, setRenameFileName] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [savingRename, setSavingRename] = useState(false);
   const accept = [...Object.keys(DOCUMENT_FILE_TYPES), "text/csv", "text/plain"].join(",");
+
+  async function saveAttachmentName(attachment: DocumentFileAttachment) {
+    const fileName = renameFileName.trim();
+    const fileType = getDocumentFileType(fileName);
+    if (!fileName || fileName.length > 255 || /[\\/\u0000-\u001f]/.test(fileName) ||
+      !fileType || fileType.contentType !== attachment.contentType) {
+      setRenameError("Enter a valid file name with its original file format.");
+      return;
+    }
+    if (!initial) return;
+    if (fileName === attachment.fileName) {
+      setRenamingAttachmentId(null);
+      setRenameError("");
+      return;
+    }
+    setSavingRename(true);
+    setRenameError("");
+    try {
+      await onRenameAttachment(initial, attachment.id, fileName);
+      setAttachmentDrafts((current) => current.map((draft) => draft.id === attachment.id && draft.existing
+        ? { ...draft, existing: { ...draft.existing, fileName } }
+        : draft));
+      setRenamingAttachmentId(null);
+    } catch (caught) {
+      setRenameError(caught instanceof Error ? caught.message : "The attachment name could not be saved.");
+    } finally {
+      setSavingRename(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -14565,9 +14599,27 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
               setAttachmentDrafts((current) => current.map((entry) => entry.id === attachment.id ? { id: entry.id, file } : entry));
             }} />
             {attachment.file && <span className="section-description">Selected: {attachment.file.name} · {formatFileSize(attachment.file.size)}</span>}
-            {!attachment.file && attachment.existing && <span className="section-description">Current: {attachment.existing.fileName} · {formatFileSize(attachment.existing.sizeBytes)}</span>}
+            {!attachment.file && attachment.existing && <div className="document-attachment-current">
+              {renamingAttachmentId === attachment.id
+                ? <>
+                  <Input autoFocus aria-label={`Rename ${attachment.existing.fileName}`} maxLength={255} value={renameFileName} onChange={(event) => setRenameFileName(event.target.value)} />
+                  <button type="button" className="icon-button" aria-label="Save attachment name" title="Save name" disabled={savingRename} onClick={() => {
+                    if (attachment.existing) void saveAttachmentName(attachment.existing);
+                  }}><Check size={14} /></button>
+                  <button type="button" className="icon-button" aria-label="Cancel attachment rename" title="Cancel" disabled={savingRename} onClick={() => { setRenamingAttachmentId(null); setRenameError(""); }}><X size={14} /></button>
+                  {renameError && <span className="document-attachment-rename-error" role="alert">{renameError}</span>}
+                </>
+                : <>
+                  <span className="section-description">Current: {attachment.existing.fileName} · {formatFileSize(attachment.existing.sizeBytes)}</span>
+                  <button type="button" className="icon-button" aria-label={`Rename ${attachment.existing.fileName}`} title="Rename file" disabled={savingRename} onClick={() => {
+                    setRenameFileName(attachment.existing?.fileName ?? "");
+                    setRenameError("");
+                    setRenamingAttachmentId(attachment.id);
+                  }}><Pencil size={14} /></button>
+                </>}
+            </div>}
           </div>
-          <button type="button" className="icon-button" aria-label={`Remove attachment row ${index + 1}`} title="Remove attachment" onClick={() =>
+          <button type="button" className="icon-button" aria-label={`Remove attachment row ${index + 1}`} title="Remove attachment" disabled={savingRename} onClick={() =>
             setAttachmentDrafts((current) => current.filter((entry) => entry.id !== attachment.id))
           }><Trash2 size={14} /></button>
         </div>)}</div>
@@ -14575,7 +14627,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       </div>
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
-    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
+    </div>{error && <div className="alert alert-error" style={{ marginTop: 13 }} role="alert">{error}</div>}<div className="modal-actions"><Button type="button" variant="outline" onClick={onClose} disabled={busy || savingRename}>Cancel</Button><Button type="submit" disabled={busy || savingRename}>{busy ? "Saving to Supabase..." : initial ? "Save details" : "Save document"}</Button></div></form>
   </Modal>;
 }
 
@@ -14644,7 +14696,7 @@ function DocumentAnalyticsChart({ title, subtitle, entries, formatValue }: {
   </Card>;
 }
 
-function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onNavigate, createFileUrl, loadStorageUsage }: {
+function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSaveCategory, onCopy, onArchive, onRestore, onDelete, onToggleFavorite, onRemoveFile, onRenameAttachment, onNavigate, createFileUrl, loadStorageUsage }: {
   documents: DocumentAttachment[];
   categories: DocumentCategory[];
   totalStoredBytes: number;
@@ -14656,6 +14708,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
   onDelete: (document: DocumentAttachment) => Promise<void>;
   onToggleFavorite: (document: DocumentAttachment) => Promise<void>;
   onRemoveFile: (document: DocumentAttachment, attachmentId?: string) => Promise<void>;
+  onRenameAttachment: (document: DocumentAttachment, attachmentId: string, fileName: string) => Promise<void>;
   onNavigate: (page: Page) => void;
   createFileUrl: (storagePath: string, downloadName?: string) => Promise<string>;
   loadStorageUsage: () => Promise<DocumentStorageUsage>;
@@ -15067,7 +15120,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
       : <Card><EmptyState icon={<FileDown size={18} />} title={visible.length || viewDocuments.length ? "No matching documents" : section === "archived" ? "No archived documents" : section === "favorites" ? "No favorite documents" : "No documents uploaded yet"} description={visible.length || viewDocuments.length ? "Try changing the search or filters." : "Add a document record now and attach a file later if you prefer."} /></Card>}
     {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Select aria-label="Rows per page" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
     </>}
-    {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
+    {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} onRenameAttachment={onRenameAttachment} />}
     {viewer && <DocumentViewer
       document={viewer.document}
       attachment={viewer.attachment}
@@ -18626,6 +18679,30 @@ export default function App() {
         if (reusedFile) setNotice(`Reused existing stored file content for "${details.title}" where possible.`);
       }
 
+      async function renameModuleDocumentAttachment(document: DocumentAttachment, attachmentId: string, fileName: string) {
+        const attachments = getDocumentAttachments(document);
+        const renamedAttachment = attachments.find((attachment) => attachment.id === attachmentId);
+        if (!renamedAttachment) throw new Error("The selected attachment is no longer part of this document.");
+        const updatedAttachments = attachments.map((attachment) => attachment.id === attachmentId
+          ? { ...attachment, fileName }
+          : attachment);
+        const primaryAttachment = updatedAttachments[0];
+        await mutate({
+          collection: "documents",
+          action: "upsert",
+          record: {
+            ...document,
+            attachments: updatedAttachments,
+            fileName: primaryAttachment?.fileName ?? "",
+            contentType: primaryAttachment?.contentType ?? "",
+            sizeBytes: primaryAttachment?.sizeBytes ?? 0,
+            storagePath: primaryAttachment?.storagePath ?? "",
+            contentHash: primaryAttachment?.contentHash,
+          },
+        });
+        setNotice("Attachment file name saved to the document database.");
+      }
+
       async function removeModuleDocumentFile(document: DocumentAttachment, attachmentId?: string) {
         const attachments = attachmentId
           ? getDocumentAttachments(document).filter((attachment) => attachment.id !== attachmentId)
@@ -18678,6 +18755,7 @@ export default function App() {
           record: { ...document, isFavorite: !document.isFavorite },
         })}
         onRemoveFile={removeModuleDocumentFile}
+        onRenameAttachment={renameModuleDocumentAttachment}
         onNavigate={changePage}
         createFileUrl={createFileUrl}
         loadStorageUsage={loadStorageUsage}
