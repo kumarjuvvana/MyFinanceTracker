@@ -80,6 +80,7 @@ import {
 } from "./lib/assetAnalytics";
 import { projectLinearTrend, type MonthlyValue } from "./lib/forecastReport";
 
+const APP_NAME = "Everyday Tracker";
 const PREFERENCES_KEY = "daybook-shopping-preferences";
 function savedScreenSetting<T extends string>(
   settings: Record<string, string>,
@@ -1978,7 +1979,7 @@ function ShoppingReports({ data, onSaveBudget, initialFilters, onSaveView }: {
         <div className="shopping-report-budget-actions"><Button type="submit" disabled={budgetSaving}>{budgetSaving ? "Saving..." : "Save budget"}</Button>{monthlyBudget !== undefined && <Button type="button" variant="outline" disabled={budgetSaving} onClick={() => { setBudgetDraft(""); void persistMonthlyBudget(undefined); }}>Clear</Button>}</div>
       </form>
       {budgetMessage && <p className="section-description" role="status">{budgetMessage}</p>}
-      <p className="shopping-report-budget-note">Local purchase records have no per-record currency and use the app display currency. External payments retain their source currency in the combined report; no conversion is performed. Budget settings are saved with your Daybook preferences.</p>
+      <p className="shopping-report-budget-note">Local purchase records have no per-record currency and use the app display currency. External payments retain their source currency in the combined report; no conversion is performed. Budget settings are saved with your Everyday Tracker preferences.</p>
     </Card>
   </>;
 }
@@ -2143,9 +2144,9 @@ function ExternalFinanceReports({
       title={fixedDataset ? (dataset === "incomes" ? "Income reports" : "Payment reports") : "External finance data"}
       subtitle={fixedDataset
         ? dataset === "incomes"
-          ? "Review received income from the external finance source without copying records into Daybook."
-          : "Review paid transactions from the external finance source without copying records into Daybook."
-        : "Browse the selected source-project tables without copying records into Daybook."}
+          ? "Review received income from the external finance source without copying records into Everyday Tracker."
+          : "Review paid transactions from the external finance source without copying records into Everyday Tracker."
+        : "Browse the selected source-project tables without copying records into Everyday Tracker."}
     />
     <p className="reports-hub-caveat">This view reads only approved tables and rows permitted by source-database RLS. It never writes to the source database. Payments and incomes are summarized only for paid/received records and remain separated by currency. Other amounts are shown as source values; no currency is inferred or converted.</p>
     <div className="toolbar filter-toolbar shopping-filter-toolbar report-filter-toolbar">
@@ -3147,7 +3148,7 @@ function ForecastReports({ data, initialFilters, onSaveView, onSavePreferences }
         <div className="shopping-report-budget-actions"><Button type="submit" disabled={goalSaving}>{goalSaving ? "Saving..." : "Save goal"}</Button>{goal && <Button type="button" variant="outline" disabled={goalSaving} onClick={() => void clearGoal()}>Clear goal</Button>}</div>
       </form>
       {goalMessage && <p className="section-description" role="status">{goalMessage}</p>}
-      <p className="shopping-report-budget-note">The goal is stored in existing Daybook preferences. This adds no database tables or columns.</p>
+      <p className="shopping-report-budget-note">The goal is stored in existing Everyday Tracker preferences. This adds no database tables or columns.</p>
     </Card>
   </>;
 }
@@ -9549,7 +9550,7 @@ function PromptManagerPage({ records, onSave, onDelete, onCopy }: {
 
   return <>
     <PageHeading eyebrow="Reusable AI instructions" title="AI Prompts" subtitle="Browse prompts by category or prompt type, then search, filter, and copy them into the AI tool you use." action={<Button onClick={() => setEditor(null)}><Plus size={15} /> Add prompt</Button>} />
-    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Daybook data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
+    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Prompts are saved with your shared Everyday Tracker data. Copy places only the prompt text on your clipboard; customize placeholders before running it.</span></div>
     <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search AI prompts" placeholder="Search title, prompt, description, tool..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer label="Prompt filters" activeCount={(categoryFilter !== "All categories" ? 1 : 0) + (typeFilter !== "All types" ? 1 : 0) + (sortBy !== "title" ? 1 : 0) + (groupBy !== "category" ? 1 : 0)}><Field label="Category"><Select aria-label="Filter prompt category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</Select></Field><Field label="Type"><Select aria-label="Filter prompt type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}><option>All types</option><option>System</option><option>Developer</option><option>User</option><option>Task</option><option>Other</option></Select></Field><Field label="Sort by"><Select aria-label="Sort AI prompts" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="title">Title</option><option value="category">Category</option><option value="tool">Tool</option></Select></Field><Field label="Group by"><Select aria-label="Group AI prompts" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="category">Category</option><option value="type">Type</option><option value="none">No grouping</option></Select></Field></FilterDrawer>    <RecordViewToggle value={view} onChange={setView} label="AI prompts" screen="ai-prompts" settings={{ search, categoryFilter, typeFilter, sortBy, groupBy }} /><Badge>{visible.length} {visible.length === 1 ? "prompt" : "prompts"}</Badge></div>
     {groupBy !== "none" && promptGroups.length > 0 && <div className="prompt-group-actions record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPromptGroupsExpanded(false)}>Hide all</Button></div>}
     {groupBy === "none" ? renderPrompts(visible) : <div className="record-date-groups prompt-category-groups">{promptGroups.map((group) => <DevotionalRecordGroup key={group.key} title={group.title} count={group.records.length} expandAll={expandAllGroups} expansionRevision={groupExpansionRevision}>{renderPrompts(group.records)}</DevotionalRecordGroup>)}</div>}
@@ -9907,7 +9908,7 @@ function MindfulnessPage({ habits, logs, onSaveHabit, onArchiveHabit, onSaveLog,
 
   return <>
     <PageHeading eyebrow="Practice with patience" title="Mind & habits" subtitle="Build daily habits, track progress toward a target, and reflect on emotions and meaningful actions." action={activeTab === "habits" ? <Button onClick={() => setHabitEditor(null)}><Plus size={15} /> Add habit</Button> : <Button onClick={() => setLogEditor(null)}><Plus size={15} /> Add reflection</Button>} />
-    <div className="alert"><Heart size={15} style={{ flex: "none", marginTop: 1 }} /><span>A gentle personal journal, not a medical assessment. Progress is about noticing and practicing, not being perfect. These notes are saved in your shared Daybook data.</span></div>
+    <div className="alert"><Heart size={15} style={{ flex: "none", marginTop: 1 }} /><span>A gentle personal journal, not a medical assessment. Progress is about noticing and practicing, not being perfect. These notes are saved in your shared Everyday Tracker data.</span></div>
     <div className="mindful-summary"><Card><span>Days reflected · last 7 days</span><strong>{recentDays} / 7</strong></Card><Card><span>Habit practices · last 7 days</span><strong>{recentHabitPractices}</strong></Card><Card><span>Positive habits</span><strong>{habits.length}</strong></Card></div>
     <nav className="student-profile-tabs" aria-label="Mind and habits sections">
       <Button variant={activeTab === "habits" ? "primary" : "outline"} aria-pressed={activeTab === "habits"} onClick={() => setActiveTab("habits")}><Heart size={14} />Habit tracker <Badge>{habits.length}</Badge></Button>
@@ -10360,14 +10361,14 @@ function HostingStoragePage() {
 
   return <>
     <PageHeading eyebrow="Infrastructure overview" title="Hosting & storage" subtitle="Review measured Supabase usage and the size of this Vercel deployment build." action={<Button variant="outline" onClick={() => void refreshUsage()} disabled={loading}><RefreshCw size={14} />{loading ? "Measuring..." : "Refresh usage"}</Button>} />
-    <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>The connected project below is the original Daybook Supabase project. Saved-profile usage is measured separately for each database profile. Bucket capacity and plan quotas are not exposed by these measurements. Vercel reports this build’s output size, not account-wide remaining quota.</span></div>
+    <div className="alert"><HardDrive size={15} style={{ flex: "none", marginTop: 1 }} /><span>The connected project below is the original Everyday Tracker Supabase project. Saved-profile usage is measured separately for each database profile. Bucket capacity and plan quotas are not exposed by these measurements. Vercel reports this build’s output size, not account-wide remaining quota.</span></div>
     {cloudError && <div className="alert alert-error" role="alert">{cloudError}</div>}
     {deploymentError && <div className="alert alert-warning" role="status">{deploymentError}</div>}
     {loading && !cloudUsage && !deploymentUsage && <Card><p className="section-description">Measuring project usage...</p></Card>}
     <div className="hosting-usage-grid">
       {cloudUsage && <>
-        <CapacityCard title="Original Daybook Supabase database" usedBytes={cloudUsage.databaseBytes} limitBytes={FREE_DATABASE_LIMIT_BYTES} detail="Total PostgreSQL database size, including tables, indexes, and system data. Quota shown is only a Free-plan reference." />
-        <CapacityCard title="Original Daybook Supabase Storage" usedBytes={cloudUsage.storageBytes} limitBytes={FREE_STORAGE_LIMIT_BYTES} detail={`${cloudUsage.storageObjects.toLocaleString()} stored object(s), across all buckets in this project. Quota shown is only a Free-plan reference.`} />
+        <CapacityCard title="Original Everyday Tracker Supabase database" usedBytes={cloudUsage.databaseBytes} limitBytes={FREE_DATABASE_LIMIT_BYTES} detail="Total PostgreSQL database size, including tables, indexes, and system data. Quota shown is only a Free-plan reference." />
+        <CapacityCard title="Original Everyday Tracker Supabase Storage" usedBytes={cloudUsage.storageBytes} limitBytes={FREE_STORAGE_LIMIT_BYTES} detail={`${cloudUsage.storageObjects.toLocaleString()} stored object(s), across all buckets in this project. Quota shown is only a Free-plan reference.`} />
       </>}
       {deploymentUsage && <Card className="capacity-card hosting-output-card">
         <h2 className="section-title">Vercel deployment output</h2>
@@ -10583,7 +10584,7 @@ function DatabaseManagerPage() {
 
   return <>
     <PageHeading eyebrow="Database tools" title="Database manager" subtitle="Inspect a saved database profile or the configured database. Reads and reviewed SQL writes connect at request time." action={<Button variant="outline" onClick={() => { setRows(null); void refreshCatalog(); }} disabled={loading || busy || !catalog}><RefreshCw size={14} />Refresh</Button>} />
-    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>SQL console accepts one SELECT, INSERT, UPDATE, or DELETE statement. DDL, transactions, protected core tables, functions, subqueries, multi-statement scripts, and unbounded SELECTs are blocked. Every write needs a typed confirmation; writes are permanent, bypass the archive, and database triggers or foreign-key cascades may affect linked data. The confirmation helps prevent mistakes; it is not separate authorization. Anyone with the shared Daybook password can use this screen.</span></div>
+    <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>SQL console accepts one SELECT, INSERT, UPDATE, or DELETE statement. DDL, transactions, protected core tables, functions, subqueries, multi-statement scripts, and unbounded SELECTs are blocked. Every write needs a typed confirmation; writes are permanent, bypass the archive, and database triggers or foreign-key cascades may affect linked data. The confirmation helps prevent mistakes; it is not separate authorization. Anyone with the shared Everyday Tracker password can use this screen.</span></div>
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     {notice && <div className="alert alert-success" role="status">{notice}</div>}
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Database connection source</h2><p className="section-description">A saved profile connects without setting SUPABASE_DB_URL in Vercel. The passphrase is sent only with authenticated database requests and is not stored by the app.</p></div><Database size={16} /></div>
@@ -10632,7 +10633,7 @@ function DatabaseManagerPage() {
     {catalog && view === "triggers" && <div className="database-object-list">{catalog.triggers.map((trigger) => <Card className="database-object" key={`${trigger.table_name}:${trigger.name}`}><div className="card-head"><div><h2 className="section-title">{trigger.name}</h2><p className="section-description">Table: {trigger.table_name}</p></div><Badge>Read only</Badge></div><pre>{trigger.definition}</pre></Card>)}{!catalog.triggers.length && <Card><EmptyState icon={<Database size={18} />} title="No public triggers" description="No non-internal triggers were found in the public schema." /></Card>}</div>}
     {sqlReview && <Modal title={`Review ${sqlReview.command.toUpperCase()} statement`} onClose={() => { if (!busy) { setSqlReview(null); setSqlReviewedText(""); } }} wide>
       <div className="alert alert-warning"><Database size={15} style={{ flex: "none", marginTop: 1 }} /><span>{sqlReview.requiresConfirmation
-        ? `This write will be committed permanently. It cannot be undone here and bypasses the Daybook archive. Existing triggers and foreign-key rules may also change related data.`
+        ? `This write will be committed permanently. It cannot be undone here and bypasses the Everyday Tracker archive. Existing triggers and foreign-key rules may also change related data.`
         : "This SELECT will run without changing rows. It is limited to 100 results and cannot call database functions."}</span></div>
       <p className="section-description">Command: <strong>{sqlReview.command.toUpperCase()}</strong>{sqlReview.tables.length ? ` · Public table(s): ${sqlReview.tables.join(", ")}` : ""}</p>
       <pre className="database-sql-preview">{sqlReviewedText.trim()}</pre>
@@ -10983,7 +10984,7 @@ function VehicleManagement({ vehicles, journeys, maintenance, onSaveVehicle, onC
     : [{ title: "", vehicles: visibleVehicles }];
 
   return <><PageHeading eyebrow="On the road" title="Vehicle management" subtitle="Keep vehicle details, travel logs, and service and repair history together." action={<Button onClick={() => setVehicleEditor({ initial: null })}><Plus size={15} /> Add a vehicle</Button>} />
-    <div className="alert"><Car size={15} style={{ flex: "none", marginTop: 1 }} /><span>Travel, service and repair records are saved with your shared Daybook data and sync to your other devices.</span></div>
+    <div className="alert"><Car size={15} style={{ flex: "none", marginTop: 1 }} /><span>Travel, service and repair records are saved with your shared Everyday Tracker data and sync to your other devices.</span></div>
     {vehicles.length > 0 && <div className="toolbar filter-toolbar vehicle-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search vehicles and logs" placeholder="Search vehicles, journeys, services, or notes..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={[vehicleFilter !== "All vehicles", fuelType !== "All fuel types", recordType !== "All records", Boolean(from), Boolean(to), sortBy !== "name"].filter(Boolean).length}><Field label="Vehicle"><Select aria-label="Filter by vehicle" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}><option>All vehicles</option>{vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.name}</option>)}</Select></Field><Field label="Fuel type"><Select aria-label="Filter vehicles by fuel type" value={fuelType} onChange={(event) => setFuelType(event.target.value)}><option>All fuel types</option>{fuelTypes.map((type) => <option key={type}>{type}</option>)}</Select></Field><Field label="Record type"><Select aria-label="Filter vehicle records by type" value={recordType} onChange={(event) => setRecordType(event.target.value)}><option>All records</option><option>Journeys</option><option>Service</option><option>Repair</option></Select></Field><Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} max={to || undefined} /></Field><Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field><Field label="Sort by"><Select aria-label="Sort vehicles" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="name">Name (A–Z)</option><option value="make">Make / model (A–Z)</option><option value="year-newest">Year (newest)</option></Select></Field><Button type="button" size="sm" variant="outline" onClick={() => { setVehicleFilter("All vehicles"); setFuelType("All fuel types"); setRecordType("All records"); setFrom(""); setTo(""); setSortBy("name"); }}>Clear filters</Button></FilterDrawer><Field className="vehicle-group-control" label="Group by"><Select aria-label="Group vehicles" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="vehicle">Vehicle</option><option value="fuelType">Fuel type</option></Select></Field><Badge>{visibleVehicles.length} {visibleVehicles.length === 1 ? "vehicle" : "vehicles"}</Badge></div>}
     {!vehicles.length ? <Card><EmptyState icon={<Car size={18} />} title="No vehicles yet" description="Add a vehicle to start recording journeys, services and repairs." /></Card> :
       visibleVehicles.length ? <div className="vehicle-record-groups">{vehicleGroups.map((group) => <section key={group.title || "all-vehicles"}>
@@ -12098,7 +12099,7 @@ function DevotionalPage({ entries, readings, dailyPrayerLogs, resources, songs, 
 
   return <>
     <PageHeading eyebrow="Christian faith" title="Devotional" subtitle="Keep daily Bible readings, Scripture reflections, and prayer requests together in your personal faith journal." action={activeSectionAction} />
-    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Record Bible references and your own reflections, not full copyrighted passage text. Devotional notes and prayer requests are private shared Daybook data.</span></div>
+    <div className="alert"><BookOpen size={15} style={{ flex: "none", marginTop: 1 }} /><span>Record Bible references and your own reflections, not full copyrighted passage text. Devotional notes and prayer requests are private shared Everyday Tracker data.</span></div>
     <nav className="student-profile-tabs devotional-tabs" aria-label="Devotional sections">
       <Button variant={activeTab === "readings" ? "primary" : "outline"} aria-pressed={activeTab === "readings"} onClick={() => changeDevotionalTab("readings")}><BookOpen size={14} />Daily Bible reading<Badge>{readings.length}</Badge></Button>
       <Button variant={activeTab === "reflections" ? "primary" : "outline"} aria-pressed={activeTab === "reflections"} onClick={() => changeDevotionalTab("reflections")}><BookOpen size={14} />Bible reflections<Badge>{entries.length}</Badge></Button>
@@ -14071,7 +14072,7 @@ function EducationCareerPage({ education, qualifications, experience, skills, on
     <div className="career-summary">
       <Card><span>Education</span><strong>{education.length}</strong></Card><Card><span>Qualifications</span><strong>{qualifications.length}</strong></Card><Card><span>Work roles</span><strong>{experience.length}</strong></Card><Card><span>Skills</span><strong>{skills.length}</strong></Card>
     </div>
-    <div className="alert"><Briefcase size={15} style={{ flex: "none", marginTop: 1 }} /><span>This is your own career profile, separate from the Schools & Colleges records and Learning goals. Profile details are stored as shared Daybook data and included in JSON backups.</span></div>
+    <div className="alert"><Briefcase size={15} style={{ flex: "none", marginTop: 1 }} /><span>This is your own career profile, separate from the Schools & Colleges records and Learning goals. Profile details are stored as shared Everyday Tracker data and included in JSON backups.</span></div>
     <nav className="student-profile-tabs" aria-label="Education and career sections">
       <Button variant={activeSection === "education" ? "primary" : "outline"} aria-pressed={activeSection === "education"} onClick={() => setActiveSection("education")}><GraduationCap size={14} />Education <Badge>{education.length}</Badge></Button>
       <Button variant={activeSection === "qualifications" ? "primary" : "outline"} aria-pressed={activeSection === "qualifications"} onClick={() => setActiveSection("qualifications")}><Award size={14} />Qualifications <Badge>{qualifications.length}</Badge></Button>
@@ -14220,7 +14221,7 @@ function FamilyPage({ members, onSave, onDelete }: {
       <Card><span>Children</span><strong>{childrenCount}</strong></Card>
       <Card><span>Other relatives</span><strong>{relativesCount}</strong></Card>
     </div>
-    <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Daybook data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
+    <div className="alert"><UsersRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Birth year, birthplace, residence, phone, and email are optional. Family information is shared Everyday Tracker data visible to people with access; get consent before adding another adult’s contact details and avoid sensitive information.</span></div>
     <div className="toolbar filter-toolbar family-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label="Search family members" placeholder="Search name, relationship, place, education, or work..." value={search} onChange={(event) => setSearch(event.target.value)} /></div><FilterDrawer activeCount={relationshipFilter === "All relationships" ? 0 : 1}><Field label="Relationship"><Select aria-label="Filter family members by relationship" value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option>All relationships</option><option>Self</option><option>Spouse</option><option>Child</option><option>Parent</option><option>Sibling</option><option>Grandparent</option><option>Grandchild</option><option>Aunt / Uncle</option><option>Cousin</option><option>In-law</option><option>Other</option></Select></Field></FilterDrawer><Field className="family-group-control" label="Group by"><Select aria-label="Group family members" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="relationship">Relationship</option><option value="none">No grouping</option></Select></Field><RecordViewToggle value={view} onChange={setView} label="Family members" screen="family" settings={{ search, relationshipFilter, groupBy }} /><Badge>{visibleMembers.length} {visibleMembers.length === 1 ? "member" : "members"}</Badge></div>
     {visibleMembers.length ? <div className="family-record-groups">{familyGroups.map((group) => <section key={group.title || "all-members"}>
       {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.members.length}</span></h2>}
@@ -15575,7 +15576,7 @@ function AccountCredentialsPage({ records, archivedRecords, vault, onSave, onArc
 
   return <>
     <PageHeading eyebrow="Finance & account references" title="Account credentials" subtitle="Search and manage account sign-in details." action={!showArchived ? <Button onClick={() => setEditor(null)}><Plus size={15} />Add account</Button> : undefined} />
-    <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored as readable records in the assigned mydocumentsmanager database and are not included in Daybook JSON backups. Database administrators with service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
+    <div className="alert"><KeyRound size={15} style={{ flex: "none", marginTop: 1 }} /><span>Credentials are stored as readable records in the assigned mydocumentsmanager database and are not included in Everyday Tracker JSON backups. Database administrators with service-role access can read passwords and account details. Do not store bank PINs, one-time codes, recovery codes, or other credentials that should not be exposed to database administrators.</span></div>
     {vault && <div className="alert"><LockKeyhole size={15} style={{ flex: "none", marginTop: 1 }} /><span>An older encrypted credential vault is available. Import it once to move its account records into the direct-access table. Its passphrase is needed only for that transfer. <Button size="sm" variant="outline" onClick={() => { setImportOpen(true); setError(""); }}>Import legacy vault</Button></span></div>}
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <nav className="document-subnav" aria-label="Account credential sections"><Button type="button" variant={!showArchived ? "primary" : "outline"} aria-pressed={!showArchived} onClick={() => { setShowArchived(false); setPage(0); }}>Active ({records.length})</Button><Button type="button" variant={showArchived ? "primary" : "outline"} aria-pressed={showArchived} onClick={() => { setShowArchived(true); setPage(0); }}>Archived ({archivedRecords.length})</Button></nav>
@@ -15823,14 +15824,14 @@ export function CredentialVaultPage({ vault, section, onNavigate, onSave, onDele
     <Card className="credential-lock-card">
       <div className="credential-lock-icon"><KeyRound size={20} /></div>
       <h2>{vault ? "Unlock your account vault" : "Create your account vault"}</h2>
-      <p>{vault ? "Use the same vault passphrase on each device. It is separate from your Daybook access password." : "Choose a unique passphrase of at least 12 characters. It is never sent to the server."}</p>
+      <p>{vault ? "Use the same vault passphrase on each device. It is separate from your Everyday Tracker access password." : "Choose a unique passphrase of at least 12 characters. It is never sent to the server."}</p>
       <form className="credential-lock-form" onSubmit={(event) => void (vault ? openVault(event) : createVault(event))}>
         <Field label="Vault passphrase"><Input type="password" autoComplete={vault ? "current-password" : "new-password"} maxLength={256} required value={password} onChange={(event) => setPassword(event.target.value)} /></Field>
         {!vault && <Field label="Confirm vault passphrase"><Input type="password" autoComplete="new-password" maxLength={256} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></Field>}
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         <Button type="submit" disabled={busy}>{busy ? "Working..." : vault ? "Unlock vault" : "Create encrypted vault"}</Button>
         {vault && <Button type="button" variant="danger" disabled={busy} onClick={() => {
-          if (!window.confirm("Remove the encrypted credential vault from current shared data? Other Daybook records will remain. Older encrypted copies remain in Git history.")) return;
+          if (!window.confirm("Remove the encrypted credential vault from current shared data? Other Everyday Tracker records will remain. Older encrypted copies remain in Git history.")) return;
           onDelete();
           setError("");
         }}>Delete encrypted vault</Button>}
@@ -15927,7 +15928,7 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     .filter((entry) => entry.current || entry.backup) : [];
   function downloadSectionCsv(filename: string, rows: object[]) {
     if (!rows.length) return;
-    downloadBlob(new Blob(["\uFEFF", exportCsvRows(rows)], { type: "text/csv;charset=utf-8" }), `daybook-${filename}-${today()}.csv`);
+    downloadBlob(new Blob(["\uFEFF", exportCsvRows(rows)], { type: "text/csv;charset=utf-8" }), `everyday-tracker-${filename}-${today()}.csv`);
   }
   const vehicleNames = new Map((data.vehicles ?? []).map((vehicle) => [vehicle.id, vehicle.name]));
   const stockNames = new Map((data.stocks ?? []).map((stock) => [stock.id, `${stock.symbol} · ${stock.name}`]));
@@ -15965,10 +15966,10 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     ...(data.vehicleMaintenance ?? []).map((entry) => ({ recordType: entry.type, vehicleName: vehicleNames.get(entry.vehicleId) ?? "", ...entry })),
   ];
   return <><PageHeading eyebrow="Your data, your way" title="Data management" subtitle="Your records sync through Supabase and can be backed up or moved whenever you like." />
-    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Daybook records, favorites, and display preferences sync to Supabase and are shared across your devices. Account credentials are encrypted separately; other records remain readable to people with the Daybook password or Supabase service-role access. Sign in with your Daybook access password on each device.</span></div>
+    <div className="alert"><Sparkles size={15} style={{ flex: "none", marginTop: 1 }} /><span>Everyday Tracker records, favorites, and display preferences sync to Supabase and are shared across your devices. Account credentials are encrypted separately; other records remain readable to people with the Everyday Tracker password or Supabase service-role access. Sign in with your Everyday Tracker access password on each device.</span></div>
     <SettingsDisclosure title="Visual theme" description="Choose colors and appearance" icon={<Palette size={17} />}>
     <Card className="settings-card theme-picker-card">
-      <div className="card-head"><div><h2 className="section-title">Choose your look</h2><p className="section-description">Preview a visual style across every page. Your choice is saved with shared Daybook data.</p></div><Palette size={18} /></div>
+      <div className="card-head"><div><h2 className="section-title">Choose your look</h2><p className="section-description">Preview a visual style across every page. Your choice is saved with shared Everyday Tracker data.</p></div><Palette size={18} /></div>
       <div className="design-theme-heading"><strong>Application-wide design</strong><span>Select a preset, then use the existing Save now option in Appearance & currency below to apply it.</span></div>
       <div className="design-theme-picker" role="group" aria-label="Application-wide design theme">
         {DESIGN_THEMES.map((theme) => {
@@ -16001,20 +16002,20 @@ function DataManagement({ data, currency, darkMode, fontSize, fontStyle, fontFam
     </SettingsDisclosure>
     <SettingsDisclosure title="Navigation menu" description="Grouping, ordering and menu display" icon={<ListTree size={17} />}><Card className="settings-card"><div className="card-head"><div><h2 className="section-title">Navigation menu</h2><p className="section-description">Reduce sidebar clutter by grouping screens. Choose the menu order used within groups, or across the flat menu.</p></div><ListTree size={17} /></div><div className="settings-grid navigation-settings-grid"><label className="dashboard-widget-option"><input type="checkbox" checked={groupMenus} onChange={(event) => onGroupMenusChange(event.target.checked)} /><span><strong>Group menus by category</strong><small>{groupMenus ? "Groups start collapsed; the active section opens automatically." : "Show every screen in one flat list."}</small></span></label><Field label="Menu order"><Select value={menuSortOrder} onChange={(event) => onMenuSortOrderChange(event.target.value as MenuSortOrder)}><option value="current">Current order</option><option value="ascending">Ascending (A–Z)</option></Select></Field></div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Favorite screens" description="Choose screens to keep in your quick-access list" icon={<Star size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose favorite screens</h2><p className="section-description">Selections save to the shared Supabase preferences table, so they appear on your other devices too. You can also mark the current screen with the star in the top bar.</p></div><Star size={17} /></div><div className="dashboard-widget-options">{FAVORITABLE_PAGES.filter((page) => page !== "Reports").map((page) => <label className="dashboard-widget-option" key={page}><input type="checkbox" disabled={favoriteSavePending} checked={favoritePages.includes(page)} onChange={() => onToggleFavoritePage(page)} /><span><strong>{page}</strong><small>{favoriteSavePending ? "Saving to Supabase…" : "Saved in shared Supabase preferences"}</small></span></label>)}</div></Card></SettingsDisclosure>
-    <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved with shared Daybook data.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
+    <SettingsDisclosure title="Dashboard cards" description="Choose the screen summaries shown on Dashboard" icon={<LayoutDashboard size={17} />}><Card className="dashboard-widget-settings"><div className="card-head"><div><h2 className="section-title">Choose dashboard cards</h2><p className="section-description">Select the screens you want to see on your Dashboard. These choices are saved with shared Everyday Tracker data.</p></div><LayoutDashboard size={17} /></div><div className="dashboard-widget-options">{DASHBOARD_WIDGET_OPTIONS.map((option) => <label className="dashboard-widget-option" key={option.id}><input type="checkbox" checked={dashboardWidgets.includes(option.id)} onChange={() => onToggleDashboardWidget(option.id)} /><span><strong>{option.label}</strong><small>{option.description}</small></span></label>)}</div></Card></SettingsDisclosure>
     <SettingsDisclosure title="Screen descriptions" description="Show or hide page subtitles and built-in help notes" icon={<Eye size={17} />}><Card className="settings-card"><label className="dashboard-widget-option"><input type="checkbox" checked={showScreenDescriptions} onChange={(event) => onShowScreenDescriptionsChange(event.target.checked)} /><span><strong>Show descriptions under screen titles</strong><small>Applies to page descriptions and built-in help notes across the app.</small></span></label></Card></SettingsDisclosure>
     <SettingsDisclosure title="Appearance, sync and data tools" description="Fonts, currency, backups, exports and account actions" icon={<Settings2 size={17} />}><div className="settings-grid"><Card className="settings-card"><div className="settings-icon"><Settings2 size={17} /></div><h3>Appearance & currency</h3><p>Choose a font family, font style and size, accent color, dark background theme and display currency. Currency formatting does not convert amounts.</p><Field label="Currency"><Select value={currency} onChange={(event) => onCurrencyChange(event.target.value as Currency)}>{CURRENCIES.map((option) => <option key={option} value={option}>{option}</option>)}</Select></Field><Field label="Font family"><Select value={fontFamily} onChange={(event) => onFontFamilyChange(event.target.value as FontFamily)}>{FONT_FAMILIES.map((option) => <option key={option} value={option}>{FONT_FAMILY_LABELS[option]}</option>)}</Select></Field><Field label="Font style"><Select value={fontStyle} onChange={(event) => onFontStyleChange(event.target.value as FontStyle)}><option value="modern">Modern</option><option value="editorial">Editorial</option><option value="rounded">Rounded</option></Select></Field><Field label="Font size"><Select value={fontSize} onChange={(event) => onFontSizeChange(event.target.value as FontSize)}><option value="extra-small">Extra small (82%)</option><option value="small">Small (92%)</option><option value="medium">Default (100%)</option><option value="large">Large (108%)</option><option value="extra-large">Extra large (116%)</option><option value="xx-large">Maximum (124%)</option></Select></Field><Field label="Accent color"><Select value={accentColor} onChange={(event) => onAccentChange(event.target.value as AccentColor)}>{ACCENT_COLORS.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Field label="Dark mode background"><Select value={darkTheme} onChange={(event) => onDarkThemeChange(event.target.value as DarkTheme)}>{DARK_THEMES.map((option) => <option key={option} value={option}>{option[0].toUpperCase() + option.slice(1)}</option>)}</Select></Field><Button className="preference-toggle" variant="outline" onClick={onToggleDarkMode}>{darkMode ? <Sun size={14} /> : <Moon size={14} />}{darkMode ? "Switch to light mode" : "Switch to dark mode"}</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><Database size={17} /></div><h3>Supabase sync</h3><p>Changes save automatically. Other devices check for updates when opened and every two minutes while the app is active.</p><p role="status">{syncStatus === "saving" ? "Saving shared data…" : syncStatus === "error" ? syncMessage || "Not synced. Check your connection." : syncMessage || "All changes saved."}</p><div className="connector-actions"><Button variant="outline" onClick={() => void saveDesignTheme()} disabled={syncStatus === "saving"}><Download size={14} />Save now</Button><Button variant="outline" onClick={onRefresh} disabled={syncStatus === "saving" || refreshing}><RefreshCw size={14} className={refreshing ? "spin" : ""} />{refreshing ? "Refreshing…" : "Refresh"}</Button></div><Button variant="outline" onClick={onSignOut}>Sign out</Button></Card>
-      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download a Daybook backup</h3><p>Save shared Daybook records, archive data, and the encrypted credential-vault blob as versioned JSON. Documents, Personal Documents, and Account credentials in mydocumentsmanager are separate and excluded. Uploaded files remain in private storage and are not included.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download Daybook JSON backup</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><FileJson2 size={17} /></div><h3>Download an Everyday Tracker backup</h3><p>Save shared Everyday Tracker records, archive data, and the encrypted credential-vault blob as versioned JSON. Documents, Personal Documents, and Account credentials in mydocumentsmanager are separate and excluded. Uploaded files remain in private storage and are not included.</p><Button variant="outline" onClick={onExport}><Download size={14} /> Download Everyday Tracker JSON backup</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export for spreadsheets</h3><p>Take your purchase history with you in an Excel-friendly CSV file.</p><Button variant="outline" onClick={() => {
         const blob = new Blob([exportCsv(data.purchases)], { type: "text/csv;charset=utf-8" });
-        downloadBlob(blob, `daybook-purchases-${today()}.csv`);
+        downloadBlob(blob, `everyday-tracker-purchases-${today()}.csv`);
       }}><ArrowDownToLine size={14} /> Export purchases CSV</Button></Card>
       <Card className="settings-card"><div className="settings-icon"><FileDown size={17} /></div><h3>Export other sections</h3><p>Download spreadsheet-friendly CSV files. Related history is included in each section export; nested education details are preserved in their cells.</p><div className="connector-actions"><Button variant="outline" disabled={!stockRows.length} onClick={() => downloadSectionCsv("stocks", stockRows)}><ArrowDownToLine size={14} />Stocks ({stockRows.length})</Button><Button variant="outline" disabled={!subscriptionRows.length} onClick={() => downloadSectionCsv("subscriptions", subscriptionRows)}><ArrowDownToLine size={14} />Subscriptions ({(data.subscriptions ?? []).length})</Button><Button variant="outline" disabled={!educationRows.length} onClick={() => downloadSectionCsv("education", educationRows)}><ArrowDownToLine size={14} />Education ({educationRows.length})</Button><Button variant="outline" disabled={!vehicleRows.length} onClick={() => downloadSectionCsv("vehicles", vehicleRows)}><ArrowDownToLine size={14} />Vehicles ({vehicleRows.length})</Button></div></Card>
-      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Choose a Daybook JSON backup to validate and preview its section counts before replacing shared Daybook data. This does not change mydocumentsmanager or uploaded files.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) { const backup = await onPreviewImport(file); if (backup) setRestorePreview({ backup, fileName: file.name }); } input.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
+      <Card className="settings-card"><div className="settings-icon"><Upload size={17} /></div><h3>Restore a backup</h3><p>Choose an Everyday Tracker JSON backup to validate and preview its section counts before replacing shared Everyday Tracker data. This does not change mydocumentsmanager or uploaded files.</p><input ref={inputRef} className="sr-only" type="file" accept=".json,application/json" aria-label="Choose a JSON backup" onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (file) { const backup = await onPreviewImport(file); if (backup) setRestorePreview({ backup, fileName: file.name }); } input.value = ""; }} /><Button variant="outline" onClick={() => inputRef.current?.click()}><Upload size={14} /> Choose JSON file</Button></Card>
       <Card className="settings-card danger-card"><div className="settings-icon"><Trash2 size={17} /></div><h3>Clear all data</h3><p>Move all active records in shared Supabase data to the Archive. Favorites and display preferences remain. This cannot be undone.</p><Button variant="danger" onClick={onClear}><Trash2 size={14} /> Clear my data</Button></Card></div></SettingsDisclosure>
     <SettingsDisclosure title="Data overview" description="Counts for data currently saved in Supabase" icon={<Database size={17} />}><Card style={{ marginTop: 16 }}><div className="card-head"><div><h2 className="section-title">At a glance</h2><p className="section-description">What's saved in shared data right now</p></div><Database size={16} color="#829080" /></div><div className="stat-grid" style={{ gridTemplateColumns: "repeat(3,minmax(0,1fr))" }}><div><div className="stat-foot">Shopping list items</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.items.length}</div></div><div><div className="stat-foot">Purchases recorded</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.purchases.length}</div></div><div><div className="stat-foot">Shopping trips</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{data.trips.length}</div></div><div><div className="stat-foot">Saved products</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.products ?? []).length}</div></div><div><div className="stat-foot">Saved stores</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stores ?? []).length}</div></div><div><div className="stat-foot">Notes & reminders</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.reminders ?? []).length}</div></div><div><div className="stat-foot">Tracked stocks</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stocks ?? []).length}</div></div><div><div className="stat-foot">Saved stock prices</div><div className="table-primary" style={{ fontSize: 18, marginTop: 5 }}>{(data.stockQuotes ?? []).length}</div></div></div></Card></SettingsDisclosure>
-    {restorePreview && <Modal title="Preview backup restore" onClose={() => setRestorePreview(null)} wide><p className="section-description">File: <strong>{restorePreview.fileName}</strong></p><div className="alert alert-error" role="alert" style={{ marginTop: 14 }}>Continuing will replace shared Daybook data and save it to Supabase. This cannot be automatically undone. It does not change mydocumentsmanager or its uploaded files.</div><div className="backup-preview-table"><div className="backup-preview-row backup-preview-header"><strong>Section</strong><strong>Current</strong><strong>Backup</strong></div>{restoreCounts.map((entry) => <div className="backup-preview-row" key={entry.label}><span>{entry.label}</span><span>{entry.current}</span><span>{entry.backup}</span></div>)}</div><div className="modal-actions"><Button type="button" variant="outline" onClick={() => setRestorePreview(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => { onRestore(restorePreview.backup); setRestorePreview(null); }}>Replace current data</Button></div></Modal>}
+    {restorePreview && <Modal title="Preview backup restore" onClose={() => setRestorePreview(null)} wide><p className="section-description">File: <strong>{restorePreview.fileName}</strong></p><div className="alert alert-error" role="alert" style={{ marginTop: 14 }}>Continuing will replace shared Everyday Tracker data and save it to Supabase. This cannot be automatically undone. It does not change mydocumentsmanager or its uploaded files.</div><div className="backup-preview-table"><div className="backup-preview-row backup-preview-header"><strong>Section</strong><strong>Current</strong><strong>Backup</strong></div>{restoreCounts.map((entry) => <div className="backup-preview-row" key={entry.label}><span>{entry.label}</span><span>{entry.current}</span><span>{entry.backup}</span></div>)}</div><div className="modal-actions"><Button type="button" variant="outline" onClick={() => setRestorePreview(null)}>Cancel</Button><Button type="button" variant="danger" onClick={() => { onRestore(restorePreview.backup); setRestorePreview(null); }}>Replace current data</Button></div></Modal>}
   </>;
 }
 
@@ -16250,8 +16251,8 @@ function TestConnectors({ accounts, onImport }: {
   const [session, setSession] = useState<GmailSession | null>(null);
   const [sendSession, setSendSession] = useState<GmailSession | null>(null);
   const [recipient, setRecipient] = useState("");
-  const [subject, setSubject] = useState("Daybook test reminder");
-  const [content, setContent] = useState("This is a test email from your Daybook shopping tracker.");
+  const [subject, setSubject] = useState("Everyday Tracker test reminder");
+  const [content, setContent] = useState("This is a test email from your Everyday Tracker app.");
   const [accessPassword, setAccessPassword] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordError, setPasswordError] = useState("");
@@ -16271,7 +16272,7 @@ function TestConnectors({ accounts, onImport }: {
   const [reviewRows, setReviewRows] = useState<GmailReviewRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [scheduleRecipient, setScheduleRecipient] = useState("");
-  const [scheduleSubject, setScheduleSubject] = useState("Daybook reminder");
+  const [scheduleSubject, setScheduleSubject] = useState("Everyday Tracker reminder");
   const [scheduleContent, setScheduleContent] = useState("");
   const [scheduleAt, setScheduleAt] = useState(() => istDateTimeInput(new Date(Date.now() + 60 * 60 * 1000)));
   const [scheduleRecurrence, setScheduleRecurrence] = useState<"once" | "daily" | "weekly">("once");
@@ -16408,8 +16409,8 @@ function TestConnectors({ accounts, onImport }: {
       }
       setScheduleNotice(
         scheduleRecurrence === "once"
-          ? "Email saved. Daybook will send this saved email at the selected IST time."
-          : `Email saved. Daybook will send this saved email ${scheduleRecurrence === "daily" ? "daily" : `weekly on ${new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: GMAIL_SCHEDULE_TIME_ZONE }).format(new Date(scheduledFor))}`} at the selected IST time until you cancel it.`,
+          ? "Email saved. Everyday Tracker will send this saved email at the selected IST time."
+          : `Email saved. Everyday Tracker will send this saved email ${scheduleRecurrence === "daily" ? "daily" : `weekly on ${new Intl.DateTimeFormat(undefined, { weekday: "long", timeZone: GMAIL_SCHEDULE_TIME_ZONE }).format(new Date(scheduledFor))}`} at the selected IST time until you cancel it.`,
       );
       setScheduleContent("");
       await refreshGmailSchedules();
@@ -16446,7 +16447,7 @@ function TestConnectors({ accounts, onImport }: {
     const pending = gmailSchedules.filter((schedule) => schedule.status === "pending").length;
     const confirmation = pending
       ? `Disconnect Gmail and cancel ${pending} pending scheduled email${pending === 1 ? "" : "s"}? Google authorization will also be revoked.`
-      : "Disconnect Gmail and revoke Daybook's scheduled sending authorization?";
+      : "Disconnect Gmail and revoke Everyday Tracker's scheduled sending authorization?";
     if (!window.confirm(confirmation)) return;
     setScheduleError("");
     setScheduleNotice("");
@@ -16588,7 +16589,7 @@ function TestConnectors({ accounts, onImport }: {
       await validateAccessPassword(accessPassword);
       setPasswordValid(true);
     } catch (caught) {
-      setPasswordError(caught instanceof Error ? caught.message : "Could not validate the Daybook access password.");
+      setPasswordError(caught instanceof Error ? caught.message : "Could not validate the Everyday Tracker access password.");
     } finally {
       setAccessPassword("");
       setPasswordBusy(false);
@@ -16652,12 +16653,12 @@ function TestConnectors({ accounts, onImport }: {
     }
   }
 
-  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Test the Daybook password, Gmail email delivery, or review bank transactions from Gmail." />
-    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Daybook access password test</h2><p className="section-description">Verify the Vercel password setting without signing out or loading data again.</p></div><Badge tone="neutral">No data access</Badge></div>
+  return <><PageHeading eyebrow="Experiment safely" title="R&D / Test Connectors" subtitle="Test the Everyday Tracker password, Gmail email delivery, or review bank transactions from Gmail." />
+    <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Everyday Tracker access password test</h2><p className="section-description">Verify the Vercel password setting without signing out or loading data again.</p></div><Badge tone="neutral">No data access</Badge></div>
       <form className="connector-form" onSubmit={(event) => void testAccessPassword(event)}>
-        <Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => { setAccessPassword(event.target.value); setPasswordValid(false); setPasswordError(""); }} /></Field>
+        <Field className="full" label="Everyday Tracker access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => { setAccessPassword(event.target.value); setPasswordValid(false); setPasswordError(""); }} /></Field>
         {passwordError && <div className="alert alert-error full" role="alert">{passwordError}</div>}
-        {passwordValid && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No new session was created and no Daybook data was accessed.</div>}
+        {passwordValid && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No new session was created and no Everyday Tracker data was accessed.</div>}
         <div className="full"><Button type="submit" disabled={passwordBusy}>{passwordBusy ? "Checking..." : "Validate password"}</Button></div>
       </form>
     </Card>
@@ -16709,7 +16710,7 @@ function TestConnectors({ accounts, onImport }: {
       {notice && <div className="alert alert-success" role="status">{notice}</div>}
     </Card>
     <Card className="connector-card"><div className="card-head"><div><h2 className="section-title">Schedule an email</h2><p className="section-description">Choose who receives it, the subject, message, repeat frequency, and send time in IST.</p></div><Badge tone={scheduleConnectedEmail ? "green" : "neutral"}>{scheduleConnectedEmail ? `Sender: ${scheduleConnectedEmail}` : "Gmail sender not connected"}</Badge></div>
-      <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>The background job only checks for emails that you explicitly save here and whose selected send time is due; it does not send anything just because the job runs. Choose once, daily, or weekly. Daily and weekly emails repeat until cancelled. The Gmail refresh token is encrypted in Supabase, but recipients, subjects, and message content are stored as readable schedule data. Anyone with the Daybook password can manage schedules and send from this Gmail account, so keep that password private. Disconnecting revokes Gmail authorization and cancels pending emails. Delivery may be a little later than the selected time.</span></div>
+      <div className="alert"><Mail size={15} style={{ flex: "none", marginTop: 1 }} /><span>The background job only checks for emails that you explicitly save here and whose selected send time is due; it does not send anything just because the job runs. Choose once, daily, or weekly. Daily and weekly emails repeat until cancelled. The Gmail refresh token is encrypted in Supabase, but recipients, subjects, and message content are stored as readable schedule data. Anyone with the Everyday Tracker password can manage schedules and send from this Gmail account, so keep that password private. Disconnecting revokes Gmail authorization and cancels pending emails. Delivery may be a little later than the selected time.</span></div>
       {!scheduleConnectedEmail && <div className="connector-actions"><Button type="button" onClick={() => void connectScheduledGmail()} disabled={scheduleBusy}>{scheduleBusy ? "Starting Google authorization..." : "Connect Gmail for scheduled sending"}</Button></div>}
       {scheduleConnectedEmail && <div className="connector-actions"><Button type="button" variant="outline" onClick={() => void disconnectScheduledGmail()} disabled={scheduleBusy}>{scheduleBusy ? "Disconnecting..." : "Disconnect and revoke Gmail access"}</Button><Button type="button" variant="outline" onClick={() => void refreshGmailSchedules()} disabled={scheduleLoading}>{scheduleLoading ? "Refreshing..." : "Refresh schedules"}</Button></div>}
       {scheduleConnectedEmail && <form className="connector-form" onSubmit={(event) => void scheduleEmail(event)}>
@@ -16961,11 +16962,15 @@ export default function App() {
     return () => window.removeEventListener("popstate", syncRouteFromLocation);
   }, []);
 
+  useEffect(() => {
+    document.title = `${page} | ${APP_NAME}`;
+  }, [page]);
+
   function queueSave(snapshot: TrackerData): Promise<string | null> {
     setSyncStatus("saving");
     setSyncMessage("");
     const save = saveQueue.current.then(async () => {
-      if (!authenticatedRef.current) throw new Error("Sign in to Daybook before saving.");
+      if (!authenticatedRef.current) throw new Error("Sign in to Everyday Tracker before saving.");
       const nextRevision = await saveSharedData(snapshot, revisionRef.current);
       revisionRef.current = nextRevision;
       setRevision(nextRevision);
@@ -17058,7 +17063,7 @@ export default function App() {
     setError("");
     try {
       const saved = await loadSharedData();
-      if (!validateData(saved.data)) throw new Error("Shared Daybook data is invalid or uses an unsupported version. Restore a valid JSON backup.");
+      if (!validateData(saved.data)) throw new Error("Shared Everyday Tracker data is invalid or uses an unsupported version. Restore a valid JSON backup.");
       const prepared = await prepareSharedData(saved);
       setData(prepared.data);
       setRevision(prepared.revision);
@@ -17070,7 +17075,7 @@ export default function App() {
       setSyncMessage(prepared.migrationWarning || (saved.initialized ? "Connected to Supabase cloud storage." : "Choose how to initialize shared data."));
       if (prepared.migrationWarning) setError(prepared.migrationWarning);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not load shared Daybook data.");
+      setError(caught instanceof Error ? caught.message : "Could not load shared Everyday Tracker data.");
       throw caught;
     } finally {
       setDataLoading(false);
@@ -17115,7 +17120,7 @@ export default function App() {
       setSyncMessage("All changes saved to Supabase.");
       setNotice(legacy ? "Your browser data has been saved to Supabase." : "Your seed data is now stored in Supabase.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not initialize shared Daybook data.");
+      setError(caught instanceof Error ? caught.message : "Could not initialize shared Everyday Tracker data.");
     } finally {
       setDataLoading(false);
     }
@@ -17134,7 +17139,7 @@ export default function App() {
     } catch (caught) {
       setAuthenticated(false);
       authenticatedRef.current = false;
-      setError(caught instanceof Error ? caught.message : "Could not sign in to Daybook.");
+      setError(caught instanceof Error ? caught.message : "Could not sign in to Everyday Tracker.");
     } finally {
       setAuthLoading(false);
     }
@@ -17149,7 +17154,7 @@ export default function App() {
       await validateAccessPassword(authTestPassword);
       setAuthTestPassed(true);
     } catch (caught) {
-      setAuthTestError(caught instanceof Error ? caught.message : "Could not validate the Daybook access password.");
+      setAuthTestError(caught instanceof Error ? caught.message : "Could not validate the Everyday Tracker access password.");
     } finally {
       setAuthTestPassword("");
       setAuthTestLoading(false);
@@ -17221,7 +17226,7 @@ export default function App() {
         await preferenceSaveQueue.current;
       }
       const saved = await loadSharedData();
-      if (!validateData(saved.data)) throw new Error("Shared Daybook data is invalid or uses an unsupported version. Restore a valid JSON backup.");
+      if (!validateData(saved.data)) throw new Error("Shared Everyday Tracker data is invalid or uses an unsupported version. Restore a valid JSON backup.");
       if (saved.revision !== revisionRef.current ||
         saved.preferencesRevision !== preferenceRevisionRef.current || discardLocalChanges) {
         if (!manual && syncStatusRef.current !== "saved") return;
@@ -17242,7 +17247,7 @@ export default function App() {
       }
       if (manual && !refreshWarning) setError("");
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Could not refresh shared Daybook data.";
+      const message = caught instanceof Error ? caught.message : "Could not refresh shared Everyday Tracker data.";
       setError(message);
       if (manual) {
         setSyncStatus("error");
@@ -17267,7 +17272,7 @@ export default function App() {
         if (active) {
           setAuthenticated(false);
           authenticatedRef.current = false;
-          setError(caught instanceof Error ? caught.message : "Could not restore the Daybook session.");
+          setError(caught instanceof Error ? caught.message : "Could not restore the Everyday Tracker session.");
         }
       } finally {
         if (active) setAuthLoading(false);
@@ -17308,7 +17313,7 @@ export default function App() {
   function persistUpdate(mutator: (previous: TrackerData) => TrackerData): Promise<void> {
     const operation = persistUpdateQueue.current.then(async () => {
       const previous = latestDataRef.current;
-      if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving changes.");
+      if (!previous || !authenticatedRef.current) throw new Error("Sign in to Everyday Tracker before saving changes.");
       const next = mutator(previous);
       if (saveTimer.current !== null) {
         window.clearTimeout(saveTimer.current);
@@ -17331,7 +17336,7 @@ export default function App() {
     setPreferenceSavePending(true);
     const operation = preferenceSaveQueue.current.then(async () => {
       const previous = latestDataRef.current;
-      if (!previous || !authenticatedRef.current) throw new Error("Sign in to Daybook before saving preferences.");
+      if (!previous || !authenticatedRef.current) throw new Error("Sign in to Everyday Tracker before saving preferences.");
       const next = mutator(previous);
       if (saveTimer.current !== null) {
         window.clearTimeout(saveTimer.current);
@@ -17368,7 +17373,7 @@ export default function App() {
   }
   function savePreferenceSnapshot(snapshot: TrackerData): Promise<void> {
     const operation = preferenceSaveQueue.current.then(async () => {
-      if (!authenticatedRef.current) throw new Error("Sign in to Daybook before saving preferences.");
+      if (!authenticatedRef.current) throw new Error("Sign in to Everyday Tracker before saving preferences.");
       preferenceRevisionRef.current = await saveSharedPreferences(
         snapshot.favoritePages ?? [],
         snapshot.preferences ?? DEFAULT_TRACKER_PREFERENCES,
@@ -18299,7 +18304,7 @@ export default function App() {
   async function previewBackup(file: File): Promise<TrackerData | null> {
     try {
       const parsed: unknown = JSON.parse(await file.text());
-      if (!validateData(parsed)) throw new Error("This file is not a valid Daybook backup (version 1). Your current data has not been changed.");
+      if (!validateData(parsed)) throw new Error("This file is not a valid Everyday Tracker backup (version 1). Your current data has not been changed.");
       return normalizeTrackerData(parsed);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "We couldn't read that backup file. Your current data has not been changed.");
@@ -18324,12 +18329,12 @@ export default function App() {
       personalRecords: [],
       credentialRecords: [],
     };
-    downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }), `daybook-backup-${today()}.json`);
-    setNotice("Your Daybook backup is ready. Records in mydocumentsmanager and uploaded files are excluded.");
+    downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }), `everyday-tracker-backup-${today()}.json`);
+    setNotice("Your Everyday Tracker backup is ready. Records in mydocumentsmanager and uploaded files are excluded.");
   }
   function clearData() {
     if (!data) return;
-    if (!window.confirm("Clear all active Daybook records? They will be moved to the Archive first. The encrypted credential vault is excluded from archive and will be permanently cleared.")) return;
+    if (!window.confirm("Clear all active Everyday Tracker records? They will be moved to the Archive first. The encrypted credential vault is excluded from archive and will be permanently cleared.")) return;
     const { version, archivedRecords, credentialVault, stockSeedVersion, favoritePages: archivedFavorites, preferences, morningExerciseActivities, ...snapshot } = data;
     void version;
     void credentialVault;
@@ -18386,11 +18391,11 @@ export default function App() {
     window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
   }
 
-  if (authLoading) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Checking your Daybook session...</div></div>;
-  if (!authenticated) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content">{authTestMode ? <><PageHeading eyebrow="Temporary verification" title="Test access password" subtitle="Check the configured Daybook password without opening or changing shared data." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleTestAccessPassword(event)}><Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={authTestPassword} onChange={(event) => { setAuthTestPassword(event.target.value); setAuthTestPassed(false); setAuthTestError(""); }} /></Field>{authTestError && <div className="alert alert-error full" role="alert">{authTestError}</div>}{authTestPassed && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No session was created and no Daybook data was accessed.</div>}<div className="full"><Button type="submit" disabled={authTestLoading}>{authTestLoading ? "Checking..." : "Validate password"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This checks the server-side DATA_ACCESS_PASSWORD setting. It does not create a sign-in session or make a database request.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(false); setAuthTestPassed(false); setAuthTestError(""); setAuthTestPassword(""); }}>Back to sign in</Button></Card></> : <><PageHeading eyebrow="Your data, wherever you go" title="Open your Daybook" subtitle="Enter your Daybook access password to securely load your shared records." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleSignIn(event)}><Field className="full" label="Daybook access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => setAccessPassword(event.target.value)} /></Field>{error && <div className="alert alert-error full" role="alert">{error}</div>}<div className="full"><Button type="submit" disabled={authLoading}>{authLoading ? "Signing in..." : "Open Daybook"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This password is configured by the site owner in Vercel. No Google account or external sign-in is needed.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(true); setError(""); }}>Test access password configuration</Button></Card></>}</div></main></div>;
-  if (dataLoading && !data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Loading your shared Daybook data...</div></div>;
-  if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Daybook records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Daybook data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
-  if (!data) return <div className="loading"><div><div className="loading-mark"><ShoppingBasket size={17} /></div>Getting your daybook ready...</div></div>;
+  if (authLoading) return <div className="loading"><div><div className="loading-mark"><LayoutDashboard size={17} /></div>Checking your Everyday Tracker session...</div></div>;
+  if (!authenticated) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content">{authTestMode ? <><PageHeading eyebrow="Temporary verification" title="Test access password" subtitle="Check the configured Everyday Tracker password without opening or changing shared data." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleTestAccessPassword(event)}><Field className="full" label="Everyday Tracker access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={authTestPassword} onChange={(event) => { setAuthTestPassword(event.target.value); setAuthTestPassed(false); setAuthTestError(""); }} /></Field>{authTestError && <div className="alert alert-error full" role="alert">{authTestError}</div>}{authTestPassed && <div className="alert alert-success full" role="status">Password matches the value configured in Vercel. No session was created and no Everyday Tracker data was accessed.</div>}<div className="full"><Button type="submit" disabled={authTestLoading}>{authTestLoading ? "Checking..." : "Validate password"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This checks the server-side DATA_ACCESS_PASSWORD setting. It does not create a sign-in session or make a database request.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(false); setAuthTestPassed(false); setAuthTestError(""); setAuthTestPassword(""); }}>Back to sign in</Button></Card></> : <><PageHeading eyebrow="Your data, wherever you go" title="Open your Everyday Tracker" subtitle="Enter your Everyday Tracker access password to securely load your shared records." /><Card className="connector-card"><form className="connector-form" onSubmit={(event) => void handleSignIn(event)}><Field className="full" label="Everyday Tracker access password"><Input type="password" autoComplete="current-password" maxLength={256} required value={accessPassword} onChange={(event) => setAccessPassword(event.target.value)} /></Field>{error && <div className="alert alert-error full" role="alert">{error}</div>}<div className="full"><Button type="submit" disabled={authLoading}>{authLoading ? "Signing in..." : "Open Everyday Tracker"}</Button></div></form><p className="section-description" style={{ marginTop: 16 }}>This password is configured by the site owner in Vercel. No Google account or external sign-in is needed.</p><Button variant="outline" style={{ marginTop: 14 }} onClick={() => { setAuthTestMode(true); setError(""); }}>Test access password configuration</Button></Card></>}</div></main></div>;
+  if (dataLoading && !data) return <div className="loading"><div><div className="loading-mark"><LayoutDashboard size={17} /></div>Loading your shared Everyday Tracker data...</div></div>;
+  if (setupRequired && data) return <div className={`app-shell font-${fontSize} font-style-${fontStyle} accent-${accentColor}`}><main className="main-area"><div className="main-content"><PageHeading eyebrow="One-time setup" title="Choose your starting data" subtitle="No shared data file exists yet. The initial data structure is versioned in the Git repository." />{error && <div className="alert alert-error" role="alert">{error}</div>}<Card className="connector-card"><h2 className="section-title">Move existing data from this device</h2><p className="section-description">Copy this browser’s older Everyday Tracker records to the shared GitHub data file. The old browser copy will not be deleted. If there are no older records on this device, the Git seed file will be used.</p><Button onClick={() => void initializeSharedData(true)} disabled={dataLoading}><Upload size={14} />{dataLoading ? "Saving shared data..." : "Use data from this device"}</Button></Card><Card className="connector-card" style={{ marginTop: 16 }}><h2 className="section-title">Start with the Git seed file</h2><p className="section-description">Use the blank Everyday Tracker data file tracked in Git, then share it with your other devices.</p><Button variant="outline" onClick={() => void initializeSharedData(false)} disabled={dataLoading}><Plus size={14} />Use Git seed data</Button></Card></div></main></div>;
+  if (!data) return <div className="loading"><div><div className="loading-mark"><LayoutDashboard size={17} /></div>Getting your Everyday Tracker ready...</div></div>;
   const favoritePages = data.favoritePages ?? [];
   const menuGroups = (() => {
     if (!groupMenus) return [{ group: null, entries: orderedNavigation(navigation, menuSortOrder) }];
@@ -18799,7 +18804,7 @@ export default function App() {
   };
   return <ScreenViewPreferencesContext.Provider value={{ views: preferences.savedScreenViews ?? {}, save: saveScreenView }}><CurrencyContext.Provider value={currency}><div className={`app-shell ${darkMode ? "dark" : ""} design-${designTheme ?? "legacy"} ${showScreenDescriptions ? "" : "hide-screen-descriptions"} font-${fontSize} font-style-${fontStyle} font-family-${fontFamily} accent-${accentColor} theme-${darkTheme} style-${visualTheme}`}>
     {mobileMenu && <button aria-label="Close menu" onClick={() => setMobileMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 9, background: "#18211b55", border: 0 }} />}
-    <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><ShoppingBasket size={19} /></div><div><div className="brand-name">daybook<span>.</span></div><div className="brand-caption">your shopping companion</div></div></div>
+    <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}><div className="brand"><div className="brand-mark"><LayoutDashboard size={19} /></div><div><div className="brand-name">Everyday Tracker</div><div className="brand-caption">your life, thoughtfully organized</div></div></div>
       <div className="nav-label">YOUR SPACE</div><nav className={`nav-list ${groupMenus ? "nav-list-grouped" : ""}`} aria-label="Main navigation">{menuGroups.map(({ group, entries }) => {
         const collapsed = group !== null && collapsedNavGroups.has(group);
         return <div className="nav-section" key={group ?? "all"}>
@@ -18811,10 +18816,11 @@ export default function App() {
           {!collapsed && entries.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}
         </div>;
       })}</nav>
-      <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday shopping, gently organized in one place.</div></div>
+      <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday life, thoughtfully organized in one place.</div></div>
     </aside>
     <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className={`theme-toggle favorite-toggle${favoritePages.includes(page) ? " selected" : ""}`} type="button" disabled={page === "Favorites" || favoriteSavePending} aria-pressed={favoritePages.includes(page)} aria-label={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? `Remove ${page} from favorites` : `Add ${page} to favorites`} title={favoriteSavePending ? "Saving favorites to Supabase…" : page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavoritePage(page)}>{favoritePages.includes(page) ? <Star size={15} fill="currentColor" /> : <Star size={15} />}<span>{favoriteSavePending ? "Saving…" : favoritePages.includes(page) ? "Favorited" : "Favorite"}</span></button><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => updatePreferences((current) => ({ ...current, groupMenus: !current.groupMenus }))}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
       <div className="main-content">{error && <div className="alert alert-error" role="alert"><X size={15} style={{ flex: "none", marginTop: 1 }} /><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}><X size={14} /></button></div>}{notice && <div className="alert alert-success" role="status"><CheckCircle2 size={15} /><span>{notice}</span><button className="icon-button" aria-label="Dismiss message" onClick={() => setNotice("")}><X size={14} /></button></div>}<div className="screen-page-content">{pageContent[page]}</div>{page === "Shopping list" && editing && <ItemModal initial={editing} products={data.products ?? []} onClose={() => setEditing(null)} onSave={editItem} />}</div>
+    <footer className="app-footer">&copy; {new Date().getFullYear()} Kiran Developments</footer>
     </main>
     <nav className="mobile-nav" aria-label="Mobile navigation">{navigation.filter(({ name }) => ["Dashboard", "Shopping list", "Shopping trips", "Purchase history"].includes(name)).map(({ name, icon: Icon }) => <button key={name} className={page === name ? "active" : ""} onClick={() => changePage(name)}><Icon size={17} /><span>{name === "Shopping list" ? "List" : name === "Shopping trips" ? "Trips" : name === "Purchase history" ? "History" : name}</span></button>)}</nav>
     {modal === "add" && <ItemModal products={data.products ?? []} onClose={() => setModal(null)} onSave={addItem} />}
