@@ -14579,13 +14579,29 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   </Modal>;
 }
 
-function DocumentViewer({ document, attachment, source, onClose }: {
+function DocumentViewer({ document, attachment, source, onClose, onBack, onOpenFile, onDownload }: {
   document: DocumentAttachment;
-  attachment: DocumentFileAttachment;
-  source: string;
+  attachment?: DocumentFileAttachment;
+  source?: string;
   onClose: () => void;
+  onBack: () => void;
+  onOpenFile: (attachment: DocumentFileAttachment) => void;
+  onDownload: (attachment: DocumentFileAttachment) => void;
 }) {
   const [fullscreen, setFullscreen] = useState(false);
+  const attachments = getDocumentAttachments(document);
+  if (!attachment || !source) {
+    return <Modal title={`${document.title} · Attachments`} onClose={onClose} wide fullscreen={fullscreen}>
+      <div className="document-viewer-attachments">
+        {attachments.map((file) => <div className="document-viewer-attachment" key={file.id}>
+          <button type="button" className="document-viewer-attachment-open" onClick={() => onOpenFile(file)}>
+            <FileText size={16} /><span><strong>{file.fileName}</strong><small>{formatFileSize(file.sizeBytes)}</small></span>
+          </button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onDownload(file)}><Download size={14} />Download</Button>
+        </div>)}
+      </div>
+    </Modal>;
+  }
   const contentType = attachment.contentType || getDocumentFileType(attachment.fileName)?.contentType || "";
   const isImage = contentType.startsWith("image/");
   const isPdf = contentType === "application/pdf";
@@ -14593,7 +14609,10 @@ function DocumentViewer({ document, attachment, source, onClose }: {
   const isXlsx = contentType === DOCUMENT_FILE_TYPES[".xlsx"];
   return <Modal title={`${document.title} · ${attachment.fileName}`} onClose={onClose} wide fullscreen={fullscreen}>
     <div className="document-preview-actions">
-      {isPdf && <a className="document-pdf-open" href={source} target="_blank" rel="noopener noreferrer">Open PDF in browser</a>}
+      {attachments.length > 1
+        ? <Button type="button" size="sm" variant="outline" onClick={onBack}><ChevronLeft size={14} />Back to attachments</Button>
+        : <span />}
+      <Button type="button" size="sm" variant="outline" onClick={() => onDownload(attachment)}><Download size={14} />Download file</Button>
       <Button type="button" size="sm" variant="outline" aria-pressed={fullscreen} onClick={() => setFullscreen((current) => !current)}>
         {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}{fullscreen ? "Restore preview" : "Enlarge preview"}
       </Button>
@@ -14643,7 +14662,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
 }) {
   const savedView = useSavedScreenView("documents");
   const [editor, setEditor] = useState<{ initial: DocumentAttachment | null } | null>(null);
-  const [viewer, setViewer] = useState<{ document: DocumentAttachment; attachment: DocumentFileAttachment; source: string } | null>(null);
+  const [viewer, setViewer] = useState<{ document: DocumentAttachment; attachment?: DocumentFileAttachment; source?: string } | null>(null);
   const [categoryEditor, setCategoryEditor] = useState(false);
   const [search, setSearch] = useState(() => savedView.search ?? "");
   const [personFilter, setPersonFilter] = useState(() => savedView.personFilter ?? "All people");
@@ -14742,6 +14761,14 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         throw caught;
       }
     });
+  }
+  function openDocumentAttachments(document: DocumentAttachment) {
+    const attachments = getDocumentAttachments(document);
+    if (attachments.length === 1) {
+      void openDocumentFile(document, attachments[0]);
+      return;
+    }
+    if (attachments.length > 1) setViewer({ document });
   }
   const activeDocuments = documents.filter((document) => document.isArchived !== true);
   const archivedDocuments = documents.filter((document) => document.isArchived === true);
@@ -14899,7 +14926,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         return <tr key={document.id}>
           <td><strong>{document.title}</strong>{document.referenceNumber && <small>Ref. {maskedDocumentNumber(document.referenceNumber)}</small>}</td>
           <td>{category?.name ?? "Uncategorized"}</td><td>{document.personName || "—"}</td>
-          <td>{format}{hasFile && <div className="document-attachment-file-list">{attachments.map((attachment) => <button type="button" key={attachment.id} onClick={() => void openDocumentFile(document, attachment, true)}>{attachment.fileName} · {formatFileSize(attachment.sizeBytes)}</button>)}</div>}</td>
+          <td>{format}{hasFile && <button type="button" className="document-attachments-link" onClick={() => openDocumentAttachments(document)}>{attachments.length === 1 ? "View file" : `View ${attachments.length} attachments`}</button>}</td>
           <td>{dateLabel(document.uploadedAt.slice(0, 10))}</td><td>{document.dueDate ? dateLabel(document.dueDate) : "—"}</td>
           <td><Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></td>
           <td><div className="document-card-actions">
@@ -14939,14 +14966,11 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
           : <button className="icon-button" aria-label={`Archive ${document.title}`} onClick={() => {
             if (window.confirm(`Move "${document.title}" to the archive? Its uploaded file will remain stored.`)) void runAction(() => onArchive(document));
           }}><Archive size={14} /></button>}
-      </div>{hasFile && <div className="document-card-attachments">{attachments.map((attachment) => {
-        const contentType = attachment.contentType || getDocumentFileType(attachment.fileName)?.contentType || "";
-        const canPreview = canPreviewDocumentContentType(contentType);
-        return <div className="document-card-attachment" key={attachment.id}><span><FileText size={13} />{attachment.fileName} · {formatFileSize(attachment.sizeBytes)}</span><div>
-          {canPreview && <button type="button" className="icon-button" aria-label={`View ${attachment.fileName}`} title="View file" onClick={() => void openDocumentFile(document, attachment)}><Eye size={14} /></button>}
-          <button type="button" className="icon-button" aria-label={`Download ${attachment.fileName}`} title="Download file" onClick={() => void openDocumentFile(document, attachment, true)}><Download size={14} /></button>
-        </div></div>;
-      })}</div>}</Card>;
+      </div>{hasFile && <div className="document-card-attachments">
+        <button type="button" className="document-attachments-link" onClick={() => openDocumentAttachments(document)}>
+          <Eye size={14} />{attachments.length === 1 ? "View file" : `View ${attachments.length} attachments`}
+        </button>
+      </div>}</Card>;
     })}</div>;
   }
 
@@ -15044,7 +15068,15 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
     {visible.length > 0 && <div className="document-pagination"><span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visible.length)} of {visible.length}</span><Select aria-label="Rows per page" value={String(pageSize)} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}><option value="6">6</option><option value="12">12</option><option value="24">24</option><option value="48">48</option></Select><div><Button type="button" size="sm" variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>Previous</Button><Button type="button" size="sm" variant="outline" disabled={currentPage >= totalPages - 1} onClick={() => setPage(currentPage + 1)}>Next</Button></div></div>}
     </>}
     {editor && <DocumentModal key={editor.initial?.id ?? "new-document"} initial={editor.initial} categories={categories} onClose={() => setEditor(null)} onSave={onSave} />}
-    {viewer && <DocumentViewer document={viewer.document} attachment={viewer.attachment} source={viewer.source} onClose={() => setViewer(null)} />}
+    {viewer && <DocumentViewer
+      document={viewer.document}
+      attachment={viewer.attachment}
+      source={viewer.source}
+      onClose={() => setViewer(null)}
+      onBack={() => setViewer({ document: viewer.document })}
+      onOpenFile={(attachment) => void openDocumentFile(viewer.document, attachment)}
+      onDownload={(attachment) => void openDocumentFile(viewer.document, attachment, true)}
+    />}
     {categoryEditor && <Modal title="Create document category" onClose={() => setCategoryEditor(false)}>
       <form onSubmit={(event) => void saveCategory(event)}><div className="form-grid">
         <Field className="full" label="Category name"><Input autoFocus required maxLength={60} value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} /></Field>
