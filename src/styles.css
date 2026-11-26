@@ -1908,6 +1908,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .document-attachment-draft .icon-button{flex:none}
 .document-card-attachments{display:flex;flex:1 0 100%;align-items:center;width:100%;padding-left:50px}
 .document-attachments-link{display:inline-flex;align-items:center;gap:5px;padding:3px 0;border:0;background:transparent;color:var(--user-accent);font:inherit;font-size:11px;font-weight:600;text-align:left;cursor:pointer}
+.document-table .document-attachments-link{margin-left:4px}
 .document-attachments-link:hover{text-decoration:underline}
 .document-viewer-attachments{display:grid;gap:8px}
 .document-viewer-attachment{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--panel-line,#e8ece6);border-radius:9px;background:transparent}
