@@ -14926,7 +14926,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
         return <tr key={document.id}>
           <td><strong>{document.title}</strong>{document.referenceNumber && <small>Ref. {maskedDocumentNumber(document.referenceNumber)}</small>}</td>
           <td>{category?.name ?? "Uncategorized"}</td><td>{document.personName || "—"}</td>
-          <td>{format}{hasFile && <button type="button" className="document-attachments-link" onClick={() => openDocumentAttachments(document)}>{attachments.length === 1 ? "View file" : `View ${attachments.length} attachments`}</button>}</td>
+          <td>{format}{hasFile && <button type="button" className="document-attachments-link" onClick={() => openDocumentAttachments(document)}>{attachments.length === 1 ? "View file" : "View files"}</button>}</td>
           <td>{dateLabel(document.uploadedAt.slice(0, 10))}</td><td>{document.dueDate ? dateLabel(document.dueDate) : "—"}</td>
           <td><Badge tone={document.isArchived ? "neutral" : due.tone}>{document.isArchived ? "Archived" : due.label}</Badge></td>
           <td><div className="document-card-actions">
@@ -14968,7 +14968,7 @@ function DocumentManager({ documents, categories, totalStoredBytes, onSave, onSa
           }}><Archive size={14} /></button>}
       </div>{hasFile && <div className="document-card-attachments">
         <button type="button" className="document-attachments-link" onClick={() => openDocumentAttachments(document)}>
-          <Eye size={14} />{attachments.length === 1 ? "View file" : `View ${attachments.length} attachments`}
+          <Eye size={14} />{attachments.length === 1 ? "View file" : "View files"}
         </button>
       </div>}</Card>;
     })}</div>;
