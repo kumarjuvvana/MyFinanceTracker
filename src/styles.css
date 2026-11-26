@@ -2448,14 +2448,31 @@ button.fleet-bar-row:disabled{cursor:default}
 .reminder-page-list.reminder-grid-layout .reminder-card>.reminder-category-badge{grid-column:2;grid-row:2;justify-self:start}
 .reminder-page-list.reminder-grid-layout .reminder-card>.reminder-status-badge{grid-column:3;grid-row:2;justify-self:end}
 .reminder-page-list.reminder-grid-layout .reminder-card>.table-actions{grid-column:2/-1;grid-row:3;justify-self:end}
+.reminder-page-list.reminder-list-layout{grid-template-columns:minmax(0,1fr);gap:0}
 .shopping-filter-toolbar{align-items:flex-end;flex-wrap:wrap}
 .shopping-filter-toolbar>.search-wrap{flex:1 1 220px}
 .shopping-quick-filters{display:flex;align-items:flex-end;gap:8px;flex:2 1 380px;min-width:0}
 .shopping-quick-filters>.field-wrap{flex:1 1 110px;min-width:0}
+.shopping-filter-toolbar .shopping-group-control{display:flex;align-items:center;gap:8px;flex:none;width:auto;margin:0}
+.shopping-filter-toolbar .shopping-group-control .field-label{white-space:nowrap}
+.shopping-filter-toolbar .shopping-group-control>.field{width:160px}
 .shopping-filter-toolbar>.filter-drawer-trigger{align-self:flex-end}
 .shopping-record-group{display:grid;gap:8px;margin-bottom:12px}
 .shopping-record-group-title{display:flex;align-items:center;gap:8px;margin:3px 2px;color:#465548;font:700 13px Manrope,sans-serif}
 .shopping-record-group-title span{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:20px;background:#edf4ee;color:#5d795f;font:600 10px "DM Sans",sans-serif}
+.shopping-list-view,.purchase-history-list,.price-history-list{display:grid;min-width:0}
+.shopping-list-view-card,.purchase-history-card,.price-history-card{display:grid;gap:10px;min-width:0}
+.shopping-list-view-head,.shopping-list-view-meta,.purchase-history-card-head,.purchase-history-card-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.shopping-list-view-head>div,.purchase-history-card-head>div{min-width:0}
+.shopping-list-view-meta,.purchase-history-card-meta{color:var(--text-muted,var(--muted,#747d73));font-size:10px}
+.shopping-list-view-card>.table-actions,.purchase-history-card>.table-actions{justify-content:flex-end}
+.shopping-pagination{justify-content:flex-start;flex-wrap:wrap;gap:8px}
+.master-filter-toolbar{align-items:flex-end}
+.master-entry-list.master-record-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px;border-top:0}
+.master-entry-list.master-record-grid .master-entry{align-items:flex-start;min-width:0;border:1px solid var(--panel-line,var(--line,#e3e8e1));border-radius:11px;padding:12px;background:var(--panel,var(--surface,#fff))}
+.master-entry-list.master-record-grid .master-entry .recent-info{min-width:0}
+.master-table-scroll{width:100%;overflow-x:auto}
+.master-table-scroll .data-table{min-width:580px}
 .app-shell.dark .shopping-record-group-title{color:#d4ddd4}
 .app-shell.dark .shopping-record-group-title span{background:#2b3d30;color:#a6c1a8}
 .bank-account-groups,.subscription-groups,.habit-checkin-groups{display:grid;gap:12px}
@@ -2472,6 +2489,8 @@ button.fleet-bar-row:disabled{cursor:default}
   .shopping-filter-toolbar{flex-wrap:wrap}
   .shopping-filter-toolbar>.search-wrap,.shopping-quick-filters{flex:1 1 100%;width:100%}
   .shopping-quick-filters>.field-wrap{flex:1 1 130px}
+  .shopping-filter-toolbar .shopping-group-control{flex-wrap:wrap}
+  .shopping-filter-toolbar .shopping-group-control>.field{width:100%}
 }
 @media(max-width:430px){
   .shopping-quick-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}

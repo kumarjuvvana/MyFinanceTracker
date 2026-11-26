@@ -1265,12 +1265,16 @@ function ItemModal({ initial, products, onClose, onSave }: { initial?: ShoppingI
 }
 
 function ShoppingList({ data, onToggle, onAdd, onEdit, onCopy, onDelete }: { data: TrackerData; onToggle: (item: ShoppingItem) => void; onAdd: () => void; onEdit: (item: ShoppingItem) => void; onCopy: (item: ShoppingItem) => void; onDelete: (item: ShoppingItem) => void }) {
+  const savedView = useSavedScreenView("shopping-list");
   const formatCurrency = useCurrencyFormatter();
-  const [filter, setFilter] = useState("All items");
-  const [category, setCategory] = useState("All categories");
-  const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("name");
-  const [groupBy, setGroupBy] = useState("category");
+  const [filter, setFilter] = useState(() => savedView.statusFilter ?? "All items");
+  const [category, setCategory] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "name", ["name", "category", "price-highest"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "category", ["category", "status", "none"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const items = data.items.filter((item) =>
     (filter === "All items" || (filter === "To buy" ? !item.purchased : item.purchased)) &&
     (category === "All categories" || item.category === category) &&
@@ -1278,36 +1282,48 @@ function ShoppingList({ data, onToggle, onAdd, onEdit, onCopy, onDelete }: { dat
     .sort((a, b) => sortBy === "category" ? a.category.localeCompare(b.category) || a.name.localeCompare(b.name)
       : sortBy === "price-highest" ? b.estimatedPrice * b.quantity - a.estimatedPrice * a.quantity || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(items.length / pageSize) - 1));
+  const pageItems = pageRecords(items, currentPage, pageSize);
   const itemGroups = groupBy === "none"
-    ? [{ key: "all", title: "", items }]
-    : [...new Set(items.map((item) => groupBy === "category"
+    ? [{ key: "all", title: "", items: pageItems }]
+    : [...new Set(pageItems.map((item) => groupBy === "category"
       ? item.category
       : item.purchased ? "Picked up" : "To buy"))]
       .sort((a, b) => groupBy === "category" ? a.localeCompare(b) : a === "To buy" ? -1 : 1)
       .map((title) => ({
         key: title,
         title,
-        items: items.filter((item) => (groupBy === "category"
+        items: pageItems.filter((item) => (groupBy === "category"
           ? item.category
           : item.purchased ? "Picked up" : "To buy") === title),
       }));
+  const renderItems = (records: ShoppingItem[]) => view === "table"
+    ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{records.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div className="table-primary">{item.name}</div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>
+    : <div className={`shopping-list-view ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{records.map((item) => <Card className="shopping-list-view-card" key={item.id}>
+      <div className="shopping-list-view-head"><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div><div className="table-secondary">{item.quantity} {item.unit} · {formatCurrency(item.estimatedPrice * item.quantity)}</div></div><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></div>
+      <div className="shopping-list-view-meta"><Badge>{item.category}</Badge><span>{formatCurrency(item.estimatedPrice)} per {item.unit}</span></div>
+      <div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div>
+    </Card>)}</div>;
   return <><PageHeading eyebrow="Plan a little ahead" title="Shopping list" subtitle={`${data.items.filter((item) => !item.purchased).length} things waiting patiently for their turn.`} action={<Button onClick={onAdd}><Plus size={15} /> Add an item</Button>} />
     <div className="toolbar filter-toolbar shopping-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search items" placeholder="Find something..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} /></div>
       <div className="shopping-quick-filters">
-        <Field label="Category"><Select aria-label="Filter shopping list by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
-        <Field label="Status"><Select aria-label="Filter shopping list by status" value={filter} onChange={(event) => setFilter(event.target.value)}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field>
-        <Field label="Group by"><Select aria-label="Group shopping list" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Category"><Select aria-label="Filter shopping list by category" value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field label="Status"><Select aria-label="Filter shopping list by status" value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option>All items</option><option>To buy</option><option>Picked up</option></Select></Field>
+        <Field className="shopping-group-control" label="Group by"><Select aria-label="Group shopping list" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setPage(0); }}><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={sortBy !== "name" ? 1 : 0}>
         <Field label="Sort by"><Select aria-label="Sort shopping list" value={sortBy} onChange={(e) => setSortBy(e.target.value)}><option value="name">Name (A–Z)</option><option value="category">Category</option><option value="price-highest">Estimated total (highest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Shopping list" screen="shopping-list" settings={{ search, statusFilter: filter, categoryFilter: category, sortBy, groupBy, pageSize: String(pageSize) }} />
       <Badge>{items.length} {items.length === 1 ? "item" : "items"}</Badge>
     </div>
+    {items.length > 0 && <ReportPagination count={items.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="shopping-pagination" />}
     {items.length ? itemGroups.map((group) => <section className="shopping-record-group" key={group.key}>
       {group.title && <h2 className="shopping-record-group-title">{group.title}<span>{group.items.length}</span></h2>}
-      <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Category</th><th>Quantity</th><th>Est. total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{group.items.map((item) => <tr key={item.id}><td data-label="Item"><div style={{ display: "flex", alignItems: "center", gap: 10 }}><button className={`check-button ${item.purchased ? "checked" : ""}`} aria-label={item.purchased ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`} onClick={() => onToggle(item)}>{item.purchased && <Check size={12} />}</button><div><div className="table-primary">{item.name}</div></div></div></td><td data-label="Category"><Badge>{item.category}</Badge></td><td data-label="Quantity">{item.quantity} {item.unit}</td><td data-label="Est. total" className="table-total">{formatCurrency(item.estimatedPrice * item.quantity)}<div className="table-secondary">{formatCurrency(item.estimatedPrice)} / {item.unit}</div></td><td data-label="Status"><Badge tone={item.purchased ? "green" : "amber"}>{item.purchased ? "Picked up" : "To buy"}</Badge></td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${item.name}`} onClick={() => onCopy(item)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${item.name}`} onClick={() => onDelete(item)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>
+      {renderItems(group.items)}
     </section>) : <Card className="table-card"><EmptyState icon={<ClipboardList size={18} />} title={search || category !== "All categories" ? "No items found" : "A fresh start"} description={search || category !== "All categories" ? "Try adjusting or clearing your filters." : "Add a few things you need and they will be right here."} /></Card>}
+    {items.length > 0 && <ReportPagination count={items.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="shopping-pagination" />}
   </>;
 }
 
@@ -1335,14 +1351,18 @@ function TripModal({ data, onClose, onSave }: { data: TrackerData; onClose: () =
 }
 
 function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: TrackerData; onAdd: () => void; onSave: (trip: ShoppingTrip) => void; onCopy: (trip: ShoppingTrip) => void; onDelete: (trip: ShoppingTrip) => void }) {
+  const savedView = useSavedScreenView("shopping-trips");
   const formatCurrency = useCurrencyFormatter();
   const [editing, setEditing] = useState<ShoppingTrip | null>(null);
-  const [search, setSearch] = useState("");
-  const [store, setStore] = useState("All stores");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [sortBy, setSortBy] = useState("date-newest");
-  const [groupBy, setGroupBy] = useState("date");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [store, setStore] = useState(() => savedView.storeFilter ?? "All stores");
+  const [from, setFrom] = useState(() => savedView.from ?? "");
+  const [to, setTo] = useState(() => savedView.to ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "date-newest", ["date-newest", "date-oldest", "store", "total-highest"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month", "store", "none"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const stores = [...new Set(data.trips.map((trip) => trip.store))].sort((a, b) => a.localeCompare(b));
@@ -1361,41 +1381,52 @@ function ShoppingTrips({ data, onAdd, onSave, onCopy, onDelete }: { data: Tracke
     }
     return b.date.localeCompare(a.date);
   });
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(trips.length / pageSize) - 1));
+  const pageTrips = pageRecords(trips, currentPage, pageSize);
   const tripGroupKey = (trip: ShoppingTrip) => groupBy === "store" ? trip.store : groupBy === "month" ? monthKey(trip.date) : trip.date;
-  const tripGroups = groupBy === "none" ? [] : [...new Set(trips.map(tripGroupKey))].map((key) => ({
+  const tripGroups = groupBy === "none" ? [] : [...new Set(pageTrips.map(tripGroupKey))].map((key) => ({
     key,
     title: groupBy === "store" ? key : groupBy === "month"
       ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })
       : `Shopping trips · ${dateLabel(key)}`,
-    records: trips.filter((trip) => tripGroupKey(trip) === key),
+    records: pageTrips.filter((trip) => tripGroupKey(trip) === key),
   }));
   function setTripGroupsExpanded(expanded: boolean) {
     setGroupsExpanded(expanded);
     setGroupExpansionRevision((revision) => revision + 1);
   }
-  const renderTripCards = (records: ShoppingTrip[]) => <div className="trip-grid">{records.map((trip) => {
+  const renderTrips = (records: ShoppingTrip[]) => view === "table"
+    ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Store</th><th>Items</th><th>Total</th><th>Notes</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{records.map((trip) => {
+      const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
+      const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
+      return <tr key={trip.id}><td data-label="Date">{dateLabel(trip.date)}</td><td data-label="Store"><strong>{trip.store}</strong></td><td data-label="Items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(", ") : "No items recorded"}</td><td data-label="Total" className="table-total">{formatCurrency(total)}</td><td data-label="Notes">{trip.notes || "—"}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div></td></tr>;
+    })}</tbody></table></Card>
+    : <div className={`trip-grid ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{records.map((trip) => {
     const purchases = trip.purchaseIds.map((id) => data.purchases.find((purchase) => purchase.id === id)).filter((purchase): purchase is Purchase => Boolean(purchase));
     const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
     return <Card className="trip-card" key={trip.id}><div className="trip-card-top"><div><div className="trip-store">{trip.store}</div><div className="trip-date"><CalendarDays size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{dateLabel(trip.date)}</div></div><div className="trip-total">{formatCurrency(total)}</div><button className="icon-button" aria-label={`Edit trip to ${trip.store}`} onClick={() => setEditing(trip)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy trip to ${trip.store} without purchases`} title="Copy trip without its purchases" onClick={() => onCopy(trip)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive trip to ${trip.store}`} onClick={() => onDelete(trip)}><Archive size={14} /></button></div><p className="trip-note"><LinkifiedText>{trip.notes || "A little shopping, all in one place."}</LinkifiedText></p><div className="trip-items">{purchases.length ? purchases.map((purchase) => purchase.itemName).join(" · ") : "No items recorded"}</div></Card>;
   })}</div>;
   return <><PageHeading eyebrow="Make a little plan" title="Shopping trips" subtitle="Your errands, saved in one easy place." action={<Button onClick={onAdd}><Plus size={15} /> Plan a trip</Button>} />
     <div className="toolbar filter-toolbar shopping-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label="Search shopping trips" placeholder="Search stores, notes, or purchased items..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search shopping trips" placeholder="Search stores, notes, or purchased items..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
       <div className="shopping-quick-filters">
-        <Field label="Store"><Select aria-label="Filter trips by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Group by"><Select aria-label="Group shopping trips" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Store"><Select aria-label="Filter trips by store" value={store} onChange={(event) => { setStore(event.target.value); setPage(0); }}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field className="shopping-group-control" label="Group by"><Select aria-label="Group shopping trips" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setPage(0); }}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}>
         <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field>
         <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
         <Field label="Sort by"><Select aria-label="Sort shopping trips" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="store">Store (A–Z)</option><option value="total-highest">Total (highest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Shopping trips" screen="shopping-trips" settings={{ search, storeFilter: store, from, to, sortBy, groupBy, pageSize: String(pageSize) }} />
       <Badge>{trips.length} {trips.length === 1 ? "trip" : "trips"}</Badge>
     </div>
+    {trips.length > 0 && <ReportPagination count={trips.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="shopping-pagination" />}
     {trips.length ? <>
       {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setTripGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setTripGroupsExpanded(false)}>Hide all</Button></div>}
-      {groupBy === "none" ? renderTripCards(trips) : <div className="record-date-groups">{tripGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderTripCards(group.records)}</DevotionalRecordGroup>)}</div>}
+      {groupBy === "none" ? renderTrips(pageTrips) : <div className="record-date-groups">{tripGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderTrips(group.records)}</DevotionalRecordGroup>)}</div>}
     </> : <Card><EmptyState icon={<ShoppingBag size={18} />} title={data.trips.length ? "No trips match your filters" : "No trips planned just yet"} description={data.trips.length ? "Try changing the search, store, or date range." : "Create a trip, choose a store and add items from your shopping list."} /></Card>}
+    {trips.length > 0 && <ReportPagination count={trips.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="shopping-pagination" />}
     {editing && <TripEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(trip) => { onSave(trip); setEditing(null); }} />}
   </>;
 }
@@ -1438,14 +1469,18 @@ function PurchaseEditor({ initial, onClose, onSave }: { initial: Purchase; onClo
 }
 
 function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData; onSave: (purchase: Purchase) => void; onCopy: (purchase: Purchase) => void; onDelete: (purchase: Purchase) => void }) {
+  const savedView = useSavedScreenView("purchase-history");
   const formatCurrency = useCurrencyFormatter();
-  const [search, setSearch] = useState("");
-  const [store, setStore] = useState("All stores");
-  const [category, setCategory] = useState("All categories");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [sortBy, setSortBy] = useState("date-newest");
-  const [groupBy, setGroupBy] = useState("date");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [store, setStore] = useState(() => savedView.storeFilter ?? "All stores");
+  const [category, setCategory] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [from, setFrom] = useState(() => savedView.from ?? "");
+  const [to, setTo] = useState(() => savedView.to ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "date-newest", ["date-newest", "date-oldest", "item", "price-highest"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "date", ["date", "month", "store", "category", "none"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [editing, setEditing] = useState<Purchase | null>(null);
@@ -1454,54 +1489,65 @@ function PurchaseHistory({ data, onSave, onCopy, onDelete }: { data: TrackerData
     sortBy === "date-oldest" ? a.date.localeCompare(b.date) :
       sortBy === "item" ? a.itemName.localeCompare(b.itemName) || b.date.localeCompare(a.date) :
         sortBy === "price-highest" ? b.price - a.price || b.date.localeCompare(a.date) : b.date.localeCompare(a.date));
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(purchases.length / pageSize) - 1));
+  const pagePurchases = pageRecords(purchases, currentPage, pageSize);
   const total = purchases.reduce((sum, purchase) => sum + purchase.price, 0);
   const purchaseGroupKey = (purchase: Purchase) => groupBy === "store" ? purchase.store : groupBy === "category" ? purchase.category : groupBy === "month" ? monthKey(purchase.date) : purchase.date;
-  const purchaseGroups = groupBy === "none" ? [] : [...new Set(purchases.map(purchaseGroupKey))].map((key) => ({
+  const purchaseGroups = groupBy === "none" ? [] : [...new Set(pagePurchases.map(purchaseGroupKey))].map((key) => ({
     key,
     title: groupBy === "month"
       ? new Date(`${key}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })
       : groupBy === "date" ? `Purchases · ${dateLabel(key)}` : key,
-    records: purchases.filter((purchase) => purchaseGroupKey(purchase) === key),
+    records: pagePurchases.filter((purchase) => purchaseGroupKey(purchase) === key),
   }));
   function setPurchaseGroupsExpanded(expanded: boolean) {
     setGroupsExpanded(expanded);
     setGroupExpansionRevision((revision) => revision + 1);
   }
-  const renderPurchaseTable = (records: Purchase[]) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>;
+  const renderPurchases = (records: Purchase[]) => view === "table"
+    ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Date</th><th>Item</th><th>Store</th><th>Category</th><th>Quantity</th><th>Paid</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Item"><div className="table-primary">{purchase.itemName}</div></td><td data-label="Store">{purchase.store}</td><td data-label="Category"><Badge>{purchase.category}</Badge></td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></td></tr>)}</tbody></table></Card>
+    : <div className={`purchase-history-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{records.map((purchase) => <Card className="purchase-history-card" key={purchase.id}><div className="purchase-history-card-head"><div><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{dateLabel(purchase.date)} · {purchase.store}</div></div><strong className="table-total">{formatCurrency(purchase.price)}</strong></div><div className="purchase-history-card-meta"><Badge>{purchase.category}</Badge><span>{purchase.quantity} {purchase.unit}</span></div><div className="table-actions"><button className="icon-button" aria-label={`Edit purchase ${purchase.itemName}`} onClick={() => setEditing(purchase)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy purchase ${purchase.itemName}`} onClick={() => onCopy(purchase)}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive purchase ${purchase.itemName}`} onClick={() => onDelete(purchase)}><Archive size={14} /></button></div></Card>)}</div>;
   return <><PageHeading eyebrow="A record of the good stuff" title="Purchase history" subtitle="Everything you've brought home, in one place." />
     <div className="toolbar filter-toolbar shopping-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input placeholder="Search items, stores, categories..." aria-label="Search purchases" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input placeholder="Search items, stores, categories..." aria-label="Search purchases" value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} /></div>
       <div className="shopping-quick-filters">
-        <Field label="Store"><Select aria-label="Filter purchases by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Category"><Select aria-label="Filter purchases by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
-        <Field label="Group by"><Select aria-label="Group purchases" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="category">Category</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Store"><Select aria-label="Filter purchases by store" value={store} onChange={(event) => { setStore(event.target.value); setPage(0); }}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter purchases by category" value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field className="shopping-group-control" label="Group by"><Select aria-label="Group purchases" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setPage(0); }}><option value="date">Date</option><option value="month">Month</option><option value="store">Store</option><option value="category">Category</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-newest"].filter(Boolean).length}>
         <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} max={to || undefined} /></Field>
         <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
         <Field label="Sort by"><Select aria-label="Sort purchases" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-newest">Date (newest)</option><option value="date-oldest">Date (oldest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Paid (highest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Purchase history" screen="purchase-history" settings={{ search, storeFilter: store, categoryFilter: category, from, to, sortBy, groupBy, pageSize: String(pageSize) }} />
       <Badge>{purchases.length} records</Badge>
     </div>
     <div className="history-summary"><span className="section-description" style={{ margin: 0 }}>{purchases.length} {purchases.length === 1 ? "purchase" : "purchases"} found</span><strong>Total · {formatCurrency(total)}</strong></div>
+    {purchases.length > 0 && <ReportPagination count={purchases.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="shopping-pagination" />}
     {purchases.length ? <>
       {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPurchaseGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPurchaseGroupsExpanded(false)}>Hide all</Button></div>}
-      {groupBy === "none" ? renderPurchaseTable(purchases) : <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPurchaseTable(group.records)}</DevotionalRecordGroup>)}</div>}
+      {groupBy === "none" ? renderPurchases(pagePurchases) : <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPurchases(group.records)}</DevotionalRecordGroup>)}</div>}
     </> : <Card className="table-card"><EmptyState icon={<Search size={18} />} title="No purchases match" description="Try adjusting the dates, store, category or item search." /></Card>}
+    {purchases.length > 0 && <ReportPagination count={purchases.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="shopping-pagination" />}
     {editing && <PurchaseEditor key={editing.id} initial={editing} onClose={() => setEditing(null)} onSave={(purchase) => { onSave({ ...purchase, id: editing.id, ...(editing.tripId ? { tripId: editing.tripId } : {}) }); setEditing(null); }} />}
   </>;
 }
 
 function PriceHistory({ data }: { data: TrackerData }) {
+  const savedView = useSavedScreenView("item-price-history");
   const formatCurrency = useCurrencyFormatter();
-  const [search, setSearch] = useState("");
-  const [item, setItem] = useState("All items");
-  const [store, setStore] = useState("All stores");
-  const [category, setCategory] = useState("All categories");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [sortBy, setSortBy] = useState("date-oldest");
-  const [groupBy, setGroupBy] = useState("item");
+  const [search, setSearch] = useState(() => savedView.search ?? "");
+  const [item, setItem] = useState(() => savedView.itemFilter ?? "All items");
+  const [store, setStore] = useState(() => savedView.storeFilter ?? "All stores");
+  const [category, setCategory] = useState(() => savedView.categoryFilter ?? "All categories");
+  const [from, setFrom] = useState(() => savedView.from ?? "");
+  const [to, setTo] = useState(() => savedView.to ?? "");
+  const [sortBy, setSortBy] = useState(() => savedScreenSetting(savedView, "sortBy", "date-oldest", ["date-oldest", "date-newest", "item", "price-highest", "unit-price-highest"]));
+  const [groupBy, setGroupBy] = useState(() => savedScreenSetting(savedView, "groupBy", "item", ["item", "category", "store", "date", "none"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const names = [...new Set(data.purchases.map((purchase) => purchase.itemName))].sort();
@@ -1519,42 +1565,49 @@ function PriceHistory({ data }: { data: TrackerData }) {
     if (sortBy === "unit-price-highest") return b.price / b.quantity - a.price / a.quantity;
     return a.date.localeCompare(b.date) || a.itemName.localeCompare(b.itemName);
   });
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(purchases.length / pageSize) - 1));
+  const pagePurchases = pageRecords(purchases, currentPage, pageSize);
   const purchaseGroupKey = (purchase: Purchase) => groupBy === "item" ? purchase.itemName
     : groupBy === "category" ? purchase.category
       : groupBy === "store" ? purchase.store : purchase.date;
-  const purchaseGroupKeys = [...new Set(purchases.map(purchaseGroupKey))].sort((a, b) => groupBy === "date"
+  const purchaseGroupKeys = [...new Set(pagePurchases.map(purchaseGroupKey))].sort((a, b) => groupBy === "date"
     ? sortBy === "date-newest" ? b.localeCompare(a) : a.localeCompare(b)
     : a.localeCompare(b, undefined, { sensitivity: "base" }));
   const purchaseGroups = groupBy === "none" ? [] : purchaseGroupKeys.map((key) => ({
     key,
     title: groupBy === "date" ? `Price history · ${dateLabel(key)}` : key,
-    records: purchases.filter((purchase) => purchaseGroupKey(purchase) === key),
+    records: pagePurchases.filter((purchase) => purchaseGroupKey(purchase) === key),
   }));
   function setPriceGroupsExpanded(expanded: boolean) {
     setGroupsExpanded(expanded);
     setGroupExpansionRevision((revision) => revision + 1);
   }
-  const renderPriceHistoryTable = (records: Purchase[]) => <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Date</th><th>Store</th><th>Quantity</th><th>Price paid</th><th>Unit price</th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Item"><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{purchase.category}</div></td><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Store">{purchase.store}</td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Price paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Unit price">{formatCurrency(purchase.price / purchase.quantity)} <span className="table-secondary">/ {purchase.unit}</span></td></tr>)}</tbody></table></Card>;
+  const renderPriceHistory = (records: Purchase[]) => view === "table"
+    ? <Card className="table-card"><table className="data-table mobile-card-table"><thead><tr><th>Item</th><th>Date</th><th>Store</th><th>Quantity</th><th>Price paid</th><th>Unit price</th></tr></thead><tbody>{records.map((purchase) => <tr key={purchase.id}><td data-label="Item"><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{purchase.category}</div></td><td data-label="Date">{dateLabel(purchase.date)}</td><td data-label="Store">{purchase.store}</td><td data-label="Quantity">{purchase.quantity} {purchase.unit}</td><td data-label="Price paid" className="table-total">{formatCurrency(purchase.price)}</td><td data-label="Unit price">{formatCurrency(purchase.price / purchase.quantity)} <span className="table-secondary">/ {purchase.unit}</span></td></tr>)}</tbody></table></Card>
+    : <div className={`price-history-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{records.map((purchase) => <Card className="price-history-card" key={purchase.id}><div className="purchase-history-card-head"><div><div className="table-primary">{purchase.itemName}</div><div className="table-secondary">{dateLabel(purchase.date)} · {purchase.store}</div></div><strong className="table-total">{formatCurrency(purchase.price)}</strong></div><div className="purchase-history-card-meta"><Badge>{purchase.category}</Badge><span>{purchase.quantity} {purchase.unit} · {formatCurrency(purchase.price / purchase.quantity)} / {purchase.unit}</span></div></Card>)}</div>;
   return <><PageHeading eyebrow="A little perspective" title="Item price history" subtitle="See how the things you buy have changed over time." />
     <div className="toolbar filter-toolbar shopping-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label="Search price history" placeholder="Search items, stores, or categories..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search price history" placeholder="Search items, stores, or categories..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
       <div className="shopping-quick-filters">
-        <Field label="Item"><Select aria-label="Filter price history by item" value={item} onChange={(event) => setItem(event.target.value)}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Store"><Select aria-label="Filter price history by store" value={store} onChange={(event) => setStore(event.target.value)}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Category"><Select aria-label="Filter price history by category" value={category} onChange={(event) => setCategory(event.target.value)}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field>
-        <Field label="Group by"><Select aria-label="Group price history" value={groupBy} onChange={(event) => setGroupBy(event.target.value)}><option value="item">Item</option><option value="category">Category</option><option value="store">Store</option><option value="date">Date</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Item"><Select aria-label="Filter price history by item" value={item} onChange={(event) => { setItem(event.target.value); setPage(0); }}><option>All items</option>{names.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Store"><Select aria-label="Filter price history by store" value={store} onChange={(event) => { setStore(event.target.value); setPage(0); }}><option>All stores</option>{stores.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field label="Category"><Select aria-label="Filter price history by category" value={category} onChange={(event) => { setCategory(event.target.value); setPage(0); }}><option>All categories</option>{categories.map((name) => <option key={name}>{name}</option>)}</Select></Field>
+        <Field className="shopping-group-control" label="Group by"><Select aria-label="Group price history" value={groupBy} onChange={(event) => { setGroupBy(event.target.value); setPage(0); }}><option value="item">Item</option><option value="category">Category</option><option value="store">Store</option><option value="date">Date</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer label="Apply filters" activeCount={[Boolean(from), Boolean(to), sortBy !== "date-oldest"].filter(Boolean).length}>
         <Field label="From date"><DateInput className="filter-date" aria-label="From date" value={from} onValueChange={setFrom} /></Field>
         <Field label="To date"><DateInput className="filter-date" aria-label="To date" min={from || undefined} value={to} onValueChange={setTo} /></Field>
         <Field label="Sort by"><Select aria-label="Sort price history" value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="date-oldest">Date (oldest)</option><option value="date-newest">Date (newest)</option><option value="item">Item (A–Z)</option><option value="price-highest">Price paid (highest)</option><option value="unit-price-highest">Unit price (highest)</option></Select></Field>
       </FilterDrawer>
+      <RecordViewToggle value={view} onChange={setView} label="Item price history" screen="item-price-history" settings={{ search, itemFilter: item, storeFilter: store, categoryFilter: category, from, to, sortBy, groupBy, pageSize: String(pageSize) }} />
       <Badge>{purchases.length} records</Badge>
     </div>
-    {purchases.length ? groupBy === "none" ? renderPriceHistoryTable(purchases) : <>
+    {purchases.length > 0 && <ReportPagination count={purchases.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="shopping-pagination" />}
+    {purchases.length ? groupBy === "none" ? renderPriceHistory(pagePurchases) : <>
       <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setPriceGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setPriceGroupsExpanded(false)}>Hide all</Button></div>
-      <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPriceHistoryTable(group.records)}</DevotionalRecordGroup>)}</div>
+      <div className="record-date-groups">{purchaseGroups.map((group) => <DevotionalRecordGroup key={`${groupBy}:${group.key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderPriceHistory(group.records)}</DevotionalRecordGroup>)}</div>
     </> : <Card className="table-card"><EmptyState icon={<ArrowLeftRight size={18} />} title={data.purchases.length ? "No matching price history" : "No price history yet"} description={data.purchases.length ? "Try changing the item, store, category, or date filters." : "Record a few purchases to see their price history here."} /></Card>}
+    {purchases.length > 0 && <ReportPagination count={purchases.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="shopping-pagination" />}
   </>;
 }
 
@@ -3707,6 +3760,8 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
   const [dateFrom, setDateFrom] = useState(() => savedView.dateFrom ?? "");
   const [dateTo, setDateTo] = useState(() => savedView.dateTo ?? "");
   const [recordLayout, setRecordLayout] = useState<RecordViewMode>(() => savedViewMode(savedView));
+  const [pageSize, setPageSize] = useState(() => savedPageSize(savedView));
+  const [page, setPage] = useState(0);
   const [groupsExpanded, setGroupsExpanded] = useState(false);
   const [groupExpansionRevision, setGroupExpansionRevision] = useState(0);
   const [error, setError] = useState("");
@@ -3733,11 +3788,13 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
       if (completionOrder !== 0) return completionOrder;
       return sortOrder === "date-ascending" ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
     });
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(visible.length / pageSize) - 1));
+  const pageVisible = pageRecords(visible, currentPage, pageSize);
   const activeFilterCount = Number(statusFilter !== "All reminders") + Number(categoryFilter !== "All categories") +
     Number(Boolean(dateFrom)) + Number(Boolean(dateTo)) + Number(sortOrder !== "date-ascending") + Number(groupBy !== "date");
   const groupedReminders = (() => {
     const groups = new Map<string, { title: string; records: Reminder[] }>();
-    for (const reminder of visible) {
+    for (const reminder of pageVisible) {
       const categoryName = reminder.category?.trim() || "General";
       const group = groupBy === "date" ? reminder.date
         : groupBy === "category" ? categoryName.toLocaleLowerCase()
@@ -3766,6 +3823,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
     setDateTo("");
     setSortOrder("date-ascending");
     setGroupBy("date");
+    setPage(0);
   }
   function renderReminderCards(entries: Reminder[]) {
     if (recordLayout === "table") {
@@ -3786,7 +3844,7 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
         </tr>)}</tbody>
       </table></Card>;
     }
-    return <div className={`reminder-page-list${recordLayout === "grid" ? " reminder-grid-layout" : ""}`}>{entries.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />)}</div>;
+    return <div className={`reminder-page-list ${recordLayout === "grid" ? "reminder-grid-layout" : "reminder-list-layout"}`}>{entries.map((reminder) => <ReminderCard key={reminder.id} reminder={reminder} onEdit={() => setEditor(reminder)} onSave={onSave} onDelete={onDelete} onToggle={onToggle} />)}</div>;
   }
   return <><PageHeading eyebrow="Keep a note of it" title="Notes & reminders" subtitle="Keep personal notes and dated reminders organized in one place." action={activeTab === "list" ? <Button onClick={() => setActiveTab("add")}><Plus size={15} />Add reminder</Button> : undefined} />
     <nav className="student-profile-tabs reminder-tabs" aria-label="Notes and reminders sections">
@@ -3803,31 +3861,36 @@ function ReminderPage({ reminders, categories: savedCategories, onSave, onDelete
     </form></Card>}
     {activeTab === "list" && <>
     <div className="toolbar filter-toolbar reminder-filter-toolbar">
-      <div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      <div className="search-wrap"><Search size={15} /><Input aria-label="Search reminders" placeholder="Search title, category, date, details..." value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} /></div>
       <div className="shopping-quick-filters">
-        <Field label="Status"><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option>All reminders</option><option>Pending</option><option>Completed</option></Select></Field>
-        <Field label="Category"><Select aria-label="Filter reminders by category" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}><option>All categories</option>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
-        <Field label="Group by"><Select aria-label="Group reminders" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setAllGroupsExpanded(false); }}><option value="date">Date</option><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
+        <Field label="Status"><Select aria-label="Filter reminders by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }}><option>All reminders</option><option>Pending</option><option>Completed</option></Select></Field>
+        <Field label="Category"><Select aria-label="Filter reminders by category" value={categoryFilter} onChange={(event) => { setCategoryFilter(event.target.value); setPage(0); }}><option>All categories</option>{categories.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>
+        <Field className="shopping-group-control" label="Group by"><Select aria-label="Group reminders" value={groupBy} onChange={(event) => { setGroupBy(event.target.value as typeof groupBy); setAllGroupsExpanded(false); setPage(0); }}><option value="date">Date</option><option value="category">Category</option><option value="status">Status</option><option value="none">No grouping</option></Select></Field>
       </div>
       <FilterDrawer activeCount={[Number(Boolean(dateFrom)), Number(Boolean(dateTo)), Number(sortOrder !== "date-ascending")].reduce((sum, count) => sum + count, 0)} label="Apply filters">
         <Field label="Sort by"><Select aria-label="Sort reminders" value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}><option value="date-ascending">Due date (earliest)</option><option value="date-descending">Due date (latest)</option><option value="title">Title A–Z</option><option value="category">Category A–Z</option></Select></Field>
         <Field label="From date"><DateInput aria-label="Filter reminders from date" value={dateFrom} onValueChange={setDateFrom} max={dateTo || undefined} /></Field>
         <Field label="To date"><DateInput aria-label="Filter reminders to date" value={dateTo} onValueChange={setDateTo} min={dateFrom || undefined} /></Field>
       </FilterDrawer>
-      <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Reminders" screen="reminders" settings={{ search, categoryFilter, statusFilter, sortOrder, groupBy, dateFrom, dateTo }} />
+      <RecordViewToggle value={recordLayout} onChange={setRecordLayout} label="Reminders" screen="reminders" settings={{ search, categoryFilter, statusFilter, sortOrder, groupBy, dateFrom, dateTo, pageSize: String(pageSize) }} />
       <Badge>{visible.length} {visible.length === 1 ? "reminder" : "reminders"}</Badge>
     </div>
     {(search || activeFilterCount > 0) && <div className="important-date-clear-filters"><Button type="button" size="sm" variant="outline" onClick={clearListOptions}>Clear search, filters & sorting</Button></div>}
+    {visible.length > 0 && <ReportPagination count={visible.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="shopping-pagination" />}
     {visible.length ? <>
       {groupBy !== "none" && <div className="record-group-actions"><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(true)}>Show all</Button><Button type="button" size="sm" variant="outline" onClick={() => setAllGroupsExpanded(false)}>Hide all</Button></div>}
-      {groupBy === "none" ? renderReminderCards(visible) : <div className="record-date-groups">{groupedReminders.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderReminderCards(group.records)}</DevotionalRecordGroup>)}</div>}
+      {groupBy === "none" ? renderReminderCards(pageVisible) : <div className="record-date-groups">{groupedReminders.map(([key, group]) => <DevotionalRecordGroup key={`${groupBy}:${key}`} title={group.title} count={group.records.length} expandAll={groupsExpanded} expansionRevision={groupExpansionRevision}>{renderReminderCards(group.records)}</DevotionalRecordGroup>)}</div>}
     </> : <div className="reminder-page-list"><Card><EmptyState icon={<Bell size={18} />} title={reminders.length ? "No matching reminders" : "No notes or reminders yet"} description={reminders.length ? "Try another search or clear the current filters." : "Add a dated reminder and it will appear here and on your dashboard when due."} /></Card></div>}
+    {visible.length > 0 && <ReportPagination count={visible.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} className="shopping-pagination" />}
     </>}
     {editor !== undefined && <ReminderModal key={editor?.id ?? "new-reminder"} initial={editor} categories={categories} onClose={() => setEditor(undefined)} onSave={(reminder, id) => { onSave(reminder, id); setEditor(undefined); }} />}
   </>;
 }
 
 function MasterData({ stores, products, reminders, reminderCategories, onAddStore, onSaveStore, onDeleteStore, onAddProduct, onSaveProduct, onDeleteProduct, onAddReminderCategory, onRenameReminderCategory, onDeleteReminderCategory }: { stores: Store[]; products: Product[]; reminders: Reminder[]; reminderCategories: string[]; onAddStore: (store: Omit<Store, "id">) => void; onSaveStore: (store: Omit<Store, "id">, id: string) => void; onDeleteStore: (id: string) => void; onAddProduct: (product: Omit<Product, "id">) => void; onSaveProduct: (product: Omit<Product, "id">, id: string) => void; onDeleteProduct: (id: string) => void; onAddReminderCategory: (category: string) => void; onRenameReminderCategory: (oldCategory: string, newCategory: string) => void; onDeleteReminderCategory: (category: string) => void }) {
+  const productSavedView = useSavedScreenView("master-products");
+  const storeSavedView = useSavedScreenView("master-stores");
+  const reminderCategorySavedView = useSavedScreenView("master-reminder-categories");
   const currency = useContext(CurrencyContext);
   const [storeName, setStoreName] = useState("");
   const [location, setLocation] = useState("");
@@ -3839,9 +3902,20 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<"products" | "stores" | "categories" | "editor">("products");
-  const [masterSearch, setMasterSearch] = useState("");
-  const [productCategoryFilter, setProductCategoryFilter] = useState("All categories");
-  const [masterSort, setMasterSort] = useState("name");
+  const [masterSearch, setMasterSearch] = useState(() => productSavedView.search ?? "");
+  const [productCategoryFilter, setProductCategoryFilter] = useState(() => productSavedView.categoryFilter ?? "All categories");
+  const [masterSort, setMasterSort] = useState(() => savedScreenSetting(productSavedView, "sortBy", "name", ["name", "price-highest", "price-lowest"]));
+  const [masterViews, setMasterViews] = useState<Record<"products" | "stores" | "categories", RecordViewMode>>(() => ({
+    products: savedViewMode(productSavedView),
+    stores: savedViewMode(storeSavedView),
+    categories: savedViewMode(reminderCategorySavedView),
+  }));
+  const [masterPageSizes, setMasterPageSizes] = useState(() => ({
+    products: savedPageSize(productSavedView),
+    stores: savedPageSize(storeSavedView),
+    categories: savedPageSize(reminderCategorySavedView),
+  }));
+  const [masterPage, setMasterPage] = useState(0);
   const [editorKind, setEditorKind] = useState<"product" | "store" | "category" | null>(null);
   const [error, setError] = useState("");
   const query = masterSearch.trim().toLocaleLowerCase();
@@ -3858,6 +3932,32 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
       ? reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === b.toLocaleLowerCase()).length -
         reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === a.toLocaleLowerCase()).length || a.localeCompare(b)
       : a.localeCompare(b));
+  const masterListTab = activeTab === "stores" || activeTab === "categories" ? activeTab : "products";
+  const activeMasterView = masterViews[masterListTab];
+  const activeMasterPageSize = masterPageSizes[masterListTab];
+  const activeMasterScreen = masterListTab === "products" ? "master-products"
+    : masterListTab === "stores" ? "master-stores" : "master-reminder-categories";
+  const activeMasterCount = masterListTab === "products" ? visibleProducts.length
+    : masterListTab === "stores" ? visibleStores.length : visibleReminderCategories.length;
+  const activeMasterPage = Math.min(masterPage, Math.max(0, Math.ceil(activeMasterCount / activeMasterPageSize) - 1));
+  const visibleProductsPage = pageRecords(visibleProducts, activeMasterPage, activeMasterPageSize);
+  const visibleStoresPage = pageRecords(visibleStores, activeMasterPage, activeMasterPageSize);
+  const visibleReminderCategoriesPage = pageRecords(visibleReminderCategories, activeMasterPage, activeMasterPageSize);
+  function selectMasterTab(tab: "products" | "stores" | "categories" | "editor") {
+    setActiveTab(tab);
+    setMasterPage(0);
+    if (tab === "editor") return;
+    const saved = tab === "products" ? productSavedView : tab === "stores" ? storeSavedView : reminderCategorySavedView;
+    setMasterSearch(saved.search ?? "");
+    setProductCategoryFilter(saved.categoryFilter ?? "All categories");
+    setMasterSort(tab === "products"
+      ? savedScreenSetting(saved, "sortBy", "name", ["name", "price-highest", "price-lowest"])
+      : tab === "stores"
+        ? savedScreenSetting(saved, "sortBy", "name", ["name", "location"])
+        : savedScreenSetting(saved, "sortBy", "name", ["name", "most-used"]));
+    setMasterViews((current) => ({ ...current, [tab]: savedViewMode(saved) }));
+    setMasterPageSizes((current) => ({ ...current, [tab]: savedPageSize(saved) }));
+  }
   function openEditor(kind: "product" | "store" | "category") {
     setEditorKind(kind);
     setEditingStore(null);
@@ -3874,6 +3974,26 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
     } else {
       setReminderCategoryName("");
     }
+    setActiveTab("editor");
+  }
+  function editProduct(product: Product) {
+    setEditingProduct(product);
+    setEditingStore(null);
+    setEditorKind("product");
+    setProductName(product.name);
+    setCategory(product.category);
+    setUnit(product.unit);
+    setPrice(product.estimatedPrice);
+    setError("");
+    setActiveTab("editor");
+  }
+  function editStore(store: Store) {
+    setEditingStore(store);
+    setEditingProduct(null);
+    setEditorKind("store");
+    setStoreName(store.name);
+    setLocation(store.location);
+    setError("");
     setActiveTab("editor");
   }
   function addStore(event: FormEvent) {
@@ -3910,29 +4030,40 @@ function MasterData({ stores, products, reminders, reminderCategories, onAddStor
   return <><PageHeading eyebrow="Reusable shopping details" title="Master data" subtitle="Keep products, stores, and reminder categories organized. Add and edit forms are separate from their record lists." />
     {error && <div className="alert alert-error" role="alert">{error}</div>}
     <nav className="student-profile-tabs master-tabs" aria-label="Master data sections">
-      <Button variant={activeTab === "products" ? "primary" : "outline"} aria-pressed={activeTab === "products"} onClick={() => setActiveTab("products")}><ShoppingBasket size={14} />Products<Badge>{products.length}</Badge></Button>
-      <Button variant={activeTab === "stores" ? "primary" : "outline"} aria-pressed={activeTab === "stores"} onClick={() => setActiveTab("stores")}><Database size={14} />Stores<Badge>{stores.length}</Badge></Button>
-      <Button variant={activeTab === "categories" ? "primary" : "outline"} aria-pressed={activeTab === "categories"} onClick={() => setActiveTab("categories")}><Bell size={14} />Reminder categories<Badge>{reminderCategories.length}</Badge></Button>
-      <Button variant={activeTab === "editor" ? "primary" : "outline"} aria-pressed={activeTab === "editor"} onClick={() => { setEditorKind(null); setActiveTab("editor"); }}><Plus size={14} />Add / edit</Button>
+      <Button variant={activeTab === "products" ? "primary" : "outline"} aria-pressed={activeTab === "products"} onClick={() => selectMasterTab("products")}><ShoppingBasket size={14} />Products<Badge>{products.length}</Badge></Button>
+      <Button variant={activeTab === "stores" ? "primary" : "outline"} aria-pressed={activeTab === "stores"} onClick={() => selectMasterTab("stores")}><Database size={14} />Stores<Badge>{stores.length}</Badge></Button>
+      <Button variant={activeTab === "categories" ? "primary" : "outline"} aria-pressed={activeTab === "categories"} onClick={() => selectMasterTab("categories")}><Bell size={14} />Reminder categories<Badge>{reminderCategories.length}</Badge></Button>
+      <Button variant={activeTab === "editor" ? "primary" : "outline"} aria-pressed={activeTab === "editor"} onClick={() => { setEditorKind(null); selectMasterTab("editor"); }}><Plus size={14} />Add / edit</Button>
     </nav>
-    {activeTab !== "editor" && <div className="toolbar filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={`Search master ${activeTab}`} placeholder={activeTab === "products" ? "Search products..." : activeTab === "stores" ? "Search stores and locations..." : "Search reminder categories..."} value={masterSearch} onChange={(event) => setMasterSearch(event.target.value)} /></div><FilterDrawer label="Search & sort" activeCount={(activeTab === "products" && productCategoryFilter !== "All categories" ? 1 : 0) + (masterSort !== "name" ? 1 : 0)}>
+    {activeTab !== "editor" && <div className="toolbar filter-toolbar shopping-filter-toolbar master-filter-toolbar"><div className="search-wrap"><Search size={15} /><Input aria-label={`Search master ${activeTab}`} placeholder={activeTab === "products" ? "Search products..." : activeTab === "stores" ? "Search stores and locations..." : "Search reminder categories..."} value={masterSearch} onChange={(event) => { setMasterSearch(event.target.value); setMasterPage(0); }} /></div><FilterDrawer label="Search & sort" activeCount={(activeTab === "products" && productCategoryFilter !== "All categories" ? 1 : 0) + (masterSort !== "name" ? 1 : 0)}>
       {activeTab === "products" && <Field label="Product category"><Select aria-label="Filter products by category" value={productCategoryFilter} onChange={(event) => setProductCategoryFilter(event.target.value)}><option>All categories</option>{CATEGORIES.map((entry) => <option key={entry}>{entry}</option>)}</Select></Field>}
       {activeTab === "products" && <Field label="Sort by"><Select aria-label="Sort products" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="price-highest">Price (highest)</option><option value="price-lowest">Price (lowest)</option></Select></Field>}
       {activeTab === "stores" && <Field label="Sort by"><Select aria-label="Sort stores" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="location">Location (A–Z)</option></Select></Field>}
       {activeTab === "categories" && <Field label="Sort by"><Select aria-label="Sort reminder categories" value={masterSort} onChange={(event) => setMasterSort(event.target.value)}><option value="name">Name (A–Z)</option><option value="most-used">Most used</option></Select></Field>}
-    </FilterDrawer><Badge>{activeTab === "products" ? `${visibleProducts.length} products` : activeTab === "stores" ? `${visibleStores.length} stores` : `${visibleReminderCategories.length} categories`}</Badge></div>}
+    </FilterDrawer><RecordViewToggle value={activeMasterView} onChange={(nextView) => { setMasterViews((current) => ({ ...current, [masterListTab]: nextView })); setMasterPage(0); }} label={activeTab === "products" ? "Master products" : activeTab === "stores" ? "Master stores" : "Master reminder categories"} screen={activeMasterScreen} settings={{ search: masterSearch, categoryFilter: productCategoryFilter, sortBy: masterSort, pageSize: String(activeMasterPageSize) }} /><Badge>{activeTab === "products" ? `${visibleProducts.length} products` : activeTab === "stores" ? `${visibleStores.length} stores` : `${visibleReminderCategories.length} categories`}</Badge></div>}
+    {activeTab !== "editor" && activeMasterCount > 0 && <ReportPagination count={activeMasterCount} page={activeMasterPage} pageSize={activeMasterPageSize} onPageChange={setMasterPage} onPageSizeChange={(size) => { setMasterPageSizes((current) => ({ ...current, [masterListTab]: size })); setMasterPage(0); }} className="shopping-pagination master-pagination" />}
     {activeTab === "products" && <Card>
       <div className="card-head"><div><h2 className="section-title">Product master</h2><p className="section-description">Reusable names, units and per-unit price estimates</p></div><Button onClick={() => openEditor("product")}><Plus size={14} />Add product</Button></div>
-      <div className="master-entry-list">{visibleProducts.length ? visibleProducts.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => { setEditingProduct(product); setEditingStore(null); setEditorKind("product"); setProductName(product.name); setCategory(product.category); setUnit(product.unit); setPrice(product.estimatedPrice); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>) : <p className="section-description">{products.length ? "No products match the search or category filter." : "No saved products yet."}</p>}</div>
+      {visibleProducts.length ? activeMasterView === "table"
+        ? <div className="master-table-scroll"><table className="data-table mobile-card-table"><thead><tr><th>Product</th><th>Category</th><th>Unit</th><th>Estimated price</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleProductsPage.map((product) => <tr key={product.id}><td data-label="Product"><strong>{product.name}</strong></td><td data-label="Category">{product.category}</td><td data-label="Unit">{product.unit}</td><td data-label="Estimated price">{formatMoney(product.estimatedPrice, currency)} / {product.unit}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => editProduct(product)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div></td></tr>)}</tbody></table></div>
+        : <div className={`master-entry-list ${activeMasterView === "grid" ? "master-record-grid" : ""}`}>{visibleProductsPage.map((product) => <div className="master-entry" key={product.id}><div className="recent-info"><div className="recent-name">{product.name}</div><div className="recent-meta">{product.category} · {formatMoney(product.estimatedPrice, currency)} per {product.unit}</div></div><button className="icon-button" aria-label={`Edit ${product.name}`} onClick={() => editProduct(product)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${product.name}`} title="Create a copy" onClick={() => onAddProduct({ name: `${product.name} (copy)`, category: product.category, unit: product.unit, estimatedPrice: product.estimatedPrice })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${product.name}`} onClick={() => { if (window.confirm(`Move "${product.name}" to the archive?`)) onDeleteProduct(product.id); }}><Archive size={14} /></button></div>)}</div>
+        : <p className="section-description">{products.length ? "No products match the search or category filter." : "No saved products yet."}</p>}
     </Card>}
     {activeTab === "stores" && <Card>
       <div className="card-head"><div><h2 className="section-title">Store master</h2><p className="section-description">Save store names and optional addresses or locations</p></div><Button onClick={() => openEditor("store")}><Plus size={14} />Add store</Button></div>
-      <div className="master-entry-list">{visibleStores.length ? visibleStores.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => { setEditingStore(store); setEditingProduct(null); setEditorKind("store"); setStoreName(store.name); setLocation(store.location); setError(""); setActiveTab("editor"); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} title="Create a copy" onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>) : <p className="section-description">{stores.length ? "No stores match the search." : "No saved stores yet."}</p>}</div>
+      {visibleStores.length ? activeMasterView === "table"
+        ? <div className="master-table-scroll"><table className="data-table mobile-card-table"><thead><tr><th>Store</th><th>Location</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleStoresPage.map((store) => <tr key={store.id}><td data-label="Store"><strong>{store.name}</strong></td><td data-label="Location">{store.location || "No location added"}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => editStore(store)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div></td></tr>)}</tbody></table></div>
+        : <div className={`master-entry-list ${activeMasterView === "grid" ? "master-record-grid" : ""}`}>{visibleStoresPage.map((store) => <div className="master-entry" key={store.id}><div className="recent-info"><div className="recent-name">{store.name}</div><div className="recent-meta">{store.location || "No location added"}</div></div><button className="icon-button" aria-label={`Edit ${store.name}`} onClick={() => editStore(store)}><Pencil size={14} /></button><button className="icon-button" aria-label={`Copy ${store.name}`} onClick={() => onAddStore({ name: `${store.name} (copy)`, location: store.location })}><Copy size={14} /></button><button className="icon-button" aria-label={`Archive ${store.name}`} onClick={() => { if (window.confirm(`Move "${store.name}" to the archive?`)) onDeleteStore(store.id); }}><Archive size={14} /></button></div>)}</div>
+        : <p className="section-description">{stores.length ? "No stores match the search." : "No saved stores yet."}</p>}
     </Card>}
     {activeTab === "categories" && <Card>
       <div className="card-head"><div><h2 className="section-title">Reminder categories</h2><p className="section-description">Create reusable groups for Notes & reminders</p></div><Button onClick={() => openEditor("category")}><Plus size={14} />Add category</Button></div>
-      <div className="master-entry-list">{visibleReminderCategories.length ? visibleReminderCategories.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; }) : <p className="section-description">{reminderCategories.length ? "No reminder categories match the search." : "No custom categories yet. Built-in categories are always available."}</p>}</div>
+      {visibleReminderCategories.length ? activeMasterView === "table"
+        ? <div className="master-table-scroll"><table className="data-table mobile-card-table"><thead><tr><th>Category</th><th>Reminders</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleReminderCategoriesPage.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <tr key={entry}><td data-label="Category"><strong>{entry}</strong></td><td data-label="Reminders">{uses}</td><td data-label="Actions"><div className="table-actions"><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div></td></tr>; })}</tbody></table></div>
+        : <div className={`master-entry-list ${activeMasterView === "grid" ? "master-record-grid" : ""}`}>{visibleReminderCategoriesPage.map((entry) => { const uses = reminders.filter((reminder) => (reminder.category || "General").toLocaleLowerCase() === entry.toLocaleLowerCase()).length; return <div className="master-entry" key={entry}><div className="recent-info"><div className="recent-name">{entry}</div><div className="recent-meta">{uses} {uses === 1 ? "reminder" : "reminders"}</div></div><button className="icon-button" aria-label={`Edit ${entry} reminder category`} onClick={() => { const renamed = window.prompt(`Rename the "${entry}" category`, entry)?.trim(); if (renamed && renamed !== entry) onRenameReminderCategory(entry, renamed); }}><Pencil size={14} /></button><button className="icon-button" aria-label={`Archive ${entry} reminder category`} title={uses ? "Reassign reminders before archiving" : "Move to archive"} disabled={uses > 0} onClick={() => { if (window.confirm(`Move the "${entry}" reminder category to the archive?`)) onDeleteReminderCategory(entry); }}><Archive size={14} /></button></div>; })}</div>
+        : <p className="section-description">{reminderCategories.length ? "No reminder categories match the search." : "No custom categories yet. Built-in categories are always available."}</p>}
     </Card>}
+    {activeTab !== "editor" && activeMasterCount > 0 && <ReportPagination count={activeMasterCount} page={activeMasterPage} pageSize={activeMasterPageSize} onPageChange={setMasterPage} className="shopping-pagination master-pagination" />}
     {activeTab === "editor" && <Card className="master-editor-card">
       <div className="card-head"><div><h2 className="section-title">{editorKind === "product" ? editingProduct ? "Edit product" : "Add product" : editorKind === "store" ? editingStore ? "Edit store" : "Add store" : editorKind === "category" ? "Add reminder category" : "Choose what to add"}</h2><p className="section-description">This form is separate from the record list.</p></div></div>
       {!editorKind ? <div className="master-editor-choices"><Button variant="outline" onClick={() => openEditor("product")}><ShoppingBasket size={14} />Product</Button><Button variant="outline" onClick={() => openEditor("store")}><Database size={14} />Store</Button><Button variant="outline" onClick={() => openEditor("category")}><Bell size={14} />Reminder category</Button></div> : editorKind === "product" ? <form className="form-grid master-form" onSubmit={addProduct}>
