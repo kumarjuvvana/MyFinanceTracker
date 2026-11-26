@@ -1,4 +1,4 @@
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DASHBOARD_WIDGETS, DARK_THEMES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, MAX_EXTERNAL_APPS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, DEFAULT_TRACKER_PREFERENCES, type AssetRecord, type BankAccount, type Category, type CookingLog, type CookingPlan, type CookingRecipe, type CredentialRecord, type Currency, type DailyBibleReading, type DailyPrayerLog, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type EducationFeeType, type EducationRecord, type ElectricityReading, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type IssueRecord, type LearningRecord, type MindfulHabit, type MindfulnessLog, type MorningExerciseLog, type Page, type PersonalEducationRecord, type PersonalRecord, type PrayerRequest, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type Purchase, type Reminder, type SavedReportSection, type StockQuoteSnapshot, type Store, type StudentEducationPlan, type StudentProfile, type SubscriptionAccount, type TrackerData, type TrackedStock, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type WorkExperience } from "../types.js";
 import { DESIGN_THEMES } from "../types.js";
 import { DOCUMENT_FILE_TYPES, isDocumentFileAttachment, isDocumentStoragePath, MAX_DOCUMENT_ATTACHMENTS, MAX_DOCUMENT_FILE_BYTES } from "./documentFiles.js";
 
@@ -316,6 +316,15 @@ export function validateData(value: unknown): value is TrackerData {
           Object.entries(settings).length <= 40 &&
           Object.entries(settings).every(([key, setting]) =>
             /^[a-zA-Z0-9-]{1,80}$/.test(key) && typeof setting === "string" && setting.length <= 2048)))) &&
+      (preferences.externalApps === undefined || (Array.isArray(preferences.externalApps) &&
+        preferences.externalApps.length <= MAX_EXTERNAL_APPS &&
+        preferences.externalApps.every((app) =>
+          isRecord(app) &&
+          typeof app.id === "string" && app.id.trim().length > 0 && app.id.length <= 80 &&
+          typeof app.name === "string" && app.name.trim().length > 0 && app.name.length <= 80 &&
+          typeof app.url === "string" && app.url.length <= 2048 && (!app.url.trim() || isSafeHttpUrl(app.url)) &&
+          typeof app.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(app.backgroundColor)) &&
+        new Set(preferences.externalApps.map((app) => isRecord(app) ? app.id : null)).size === preferences.externalApps.length)) &&
       (preferences.forecastSavingsGoal === undefined || isValidForecastSavingsGoal(preferences.forecastSavingsGoal)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
@@ -1312,6 +1321,19 @@ export function normalizeTrackerData(data: TrackerData): TrackerData {
 export function isSafeExternalLink(value: string): boolean {
   if (!value.trim()) return true;
   return isSafeActivityLink(value);
+}
+
+export function isSafeHttpUrl(value: string): boolean {
+  const link = value.trim();
+  if (!link || link.length > 2048) return false;
+  try {
+    const url = new URL(link);
+    return !url.username && !url.password &&
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      Boolean(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function isSafeActivityLink(value: string): boolean {

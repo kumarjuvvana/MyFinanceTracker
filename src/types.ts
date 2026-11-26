@@ -14,6 +14,7 @@ export type Currency = (typeof CURRENCIES)[number];
 export type Page =
   | "Dashboard"
   | "Favorites"
+  | "External apps"
   | "Global search"
   | "Shopping list"
   | "Shopping trips"
@@ -52,7 +53,7 @@ export type Page =
   | "Data management"
   | "R&D / Test Connectors";
 export const FAVORITABLE_PAGES: Page[] = [
-  "Dashboard", "Global search", "Shopping list", "Shopping trips", "Purchase history",
+  "Dashboard", "External apps", "Global search", "Shopping list", "Shopping trips", "Purchase history",
   "Price history", "Reports", "Reports & Analytics", "Notes & reminders", "Important dates", "Master data", "Stocks", "Asset manager", "Bank accounts",
   "Learning", "Mind & habits", "Activities", "Morning exercise", "Training & classes", "Devotional", "Cooking",
   "Issues & maintenance", "Education & career", "Family", "Schools & Colleges", "Vehicles",
@@ -1270,7 +1271,16 @@ export interface TrackerPreferences {
   savedReportViews?: SavedReportView[];
   savedScreenViews?: Record<string, Record<string, string>>;
   forecastSavingsGoal?: ForecastSavingsGoal;
+  externalApps?: ExternalAppLink[];
 }
+
+export interface ExternalAppLink {
+  id: string;
+  name: string;
+  url: string;
+  backgroundColor: string;
+}
+export const MAX_EXTERNAL_APPS = 50;
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
   currency: "INR",
@@ -1285,6 +1295,7 @@ export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
   showScreenDescriptions: true,
   groupMenus: true,
   menuSortOrder: "current",
+  externalApps: [],
   activitySessions: DEFAULT_ACTIVITY_SESSIONS.map((session) => ({ ...session, items: [] })),
 };
 

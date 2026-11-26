@@ -19,6 +19,7 @@ import { deleteDocumentFile, uploadDocumentFile, type DocumentStorageUsage } fro
 import { canPreviewDocumentContentType, DOCUMENT_FILE_TYPES, getDocumentAttachments, getDocumentFileType, MAX_DOCUMENT_ATTACHMENTS, MAX_DOCUMENT_FILE_BYTES } from "./lib/documentFiles";
 import { executeDatabaseSql, executeSavedProfileDatabaseSql, loadDatabaseCatalog, loadDatabaseRows, loadSavedProfileDatabaseCatalog, loadSavedProfileDatabaseRows, loadSavedProfilesHostingUsage, reviewDatabaseSql, reviewSavedProfileDatabaseSql, testSupabaseConnection, type DatabaseCatalog, type DatabaseRows, type DocumentModulesData, type SavedProfileHostingUsage, type SqlExecutionResult, type SqlReview } from "./lib/databaseApi";
 import { DatabaseConnectionsPage } from "./components/DatabaseConnectionsPage";
+import { ExternalAppsPage } from "./components/ExternalAppsPage";
 import { clearVehiclesProfileSessionPassphrase, VehiclesProfilePage } from "./components/VehiclesProfilePage";
 import { clearDocumentModulesSessionPassphrase, DocumentModulesDatabaseGate } from "./components/DocumentModulesDatabaseGate";
 import { loadDatabaseConnectionVault } from "./lib/databaseConnectionsApi";
@@ -29,7 +30,7 @@ import { decodeGmailMessage, parseGmailTransactionMessage, type GmailTransaction
 import type { BankTransaction } from "./types";
 import type { EncryptedVault } from "./types";
 import type { DocumentFileAttachment } from "./types";
-import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type DocumentCategory, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
+import { ACCENT_COLORS, ASSET_MANAGER_VISIBLE_TYPES, ASSET_TYPES, CATEGORIES, CURRENCIES, DARK_THEMES, DEFAULT_TRACKER_PREFERENCES, EDUCATION_EXPENSE_TYPES, EDUCATION_FEE_TYPES, EDUCATION_LEVELS, EXERCISE_DAYPARTS, EXERCISE_INTENSITIES, FAVORITABLE_PAGES, FONT_FAMILIES, ITEM_UNITS, MAX_EXTERNAL_APPS, MORNING_EXERCISE_OPTIONS, REMINDER_CATEGORIES, VISUAL_THEMES, type AccentColor, type ActivityChecklistItem, type ActivityChecklistLink, type ActivityChecklistSession, type ArchivedRecord, type ArchiveSnapshot, type AssetManagerVisibleType, type AssetPriceHistoryRecord, type AssetPriceSchedule, type AssetPriceUpdateRun, type AssetRecord, type AssetType, type BankAccount, type Category, type CookingInventoryItem, type CookingLog, type CookingRecipe, type CookingRecipeIngredient, type CookingStockMeasure, type CookedDish, type CredentialRecord, type Currency, type DailyPrayerLog, type DailyPrayerType, type DarkTheme, type DashboardWidget, type DevotionalEntry, type DevotionalResource, type DevotionalSong, type DocumentAttachment, type DocumentCategory, type EducationAttendanceStatus, type EducationAward, type EducationDailyAttendance, type EducationExam, type EducationExpense, type EducationExpenseType, type EducationFeeCharge, type EducationFeeType, type EducationHoliday, type EducationLeave, type EducationLevel, type EducationMonthlyAttendance, type EducationPayment, type EducationRecord, type EducationStatus, type EducationSubject, type ElectricityReading, type EncryptedCredentialVault, type ExerciseDaypart, type ExerciseIntensity, type ExternalAppLink, type FamilyMember, type FamilyRelationship, type FontFamily, type FontSize, type FontStyle, type ImportantDate, type ImportantDateCategory, type ImportantDateFeeling, type IssueArea, type IssueKind, type IssuePriority, type IssueRecord, type IssueStatus, type LearningLevel, type LearningRecord, type LearningStatus, type MenuSortOrder, type MindfulHabit, type MindfulnessEmotion, type MindfulnessLog, type MorningExerciseLog, type MutualFundNavSnapshot, type NpsNavSnapshot, type Page, type PersonalEducationRecord, type PersonalRecord, type PersonalRecordField, type PersonalRecordType, type PrayerPeriod, type PrayerRequest, type PrayerRequestStatus, type ProfessionalQualification, type ProfessionalSkill, type Product, type PromptRecord, type PromptType, type Purchase, type Reminder, type SavedReportSection, type SavedReportView, type ShoppingItem, type ShoppingTrip, type StockExchange, type StockQuoteSnapshot, type Store, type SubscriptionAccount, type SubscriptionBillingType, type SubscriptionCategory, type SubscriptionTransaction, type SubscriptionTransactionType, type TrackedStock, type TrackerData, type TrackerPreferences, type TrainingDeliveryMode, type TrainingSession, type Vehicle, type VehicleJourney, type VehicleMaintenance, type VisualTheme, type WorkExperience } from "./types";
 import { DESIGN_THEMES, type DesignTheme } from "./types";
 import { EDUCATION_PLAN_COST_CATEGORIES, type StudentEducationPlan, type StudentProfile } from "./types";
 import type { VehicleMaintenanceType } from "./types";
@@ -145,6 +146,7 @@ const NAVIGATION_GROUP_ORDER: NavigationGroup[] = ["Overview", "Shopping", "Fina
 const navigation: NavigationItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, group: "Overview" },
   { name: "Favorites", icon: Star, group: "Overview" },
+  { name: "External apps", icon: ExternalLink, group: "Overview" },
   { name: "Global search", icon: Search, group: "Overview" },
   { name: "Shopping list", icon: ListChecks, group: "Shopping" },
   { name: "Shopping trips", icon: ShoppingBag, group: "Shopping" },
@@ -17436,6 +17438,35 @@ export default function App() {
       }),
     }));
   }
+  function saveExternalApp(app: ExternalAppLink): Promise<void> {
+    return persistPreferenceUpdate((previous) => {
+      const currentApps = previous.preferences?.externalApps ?? [];
+      const exists = currentApps.some((entry) => entry.id === app.id);
+      if (!exists && currentApps.length >= MAX_EXTERNAL_APPS) throw new Error(`You can save up to ${MAX_EXTERNAL_APPS} app shortcuts.`);
+      return {
+        ...previous,
+        preferences: {
+          ...DEFAULT_TRACKER_PREFERENCES,
+          ...previous.preferences,
+          dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+          externalApps: exists
+            ? currentApps.map((entry) => entry.id === app.id ? app : entry)
+            : [app, ...currentApps],
+        },
+      };
+    });
+  }
+  function deleteExternalApp(id: string): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        externalApps: (previous.preferences?.externalApps ?? []).filter((app) => app.id !== id),
+      },
+    }));
+  }
   async function saveScreenView(screen: string, settings: Record<string, string>) {
     try {
       await persistPreferenceUpdate((previous) => ({
@@ -18410,6 +18441,7 @@ export default function App() {
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} documentModulesData={documentModulesData} widgets={dashboardWidgets} onPage={changePage} />,
     Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
+    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onDelete={deleteExternalApp} />,
     "Global search": <GlobalSearchPage data={data} documentModulesData={documentModulesData} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
