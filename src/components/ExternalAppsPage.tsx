@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ExternalLink, Pencil, Plus } from "lucide-react";
 import { Button, Card, EmptyState, Field, Input, Modal } from "./ui";
 import { createId, isSafeHttpUrl } from "../lib/data";
 import { MAX_EXTERNAL_APPS, type ExternalAppLink } from "../types";
@@ -46,6 +46,7 @@ function ExternalAppEditor({ initial, onClose, onSave }: {
         name: trimmedName,
         url: trimmedUrl,
         backgroundColor,
+        isArchived: initial?.isArchived,
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save this app shortcut.");
@@ -75,15 +76,17 @@ function ExternalAppEditor({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-export function ExternalAppsPage({ apps, saving, onSave, onDelete }: {
+export function ExternalAppsPage({ apps, saving, onSave, onArchive }: {
   apps: ExternalAppLink[];
   saving: boolean;
   onSave: (app: ExternalAppLink) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onArchive: (id: string, isArchived: boolean) => Promise<void>;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ExternalAppLink | undefined>();
   const [actionError, setActionError] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const displayedApps = apps.filter((app) => Boolean(app.isArchived) === showArchived);
 
   function openEditor(app?: ExternalAppLink) {
     setActionError("");
@@ -97,13 +100,12 @@ export function ExternalAppsPage({ apps, saving, onSave, onDelete }: {
     setEditing(undefined);
   }
 
-  async function deleteApp(app: ExternalAppLink) {
-    if (!window.confirm(`Delete the "${app.name}" shortcut?`)) return;
+  async function setAppArchived(app: ExternalAppLink, isArchived: boolean) {
     setActionError("");
     try {
-      await onDelete(app.id);
+      await onArchive(app.id, isArchived);
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "Could not delete this app shortcut.");
+      setActionError(caught instanceof Error ? caught.message : `Could not ${isArchived ? "archive" : "restore"} this app shortcut.`);
     }
   }
 
@@ -111,28 +113,32 @@ export function ExternalAppsPage({ apps, saving, onSave, onDelete }: {
     <PageHeading
       title="External apps"
       subtitle="Save shortcuts to your other apps. Add a URL to open a card in a new tab; shortcuts sync across your devices."
-      action={<Button type="button" disabled={saving || apps.length >= MAX_EXTERNAL_APPS} onClick={() => openEditor()}><Plus size={14} /> Add app</Button>}
+      action={<Button type="button" disabled={saving || showArchived || apps.filter((app) => !app.isArchived).length >= MAX_EXTERNAL_APPS} onClick={() => openEditor()}><Plus size={14} /> Add app</Button>}
     />
+    <div className="external-app-tabs" role="tablist" aria-label="External app shortcuts">
+      <button type="button" role="tab" aria-selected={!showArchived} className={!showArchived ? "active" : ""} onClick={() => setShowArchived(false)}>Active ({apps.filter((app) => !app.isArchived).length})</button>
+      <button type="button" role="tab" aria-selected={showArchived} className={showArchived ? "active" : ""} onClick={() => setShowArchived(true)}>Archived ({apps.filter((app) => app.isArchived).length})</button>
+    </div>
     {saving && <p className="external-app-sync-status" role="status">Saving shortcuts to shared preferences…</p>}
     {actionError && <div className="alert alert-error" role="alert">{actionError}</div>}
-    {apps.length ? <div className="external-app-grid">{apps.map((app) => <Card
+    {displayedApps.length ? <div className="external-app-grid">{displayedApps.map((app) => <Card
       key={app.id}
       className="external-app-card"
       style={{ backgroundColor: app.backgroundColor, color: getTextColor(app.backgroundColor) }}
     >
       <div className="external-app-card-actions">
-        <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title={`Edit ${app.name}`} onClick={() => openEditor(app)}><Pencil size={14} /></button>
-        <button type="button" className="icon-button" disabled={saving} aria-label={`Delete ${app.name}`} title={`Delete ${app.name}`} onClick={() => void deleteApp(app)}><Trash2 size={14} /></button>
+        <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title={`Edit ${app.name}`} onClick={() => openEditor(app)}><Pencil size={12} /></button>
+        <button type="button" className="icon-button" disabled={saving} aria-label={showArchived ? `Restore ${app.name}` : `Archive ${app.name}`} title={showArchived ? "Restore shortcut" : "Archive shortcut"} onClick={() => void setAppArchived(app, !showArchived)}>{showArchived ? <ArchiveRestore size={12} /> : <Archive size={12} />}</button>
       </div>
       {app.url
-        ? <a className="external-app-card-link" href={app.url} target="_blank" rel="noopener noreferrer">{app.name}<ExternalLink size={14} /></a>
+        ? <a className="external-app-card-link" href={app.url} target="_blank" rel="noopener noreferrer">{app.name}</a>
         : <strong className="external-app-card-name">{app.name}</strong>}
     </Card>)}</div> : <Card><EmptyState
       icon={<ExternalLink size={18} />}
-      title="No external apps yet"
-      description="Add a shortcut card for another app. You can set its name and background color, then add a URL whenever you’re ready."
+      title={showArchived ? "No archived apps" : "No external apps yet"}
+      description={showArchived ? "Shortcuts you archive will appear here. You can restore them anytime." : "Add a shortcut card for another app. You can set its name and background color, then add a URL whenever you’re ready."}
     /></Card>}
-    {apps.length >= MAX_EXTERNAL_APPS && <p className="section-description">You can save up to {MAX_EXTERNAL_APPS} app shortcuts.</p>}
+    {!showArchived && apps.filter((app) => !app.isArchived).length >= MAX_EXTERNAL_APPS && <p className="section-description">You can save up to {MAX_EXTERNAL_APPS} active app shortcuts.</p>}
     {editorOpen && <ExternalAppEditor key={editing?.id ?? "new"} initial={editing} onClose={() => setEditorOpen(false)} onSave={saveApp} />}
   </>;
 }

@@ -17442,7 +17442,9 @@ export default function App() {
     return persistPreferenceUpdate((previous) => {
       const currentApps = previous.preferences?.externalApps ?? [];
       const exists = currentApps.some((entry) => entry.id === app.id);
-      if (!exists && currentApps.length >= MAX_EXTERNAL_APPS) throw new Error(`You can save up to ${MAX_EXTERNAL_APPS} app shortcuts.`);
+      if (!exists && currentApps.filter((entry) => !entry.isArchived).length >= MAX_EXTERNAL_APPS) {
+        throw new Error(`You can save up to ${MAX_EXTERNAL_APPS} active app shortcuts.`);
+      }
       return {
         ...previous,
         preferences: {
@@ -17456,14 +17458,15 @@ export default function App() {
       };
     });
   }
-  function deleteExternalApp(id: string): Promise<void> {
+  function archiveExternalApp(id: string, isArchived: boolean): Promise<void> {
     return persistPreferenceUpdate((previous) => ({
       ...previous,
       preferences: {
         ...DEFAULT_TRACKER_PREFERENCES,
         ...previous.preferences,
         dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
-        externalApps: (previous.preferences?.externalApps ?? []).filter((app) => app.id !== id),
+        externalApps: (previous.preferences?.externalApps ?? []).map((app) =>
+          app.id === id ? { ...app, isArchived } : app),
       },
     }));
   }
@@ -18441,7 +18444,7 @@ export default function App() {
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} documentModulesData={documentModulesData} widgets={dashboardWidgets} onPage={changePage} />,
     Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
-    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onDelete={deleteExternalApp} />,
+    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onArchive={archiveExternalApp} />,
     "Global search": <GlobalSearchPage data={data} documentModulesData={documentModulesData} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,

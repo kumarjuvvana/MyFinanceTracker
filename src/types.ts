@@ -1279,6 +1279,7 @@ export interface ExternalAppLink {
   name: string;
   url: string;
   backgroundColor: string;
+  isArchived?: boolean;
 }
 export const MAX_EXTERNAL_APPS = 50;
 

@@ -323,7 +323,8 @@ export function validateData(value: unknown): value is TrackerData {
           typeof app.id === "string" && app.id.trim().length > 0 && app.id.length <= 80 &&
           typeof app.name === "string" && app.name.trim().length > 0 && app.name.length <= 80 &&
           typeof app.url === "string" && app.url.length <= 2048 && (!app.url.trim() || isSafeHttpUrl(app.url)) &&
-          typeof app.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(app.backgroundColor)) &&
+          typeof app.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(app.backgroundColor) &&
+          (app.isArchived === undefined || typeof app.isArchived === "boolean")) &&
         new Set(preferences.externalApps.map((app) => isRecord(app) ? app.id : null)).size === preferences.externalApps.length)) &&
       (preferences.forecastSavingsGoal === undefined || isValidForecastSavingsGoal(preferences.forecastSavingsGoal)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
