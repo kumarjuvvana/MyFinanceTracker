@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Archive, ArchiveRestore, ExternalLink, Pencil, Plus } from "lucide-react";
+import { useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronUp, ExternalLink, GripVertical, Pencil, Plus } from "lucide-react";
 import { Button, Card, EmptyState, Field, Input, Modal } from "./ui";
 import { createId, isSafeHttpUrl } from "../lib/data";
 import { MAX_EXTERNAL_APPS, type ExternalAppLink } from "../types";
@@ -76,16 +76,18 @@ function ExternalAppEditor({ initial, onClose, onSave }: {
   </Modal>;
 }
 
-export function ExternalAppsPage({ apps, saving, onSave, onArchive }: {
+export function ExternalAppsPage({ apps, saving, onSave, onArchive, onReorder }: {
   apps: ExternalAppLink[];
   saving: boolean;
   onSave: (app: ExternalAppLink) => Promise<void>;
   onArchive: (id: string, isArchived: boolean) => Promise<void>;
+  onReorder: (apps: ExternalAppLink[]) => Promise<void>;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ExternalAppLink | undefined>();
   const [actionError, setActionError] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [draggedAppId, setDraggedAppId] = useState<string | null>(null);
   const displayedApps = apps.filter((app) => Boolean(app.isArchived) === showArchived);
 
   function openEditor(app?: ExternalAppLink) {
@@ -109,10 +111,44 @@ export function ExternalAppsPage({ apps, saving, onSave, onArchive }: {
     }
   }
 
+  async function reorderApp(sourceId: string, targetId: string) {
+    if (sourceId === targetId || saving) return;
+    const reorderedVisibleApps = [...displayedApps];
+    const sourceIndex = reorderedVisibleApps.findIndex((app) => app.id === sourceId);
+    const targetIndex = reorderedVisibleApps.findIndex((app) => app.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const [movedApp] = reorderedVisibleApps.splice(sourceIndex, 1);
+    reorderedVisibleApps.splice(targetIndex, 0, movedApp);
+    let visibleIndex = 0;
+    const visibleIds = new Set(displayedApps.map((app) => app.id));
+    const reorderedAllApps = apps.map((app) => visibleIds.has(app.id)
+      ? reorderedVisibleApps[visibleIndex++]
+      : app);
+    setActionError("");
+    try {
+      await onReorder(reorderedAllApps);
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : "Could not save the app shortcut order.");
+    }
+  }
+
+  function startDragging(event: DragEvent<HTMLButtonElement>, appId: string) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", appId);
+    setDraggedAppId(appId);
+  }
+
+  function dropOnCard(event: DragEvent<HTMLElement>, targetId: string) {
+    event.preventDefault();
+    const sourceId = event.dataTransfer.getData("text/plain") || draggedAppId;
+    if (sourceId) void reorderApp(sourceId, targetId);
+    setDraggedAppId(null);
+  }
+
   return <>
     <PageHeading
       title="External apps"
-      subtitle="Save shortcuts to your other apps. Add a URL to open a card in a new tab; shortcuts sync across your devices."
+      subtitle="Save shortcuts to your other apps. Drag cards to arrange them; changes sync across your devices."
       action={<Button type="button" disabled={saving || showArchived || apps.filter((app) => !app.isArchived).length >= MAX_EXTERNAL_APPS} onClick={() => openEditor()}><Plus size={14} /> Add app</Button>}
     />
     <div className="external-app-tabs" role="tablist" aria-label="External app shortcuts">
@@ -121,12 +157,17 @@ export function ExternalAppsPage({ apps, saving, onSave, onArchive }: {
     </div>
     {saving && <p className="external-app-sync-status" role="status">Saving shortcuts to shared preferences…</p>}
     {actionError && <div className="alert alert-error" role="alert">{actionError}</div>}
-    {displayedApps.length ? <div className="external-app-grid">{displayedApps.map((app) => <Card
+    {displayedApps.length ? <div className="external-app-grid">{displayedApps.map((app, index) => <Card
       key={app.id}
-      className="external-app-card"
+      className={`external-app-card${draggedAppId === app.id ? " is-dragging" : ""}`}
       style={{ backgroundColor: app.backgroundColor, color: getTextColor(app.backgroundColor) }}
+      onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
+      onDrop={(event) => dropOnCard(event, app.id)}
     >
       <div className="external-app-card-actions">
+        <button type="button" className="icon-button external-app-drag-handle" draggable={!saving} disabled={saving} aria-label={`Drag ${app.name} to reorder`} title="Drag to reorder" onDragStart={(event) => startDragging(event, app.id)} onDragEnd={() => setDraggedAppId(null)}><GripVertical size={12} /></button>
+        <button type="button" className="icon-button" disabled={saving || index === 0} aria-label={`Move ${app.name} up`} title="Move up" onClick={() => index > 0 && void reorderApp(app.id, displayedApps[index - 1].id)}><ChevronUp size={12} /></button>
+        <button type="button" className="icon-button" disabled={saving || index === displayedApps.length - 1} aria-label={`Move ${app.name} down`} title="Move down" onClick={() => index < displayedApps.length - 1 && void reorderApp(app.id, displayedApps[index + 1].id)}><ChevronDown size={12} /></button>
         <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title={`Edit ${app.name}`} onClick={() => openEditor(app)}><Pencil size={12} /></button>
         <button type="button" className="icon-button" disabled={saving} aria-label={showArchived ? `Restore ${app.name}` : `Archive ${app.name}`} title={showArchived ? "Restore shortcut" : "Archive shortcut"} onClick={() => void setAppArchived(app, !showArchived)}>{showArchived ? <ArchiveRestore size={12} /> : <Archive size={12} />}</button>
       </div>

@@ -17470,6 +17470,17 @@ export default function App() {
       },
     }));
   }
+  function reorderExternalApps(apps: ExternalAppLink[]): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        externalApps: apps,
+      },
+    }));
+  }
   async function saveScreenView(screen: string, settings: Record<string, string>) {
     try {
       await persistPreferenceUpdate((previous) => ({
@@ -18444,7 +18455,7 @@ export default function App() {
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} documentModulesData={documentModulesData} widgets={dashboardWidgets} onPage={changePage} />,
     Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
-    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onArchive={archiveExternalApp} />,
+    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onArchive={archiveExternalApp} onReorder={reorderExternalApps} />,
     "Global search": <GlobalSearchPage data={data} documentModulesData={documentModulesData} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
