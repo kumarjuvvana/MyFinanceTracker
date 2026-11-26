@@ -6,6 +6,7 @@ export const DOCUMENT_FILE_TYPES = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".txt": "text/plain",
+  ".text": "text/plain",
   ".csv": "text/csv",
   ".doc": "application/msword",
   ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

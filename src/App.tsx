@@ -14473,7 +14473,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
   const [file, setFile] = useState<File | undefined>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const accept = Object.keys(DOCUMENT_FILE_TYPES).join(",");
+  const accept = [...Object.keys(DOCUMENT_FILE_TYPES), "text/csv", "text/plain"].join(",");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -14487,7 +14487,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       return;
     }
     if (file && !getDocumentFileType(file.name)) {
-      setError("Choose a PDF, image, text, spreadsheet, presentation, or Word document.");
+      setError("Choose a PDF, image, CSV, text, spreadsheet, presentation, or Word document.");
       return;
     }
     if (file && file.size > MAX_DOCUMENT_FILE_BYTES) {
@@ -14535,7 +14535,7 @@ function DocumentModal({ initial, categories, onClose, onSave }: {
       <Field label="Due date (optional)"><DateInput aria-label="Due date" value={dueDate} onValueChange={setDueDate} min={issueDate || undefined} /></Field>
       <Field className="full" label="Tags (comma separated)"><Input maxLength={500} placeholder="Optional" value={tagsText} onChange={(event) => setTagsText(event.target.value)} /></Field>
       <label className="document-favorite-toggle"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /> Add to favorites</label>
-      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Files are stored privately in Supabase Storage. Maximum 13 MB per file."}</span></Field>
+      <Field className="full" label={initial?.storagePath ? "Replace uploaded file (optional)" : "Attach a file (optional)"}><input className="field document-file-input" type="file" accept={accept} onChange={(event) => setFile(event.currentTarget.files?.[0])} /><span className="section-description">{initial?.storagePath ? `The current file (${initial.fileName}) is kept unless you choose a replacement or remove it from the document row.` : "Supported: PDF, images, CSV (.csv), plain text (.txt, .text), Word, Excel, PowerPoint, and RTF. Maximum 13 MB per file."}</span></Field>
       {initial?.storagePath && !file && <div className="alert full"><FileText size={14} /> The existing uploaded file will be kept when you save these details. Choose a file above to replace it, or use Remove uploaded file on the document row to delete it.</div>}
       <Field className="full" label="External document link (optional)"><ExternalLinkInput maxLength={2048} placeholder="URL or local path" value={externalLink} onChange={(event) => setExternalLink(event.target.value)} /><span className="section-description">You can add an HTTP(S), FTP, or local path link, upload a file, or include both.</span></Field>
       <Field className="full" label="Notes (optional)"><textarea className="field textarea" rows={3} maxLength={2000} placeholder="Optional notes" value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
