@@ -30,6 +30,32 @@ export function useSavedScreenView(screen: string): ScreenViewSettings {
   return useContext(ScreenViewPreferencesContext).views[screen] ?? EMPTY_SCREEN_VIEW_SETTINGS;
 }
 
+export function SaveScreenViewButton({ screen, settings, label }: {
+  screen: string;
+  settings: ScreenViewSettings;
+  label: string;
+}) {
+  const { save } = useContext(ScreenViewPreferencesContext);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const settingsKey = JSON.stringify(settings);
+  useEffect(() => setSaved(false), [screen, settingsKey]);
+  async function saveDefaultView() {
+    if (saving) return;
+    setSaving(true);
+    setSaved(false);
+    try {
+      await save(screen, settings);
+      setSaved(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return <Button type="button" size="sm" variant="outline" aria-label={`Save ${label} as default`} title={`Save ${label} as your default`} disabled={saving} onClick={() => void saveDefaultView().catch(() => undefined)}>
+    {saved ? <Check size={14} /> : <Save size={14} />}{saving ? "Saving…" : saved ? "Saved" : "Save default"}
+  </Button>;
+}
+
 export function RecordViewToggle({ value, onChange, label, screen, settings }: {
   value: RecordViewMode;
   onChange: (value: RecordViewMode) => void;
@@ -37,25 +63,11 @@ export function RecordViewToggle({ value, onChange, label, screen, settings }: {
   screen?: string;
   settings?: ScreenViewSettings;
 }) {
-  const { save } = useContext(ScreenViewPreferencesContext);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  async function saveDefaultView() {
-    if (!screen || !settings || saving) return;
-    setSaving(true);
-    setSaved(false);
-    try {
-      await save(screen, { ...settings, view: value });
-      setSaved(true);
-    } finally {
-      setSaving(false);
-    }
-  }
   return <div className="document-view-switch" role="group" aria-label={`${label} display mode`}>
     <Button type="button" size="sm" variant={value === "grid" ? "primary" : "outline"} aria-pressed={value === "grid"} onClick={() => onChange("grid")}><Grid2X2 size={14} />Grid</Button>
     <Button type="button" size="sm" variant={value === "list" ? "primary" : "outline"} aria-pressed={value === "list"} onClick={() => onChange("list")}><List size={14} />List</Button>
     <Button type="button" size="sm" variant={value === "table" ? "primary" : "outline"} aria-pressed={value === "table"} onClick={() => onChange("table")}><Table2 size={14} />Table</Button>
-    {screen && settings && <Button type="button" size="sm" variant="outline" aria-label={`Save ${label} view as default`} title={`Save ${label} filters, sorting, and display as your default`} disabled={saving} onClick={() => void saveDefaultView().catch(() => undefined)}>{saved ? <Check size={14} /> : <Save size={14} />}{saving ? "Saving…" : saved ? "Saved" : "Save default"}</Button>}
+    {screen && settings && <SaveScreenViewButton screen={screen} settings={{ ...settings, view: value }} label={`${label} filters, sorting, and display`} />}
   </div>;
 }
 

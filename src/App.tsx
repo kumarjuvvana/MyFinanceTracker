@@ -6,7 +6,7 @@ import {
   ImagePlus, LoaderCircle, Moon, Music2, Plus, Search, Settings2, ShoppingBag, ShoppingBasket, ShoppingCart, Sparkles, ListTree, GripVertical,
   RefreshCw, Star, Sun, Trash2, TrendingUp, Upload, Wallet, Wrench, X, Zap, Heart, CookingPot, Utensils, UsersRound, HardDrive,
 } from "lucide-react";
-import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, ScreenViewPreferencesContext, Select, type RecordViewMode, useSavedScreenView } from "./components/ui";
+import { Badge, Button, Card, DateInput, EmptyState, ExternalLinkInput, Field, FilterDrawer, Input, LinkifiedText, Modal, RecordViewToggle, SaveScreenViewButton, ScreenViewPreferencesContext, Select, type RecordViewMode, useSavedScreenView } from "./components/ui";
 import { GlobalSearchPage } from "./components/GlobalSearchPage";
 import { OfficeDocumentViewer } from "./components/OfficeDocumentViewer";
 import { PdfDocumentViewer } from "./components/PdfDocumentViewer";
@@ -7580,8 +7580,18 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
   const [awardsExpanded, setAwardsExpanded] = useState(false);
   const [leavesExpanded, setLeavesExpanded] = useState(false);
   const [copyHolidaysOpen, setCopyHolidaysOpen] = useState(false);
-  const [examView, setExamView] = useState<"table" | "list">("table");
-  const [attendanceView, setAttendanceView] = useState<"list" | "calendar-days" | "calendar">("calendar-days");
+  const savedExamView = useSavedScreenView("schools-colleges-exam-results");
+  const savedAttendanceView = useSavedScreenView("schools-colleges-attendance");
+  const [examView, setExamView] = useState<"table" | "list">(() =>
+    savedScreenSetting<"table" | "list">(savedExamView, "view", "table", ["table", "list"]));
+  const [attendanceView, setAttendanceView] = useState<"list" | "calendar-days" | "calendar">(() =>
+    savedScreenSetting<"list" | "calendar-days" | "calendar">(savedAttendanceView, "view", "calendar-days", ["list", "calendar-days", "calendar"]));
+  useEffect(() => {
+    setExamView(savedScreenSetting<"table" | "list">(savedExamView, "view", "table", ["table", "list"]));
+  }, [savedExamView.view]);
+  useEffect(() => {
+    setAttendanceView(savedScreenSetting<"list" | "calendar-days" | "calendar">(savedAttendanceView, "view", "calendar-days", ["list", "calendar-days", "calendar"]));
+  }, [savedAttendanceView.view]);
   const subjects = record.subjects ?? [];
   const exams = record.exams ?? [];
   const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
@@ -7764,9 +7774,12 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={examsExpanded} aria-controls={`education-exams-${record.id}`} onClick={() => setExamsExpanded((value) => !value)}><ChevronRight size={14} className={examsExpanded ? "is-expanded" : ""} /><span><h3><ClipboardList size={14} />Exams & results</h3><p>{exams.length} recorded · {examsExpanded ? "Hide details" : "Show details"}</p></span></button><div className="table-actions">{unmappedSubjectCount > 0 && <Button size="sm" variant="outline" onClick={linkExamSubjects}>Link {unmappedSubjectCount} subject{unmappedSubjectCount === 1 ? "" : "s"}</Button>}<Button size="sm" variant="outline" onClick={() => setEditor({ kind: "exam", initial: null })}><Plus size={12} />Add exam</Button></div></div>
       <div id={`education-exams-${record.id}`} hidden={!examsExpanded}>
       {exams.length ? <>
-        <div className="education-result-tabs" role="tablist" aria-label={`Result views for ${record.studentName} ${record.academicYear}`}>
-          <button type="button" role="tab" aria-selected={examView === "table"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("table")}>Results table</button>
-          <button type="button" role="tab" aria-selected={examView === "list"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("list")}>List</button>
+        <div className="education-result-view-controls">
+          <div className="education-result-tabs" role="tablist" aria-label={`Result views for ${record.studentName} ${record.academicYear}`}>
+            <button type="button" role="tab" aria-selected={examView === "table"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("table")}>Results table</button>
+            <button type="button" role="tab" aria-selected={examView === "list"} aria-controls={`education-result-panel-${record.id}`} onClick={() => setExamView("list")}>List</button>
+          </div>
+          <SaveScreenViewButton screen="schools-colleges-exam-results" settings={{ view: examView }} label="school exam results view" />
         </div>
         <div id={`education-result-panel-${record.id}`} className="education-result-panel" role="tabpanel">
           {examView === "table" ? <>
@@ -7830,10 +7843,13 @@ function EducationRecordCard({ record, allRecords, defaultExpanded = true, onEdi
       <div className="education-section-head"><button type="button" className="education-section-toggle" aria-expanded={attendanceExpanded} aria-controls={`education-attendance-${record.id}`} onClick={() => setAttendanceExpanded((value) => !value)}><ChevronRight size={14} className={attendanceExpanded ? "is-expanded" : ""} /><span><h3><CalendarDays size={14} />Attendance</h3><p>{monthlyAttendance.length} monthly summaries · {dailyAttendance.length} daily entries · {attendanceExpanded ? "Hide details" : "Show details"}</p></span></button><div className="table-actions"><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "monthly", initial: null })}><Plus size={12} />Monthly</Button><Button size="sm" variant="outline" onClick={() => setEditor({ kind: "attendance", mode: "daily", initial: null })}><Plus size={12} />Day-wise</Button></div></div>
       <div id={`education-attendance-${record.id}`} hidden={!attendanceExpanded}>
       {(monthlyAttendance.length > 0 || dailyAttendance.length > 0) && <>
-        <div className="education-result-tabs" role="tablist" aria-label={`Attendance views for ${record.studentName} ${record.academicYear}`}>
-          <button type="button" role="tab" aria-selected={attendanceView === "calendar-days"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar-days")}>Calendar Days</button>
-          <button type="button" role="tab" aria-selected={attendanceView === "calendar"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar")}>Calendar</button>
-          <button type="button" role="tab" aria-selected={attendanceView === "list"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("list")}>List</button>
+        <div className="education-result-view-controls">
+          <div className="education-result-tabs" role="tablist" aria-label={`Attendance views for ${record.studentName} ${record.academicYear}`}>
+            <button type="button" role="tab" aria-selected={attendanceView === "calendar-days"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar-days")}>Calendar Days</button>
+            <button type="button" role="tab" aria-selected={attendanceView === "calendar"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("calendar")}>Calendar</button>
+            <button type="button" role="tab" aria-selected={attendanceView === "list"} aria-controls={`education-attendance-panel-${record.id}`} onClick={() => setAttendanceView("list")}>List</button>
+          </div>
+          <SaveScreenViewButton screen="schools-colleges-attendance" settings={{ view: attendanceView }} label="school attendance view" />
         </div>
         <div id={`education-attendance-panel-${record.id}`} className="education-result-panel" role="tabpanel">
           {attendanceView === "list" ? <>

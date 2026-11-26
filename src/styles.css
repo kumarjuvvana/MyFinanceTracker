@@ -1555,6 +1555,8 @@ button.fleet-bar-row:disabled{cursor:default}
 .education-section-head h3{display:flex;align-items:center;gap:7px;font:700 12px Manrope,sans-serif;color:#3d493e;margin:0}
 .education-section-head h3 svg{color:#648568;flex:none}
 .education-section-head p{font-size:10px;color:#92998f;margin:4px 0 0;overflow-wrap:anywhere}
+.education-result-view-controls{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.education-result-view-controls .education-result-tabs{flex:1}
 .education-result-tabs{display:flex;gap:6px;margin-top:12px;border-bottom:1px solid #eef0ec}
 .education-result-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;color:#858d83;padding:8px 11px;font:600 10px Inter,"Aptos","Segoe UI",sans-serif;cursor:pointer}
 .education-result-tabs button[aria-selected="true"]{border-bottom-color:var(--user-accent,#56815d);color:var(--user-accent,#56815d)}
