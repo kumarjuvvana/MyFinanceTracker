@@ -3276,3 +3276,22 @@ button.fleet-bar-row:disabled{cursor:default}
 .app-shell.dark .external-app-hub-area .external-app-delete-button{border-color:#7f1d1d;background:#3b171a;color:#fecaca}
 @media(hover:hover){.external-app-card-actions{opacity:0;pointer-events:none}.external-app-card:hover .external-app-card-actions,.external-app-card:focus-within .external-app-card-actions{opacity:1;pointer-events:auto}}
 @media(hover:none){.external-app-card-actions{opacity:1;pointer-events:auto}}
+
+.external-app-hub-area .main-content{padding-top:18px}
+.external-app-hub-header{margin-bottom:10px}
+.external-app-hub-header .eyebrow{margin-bottom:2px}
+.external-app-hub-header .page-title{font-size:24px;line-height:1.15}
+.external-app-hub-header .page-subtitle{margin-top:2px}
+.external-app-hub-header>.button{min-height:36px;height:36px;padding:0 12px;font-size:11px}
+.external-app-statistics{gap:6px;margin-bottom:10px}
+.external-app-statistics>div{gap:5px;min-width:110px;padding:5px 9px;border-radius:8px}
+.external-app-statistics strong{font-size:14px}
+.external-app-statistics span{font-size:9px}
+.external-app-toolbar{gap:8px;margin-bottom:8px}
+.external-app-search{height:34px;gap:7px;padding:0 8px;border-radius:8px}
+.external-app-search .field{height:30px;font-size:10px}
+.external-app-view-toggle{gap:2px;padding:2px;border-radius:8px}
+.external-app-view-toggle button{width:26px;height:24px}
+.external-app-tabs{gap:3px;margin-bottom:8px;padding-bottom:6px}
+.external-app-tabs>button{min-height:27px;padding:0 8px}
+@media(max-width:560px){.external-app-hub-header>.button{min-height:32px;height:32px;padding:0 9px;font-size:10px}}
