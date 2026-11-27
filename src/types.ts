@@ -1280,6 +1280,9 @@ export interface ExternalAppLink {
   name: string;
   url: string;
   backgroundColor: string;
+  titleFontSize?: number;
+  titleColor?: string;
+  titleFontFamily?: ExternalAppTitleFontFamily;
   description?: string;
   category?: string;
   icon?: string;
@@ -1288,6 +1291,7 @@ export interface ExternalAppLink {
   isArchived?: boolean;
   lastOpenedAt?: string;
 }
+export type ExternalAppTitleFontFamily = "system" | "dm-sans" | "serif" | "mono" | "rounded";
 export const MAX_EXTERNAL_APPS = 50;
 export const DEFAULT_EXTERNAL_APP_CATEGORIES = [
   "Personal",

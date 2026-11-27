@@ -3123,6 +3123,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .external-app-color-input{width:72px;height:39px;padding:4px;border:1px solid #e4e8e2;border-radius:8px;background:#fff;cursor:pointer}
 .external-app-form>.section-description{margin:-4px 0 0}
 @media(hover:none){.external-app-card-actions{opacity:1;pointer-events:auto}}
+
 @media(max-width:430px){.external-app-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.external-app-card{min-height:100px;padding:20px 8px 10px}.external-app-card-link,.external-app-card-name{font-size:15px}}
 .external-app-hub-area{background:#f5f7fa;color:#1e293b}
 .external-app-hub-area .main-content{max-width:none;padding-top:28px}
@@ -3250,4 +3251,28 @@ button.fleet-bar-row:disabled{cursor:default}
   .external-app-form-grid{grid-template-columns:minmax(0,1fr)}
   .external-app-pagination{align-items:flex-start;flex-direction:column}
 }
+@media(hover:none){.external-app-card-actions{opacity:1;pointer-events:auto}}
+
+.external-app-card.external-app-card{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);align-items:center;min-height:124px;padding:12px}
+.external-app-card.is-launchable{cursor:pointer}
+.external-app-card.is-launchable:focus-visible{outline:2px solid #0d9488;outline-offset:2px}
+.external-app-card-icon{position:absolute;top:12px;left:12px;width:32px;height:32px}
+.external-app-card-content{display:grid;grid-column:1;grid-row:1;place-items:center;width:100%;height:100%;padding:24px 44px 6px}
+.external-app-card-title{display:block;width:100%;min-width:0;text-align:center}
+.external-app-card-title strong{display:-webkit-box;overflow:hidden;color:var(--external-app-title-color,#1e293b);font-family:var(--external-app-title-family,system-ui,sans-serif);font-size:var(--external-app-title-size,18px);font-weight:700;line-height:1.3;text-align:center;text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.external-app-card-actions{top:9px;right:9px;gap:3px}
+.external-app-card .icon-button{width:22px;height:22px;padding:0;border:1px solid #ffffffa8;border-radius:6px;color:#475569;background:#ffffffdf}
+.external-app-list .external-app-card.external-app-card{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);min-height:80px;padding:10px}
+.external-app-list .external-app-card-content{padding-top:20px;padding-bottom:2px}
+.external-app-list .external-app-card-icon{top:12px}
+.external-app-title-color-field{display:flex;align-items:center;gap:9px;min-height:34px;color:#64748b;font-size:10px}
+.external-app-reset-color{padding:3px 6px;border:1px solid #e2e8f0;border-radius:5px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.external-app-delete-button{display:inline-flex;align-items:center;gap:6px;margin-right:auto;padding:7px 9px;border:1px solid #fecaca;border-radius:7px;background:#fff;color:#b91c1c;font-family:inherit;font-size:11px;font-weight:500;cursor:pointer}
+.external-app-delete-button:disabled{opacity:.55;cursor:not-allowed}
+.app-shell.dark .external-app-hub-area .external-app-card-title strong{color:var(--external-app-title-color,#f1f5f9)}
+.app-shell.dark .external-app-hub-area .external-app-card .icon-button{border-color:#2b3d4b;background:#192b39;color:#cbd5e1}
+.app-shell.dark .external-app-hub-area .external-app-title-color-field{color:#cbd5e1}
+.app-shell.dark .external-app-hub-area .external-app-reset-color{border-color:#2b3d4b;color:#cbd5e1}
+.app-shell.dark .external-app-hub-area .external-app-delete-button{border-color:#7f1d1d;background:#3b171a;color:#fecaca}
+@media(hover:hover){.external-app-card-actions{opacity:0;pointer-events:none}.external-app-card:hover .external-app-card-actions,.external-app-card:focus-within .external-app-card-actions{opacity:1;pointer-events:auto}}
 @media(hover:none){.external-app-card-actions{opacity:1;pointer-events:auto}}

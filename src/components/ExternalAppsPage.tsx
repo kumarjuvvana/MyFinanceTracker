@@ -1,17 +1,32 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from "react";
 import {
-  AppWindow, Archive, ArchiveRestore, Banknote, BookOpen, Briefcase, CalendarDays, Car, ChevronDown, ChevronUp,
-  Code2, Database, ExternalLink, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
-  MoreHorizontal, Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, Star, Trash2, X,
+  AppWindow, Archive, ArchiveRestore, Banknote, BookOpen, Briefcase, CalendarDays, Car,
+  Code2, Database, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
+  Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, Star, Trash2, X,
   type LucideIcon,
 } from "lucide-react";
 import { Button, Card, EmptyState, Field, Input, Modal } from "./ui";
 import { createId, isSafeHttpUrl } from "../lib/data";
 import {
-  DEFAULT_EXTERNAL_APP_CATEGORIES, MAX_EXTERNAL_APPS, type ExternalAppLink,
+  DEFAULT_EXTERNAL_APP_CATEGORIES, MAX_EXTERNAL_APPS, type ExternalAppLink, type ExternalAppTitleFontFamily,
 } from "../types";
 
 const DEFAULT_BACKGROUND = "#dcebdd";
+const TITLE_FONT_SIZES = [14, 16, 18, 20, 22, 24, 28, 32] as const;
+const TITLE_FONT_FAMILIES = [
+  { value: "system", label: "System" },
+  { value: "dm-sans", label: "DM Sans" },
+  { value: "serif", label: "Serif" },
+  { value: "mono", label: "Monospace" },
+  { value: "rounded", label: "Rounded" },
+] as const;
+const TITLE_FONT_CSS: Record<ExternalAppTitleFontFamily, string> = {
+  system: "system-ui, sans-serif",
+  "dm-sans": '"DM Sans", sans-serif',
+  serif: "Georgia, serif",
+  mono: '"Courier New", monospace',
+  rounded: '"Trebuchet MS", sans-serif',
+};
 const PAGE_SIZE = 12;
 const ICONS: Record<string, LucideIcon> = {
   AppWindow, Banknote, BookOpen, Briefcase, CalendarDays, Car, Code2, Database, FileText,
@@ -58,12 +73,13 @@ function normalizedUrl(url: string) {
   }
 }
 
-function ExternalAppEditor({ initial, apps, categories, onClose, onSave }: {
+function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelete }: {
   initial?: ExternalAppLink;
   apps: ExternalAppLink[];
   categories: string[];
   onClose: () => void;
   onSave: (app: ExternalAppLink) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
@@ -71,8 +87,12 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave }: {
   const [category, setCategory] = useState(initial ? getAppCategory(initial) : "Other");
   const [icon, setIcon] = useState(initial?.icon ?? CATEGORY_ICONS[initial ? getAppCategory(initial) : "Other"] ?? "AppWindow");
   const [backgroundColor, setBackgroundColor] = useState(initial?.backgroundColor ?? DEFAULT_BACKGROUND);
+  const [titleFontSize, setTitleFontSize] = useState(initial?.titleFontSize ?? 18);
+  const [titleColor, setTitleColor] = useState(initial?.titleColor ?? "");
+  const [titleFontFamily, setTitleFontFamily] = useState(initial?.titleFontFamily ?? "system");
   const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
   const [isFavorite, setIsFavorite] = useState(initial?.isFavorite ?? false);
+  const [isArchived, setIsArchived] = useState(initial?.isArchived ?? false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -114,13 +134,30 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave }: {
         category,
         icon,
         backgroundColor,
+        titleFontSize,
+        titleColor: titleColor || undefined,
+        titleFontFamily,
         tags: normalizedTags,
         isFavorite,
-        isArchived: initial?.isArchived,
+        isArchived,
         lastOpenedAt: initial?.lastOpenedAt,
       });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save this application.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteApplication() {
+    if (!initial || !window.confirm(`Permanently delete “${initial.name}”? This cannot be undone.`)) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onDelete(initial.id);
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not delete this application.");
     } finally {
       setSaving(false);
     }
@@ -153,11 +190,30 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave }: {
         <Field label="Display color">
           <div className="external-app-color-field"><input className="external-app-color-input" type="color" value={backgroundColor} onChange={(event) => setBackgroundColor(event.target.value)} /><span>{backgroundColor.toUpperCase()}</span></div>
         </Field>
+        <Field label="Name text size">
+          <select className="field" value={titleFontSize} onChange={(event) => setTitleFontSize(Number(event.target.value))}>
+            {TITLE_FONT_SIZES.map((size) => <option key={size} value={size}>{size}px</option>)}
+          </select>
+        </Field>
+        <Field label="Name text color">
+          <div className="external-app-title-color-field">
+            <input className="external-app-color-input" type="color" aria-label="Application name text color" value={titleColor || "#1e293b"} onChange={(event) => setTitleColor(event.target.value)} />
+            <span>{titleColor ? titleColor.toUpperCase() : "Theme default"}</span>
+            {titleColor && <button type="button" className="external-app-reset-color" onClick={() => setTitleColor("")}>Reset</button>}
+          </div>
+        </Field>
+        <Field label="Name font family">
+          <select className="field" value={titleFontFamily} onChange={(event) => setTitleFontFamily(event.target.value as ExternalAppTitleFontFamily)}>
+            {TITLE_FONT_FAMILIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </Field>
         <label className="external-app-favorite-check"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /><Star size={15} /> Favorite application</label>
+        {initial && <label className="external-app-favorite-check"><input type="checkbox" checked={isArchived} onChange={(event) => setIsArchived(event.target.checked)} />{isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}{isArchived ? "Archived (restore on save)" : "Archive on save"}</label>}
       </div>
       <p className="section-description">Applications open in a new tab. Your existing URL is preserved when editing. Without a URL, the card displays the name only.</p>
       {error && <div className="alert alert-error" role="alert">{error}</div>}
       <div className="modal-actions">
+        {initial && <button type="button" className="external-app-delete-button" disabled={saving} onClick={() => void deleteApplication()}><Trash2 size={14} />Delete application</button>}
         <Button type="button" variant="outline" disabled={saving} onClick={onClose}>Cancel</Button>
         <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save application"}</Button>
       </div>
@@ -239,12 +295,11 @@ function CategoryManager({ categories, apps, onClose, onSave }: {
   </Modal>;
 }
 
-export function ExternalAppsPage({ apps, categories: savedCategories, saving, onSave, onArchive, onDelete, onReorder, onOpen, onSaveCategories }: {
+export function ExternalAppsPage({ apps, categories: savedCategories, saving, onSave, onDelete, onReorder, onOpen, onSaveCategories }: {
   apps: ExternalAppLink[];
   categories: string[];
   saving: boolean;
   onSave: (app: ExternalAppLink) => Promise<void>;
-  onArchive: (id: string, isArchived: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReorder: (apps: ExternalAppLink[]) => Promise<void>;
   onOpen: (id: string) => Promise<void>;
@@ -308,25 +363,6 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     setEditing(undefined);
   }
 
-  async function setAppArchived(app: ExternalAppLink, isArchived: boolean) {
-    setActionError("");
-    try {
-      await onArchive(app.id, isArchived);
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : `Could not ${isArchived ? "archive" : "restore"} this application.`);
-    }
-  }
-
-  async function deleteApp(app: ExternalAppLink) {
-    if (!window.confirm(`Permanently delete “${app.name}”? This cannot be undone.`)) return;
-    setActionError("");
-    try {
-      await onDelete(app.id);
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "Could not delete this application.");
-    }
-  }
-
   async function reorderApp(sourceId: string, targetId: string) {
     if (sourceId === targetId || saving) return;
     const visible = [...filteredApps];
@@ -365,22 +401,6 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     setPage(0);
   }
 
-  async function toggleFavorite(app: ExternalAppLink) {
-    try {
-      await onSave({ ...app, isFavorite: !app.isFavorite });
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "Could not update the favorite.");
-    }
-  }
-
-  async function changeCategory(app: ExternalAppLink, category: string) {
-    try {
-      await onSave({ ...app, category });
-    } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : "Could not change the application category.");
-    }
-  }
-
   async function trackOpen(id: string) {
     try {
       await onOpen(id);
@@ -389,46 +409,46 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     }
   }
 
-  function renderAppCard(app: ExternalAppLink, index: number) {
+  function renderAppCard(app: ExternalAppLink) {
     const appCategory = getAppCategory(app);
     const Icon = ICONS[app.icon ?? ""] ?? ICONS[CATEGORY_ICONS[appCategory]] ?? AppWindow;
-    const openedAt = app.lastOpenedAt ? new Date(app.lastOpenedAt) : null;
-    function launchFromCard(target: EventTarget) {
-      if (!app.url || !(target instanceof Element) || target.closest("a, button, details, select, input")) return;
+    function launchApp() {
+      if (!app.url || app.isArchived) return;
       window.open(app.url, "_blank", "noopener,noreferrer");
       void trackOpen(app.id);
     }
     return <Card
       key={app.id}
-      className={`external-app-card external-app-${view}${draggedAppId === app.id ? " is-dragging" : ""}`}
-      style={{ "--external-app-color": app.backgroundColor } as CSSProperties}
-      onClick={(event) => launchFromCard(event.target)}
+      className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
+      style={{
+        "--external-app-color": app.backgroundColor,
+        "--external-app-title-size": `${app.titleFontSize ?? 18}px`,
+        "--external-app-title-family": TITLE_FONT_CSS[app.titleFontFamily ?? "system"],
+        ...(app.titleColor ? { "--external-app-title-color": app.titleColor } : {}),
+      } as CSSProperties}
+      role={app.url && !app.isArchived ? "button" : undefined}
+      tabIndex={app.url && !app.isArchived ? 0 : undefined}
+      aria-label={app.url && !app.isArchived ? `Open ${app.name}` : undefined}
+      onClick={(event) => {
+        if (event.target instanceof Element && !event.target.closest("button, a, details, select, input")) launchApp();
+      }}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          launchApp();
+        }
+      }}
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
       onDrop={(event) => dropOnCard(event, app.id)}
     >
       <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
       <div className="external-app-card-content">
-        <div className="external-app-card-title"><strong>{app.name}</strong>{app.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div>
-        {app.description && <p>{app.description}</p>}
-        <div className="external-app-card-meta"><span>{appCategory}</span><span className={`external-app-status${app.isArchived ? " archived" : ""}`}>{app.isArchived ? "Archived" : "Active"}</span></div>
-        {(app.tags?.length || openedAt) && <div className="external-app-card-foot">{app.tags?.slice(0, 3).map((tag) => <span className="external-app-tag" key={tag}>{tag}</span>)}{openedAt && <small>Opened {openedAt.toLocaleDateString()}</small>}</div>}
+        <div className="external-app-card-title"><strong>{app.name}</strong></div>
       </div>
       <div className="external-app-card-actions">
         <button type="button" className="icon-button external-app-drag-handle" draggable={!saving} disabled={saving || filter === "recent"} aria-label={`Drag ${app.name} to reorder`} title="Drag to reorder" onDragStart={(event) => startDragging(event, app.id)} onDragEnd={() => setDraggedAppId(null)}><GripVertical size={13} /></button>
-        <button type="button" className="icon-button" disabled={saving || index === 0 || filter === "recent"} aria-label={`Move ${app.name} up`} title="Move up" onClick={() => index > 0 && void reorderApp(app.id, pageApps[index - 1]?.id)}><ChevronUp size={13} /></button>
-        <button type="button" className="icon-button" disabled={saving || index === pageApps.length - 1 || filter === "recent"} aria-label={`Move ${app.name} down`} title="Move down" onClick={() => index < pageApps.length - 1 && void reorderApp(app.id, pageApps[index + 1]?.id)}><ChevronDown size={13} /></button>
-        <details className="external-app-menu"><summary aria-label={`Actions for ${app.name}`} title="Application actions"><MoreHorizontal size={15} /></summary><div className="external-app-menu-popover">
-          {app.url && <a href={app.url} target="_blank" rel="noopener noreferrer" onClick={() => void trackOpen(app.id)}><ExternalLink size={13} />Open application</a>}
-          <button type="button" onClick={() => openEditor(app)}><Pencil size={13} />Edit details</button>
-          <button type="button" onClick={() => void toggleFavorite(app)}><Star size={13} />{app.isFavorite ? "Remove from favorites" : "Add to favorites"}</button>
-          <label><span><AppWindow size={13} />Change category</span><select aria-label={`Change category for ${app.name}`} value={appCategory} onChange={(event) => void changeCategory(app, event.target.value)}>{categories.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
-          <button type="button" onClick={() => void setAppArchived(app, !app.isArchived)}>{app.isArchived ? <ArchiveRestore size={13} /> : <Archive size={13} />}{app.isArchived ? "Restore" : "Archive"}</button>
-          <button type="button" className="danger" onClick={() => void deleteApp(app)}><Trash2 size={13} />Delete</button>
-        </div></details>
+        <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title="Edit application" onClick={() => openEditor(app)}><Pencil size={13} /></button>
       </div>
-      {app.url
-        ? <a className="external-app-open" href={app.url} target="_blank" rel="noopener noreferrer" onClick={() => void trackOpen(app.id)}>Open application <ExternalLink size={13} /></a>
-        : <span className="external-app-no-url">No URL configured</span>}
     </Card>;
   }
 
@@ -467,15 +487,15 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     {filteredApps.length ? <div className={`external-app-results external-app-${view}-grid`}>
       {displayGroups.map(({ category, apps: groupApps }) => <section className="external-app-result-group" key={category || "all"}>
         {category && <h2>{category}</h2>}
-        <div className={`external-app-grid external-app-${view}`}>{groupApps.map((app) => renderAppCard(app, pageApps.findIndex((entry) => entry.id === app.id)))}</div>
+        <div className={`external-app-grid external-app-${view}`}>{groupApps.map((app) => renderAppCard(app))}</div>
       </section>)}
     </div> : <Card><EmptyState
       icon={filter === "favorites" ? <Star size={18} /> : filter === "recent" ? <CalendarDays size={18} /> : <Search size={18} />}
       title={search ? "No matching applications" : filter === "archived" ? "No archived applications" : filter === "favorites" ? "No favorite applications" : filter === "recent" ? "No recently used applications" : "No applications yet"}
-      description={search ? "Try another name, description, category, or tag." : filter === "archived" ? "Archived applications will appear here and can be restored anytime." : filter === "favorites" ? "Mark applications as favorites from their action menu." : filter === "recent" ? "Open an application to see it here." : "Add your first application to create a shortcut."}
+      description={search ? "Try another name, description, category, or tag." : filter === "archived" ? "Archived applications will appear here and can be restored from Edit." : filter === "favorites" ? "Mark applications as favorites from Edit." : filter === "recent" ? "Open an application to see it here." : "Add your first application to create a shortcut."}
     /></Card>}
     {pageCount > 1 && <div className="external-app-pagination"><span>Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredApps.length)} of {filteredApps.length}</span><div><Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Previous</Button><span>Page {page + 1} of {pageCount}</span><Button size="sm" variant="outline" disabled={page >= pageCount - 1} onClick={() => setPage((current) => current + 1)}>Next</Button></div></div>}
-    {editorOpen && <ExternalAppEditor key={editing?.id ?? "new"} initial={editing} apps={apps} categories={categories} onClose={() => setEditorOpen(false)} onSave={saveApp} />}
+    {editorOpen && <ExternalAppEditor key={editing?.id ?? "new"} initial={editing} apps={apps} categories={categories} onClose={() => setEditorOpen(false)} onSave={saveApp} onDelete={onDelete} />}
     {categoryManagerOpen && <CategoryManager categories={categories} apps={apps} onClose={() => setCategoryManagerOpen(false)} onSave={onSaveCategories} />}
   </>;
 }
