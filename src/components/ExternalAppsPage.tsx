@@ -412,11 +412,12 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
   function renderAppCard(app: ExternalAppLink) {
     const appCategory = getAppCategory(app);
     const Icon = ICONS[app.icon ?? ""] ?? ICONS[CATEGORY_ICONS[appCategory]] ?? AppWindow;
-    function launchApp() {
-      if (!app.url || app.isArchived) return;
-      window.open(app.url, "_blank", "noopener,noreferrer");
-      void trackOpen(app.id);
-    }
+    const cardContent = <>
+      <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
+      <div className="external-app-card-content">
+        <div className="external-app-card-title"><strong>{app.name}</strong></div>
+      </div>
+    </>;
     return <Card
       key={app.id}
       className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
@@ -426,25 +427,12 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
         "--external-app-title-family": TITLE_FONT_CSS[app.titleFontFamily ?? "system"],
         ...(app.titleColor ? { "--external-app-title-color": app.titleColor } : {}),
       } as CSSProperties}
-      role={app.url && !app.isArchived ? "button" : undefined}
-      tabIndex={app.url && !app.isArchived ? 0 : undefined}
-      aria-label={app.url && !app.isArchived ? `Open ${app.name}` : undefined}
-      onClick={(event) => {
-        if (event.target instanceof Element && !event.target.closest("button, a, details, select, input")) launchApp();
-      }}
-      onKeyDown={(event) => {
-        if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          launchApp();
-        }
-      }}
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
       onDrop={(event) => dropOnCard(event, app.id)}
     >
-      <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
-      <div className="external-app-card-content">
-        <div className="external-app-card-title"><strong>{app.name}</strong></div>
-      </div>
+      {app.url && !app.isArchived
+        ? <a className="external-app-card-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name}`} onClick={() => void trackOpen(app.id)}>{cardContent}</a>
+        : <div className="external-app-card-static">{cardContent}</div>}
       <div className="external-app-card-actions">
         <button type="button" className="icon-button external-app-drag-handle" draggable={!saving} disabled={saving || filter === "recent"} aria-label={`Drag ${app.name} to reorder`} title="Drag to reorder" onDragStart={(event) => startDragging(event, app.id)} onDragEnd={() => setDraggedAppId(null)}><GripVertical size={13} /></button>
         <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title="Edit application" onClick={() => openEditor(app)}><Pencil size={13} /></button>
@@ -457,12 +445,6 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       <div><p className="eyebrow">Your workspace</p><h1 className="page-title">External Applications</h1><p className="page-subtitle">Manage and access your connected applications.</p></div>
       <Button type="button" disabled={saving || apps.length >= MAX_EXTERNAL_APPS} onClick={() => openEditor()}><Plus size={14} /> Add Application</Button>
     </div>
-    <div className="external-app-statistics" aria-label="Application counts">
-      <div><strong>{apps.length}</strong><span>Total applications</span></div>
-      <div><strong>{activeApps.length}</strong><span>Active</span></div>
-      <div><strong>{archivedApps.length}</strong><span>Archived</span></div>
-    </div>
-    {saving && <p className="external-app-sync-status" role="status">Saving application hub changes…</p>}
     {actionError && <div className="alert alert-error" role="alert">{actionError}</div>}
     <div className="external-app-toolbar">
       <label className="external-app-search"><Search size={16} /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} aria-label="Search applications" placeholder="Search name, description, category, or tags…" /></label>
