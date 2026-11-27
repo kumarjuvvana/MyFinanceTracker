@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from "react";
 import {
   AppWindow, Archive, ArchiveRestore, Banknote, BookOpen, Briefcase, CalendarDays, Car, ChevronDown, ChevronUp,
   Code2, Database, ExternalLink, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
@@ -401,6 +401,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     return <Card
       key={app.id}
       className={`external-app-card external-app-${view}${draggedAppId === app.id ? " is-dragging" : ""}`}
+      style={{ "--external-app-color": app.backgroundColor } as CSSProperties}
       onClick={(event) => launchFromCard(event.target)}
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
       onDrop={(event) => dropOnCard(event, app.id)}
@@ -408,7 +409,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
       <div className="external-app-card-content">
         <div className="external-app-card-title"><strong>{app.name}</strong>{app.isFavorite && <Star size={13} fill="currentColor" aria-label="Favorite" />}</div>
-        <p>{app.description || "No description added."}</p>
+        {app.description && <p>{app.description}</p>}
         <div className="external-app-card-meta"><span>{appCategory}</span><span className={`external-app-status${app.isArchived ? " archived" : ""}`}>{app.isArchived ? "Archived" : "Active"}</span></div>
         {(app.tags?.length || openedAt) && <div className="external-app-card-foot">{app.tags?.slice(0, 3).map((tag) => <span className="external-app-tag" key={tag}>{tag}</span>)}{openedAt && <small>Opened {openedAt.toLocaleDateString()}</small>}</div>}
       </div>
