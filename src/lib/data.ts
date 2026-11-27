@@ -328,7 +328,7 @@ export function validateData(value: unknown): value is TrackerData {
             [14, 16, 18, 20, 22, 24, 28, 32].includes(app.titleFontSize)) &&
           (app.titleColor === undefined || typeof app.titleColor === "string" && /^#[0-9a-f]{6}$/i.test(app.titleColor)) &&
           (app.titleFontFamily === undefined || typeof app.titleFontFamily === "string" &&
-            ["system", "dm-sans", "serif", "mono", "rounded"].includes(app.titleFontFamily)) &&
+            ["system", "dm-sans", "serif", "mono", "rounded", "arial", "verdana", "tahoma", "trebuchet", "times", "consolas", "impact"].includes(app.titleFontFamily)) &&
           (app.description === undefined || typeof app.description === "string" && app.description.length <= 240) &&
           (app.category === undefined || typeof app.category === "string" && app.category.trim().length > 0 && app.category.length <= 80) &&
           (app.icon === undefined || typeof app.icon === "string" && /^[A-Za-z][A-Za-z0-9]{0,39}$/.test(app.icon)) &&

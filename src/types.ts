@@ -1291,7 +1291,9 @@ export interface ExternalAppLink {
   isArchived?: boolean;
   lastOpenedAt?: string;
 }
-export type ExternalAppTitleFontFamily = "system" | "dm-sans" | "serif" | "mono" | "rounded";
+export type ExternalAppTitleFontFamily =
+  | "system" | "dm-sans" | "serif" | "mono" | "rounded"
+  | "arial" | "verdana" | "tahoma" | "trebuchet" | "times" | "consolas" | "impact";
 export const MAX_EXTERNAL_APPS = 50;
 export const DEFAULT_EXTERNAL_APP_CATEGORIES = [
   "Personal",

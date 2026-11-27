@@ -19,13 +19,27 @@ const TITLE_FONT_FAMILIES = [
   { value: "serif", label: "Serif" },
   { value: "mono", label: "Monospace" },
   { value: "rounded", label: "Rounded" },
+  { value: "arial", label: "Arial" },
+  { value: "verdana", label: "Verdana" },
+  { value: "tahoma", label: "Tahoma" },
+  { value: "trebuchet", label: "Trebuchet MS" },
+  { value: "times", label: "Times New Roman" },
+  { value: "consolas", label: "Consolas" },
+  { value: "impact", label: "Impact" },
 ] as const;
 const TITLE_FONT_CSS: Record<ExternalAppTitleFontFamily, string> = {
   system: "system-ui, sans-serif",
-  "dm-sans": '"DM Sans", sans-serif',
+  "dm-sans": '"DM Sans", Arial, sans-serif',
   serif: "Georgia, serif",
   mono: '"Courier New", monospace',
-  rounded: '"Trebuchet MS", sans-serif',
+  rounded: '"Trebuchet MS", Arial, sans-serif',
+  arial: "Arial, Helvetica, sans-serif",
+  verdana: "Verdana, Geneva, sans-serif",
+  tahoma: "Tahoma, Geneva, sans-serif",
+  trebuchet: '"Trebuchet MS", Arial, sans-serif',
+  times: '"Times New Roman", Times, serif',
+  consolas: 'Consolas, "Courier New", monospace',
+  impact: 'Impact, "Arial Narrow", sans-serif',
 };
 const PAGE_SIZE = 12;
 const ICONS: Record<string, LucideIcon> = {
@@ -415,7 +429,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     const cardContent = <>
       <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
       <div className="external-app-card-content">
-        <div className="external-app-card-title"><strong>{app.name}</strong></div>
+        <div className="external-app-card-title"><strong style={{ fontFamily: TITLE_FONT_CSS[app.titleFontFamily ?? "system"] }}>{app.name}</strong></div>
       </div>
     </>;
     return <Card
@@ -424,7 +438,6 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       style={{
         "--external-app-color": app.backgroundColor,
         "--external-app-title-size": `${app.titleFontSize ?? 18}px`,
-        "--external-app-title-family": TITLE_FONT_CSS[app.titleFontFamily ?? "system"],
         ...(app.titleColor ? { "--external-app-title-color": app.titleColor } : {}),
       } as CSSProperties}
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
