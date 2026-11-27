@@ -17442,8 +17442,8 @@ export default function App() {
     return persistPreferenceUpdate((previous) => {
       const currentApps = previous.preferences?.externalApps ?? [];
       const exists = currentApps.some((entry) => entry.id === app.id);
-      if (!exists && currentApps.filter((entry) => !entry.isArchived).length >= MAX_EXTERNAL_APPS) {
-        throw new Error(`You can save up to ${MAX_EXTERNAL_APPS} active app shortcuts.`);
+      if (!exists && currentApps.length >= MAX_EXTERNAL_APPS) {
+        throw new Error(`You can save up to ${MAX_EXTERNAL_APPS} applications, including archived ones.`);
       }
       return {
         ...previous,
@@ -17478,6 +17478,45 @@ export default function App() {
         ...previous.preferences,
         dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
         externalApps: apps,
+      },
+    }));
+  }
+  function deleteExternalApp(id: string): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        externalApps: (previous.preferences?.externalApps ?? []).filter((app) => app.id !== id),
+      },
+    }));
+  }
+  function openExternalApp(id: string): Promise<void> {
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        externalApps: (previous.preferences?.externalApps ?? []).map((app) =>
+          app.id === id ? { ...app, lastOpenedAt: new Date().toISOString() } : app),
+      },
+    }));
+  }
+  function saveExternalAppCategories(categories: string[], renames: { from: string; to: string }[] = []): Promise<void> {
+    if (categories.length > MAX_EXTERNAL_APPS) return Promise.reject(new Error(`You can save up to ${MAX_EXTERNAL_APPS} custom application categories.`));
+    return persistPreferenceUpdate((previous) => ({
+      ...previous,
+      preferences: {
+        ...DEFAULT_TRACKER_PREFERENCES,
+        ...previous.preferences,
+        dashboardWidgets: [...(previous.preferences?.dashboardWidgets ?? DEFAULT_TRACKER_PREFERENCES.dashboardWidgets)],
+        externalAppCategories: categories,
+        externalApps: (previous.preferences?.externalApps ?? []).map((app) => {
+          const rename = renames.find((entry) => entry.from === app.category);
+          return rename ? { ...app, category: rename.to } : app;
+        }),
       },
     }));
   }
@@ -18455,7 +18494,7 @@ export default function App() {
   const pageContent: Record<Page, ReactNode> = {
     Dashboard: <Dashboard data={data} documentModulesData={documentModulesData} widgets={dashboardWidgets} onPage={changePage} />,
     Favorites: <FavoritesPage pages={favoritePages} saving={favoriteSavePending} onNavigate={changePage} onRemove={toggleFavoritePage} />,
-    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onArchive={archiveExternalApp} onReorder={reorderExternalApps} />,
+    "External apps": <ExternalAppsPage apps={preferences.externalApps ?? []} categories={preferences.externalAppCategories ?? []} saving={preferenceSavePending} onSave={saveExternalApp} onArchive={archiveExternalApp} onDelete={deleteExternalApp} onReorder={reorderExternalApps} onOpen={openExternalApp} onSaveCategories={saveExternalAppCategories} />,
     "Global search": <GlobalSearchPage data={data} documentModulesData={documentModulesData} query={globalSearchQuery} selectedKey={selectedSearchResultKey} onQueryChange={updateGlobalSearchQuery} onSelect={selectSearchResult} onGoToPage={changePage} />,
     "Shopping list": <ShoppingList data={data} onToggle={togglePurchased} onAdd={() => setModal("add")} onEdit={setEditing} onCopy={copyItem} onDelete={deleteItem} />,
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
@@ -18864,7 +18903,7 @@ export default function App() {
       })}</nav>
       <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday life, thoughtfully organized in one place.</div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className={`theme-toggle favorite-toggle${favoritePages.includes(page) ? " selected" : ""}`} type="button" disabled={page === "Favorites" || favoriteSavePending} aria-pressed={favoritePages.includes(page)} aria-label={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? `Remove ${page} from favorites` : `Add ${page} to favorites`} title={favoriteSavePending ? "Saving favorites to Supabase…" : page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavoritePage(page)}>{favoritePages.includes(page) ? <Star size={15} fill="currentColor" /> : <Star size={15} />}<span>{favoriteSavePending ? "Saving…" : favoritePages.includes(page) ? "Favorited" : "Favorite"}</span></button><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => updatePreferences((current) => ({ ...current, groupMenus: !current.groupMenus }))}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
+    <main className={`main-area${page === "External apps" ? " external-app-hub-area" : ""}`}><header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMobileMenu(true)}><Menu size={19} /></button><span className="topbar-date">{titleDate}</span></div><div className="topbar-right"><button className={`theme-toggle favorite-toggle${favoritePages.includes(page) ? " selected" : ""}`} type="button" disabled={page === "Favorites" || favoriteSavePending} aria-pressed={favoritePages.includes(page)} aria-label={page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? `Remove ${page} from favorites` : `Add ${page} to favorites`} title={favoriteSavePending ? "Saving favorites to Supabase…" : page === "Favorites" ? "Favorites screen" : favoritePages.includes(page) ? "Remove from favorites" : "Add to favorites"} onClick={() => toggleFavoritePage(page)}>{favoritePages.includes(page) ? <Star size={15} fill="currentColor" /> : <Star size={15} />}<span>{favoriteSavePending ? "Saving…" : favoritePages.includes(page) ? "Favorited" : "Favorite"}</span></button><button className="theme-toggle navigation-toggle" type="button" aria-pressed={groupMenus} aria-label={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} title={groupMenus ? "Switch to flat menu" : "Switch to grouped menu"} onClick={() => updatePreferences((current) => ({ ...current, groupMenus: !current.groupMenus }))}><ListTree size={15} /><span>{groupMenus ? "Grouped" : "Flat menu"}</span></button><button className="theme-toggle global-search-topbar" type="button" onClick={() => changePage("Global search")}><Search size={15} /><span>Search</span></button><button className="theme-toggle" type="button" aria-pressed={darkMode} onClick={() => updatePreferences((current) => ({ ...current, darkMode: !current.darkMode }))}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><button className="text-link" type="button" onClick={() => void handleSignOut()}>Sign out</button></div></header>
       <div className="main-content">{error && <div className="alert alert-error" role="alert"><X size={15} style={{ flex: "none", marginTop: 1 }} /><span>{error}</span><button className="icon-button" aria-label="Dismiss error" onClick={() => setError("")}><X size={14} /></button></div>}{notice && <div className="alert alert-success" role="status"><CheckCircle2 size={15} /><span>{notice}</span><button className="icon-button" aria-label="Dismiss message" onClick={() => setNotice("")}><X size={14} /></button></div>}<div className="screen-page-content">{pageContent[page]}</div>{page === "Shopping list" && editing && <ItemModal initial={editing} products={data.products ?? []} onClose={() => setEditing(null)} onSave={editItem} />}</div>
     <footer className="app-footer">&copy; {new Date().getFullYear()} Kiran Developments</footer>
     </main>

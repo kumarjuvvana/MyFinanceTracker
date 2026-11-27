@@ -1272,6 +1272,7 @@ export interface TrackerPreferences {
   savedScreenViews?: Record<string, Record<string, string>>;
   forecastSavingsGoal?: ForecastSavingsGoal;
   externalApps?: ExternalAppLink[];
+  externalAppCategories?: string[];
 }
 
 export interface ExternalAppLink {
@@ -1279,9 +1280,24 @@ export interface ExternalAppLink {
   name: string;
   url: string;
   backgroundColor: string;
+  description?: string;
+  category?: string;
+  icon?: string;
+  tags?: string[];
+  isFavorite?: boolean;
   isArchived?: boolean;
+  lastOpenedAt?: string;
 }
 export const MAX_EXTERNAL_APPS = 50;
+export const DEFAULT_EXTERNAL_APP_CATEGORIES = [
+  "Personal",
+  "Finance",
+  "Development",
+  "Vehicle Management",
+  "Education & Career",
+  "Productivity",
+  "Other",
+] as const;
 
 export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
   currency: "INR",
@@ -1297,6 +1313,7 @@ export const DEFAULT_TRACKER_PREFERENCES: TrackerPreferences = {
   groupMenus: true,
   menuSortOrder: "current",
   externalApps: [],
+  externalAppCategories: [],
   activitySessions: DEFAULT_ACTIVITY_SESSIONS.map((session) => ({ ...session, items: [] })),
 };
 

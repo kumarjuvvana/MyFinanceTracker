@@ -324,8 +324,20 @@ export function validateData(value: unknown): value is TrackerData {
           typeof app.name === "string" && app.name.trim().length > 0 && app.name.length <= 80 &&
           typeof app.url === "string" && app.url.length <= 2048 && (!app.url.trim() || isSafeHttpUrl(app.url)) &&
           typeof app.backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(app.backgroundColor) &&
-          (app.isArchived === undefined || typeof app.isArchived === "boolean")) &&
+          (app.description === undefined || typeof app.description === "string" && app.description.length <= 240) &&
+          (app.category === undefined || typeof app.category === "string" && app.category.trim().length > 0 && app.category.length <= 80) &&
+          (app.icon === undefined || typeof app.icon === "string" && /^[A-Za-z][A-Za-z0-9]{0,39}$/.test(app.icon)) &&
+          (app.tags === undefined || Array.isArray(app.tags) && app.tags.length <= 20 &&
+            app.tags.every((tag) => typeof tag === "string" && tag.trim().length > 0 && tag.length <= 40)) &&
+          (app.isFavorite === undefined || typeof app.isFavorite === "boolean") &&
+          (app.isArchived === undefined || typeof app.isArchived === "boolean") &&
+          (app.lastOpenedAt === undefined || typeof app.lastOpenedAt === "string" && !Number.isNaN(Date.parse(app.lastOpenedAt)))) &&
         new Set(preferences.externalApps.map((app) => isRecord(app) ? app.id : null)).size === preferences.externalApps.length)) &&
+      (preferences.externalAppCategories === undefined || (Array.isArray(preferences.externalAppCategories) &&
+        preferences.externalAppCategories.length <= MAX_EXTERNAL_APPS &&
+        preferences.externalAppCategories.every((category) => typeof category === "string" &&
+          category.trim().length > 0 && category.length <= 80) &&
+        new Set(preferences.externalAppCategories.map((category) => category.trim().toLocaleLowerCase())).size === preferences.externalAppCategories.length)) &&
       (preferences.forecastSavingsGoal === undefined || isValidForecastSavingsGoal(preferences.forecastSavingsGoal)) &&
       (preferences.activitySessions === undefined || isValidActivitySessions(preferences.activitySessions)) &&
       (preferences.activityCompletedItemIds === undefined || (Array.isArray(preferences.activityCompletedItemIds) &&
