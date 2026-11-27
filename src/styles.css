@@ -3280,7 +3280,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .external-app-hub-area .main-content{padding-top:18px}
 .external-app-hub-header{margin-bottom:10px}
 .external-app-hub-header .eyebrow{margin-bottom:2px}
-.external-app-hub-header .page-title{font-size:24px;line-height:1.15}
+.external-app-hub-header .page-title{font-size:20px;line-height:1.15}
 .external-app-hub-header .page-subtitle{margin-top:2px}
 .external-app-hub-header>.button{min-height:36px;height:36px;padding:0 12px;font-size:11px}
 .external-app-statistics{gap:6px;margin-bottom:10px}

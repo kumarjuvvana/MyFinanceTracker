@@ -454,7 +454,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
 
   return <>
     <div className="external-app-hub-header">
-      <div><p className="eyebrow">Your workspace</p><h1 className="page-title">Application Hub</h1><p className="page-subtitle">Manage and access your connected applications.</p></div>
+      <div><p className="eyebrow">Your workspace</p><h1 className="page-title">External Applications</h1><p className="page-subtitle">Manage and access your connected applications.</p></div>
       <Button type="button" disabled={saving || apps.length >= MAX_EXTERNAL_APPS} onClick={() => openEditor()}><Plus size={14} /> Add Application</Button>
     </div>
     <div className="external-app-statistics" aria-label="Application counts">
