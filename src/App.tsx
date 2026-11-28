@@ -4546,6 +4546,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   onDeleteBroker: (name: string) => void;
   onSaveQuote: (quote: Omit<StockQuoteSnapshot, "id">, trackHistory: boolean) => void;
 }) {
+  const savedStockView = useSavedScreenView("stocks");
   const [brokerName, setBrokerName] = useState("");
   const [editingBroker, setEditingBroker] = useState<{ original: string; value: string } | null>(null);
   const [symbol, setSymbol] = useState("");
@@ -4573,14 +4574,21 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
   const [importBroker, setImportBroker] = useState("");
   const [importBrokerDraft, setImportBrokerDraft] = useState("");
   const [addingImportBroker, setAddingImportBroker] = useState(false);
-  const [stockSearch, setStockSearch] = useState("");
-  const [stockBrokerFilter, setStockBrokerFilter] = useState("all");
-  const [stockExchangeFilter, setStockExchangeFilter] = useState("all");
-  const [stockHoldingFilter, setStockHoldingFilter] = useState("all");
-  const [stockQuoteFilter, setStockQuoteFilter] = useState("all");
-  const [stockSortBy, setStockSortBy] = useState<"symbol" | "name" | "broker" | "price" | "quantity" | "value" | "profitLoss">("symbol");
-  const [stockSortOrder, setStockSortOrder] = useState<"asc" | "desc">("asc");
-  const [stockGroupBy, setStockGroupBy] = useState<"none" | "broker" | "exchange">("none");
+  const [stockSearch, setStockSearch] = useState(() => savedStockView.search ?? "");
+  const [stockBrokerFilter, setStockBrokerFilter] = useState(() =>
+    savedScreenSetting(savedStockView, "brokerFilter", "all", ["all", "unassigned", ...brokers]));
+  const [stockExchangeFilter, setStockExchangeFilter] = useState(() =>
+    savedScreenSetting(savedStockView, "exchangeFilter", "all", ["all", "NSE", "BSE"]));
+  const [stockHoldingFilter, setStockHoldingFilter] = useState(() =>
+    savedScreenSetting(savedStockView, "holdingFilter", "all", ["all", "holdings", "watchlist"]));
+  const [stockQuoteFilter, setStockQuoteFilter] = useState(() =>
+    savedScreenSetting(savedStockView, "quoteFilter", "all", ["all", "priced", "unpriced"]));
+  const [stockSortBy, setStockSortBy] = useState<"symbol" | "name" | "broker" | "price" | "quantity" | "value" | "profitLoss">(() =>
+    savedScreenSetting(savedStockView, "sortBy", "symbol", ["symbol", "name", "broker", "price", "quantity", "value", "profitLoss"]));
+  const [stockSortOrder, setStockSortOrder] = useState<"asc" | "desc">(() =>
+    savedScreenSetting(savedStockView, "sortOrder", "asc", ["asc", "desc"]));
+  const [stockGroupBy, setStockGroupBy] = useState<"none" | "broker" | "exchange">(() =>
+    savedScreenSetting(savedStockView, "groupBy", "none", ["none", "broker", "exchange"]));
   const [collapsedStockGroups, setCollapsedStockGroups] = useState<Set<string>>(() => new Set());
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -4942,6 +4950,16 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           <Field label="Order"><Select value={stockSortOrder} onChange={(event) => setStockSortOrder(event.target.value as typeof stockSortOrder)}><option value="asc">Ascending</option><option value="desc">Descending</option></Select></Field>
           {activeStockFilters && <Button className="stock-clear-filters" type="button" variant="outline" size="sm" onClick={() => { setStockSearch(""); setStockBrokerFilter("all"); setStockExchangeFilter("all"); setStockHoldingFilter("all"); setStockQuoteFilter("all"); }}>Clear filters</Button>}
         </FilterDrawer>
+        <SaveScreenViewButton screen="stocks" settings={{
+          search: stockSearch,
+          brokerFilter: stockBrokerFilter,
+          exchangeFilter: stockExchangeFilter,
+          holdingFilter: stockHoldingFilter,
+          quoteFilter: stockQuoteFilter,
+          sortBy: stockSortBy,
+          sortOrder: stockSortOrder,
+          groupBy: stockGroupBy,
+        }} label="stock filters, sorting, and grouping" />
         <Badge>{filteredStocks.length} stocks</Badge>
       </div>
       {stocks.length ? filteredStocks.length ? <div className="stock-list"><div className={`stock-list-header${stockGroupBy !== "none" ? " stock-list-header-grouped" : ""}`} aria-hidden="true"><span>Stock</span><span>Latest price</span><span>Volume</span><span>Avg price</span><span>Invested amount</span><span>Current value</span><span>Actions</span><span /></div>{stockGroups.map((group) => {
