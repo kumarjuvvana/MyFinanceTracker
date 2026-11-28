@@ -192,7 +192,7 @@ export function EmptyState({ title, description, icon }: { title: string; descri
   return <div className="empty-state"><div className="empty-icon">{icon}</div><p className="empty-title">{title}</p><p className="empty-copy">{description}</p></div>;
 }
 
-export function Modal({ title, onClose, children, wide = false, inline = false, fullscreen = false }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; inline?: boolean; fullscreen?: boolean }) {
+export function Modal({ title, onClose, children, wide = false, inline = false, fullscreen = false, className = "" }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; inline?: boolean; fullscreen?: boolean; className?: string }) {
   const inlineEditorRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -208,7 +208,7 @@ export function Modal({ title, onClose, children, wide = false, inline = false, 
 
   return (
     <div className={`modal-backdrop ${fullscreen ? "modal-backdrop-fullscreen" : ""}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className={`modal ${wide ? "modal-wide" : ""} ${fullscreen ? "modal-fullscreen" : ""}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <section className={`modal ${wide ? "modal-wide" : ""} ${fullscreen ? "modal-fullscreen" : ""} ${className}`} role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div className="modal-head"><h2 id="modal-title">{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={18} /></button></div>
         {children}
       </section>

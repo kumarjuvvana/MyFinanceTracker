@@ -2416,6 +2416,51 @@ button.fleet-bar-row:disabled{cursor:default}
   .cooking-log-ingredient-cost{justify-content:flex-start}
 }
 
+.modal.cooking-recipe-modal,.modal.cooking-log-modal{width:min(96vw,1380px);max-height:94vh;max-height:94dvh;padding:18px}
+.modal.cooking-recipe-modal .modal-head,.modal.cooking-log-modal .modal-head{margin-bottom:14px}
+.cooking-recipe-form-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+.cooking-log-form-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px}
+.cooking-compact-ingredient-row{grid-template-columns:minmax(125px,1.1fr) minmax(110px,.9fr) minmax(130px,1.15fr) minmax(82px,.65fr) minmax(90px,.7fr) minmax(95px,.75fr) minmax(130px,1fr);align-items:end;gap:6px;padding:7px}
+.cooking-log-ingredient.cooking-compact-ingredient-row{grid-template-columns:minmax(135px,1.15fr) minmax(115px,.95fr) minmax(95px,.75fr) minmax(105px,.85fr) minmax(110px,.9fr) minmax(145px,1.15fr)}
+.cooking-compact-ingredient-row>.field-wrap{min-width:0;gap:4px}
+.cooking-compact-ingredient-row .field-label{font-size:9px;line-height:1.2}
+.cooking-compact-ingredient-row .field{height:34px;padding:0 8px;font-size:11px}
+.cooking-compact-ingredient-row .cooking-ingredient-item{grid-column:1}
+.cooking-compact-ingredient-row .cooking-ingredient-measure{grid-column:2}
+.cooking-compact-ingredient-row .cooking-ingredient-name{grid-column:3}
+.cooking-compact-ingredient-row .cooking-ingredient-quantity{grid-column:4}
+.cooking-compact-ingredient-row .cooking-ingredient-unit{grid-column:5}
+.cooking-compact-ingredient-row .cooking-ingredient-price{grid-column:6}
+.cooking-compact-ingredient-row .cooking-ingredient-cost{grid-column:7}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-name{grid-column:1}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-measure{grid-column:2}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-quantity{grid-column:3}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-unit{grid-column:4}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-price{grid-column:5}
+.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-cost{grid-column:6}
+.cooking-compact-ingredient-row .cooking-ingredient-cost{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:5px;min-width:0;min-height:34px;font-size:9px}
+.cooking-compact-ingredient-row .cooking-ingredient-cost>span{white-space:nowrap}
+.cooking-compact-ingredient-row .cooking-ingredient-cost .button{height:30px;padding:0 7px;font-size:10px}
+.cooking-compact-ingredient-row .cooking-ingredient-cost .icon-button{width:26px;height:26px;flex:none}
+.cooking-compact-ingredient-row>.field-wrap.cooking-log-ingredient-measure-note{grid-column:1/-1}
+.cooking-recipe-stock,.cooking-log-ingredients{gap:7px;padding:9px}
+.cooking-recipe-form .modal-actions,.cooking-log-form .modal-actions{margin-top:14px}
+.app-shell.dark .cooking-compact-ingredient-row .field-label{color:#c4d1c5}
+@media(max-width:1100px){
+  .modal.cooking-recipe-modal,.modal.cooking-log-modal{width:min(98vw,980px)}
+  .cooking-recipe-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cooking-compact-ingredient-row,.cooking-log-ingredient.cooking-compact-ingredient-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .cooking-compact-ingredient-row>.field-wrap,.cooking-log-ingredient.cooking-compact-ingredient-row>.field-wrap{grid-column:auto}
+  .cooking-compact-ingredient-row .cooking-ingredient-cost,.cooking-log-ingredient.cooking-compact-ingredient-row .cooking-ingredient-cost{grid-column:1/-1}
+}
+@media(max-width:760px){
+  .modal.cooking-recipe-modal,.modal.cooking-log-modal{width:100%;max-height:96vh;max-height:96dvh;padding:14px}
+  .cooking-recipe-form-grid,.cooking-log-form-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .cooking-recipe-form-grid>.full,.cooking-log-form-grid>.full{grid-column:auto}
+  .cooking-compact-ingredient-row,.cooking-log-ingredient.cooking-compact-ingredient-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cooking-compact-ingredient-row>.field-wrap,.cooking-log-ingredient.cooking-compact-ingredient-row>.field-wrap{grid-column:auto}
+}
+
 .devotional-reading-section{display:grid;gap:10px;margin-bottom:18px}
 .devotional-reading-list{display:grid;gap:9px}
 .devotional-reading-card{padding:13px}

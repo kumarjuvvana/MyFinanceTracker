@@ -12453,8 +12453,8 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
     });
   }
 
-  return <Modal title={initial ? "Edit recipe or prepared item" : "Add recipe or prepared item"} onClose={onClose} wide>
-    <form onSubmit={submit}><div className="form-grid">
+  return <Modal title={initial ? "Edit recipe or prepared item" : "Add recipe or prepared item"} onClose={onClose} wide className="cooking-recipe-modal">
+    <form className="cooking-recipe-form" onSubmit={submit}><div className="form-grid cooking-recipe-form-grid">
       <Field label="Name"><Input autoFocus required maxLength={120} placeholder="e.g. Spinach curry or mango juice" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Type"><Input required maxLength={80} placeholder="Curry, drink, juice, snack..." value={dishType} onChange={(event) => setDishType(event.target.value)} /></Field>
       <Field label="Cuisine"><Input maxLength={80} placeholder="e.g. Andhra, Mediterranean" value={cuisine} onChange={(event) => setCuisine(event.target.value)} /></Field>
@@ -12469,12 +12469,12 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
           const lineTotal = ingredient.quantity !== null && currentUnitPrice !== null
             ? ingredient.quantity * currentUnitPrice
             : null;
-          return <div className="cooking-recipe-ingredient" key={ingredient.id}>
-            <Field label="Kitchen item"><Select aria-label="Select kitchen stock item" value={ingredient.inventoryItemId ?? ""} onChange={(event) => selectInventoryItem(ingredient, event.target.value)}>
+          return <div className="cooking-recipe-ingredient cooking-compact-ingredient-row" key={ingredient.id}>
+            <Field className="cooking-ingredient-item" label="Kitchen item"><Select aria-label="Select kitchen stock item" value={ingredient.inventoryItemId ?? ""} onChange={(event) => selectInventoryItem(ingredient, event.target.value)}>
               <option value="">Custom ingredient</option>
               {inventory.map((entry) => <option value={entry.id} key={entry.id}>{entry.name}</option>)}
             </Select></Field>
-            {ingredient.inventoryItemId && <Field label="Stock measure"><Select aria-label="Select stock unit" value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => {
+            {ingredient.inventoryItemId && <Field className="cooking-ingredient-measure" label="Stock measure"><Select aria-label="Select stock unit" value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => {
               const measure = item?.measures.find((entry) => entry.id === event.target.value);
               updateInventoryIngredient(ingredient.id, (current) => ({
                 ...current,
@@ -12484,11 +12484,11 @@ function CookingRecipeModal({ initial, inventory, onClose, onSave }: {
                 unitPriceOverride: false,
               }));
             }}><option value="">No measure</option>{item?.measures.map((measure) => <option value={measure.id} key={measure.id}>{measure.unit}</option>)}</Select></Field>}
-            <Field label="Ingredient name"><Input required maxLength={120} value={ingredient.name} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, name: event.target.value }))} /></Field>
-            <Field label="Quantity"><Input type="number" min="0.001" step="any" value={ingredient.quantity ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, quantity: event.target.value === "" ? null : Number(event.target.value) }))} /></Field>
-            <Field label="Unit"><Input maxLength={40} placeholder={selectedMeasure?.unit ?? "e.g. kg, piece"} value={ingredient.unit} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unit: event.target.value }))} /></Field>
-            <Field label="Price / unit"><Input type="number" min="0" step="any" value={currentUnitPrice ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true }))} /></Field>
-            <div className="cooking-recipe-ingredient-cost"><span>Line cost</span><strong>{lineTotal === null ? "—" : formatCurrency(lineTotal)}</strong><button className="icon-button" type="button" aria-label={`Remove ${ingredient.name || "ingredient"}`} onClick={() => setInventoryIngredients((current) => current.filter((entry) => entry.id !== ingredient.id))}><X size={14} /></button></div>
+            <Field className="cooking-ingredient-name" label="Ingredient name"><Input required maxLength={120} value={ingredient.name} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, name: event.target.value }))} /></Field>
+            <Field className="cooking-ingredient-quantity" label="Quantity"><Input type="number" min="0.001" step="any" value={ingredient.quantity ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, quantity: event.target.value === "" ? null : Number(event.target.value) }))} /></Field>
+            <Field className="cooking-ingredient-unit" label="Unit"><Input maxLength={40} placeholder={selectedMeasure?.unit ?? "e.g. kg, piece"} value={ingredient.unit} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unit: event.target.value }))} /></Field>
+            <Field className="cooking-ingredient-price" label="Price / unit"><Input type="number" min="0" step="any" value={currentUnitPrice ?? ""} onChange={(event) => updateInventoryIngredient(ingredient.id, (current) => ({ ...current, unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true }))} /></Field>
+            <div className="cooking-recipe-ingredient-cost cooking-ingredient-cost"><span>Line cost</span><strong>{lineTotal === null ? "—" : formatCurrency(lineTotal)}</strong><button className="icon-button" type="button" aria-label={`Remove ${ingredient.name || "ingredient"}`} onClick={() => setInventoryIngredients((current) => current.filter((entry) => entry.id !== ingredient.id))}><X size={14} /></button></div>
           </div>;
         })}
         {inventoryIngredients.length > 0 && <div className="cooking-recipe-total">Estimated ingredient total <strong>{formatCurrency(ingredientCost)}</strong></div>}
@@ -12861,8 +12861,8 @@ function CookingLogModal({ initial, recipes, inventory, stockSaving, onAddStock,
     }
   }
 
-  return <Modal title={initial ? "Edit daily cooking log" : "Add daily cooking log"} onClose={onClose} wide>
-    <form onSubmit={submit}><div className="form-grid">
+  return <Modal title={initial ? "Edit daily cooking log" : "Add daily cooking log"} onClose={onClose} wide className="cooking-log-modal">
+    <form className="cooking-log-form" onSubmit={submit}><div className="form-grid cooking-log-form-grid">
       <Field label="Date"><DateInput autoFocus required value={date} onValueChange={setDate} /></Field>
       <Field label="Meal / occasion"><Input maxLength={100} placeholder="Breakfast, lunch, snack, family dinner..." value={occasion} onChange={(event) => setOccasion(event.target.value)} /></Field>
       <Field className="full" label="Add from your recipe book">{recipes.length ? <><div className="cooking-add-dish"><Select aria-label="Choose a saved recipe" value={recipeId} onChange={(event) => setRecipeId(event.target.value)}><option value="">Choose a recipe or prepared item</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name} · {recipe.dishType}</option>)}</Select><Button type="button" variant="outline" disabled={!recipeId} onClick={addRecipe}><Plus size={13} /> Add</Button></div><span className="field-hint">Recipe ingredient quantities and prices are copied as starting values. Adjust them below to record what you actually used today.</span></> : <span className="section-description">Add a recipe first, or enter a one-off prepared item below.</span>}</Field>
@@ -12880,14 +12880,14 @@ function CookingLogModal({ initial, recipes, inventory, stockSaving, onAddStock,
           const item = inventory.find((entry) => entry.id === ingredient.inventoryItemId);
           const measure = item?.measures.find((entry) => entry.id === ingredient.inventoryMeasureId);
           const lineCost = ingredient.quantity !== null && ingredient.unitPrice !== null ? ingredient.quantity * ingredient.unitPrice : null;
-          return <div className="cooking-log-ingredient" key={ingredient.id}>
-          <Field label="Ingredient"><Input maxLength={120} value={ingredient.name} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { name: event.target.value })} /></Field>
-          {ingredient.inventoryItemId && <Field label="Kitchen stock unit"><Select value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => updateActualMeasure(dishIndex, ingredient, event.target.value)}><option value="">No measure</option>{item?.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select></Field>}
-          <Field label="Actual quantity"><Input type="number" min="0.001" step="any" placeholder="Not used" value={ingredient.quantity ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { quantity: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-          {(!ingredient.inventoryItemId || !ingredient.inventoryMeasureId) && <Field label="Actual unit"><Input maxLength={40} placeholder="e.g. pieces, portion" value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>}
-          <Field label="Actual price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} /></Field>
-          {ingredient.inventoryItemId && !ingredient.inventoryMeasureId && <Field className="full" label="Why is there no stock measure?"><Input maxLength={1000} placeholder="e.g. Received from relatives; not counted or weighed" value={ingredient.measureNote ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { measureNote: event.target.value })} /></Field>}
-          <div className="cooking-log-ingredient-cost"><span>Actual cost</span><strong>{lineCost !== null ? formatCurrency(lineCost) : "—"}</strong>
+          return <div className="cooking-log-ingredient cooking-compact-ingredient-row" key={ingredient.id}>
+          <Field className="cooking-ingredient-name" label="Ingredient"><Input maxLength={120} value={ingredient.name} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { name: event.target.value })} /></Field>
+          {ingredient.inventoryItemId && <Field className="cooking-ingredient-measure" label="Kitchen stock unit"><Select value={ingredient.inventoryMeasureId ?? ""} onChange={(event) => updateActualMeasure(dishIndex, ingredient, event.target.value)}><option value="">No measure</option>{item?.measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.unit}</option>)}</Select></Field>}
+          <Field className="cooking-ingredient-quantity" label="Actual quantity"><Input type="number" min="0.001" step="any" placeholder="Not used" value={ingredient.quantity ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { quantity: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+          {(!ingredient.inventoryItemId || !ingredient.inventoryMeasureId) && <Field className="cooking-ingredient-unit" label="Actual unit"><Input maxLength={40} placeholder="e.g. pieces, portion" value={ingredient.unit} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unit: event.target.value })} /></Field>}
+          <Field className="cooking-ingredient-price" label="Actual price / unit"><Input type="number" min="0" step="any" value={ingredient.unitPrice ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { unitPrice: event.target.value === "" ? null : Number(event.target.value), unitPriceOverride: true })} /></Field>
+          {ingredient.inventoryItemId && !ingredient.inventoryMeasureId && <Field className="full cooking-log-ingredient-measure-note" label="Why is there no stock measure?"><Input maxLength={1000} placeholder="e.g. Received from relatives; not counted or weighed" value={ingredient.measureNote ?? ""} onChange={(event) => updateActualIngredient(dishIndex, ingredient.id, { measureNote: event.target.value })} /></Field>}
+          <div className="cooking-log-ingredient-cost cooking-ingredient-cost"><span>Actual cost</span><strong>{lineCost !== null ? formatCurrency(lineCost) : "—"}</strong>
             {item && measure && <AddCookingStockButton item={item} measure={measure} disabled={stockSaving} onAdd={onAddStock} />}
             <button type="button" className="icon-button" aria-label={`Remove ${ingredient.name} from ${dish.name}`} onClick={() => removeActualIngredient(dishIndex, ingredient.id)}><X size={13} /></button>
           </div>
