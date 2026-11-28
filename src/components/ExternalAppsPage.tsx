@@ -246,12 +246,8 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
             <Button type="button" size="sm" variant="outline" disabled={saving || fields.length >= MAX_EXTERNAL_APP_FIELDS} onClick={addField}><Plus size={13} />Add field</Button>
           </div>
           {fields.map((field, index) => <div className="external-app-field-row" key={field.id}>
-            <Field label={`Field ${index + 1} · Label`}>
-              <Input maxLength={80} aria-label={`Field ${index + 1} label`} value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} placeholder="e.g. Support portal" />
-            </Field>
-            <Field label={`Field ${index + 1} · Value`}>
-              <Input maxLength={2048} aria-label={`Field ${index + 1} value`} value={field.value} onChange={(event) => updateField(field.id, { value: event.target.value })} placeholder="Text or a link" />
-            </Field>
+            <Input maxLength={80} aria-label={`Field ${index + 1} label`} value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} placeholder="e.g. Support portal" />
+            <Input maxLength={2048} aria-label={`Field ${index + 1} value`} value={field.value} onChange={(event) => updateField(field.id, { value: event.target.value })} placeholder="Text or a link" />
             <button type="button" className="icon-button external-app-remove-field" disabled={saving} aria-label={`Remove field ${index + 1}`} title="Remove field" onClick={() => { setFields((current) => current.filter((entry) => entry.id !== field.id)); setError(""); }}><X size={14} /></button>
           </div>)}
         </section>

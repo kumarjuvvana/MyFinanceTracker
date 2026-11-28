@@ -3394,7 +3394,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .external-app-fields-heading h3{margin:0;color:#334155;font-size:12px}
 .external-app-fields-heading .section-description{margin:3px 0 0;font-size:10px}
 .external-app-field-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.2fr) auto;align-items:end;gap:9px;padding:9px;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff80}
-.external-app-field-row .field-wrap{min-width:0}
+.external-app-field-row>.field{min-width:0}
 .external-app-remove-field{width:34px;height:34px;color:#64748b}
 .external-app-card.has-custom-fields.external-app-card{grid-template-rows:auto auto;align-content:start;align-items:stretch;min-height:124px;padding:50px 12px 12px}
 .external-app-card.has-custom-fields .external-app-card-overlay-link{position:absolute;inset:0;z-index:1}
