@@ -3252,18 +3252,19 @@ function AssetAnalyticsChart({ points, chartType, label }: {
 }) {
   const width = 760;
   const height = 280;
-  const left = 54;
-  const right = 18;
-  const top = 20;
-  const bottom = 44;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
   const prices = points.map((point) => point.price);
   const actualMin = Math.min(...prices);
   const actualMax = Math.max(...prices);
   const spread = actualMax - actualMin || Math.max(actualMax * 0.1, 1);
   const min = actualMin - spread * 0.08;
   const max = actualMax + spread * 0.08;
+  const formatPrice = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  const left = Math.max(54, Math.max(...[max, (max + min) / 2, min].map((value) => formatPrice(value).length)) * 7 + 20);
+  const right = 18;
+  const top = 20;
+  const bottom = 44;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
   const coordinates = points.map((point, index) => ({
     ...point,
     x: left + (points.length <= 1 ? plotWidth / 2 : index * plotWidth / (points.length - 1)),
@@ -3274,7 +3275,8 @@ function AssetAnalyticsChart({ points, chartType, label }: {
   const barWidth = Math.max(3, Math.min(22, plotWidth / points.length * 0.62));
   const labels = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
   const axisValues = [max, (max + min) / 2, min];
-  const formatPrice = (value: number) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  const pointDetails = (point: AssetAnalyticsPoint) =>
+    `${label}\nDate: ${point.date}\nValue: ${reportCurrencyAmount(point.price, point.currency)}\n${point.provider}`;
 
   return <div className="asset-analytics-chart-wrap">
     <svg className="asset-analytics-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label} historical ${chartType} chart`}>
@@ -3286,18 +3288,44 @@ function AssetAnalyticsChart({ points, chartType, label }: {
           <text x={left - 8} y={y + 4} textAnchor="end" className="asset-analytics-axis-label">{formatPrice(value)}</text>
         </g>;
       })}
-      {chartType === "column" ? coordinates.map((point) => <rect
+      {chartType === "column" ? coordinates.map((point) => <g
         key={point.id}
-        x={point.x - barWidth / 2}
-        y={point.y}
-        width={barWidth}
-        height={Math.max(1, top + plotHeight - point.y)}
-        rx="2"
-        className="asset-analytics-bar"
-      />) : <>
+        className="asset-analytics-interactive-point"
+        tabIndex={0}
+        role="img"
+        aria-label={pointDetails(point)}
+      >
+        <title>{pointDetails(point)}</title>
+        <rect
+          x={point.x - Math.max(12, barWidth) / 2}
+          y={point.y}
+          width={Math.max(12, barWidth)}
+          height={Math.max(1, top + plotHeight - point.y)}
+          fill="transparent"
+          pointerEvents="all"
+        />
+        <rect
+          x={point.x - barWidth / 2}
+          y={point.y}
+          width={barWidth}
+          height={Math.max(1, top + plotHeight - point.y)}
+          rx="2"
+          className="asset-analytics-bar"
+        />
+      </g>) : <>
         {chartType === "area" && <path d={area} className="asset-analytics-area" />}
         <path d={line} className="asset-analytics-line" />
-        {points.length < 36 && coordinates.map((point) => <circle key={point.id} cx={point.x} cy={point.y} r="3" className="asset-analytics-point" />)}
+        {coordinates.map((point) => <g
+          key={point.id}
+          className="asset-analytics-interactive-point"
+          tabIndex={0}
+          role="img"
+          aria-label={pointDetails(point)}
+        >
+          <title>{pointDetails(point)}</title>
+          <circle cx={point.x} cy={point.y} r="8" className="asset-analytics-hit-area" />
+          {points.length < 36 && <circle cx={point.x} cy={point.y} r="3" className="asset-analytics-point" />}
+        </g>)}
       </>}
       {coordinates.map((point, index) => labels.has(index) && <text
         key={`date:${point.id}`}

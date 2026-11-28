@@ -2624,6 +2624,11 @@ button.fleet-bar-row:disabled{cursor:default}
 .asset-analytics-line{fill:none;stroke:var(--user-accent,#4c8059);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .asset-analytics-area{fill:color-mix(in srgb,var(--user-accent,#4c8059) 18%,transparent);stroke:none}
 .asset-analytics-point{fill:var(--user-accent,#4c8059);stroke:var(--panel,#fff);stroke-width:1.5}
+.asset-analytics-interactive-point{cursor:crosshair;outline:none}
+.asset-analytics-hit-area{fill:transparent;stroke:transparent;stroke-width:2;pointer-events:all}
+.asset-analytics-interactive-point:hover .asset-analytics-hit-area,.asset-analytics-interactive-point:focus-visible .asset-analytics-hit-area{stroke:var(--user-accent,#4c8059);stroke-opacity:.55}
+.asset-analytics-interactive-point:hover .asset-analytics-point,.asset-analytics-interactive-point:focus-visible .asset-analytics-point{r:5}
+.asset-analytics-interactive-point:hover .asset-analytics-bar,.asset-analytics-interactive-point:focus-visible .asset-analytics-bar{opacity:1}
 .asset-analytics-bar{fill:var(--user-accent,#4c8059);opacity:.78}
 .asset-analytics-positive{color:var(--user-accent,#4c8059)!important}
 .asset-analytics-negative{color:#a74e43!important}
