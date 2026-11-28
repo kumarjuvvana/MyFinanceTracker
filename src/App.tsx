@@ -142,6 +142,12 @@ function useCurrencyFormatter() {
 }
 type NavigationGroup = "Overview" | "Shopping" | "Finance" | "Personal growth" | "Cooking" | "Home & family" | "Data & tools";
 type NavigationItem = { name: Page; icon: typeof LayoutDashboard; group: NavigationGroup };
+type ReportHubSection = "overview" | "shopping" | "finance" | "payments" | "income" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
+type ReportHubGroupId = "investments-assets" | "spending-cashflow";
+const REPORT_HUB_SECTION_IDS = new Set<ReportHubSection>([
+  "overview", "shopping", "finance", "payments", "income", "externalFinance", "investment",
+  "assets", "assetAnalytics", "subscriptions", "forecasts", "saved",
+]);
 const NAVIGATION_GROUP_ORDER: NavigationGroup[] = ["Overview", "Shopping", "Finance", "Personal growth", "Cooking", "Home & family", "Data & tools"];
 const navigation: NavigationItem[] = [
   { name: "Dashboard", icon: LayoutDashboard, group: "Overview" },
@@ -189,10 +195,13 @@ function orderedNavigation(items: NavigationItem[], order: MenuSortOrder) {
 function readAppRoute() {
   const params = new URLSearchParams(window.location.search);
   const requestedPage = params.get("page") as Page | null;
+  const requestedReportSection = params.get("section");
   const knownPages = new Set<Page>([...navigation.map((entry) => entry.name), "Data management"]);
   return {
     page: requestedPage === "Reports" ? "Reports & Analytics" as Page
       : requestedPage && knownPages.has(requestedPage) ? requestedPage : "Dashboard" as Page,
+    reportSection: requestedReportSection && REPORT_HUB_SECTION_IDS.has(requestedReportSection as ReportHubSection)
+      ? requestedReportSection as ReportHubSection : "overview",
     query: params.get("q") ?? "",
     selectedKey: params.get("record"),
   };
@@ -2437,9 +2446,6 @@ function SubscriptionSpendingReports({ data, initialFilters, onSaveView }: {
   </>;
 }
 
-type ReportHubSection = "overview" | "shopping" | "finance" | "payments" | "income" | "externalFinance" | "investment" | "assets" | "assetAnalytics" | "subscriptions" | "forecasts" | "saved";
-type ReportHubGroupId = "investments-assets" | "spending-cashflow";
-
 const REPORT_HUB_GROUPS: {
   id: ReportHubGroupId;
   label: string;
@@ -2473,10 +2479,6 @@ const REPORT_HUB_STANDALONE_SECTIONS: { id: ReportHubSection; label: string }[] 
   { id: "forecasts", label: "Forecasts" },
   { id: "saved", label: "Saved Reports" },
 ];
-
-function reportHubGroupForSection(section: ReportHubSection): ReportHubGroupId | undefined {
-  return REPORT_HUB_GROUPS.find((group) => group.sections.some((entry) => entry.id === section))?.id;
-}
 
 function useAutomatedAssetPriceHistory(
   assetType?: AssetPriceHistoryRecord["asset_type"],
@@ -3250,6 +3252,13 @@ function AssetAnalyticsChart({ points, chartType, label }: {
   chartType: AssetAnalyticsChartType;
   label: string;
 }) {
+  const chartWrapRef = useRef<HTMLDivElement>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    point: AssetAnalyticsPoint;
+    x: number;
+    y: number;
+    below: boolean;
+  } | null>(null);
   const width = 760;
   const height = 280;
   const prices = points.map((point) => point.price);
@@ -3277,8 +3286,19 @@ function AssetAnalyticsChart({ points, chartType, label }: {
   const axisValues = [max, (max + min) / 2, min];
   const pointDetails = (point: AssetAnalyticsPoint) =>
     `${label}\nDate: ${point.date}\nValue: ${reportCurrencyAmount(point.price, point.currency)}\n${point.provider}`;
+  function showPointTooltip(point: AssetAnalyticsPoint, clientX: number, clientY: number) {
+    const bounds = chartWrapRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const halfTooltipWidth = 128;
+    const x = bounds.width <= halfTooltipWidth * 2
+      ? bounds.width / 2
+      : Math.max(halfTooltipWidth, Math.min(bounds.width - halfTooltipWidth, clientX - bounds.left));
+    const pointerY = clientY - bounds.top;
+    const below = pointerY < 96;
+    setHoveredPoint({ point, x, y: Math.max(8, below ? pointerY + 12 : pointerY - 8), below });
+  }
 
-  return <div className="asset-analytics-chart-wrap">
+  return <div className="asset-analytics-chart-wrap" ref={chartWrapRef}>
     <svg className="asset-analytics-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${label} historical ${chartType} chart`}>
       <title>{label} historical price chart</title>
       {axisValues.map((value, index) => {
@@ -3294,8 +3314,14 @@ function AssetAnalyticsChart({ points, chartType, label }: {
         tabIndex={0}
         role="img"
         aria-label={pointDetails(point)}
+        onPointerMove={(event) => showPointTooltip(point, event.clientX, event.clientY)}
+        onPointerLeave={() => setHoveredPoint(null)}
+        onFocus={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          showPointTooltip(point, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+        }}
+        onBlur={() => setHoveredPoint(null)}
       >
-        <title>{pointDetails(point)}</title>
         <rect
           x={point.x - Math.max(12, barWidth) / 2}
           y={point.y}
@@ -3321,8 +3347,14 @@ function AssetAnalyticsChart({ points, chartType, label }: {
           tabIndex={0}
           role="img"
           aria-label={pointDetails(point)}
+          onPointerMove={(event) => showPointTooltip(point, event.clientX, event.clientY)}
+          onPointerLeave={() => setHoveredPoint(null)}
+          onFocus={(event) => {
+            const bounds = event.currentTarget.getBoundingClientRect();
+            showPointTooltip(point, bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+          }}
+          onBlur={() => setHoveredPoint(null)}
         >
-          <title>{pointDetails(point)}</title>
           <circle cx={point.x} cy={point.y} r="8" className="asset-analytics-hit-area" />
           {points.length < 36 && <circle cx={point.x} cy={point.y} r="3" className="asset-analytics-point" />}
         </g>)}
@@ -3335,6 +3367,17 @@ function AssetAnalyticsChart({ points, chartType, label }: {
         className="asset-analytics-axis-label"
       >{point.date}</text>)}
     </svg>
+    {hoveredPoint && <div
+      className={`asset-analytics-tooltip${hoveredPoint.below ? " below" : ""}`}
+      style={{ left: hoveredPoint.x, top: hoveredPoint.y }}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="asset-analytics-tooltip-title">{label}</span>
+      <strong>{reportCurrencyAmount(hoveredPoint.point.price, hoveredPoint.point.currency)}</strong>
+      <span>{hoveredPoint.point.date}</span>
+      <small>{hoveredPoint.point.provider}</small>
+    </div>}
   </div>;
 }
 
@@ -3555,17 +3598,17 @@ function AssetAnalyticsReports({ data }: { data: TrackerData }) {
   </>;
 }
 
-function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences, onOpenPage }: {
+function ReportsAnalytics({ data, section, onSectionChange, onSaveShoppingBudget, onSaveReportPreferences, onOpenPage }: {
   data: TrackerData;
+  section: ReportHubSection;
+  onSectionChange: (section: ReportHubSection) => void;
   onSaveShoppingBudget: (amount: number | undefined) => Promise<void>;
   onSaveReportPreferences: (mutator: (previous: TrackerPreferences) => TrackerPreferences) => Promise<void>;
   onOpenPage: (page: Page) => void;
 }) {
   const formatCurrency = useCurrencyFormatter();
   const currency = useContext(CurrencyContext);
-  const [section, setSection] = useState<ReportHubSection>("overview");
   const [activeSavedView, setActiveSavedView] = useState<SavedReportView | null>(null);
-  const [expandedReportGroups, setExpandedReportGroups] = useState<Set<ReportHubGroupId>>(() => new Set());
   const monthRange = resolveReportDateRange("month-to-date");
   const monthPurchases = buildReport(data.purchases, shoppingPurchaseReport, {
     dateRange: monthRange,
@@ -3582,9 +3625,7 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
     : undefined;
 
   function setReportSection(next: ReportHubSection) {
-    setSection(next);
-    const group = reportHubGroupForSection(next);
-    if (group) setExpandedReportGroups((current) => new Set(current).add(group));
+    onSectionChange(next);
   }
 
   function openSection(next: ReportHubSection) {
@@ -3595,15 +3636,6 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
   function openSavedView(view: SavedReportView) {
     setActiveSavedView(view);
     setReportSection(view.section === "finance" && view.filters.reportKind === "investment" ? "investment" : view.section);
-  }
-
-  function toggleReportGroup(group: ReportHubGroupId) {
-    setExpandedReportGroups((current) => {
-      const next = new Set(current);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
   }
 
   async function saveView(name: string, viewSection: SavedReportSection, filters: Record<string, string>) {
@@ -3636,44 +3668,6 @@ function ReportsAnalytics({ data, onSaveShoppingBudget, onSaveReportPreferences,
 
   return <>
     <PageHeading eyebrow="Reports hub" title="Reports & Analytics" subtitle="Explore recorded activity and see which report areas are ready." />
-    <nav className="reports-hub-navigation" aria-label="Reports & Analytics sections">
-      {REPORT_HUB_STANDALONE_SECTIONS.slice(0, 1).map((entry) => <button
-        key={entry.id}
-        type="button"
-        aria-current={section === entry.id ? "page" : undefined}
-        className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
-        onClick={() => openSection(entry.id)}
-      >{entry.label}</button>)}
-      {REPORT_HUB_GROUPS.map((group) => {
-        const expanded = expandedReportGroups.has(group.id);
-        const active = group.sections.some((entry) => entry.id === section);
-        return <div className={`reports-hub-nav-group${active ? " active" : ""}`} key={group.id}>
-          <button
-            type="button"
-            className="reports-hub-group-toggle"
-            aria-expanded={expanded}
-            aria-controls={`report-group-${group.id}`}
-            onClick={() => toggleReportGroup(group.id)}
-          ><ChevronRight size={14} className={expanded ? "expanded" : ""} /><span>{group.label}</span><small>{group.sections.length}</small></button>
-          <div className="reports-hub-nav-items" id={`report-group-${group.id}`} hidden={!expanded}>
-            {group.sections.map((entry) => <button
-              key={entry.id}
-              type="button"
-              aria-current={section === entry.id ? "page" : undefined}
-              className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
-              onClick={() => openSection(entry.id)}
-            >{entry.label}</button>)}
-          </div>
-        </div>;
-      })}
-      {REPORT_HUB_STANDALONE_SECTIONS.slice(1).map((entry) => <button
-        key={entry.id}
-        type="button"
-        aria-current={section === entry.id ? "page" : undefined}
-        className={`reports-hub-nav-link${section === entry.id ? " active" : ""}`}
-        onClick={() => openSection(entry.id)}
-      >{entry.label}</button>)}
-    </nav>
     {section === "externalFinance" ? <ExternalFinanceReports key="externalFinance" /> : section === "payments" ? <ExternalFinanceReports key="payments" initialDataset="payments" fixedDataset /> : section === "income" ? <ExternalFinanceReports key="income" initialDataset="incomes" fixedDataset /> : section === "shopping" ? <ShoppingReports key={activeSavedView?.id ?? section} data={data} onSaveBudget={onSaveShoppingBudget} initialFilters={activeFilters} onSaveView={(name, filters) => saveView(name, "shopping", filters)} /> : section === "overview" ? <>
       <div className="stat-grid reports-hub-stats">
         <Card className="stat-card"><div className="stat-top"><span>Local shopping spend this month</span><span className="stat-icon icon-green"><ShoppingBasket size={16} /></span></div><p className="stat-value">{formatCurrency(monthPurchases.total)}</p><div className="stat-foot">{monthPurchases.recordCount} local purchases · {currency}</div></Card>
@@ -16932,6 +16926,8 @@ export default function App() {
   const [data, setData] = useState<TrackerData | null>(null);
   const [documentModulesData, setDocumentModulesData] = useState<DocumentModulesData | null>(null);
   const [page, setPage] = useState<Page>(() => readAppRoute().page);
+  const [reportHubSection, setReportHubSection] = useState<ReportHubSection>(() => readAppRoute().reportSection);
+  const [reportsNavExpanded, setReportsNavExpanded] = useState(() => readAppRoute().page === "Reports & Analytics");
   const [globalSearchQuery, setGlobalSearchQuery] = useState(() => readAppRoute().query);
   const [selectedSearchResultKey, setSelectedSearchResultKey] = useState<string | null>(() => readAppRoute().selectedKey);
   const [error, setError] = useState("");
@@ -16984,6 +16980,7 @@ export default function App() {
     function syncRouteFromLocation() {
       const route = readAppRoute();
       setPage(route.page);
+      setReportHubSection(route.reportSection);
       setGlobalSearchQuery(route.query);
       setSelectedSearchResultKey(route.selectedKey);
       setMobileMenu(false);
@@ -17065,6 +17062,10 @@ export default function App() {
     if (activeGroup) setCollapsedNavGroups((current) => current.has(activeGroup)
       ? new Set([...current].filter((group) => group !== activeGroup))
       : current);
+  }, [page]);
+
+  useEffect(() => {
+    if (page === "Reports & Analytics") setReportsNavExpanded(true);
   }, [page]);
 
   useEffect(() => {
@@ -18450,12 +18451,21 @@ export default function App() {
     setError("");
     setNotice("Data cleared. Saving the empty data file to shared storage…");
   }
-  function changePage(next: Page) {
+  function changePage(next: Page, nextReportSection?: ReportHubSection) {
     const targetPage = next === "Reports" ? "Reports & Analytics" : next;
     setPage(targetPage);
+    if (targetPage === "Reports & Analytics") {
+      const selectedSection = nextReportSection ?? "overview";
+      setReportHubSection(selectedSection);
+    } else {
+      setReportHubSection("overview");
+    }
     setSelectedSearchResultKey(null);
     setMobileMenu(false);
     const params = new URLSearchParams({ page: targetPage });
+    if (targetPage === "Reports & Analytics" && nextReportSection && nextReportSection !== "overview") {
+      params.set("section", nextReportSection);
+    }
     if (targetPage === "Global search" && globalSearchQuery.trim()) params.set("q", globalSearchQuery.trim());
     window.history.pushState({}, "", `${window.location.pathname}?${params.toString()}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -18516,8 +18526,8 @@ export default function App() {
     "Shopping trips": <ShoppingTrips data={data} onAdd={() => setModal("trip")} onSave={saveTripEdits} onCopy={copyTrip} onDelete={archiveTrip} />,
     "Purchase history": <PurchaseHistory data={data} onSave={savePurchase} onCopy={copyPurchase} onDelete={archivePurchase} />,
     "Price history": <PriceHistory data={data} />,
-    Reports: <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
-    "Reports & Analytics": <ReportsAnalytics data={data} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
+    Reports: <ReportsAnalytics data={data} section={reportHubSection} onSectionChange={(section) => changePage("Reports & Analytics", section)} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
+    "Reports & Analytics": <ReportsAnalytics data={data} section={reportHubSection} onSectionChange={(section) => changePage("Reports & Analytics", section)} onSaveShoppingBudget={saveShoppingBudget} onSaveReportPreferences={saveReportPreferences} onOpenPage={changePage} />,
     "Notes & reminders": <ReminderPage reminders={data.reminders ?? []} categories={data.reminderCategories ?? []} onSave={saveReminder} onDelete={deleteReminder} onToggle={toggleReminder} />,
     "Important dates": <ImportantDatesPage />,
     "Master data": <MasterData stores={data.stores ?? []} products={data.products ?? []} reminders={data.reminders ?? []} reminderCategories={data.reminderCategories ?? []} onAddStore={addStore} onSaveStore={saveStore} onDeleteStore={(id) => update((previous) => {
@@ -18914,7 +18924,38 @@ export default function App() {
             if (next.has(group)) next.delete(group); else next.add(group);
             return next;
           })}><ChevronRight size={13} className={`nav-section-chevron ${collapsed ? "" : "expanded"}`} /><span>{group}</span><small>{entries.length}</small></button>}
-          {!collapsed && entries.map(({ name, icon: Icon }) => <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}
+          {!collapsed && entries.map(({ name, icon: Icon }) => name === "Reports & Analytics" ? <div className="nav-report-entry" key={name}>
+            <div className="nav-report-main">
+              <button className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>
+              <button type="button" className="nav-report-toggle" aria-label={`${reportsNavExpanded ? "Collapse" : "Expand"} Reports & Analytics submenu`} aria-expanded={reportsNavExpanded} onClick={() => setReportsNavExpanded((expanded) => !expanded)}><ChevronRight size={14} className={reportsNavExpanded ? "expanded" : ""} /></button>
+            </div>
+            {reportsNavExpanded && <div className="nav-report-submenu" aria-label="Reports & Analytics submenu">
+              {REPORT_HUB_STANDALONE_SECTIONS.slice(0, 1).map((entry) => <button
+                type="button"
+                key={entry.id}
+                className={`nav-report-subitem${page === name && reportHubSection === entry.id ? " active" : ""}`}
+                aria-current={page === name && reportHubSection === entry.id ? "page" : undefined}
+                onClick={() => changePage(name, entry.id)}
+              >{entry.label}</button>)}
+              {REPORT_HUB_GROUPS.map((reportGroup) => <div className="nav-report-subgroup" key={reportGroup.id}>
+                <span className="nav-report-subheading">{reportGroup.label}</span>
+                {reportGroup.sections.map((entry) => <button
+                  type="button"
+                  key={entry.id}
+                  className={`nav-report-subitem${page === name && reportHubSection === entry.id ? " active" : ""}`}
+                  aria-current={page === name && reportHubSection === entry.id ? "page" : undefined}
+                  onClick={() => changePage(name, entry.id)}
+                >{entry.label}</button>)}
+              </div>)}
+              {REPORT_HUB_STANDALONE_SECTIONS.slice(1).map((entry) => <button
+                type="button"
+                key={entry.id}
+                className={`nav-report-subitem${page === name && reportHubSection === entry.id ? " active" : ""}`}
+                aria-current={page === name && reportHubSection === entry.id ? "page" : undefined}
+                onClick={() => changePage(name, entry.id)}
+              >{entry.label}</button>)}
+            </div>}
+          </div> : <button key={name} className={`nav-item ${page === name ? "active" : ""}`} onClick={() => changePage(name)}><Icon size={16} strokeWidth={1.8} />{name}</button>)}
         </div>;
       })}</nav>
       <div className="sidebar-bottom"><div className="nav-label">PREFERENCES</div><button className={`nav-item ${page === "Data management" ? "active" : ""}`} onClick={() => changePage("Data management")}><Settings2 size={16} strokeWidth={1.8} />Data management</button><div className="side-note"><strong>A little more mindful.</strong>Your everyday life, thoughtfully organized in one place.</div></div>
