@@ -1048,6 +1048,11 @@ body{background:#f3f5ef}
 .asset-total-card span{font-size:9px;color:#92998f;overflow-wrap:anywhere}
 .asset-total-card strong{font:700 13px Manrope,sans-serif;color:#414a42;overflow-wrap:anywhere}
 .asset-list{display:grid;gap:14px}
+.asset-list.record-grid-layout{grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.asset-list.record-list-layout{grid-template-columns:minmax(0,1fr);gap:0}
+.asset-list.record-list-layout>.asset-card{border-radius:0;padding:14px 10px}
+.asset-manager-table-card{overflow-x:auto}
+.asset-manager-table-card .data-table{min-width:720px}
 .asset-card{min-width:0;padding:18px}
 .asset-card-head,.asset-card-title{display:flex;align-items:center;gap:10px}
 .asset-card-head{justify-content:space-between}

@@ -5795,6 +5795,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
   const [groupBy, setGroupBy] = useState<"none" | "type" | "institution" | "currency">(() => savedScreenSetting(savedAssetView, "groupBy", "none", ["none", "type", "institution", "currency"]));
   const [filterCurrency, setFilterCurrency] = useState<"All currencies" | Currency>(() => savedAssetView.filterCurrency === "All currencies" || CURRENCIES.includes(savedAssetView.filterCurrency as Currency) ? savedAssetView.filterCurrency as "All currencies" | Currency : "All currencies");
   const [valueFilter, setValueFilter] = useState<"all" | "recorded" | "missing">(() => savedScreenSetting(savedAssetView, "valueFilter", "all", ["all", "recorded", "missing"]));
+  const [view, setView] = useState<RecordViewMode>(() => savedViewMode(savedAssetView));
   const [pageSize, setPageSize] = useState(() => savedPageSize(savedAssetView));
   const [page, setPage] = useState(0);
   const [savingTypes, setSavingTypes] = useState(false);
@@ -5823,6 +5824,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
     setGroupBy(savedScreenSetting<"none" | "type" | "institution" | "currency">(savedAssetView, "groupBy", "none", ["none", "type", "institution", "currency"]));
     setFilterCurrency(savedAssetView.filterCurrency === "All currencies" || CURRENCIES.includes(savedAssetView.filterCurrency as Currency) ? savedAssetView.filterCurrency as "All currencies" | Currency : "All currencies");
     setValueFilter(savedScreenSetting<"all" | "recorded" | "missing">(savedAssetView, "valueFilter", "all", ["all", "recorded", "missing"]));
+    setView(savedViewMode(savedAssetView));
     setPageSize(savedPageSize(savedAssetView));
     setPage(0);
   }, [activeType, savedAssetView]);
@@ -6876,7 +6878,7 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
           <Button type="button" disabled={savingTypes || (!hasUnsavedTypeChanges && !hasUnsavedItemChanges)} onClick={() => void saveVisibleTypes()}>{savingTypes ? "Saving..." : "Save asset and item selection"}</Button>
         </div>
       </FilterDrawer>
-      <SaveScreenViewButton screen={assetViewScreen} settings={{ search, filterCurrency, valueFilter, sortBy, groupBy, pageSize: String(pageSize) }} label={`${activeType} asset filters, grouping, and pagination`} />
+      <RecordViewToggle value={view} onChange={setView} label={`${activeType} assets`} screen={assetViewScreen} settings={{ search, filterCurrency, valueFilter, sortBy, groupBy, pageSize: String(pageSize) }} />
       <Badge>{activeType === "Stocks" ? `${visibleStocks.length} ${visibleStocks.length === 1 ? "stock" : "stocks"}` : activeType === "Bank accounts" ? `${visibleBankAccounts.length} ${visibleBankAccounts.length === 1 ? "account" : "accounts"}` : activeType === "Vehicle" ? `${visibleVehicles.length} ${visibleVehicles.length === 1 ? "vehicle" : "vehicles"}` : activeType === "Insurance" ? `${visible.length} ${visible.length === 1 ? "policy" : "policies"}` : `${visible.length} ${visible.length === 1 ? "record" : "records"}`}</Badge>
     </div>
     {assetPageCount > 0 && <ReportPagination count={assetPageCount} page={currentAssetPage} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(0); }} className="compact-report-pagination" />}
@@ -6892,9 +6894,28 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       <div><span>Purchase value · INR</span><strong>{visibleVehicleTotals.purchaseValueCount ? formatAmount(visibleVehicleTotals.purchaseValue, "INR") : "Not recorded"}{visibleVehicleTotals.purchaseValueCount < visibleVehicles.length ? ` · ${visibleVehicleTotals.purchaseValueCount} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
       <div><span>Estimated change · vehicles with both values</span><strong className={visibleVehicleTotals.estimatedChange >= 0 ? "positive" : "negative"}>{visibleVehicleTotals.comparableVehicles ? `${visibleVehicleTotals.estimatedChange >= 0 ? "+" : ""}${formatAmount(visibleVehicleTotals.estimatedChange, "INR")}` : "Not available"}{visibleVehicleTotals.comparableVehicles < visibleVehicles.length ? ` · ${visibleVehicleTotals.comparableVehicles} of ${visibleVehicles.length} vehicles` : ""}</strong></div>
     </Card></div>}
-    {activeType === "Vehicle" && visibleVehicleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+    {activeType === "Vehicle" && view === "table" && visibleVehicles.length > 0 && visibleVehicleGroups.map((group) => <section className="asset-list-group" key={group.key}>
       {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
-      <div className="asset-list">{group.records.map((vehicle) => {
+      <Card className="table-card asset-manager-table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Vehicle</th><th>Registration</th><th>Purchase value</th><th>Current value</th><th>Valuation date</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{group.records.map((vehicle) => {
+          const latest = latestVehicleValuation(vehicle);
+          const currentValue = vehicle.currentValue ?? latest?.currentValue ?? null;
+          const purchaseValue = vehiclePurchaseValue(vehicle);
+          return <tr key={vehicle.id}>
+            <td data-label="Vehicle"><strong>{vehicle.name}</strong><div className="table-secondary">{[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ") || "Vehicle"}</div></td>
+            <td data-label="Registration">{vehicle.registration || "—"}</td>
+            <td data-label="Purchase value">{purchaseValue == null ? "—" : formatAmount(purchaseValue, "INR")}</td>
+            <td data-label="Current value">{currentValue == null ? "Not recorded" : formatAmount(currentValue, "INR")}</td>
+            <td data-label="Valuation date">{(vehicle.valuationDate ?? latest?.date) ? dateLabel(vehicle.valuationDate ?? latest?.date ?? "") : "—"}</td>
+            <td data-label="Actions"><div className="table-actions"><button type="button" className="icon-button" aria-label={`Edit ${vehicle.name} details`} onClick={() => setVehicleEditor(vehicle)}><Pencil size={14} /></button></div></td>
+          </tr>;
+        })}</tbody>
+      </table></Card>
+    </section>)}
+    {activeType === "Vehicle" && view !== "table" && visibleVehicleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className={`asset-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{group.records.map((vehicle) => {
       const valuations = [...(vehicle.valuationHistory ?? [])].reverse().sort((a, b) => b.date.localeCompare(a.date));
       const latest = valuations[0];
       const currentValue = vehicle.currentValue ?? latest?.currentValue ?? null;
@@ -6930,9 +6951,28 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       </Card>;
     })}</div>}
     {activeType === "Stocks" && <div className="alert">Stock holdings and quote history are read directly from the Stocks menu’s existing data. Price and market value reflect the latest saved quote; refresh stock prices above or manage holdings in Stocks.</div>}
-    {activeType === "Stocks" && visibleStocks.length > 0 && visibleStockGroups.map((group) => <section className="asset-list-group" key={group.key}>
+    {activeType === "Stocks" && view === "table" && visibleStocks.length > 0 && visibleStockGroups.map((group) => <section className="asset-list-group" key={group.key}>
       {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
-      <div className="asset-list">{group.records.map((stock) => {
+      <Card className="table-card asset-manager-table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Holding</th><th>Quantity</th><th>Average buy price</th><th>Latest price</th><th>Current value</th><th>Price date</th></tr></thead>
+        <tbody>{group.records.map((stock) => {
+          const quote = latestStockQuotes.get(stock.id);
+          const quantity = stock.quantity ?? 0;
+          const currentValue = quote && quantity > 0 ? quote.price * quantity : null;
+          return <tr key={stock.id}>
+            <td data-label="Holding"><strong>{stock.symbol}</strong><div className="table-secondary">{stock.name}{stock.exchange ? ` · ${stock.exchange}` : ""}{stock.broker ? ` · ${stock.broker}` : ""}</div></td>
+            <td data-label="Quantity">{quantity.toLocaleString()}</td>
+            <td data-label="Average buy price">{stock.averageBuyPrice != null ? formatAmount(stock.averageBuyPrice, quote?.currency ?? "INR") : "—"}</td>
+            <td data-label="Latest price">{quote ? formatAmount(quote.price, quote.currency) : "No saved quote"}</td>
+            <td data-label="Current value">{currentValue !== null && quote ? formatAmount(currentValue, quote.currency) : "Not available"}</td>
+            <td data-label="Price date">{quote ? renderValueFreshness(quote.timestamp, quote.timestamp) : "—"}</td>
+          </tr>;
+        })}</tbody>
+      </table></Card>
+    </section>)}
+    {activeType === "Stocks" && view !== "table" && visibleStocks.length > 0 && visibleStockGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className={`asset-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{group.records.map((stock) => {
       const quote = latestStockQuotes.get(stock.id);
       const quantity = stock.quantity ?? 0;
       const currentValue = quote && quantity > 0 ? quote.price * quantity : null;
@@ -6952,9 +6992,27 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       })}</div>
     </section>)}
     {activeType === "Stocks" && !visibleStocks.length && <Card><EmptyState icon={<TrendingUp size={18} />} title={stocks.length ? "No matching stocks" : "No stocks tracked yet"} description={stocks.length ? "Try a different search." : "Add holdings in the Stocks menu; they will appear here automatically."} /></Card>}
-    {activeType === "Bank accounts" && visibleBankAccounts.length > 0 && visibleBankGroups.map((group) => <section className="asset-list-group" key={group.key}>
+    {activeType === "Bank accounts" && view === "table" && visibleBankAccounts.length > 0 && visibleBankGroups.map((group) => <section className="asset-list-group" key={group.key}>
       {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
-      <div className="asset-list">{group.records.map((account) => {
+      <Card className="table-card asset-manager-table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Bank</th><th>Account type</th><th>Account</th><th>Branch</th><th>Available balance</th><th>Balance date</th></tr></thead>
+        <tbody>{group.records.map((account) => {
+          const accountDigits = account.accountNumber.replace(/\D/g, "");
+          const accountLabel = accountDigits.length >= 4 ? `Ending ${accountDigits.slice(-4)}` : "Not shown";
+          return <tr key={account.id}>
+            <td data-label="Bank"><strong>{account.bankName}</strong></td>
+            <td data-label="Account type">{account.accountType}</td>
+            <td data-label="Account">{accountLabel}</td>
+            <td data-label="Branch">{account.branch || "—"}</td>
+            <td data-label="Available balance">{account.currentBalance == null ? "Not recorded" : formatAmount(account.currentBalance, "INR")}</td>
+            <td data-label="Balance date">{account.balanceAsOfDate ? dateLabel(account.balanceAsOfDate) : "—"}</td>
+          </tr>;
+        })}</tbody>
+      </table></Card>
+    </section>)}
+    {activeType === "Bank accounts" && view !== "table" && visibleBankAccounts.length > 0 && visibleBankGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className={`asset-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{group.records.map((account) => {
       const accountDigits = account.accountNumber.replace(/\D/g, "");
       const accountLabel = accountDigits.length >= 4 ? `Account ending ${accountDigits.slice(-4)}` : "Account number not shown";
       return <Card className="asset-card" key={account.id}>
@@ -7033,9 +7091,31 @@ function AssetManager({ assets, stocks, stockQuotes, bankAccounts, vehicles, sav
       <div><span>Purchase value · {currency}</span><strong>{total.purchaseCount ? formatAmount(total.purchase, currency) : "Not recorded"}{total.purchaseCount < total.properties ? ` · ${total.purchaseCount} of ${total.properties} properties` : ""}</strong></div>
       <div><span>Estimated change · properties with both values</span><strong className={total.estimatedChange >= 0 ? "positive" : "negative"}>{total.comparableProperties ? `${total.estimatedChange >= 0 ? "+" : ""}${formatAmount(total.estimatedChange, currency)}` : "Not available"}{total.comparableProperties < total.properties ? ` · ${total.comparableProperties} of ${total.properties} properties` : ""}</strong></div>
     </Card>)}</div>}
-    {visibleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+    {view === "table" && visibleGroups.map((group) => <section className="asset-list-group" key={group.key}>
       {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
-      <div className="asset-list">{group.records.map((asset) => {
+      <Card className="table-card asset-manager-table-card"><table className="data-table mobile-card-table">
+        <thead><tr><th>Asset</th><th>Type / institution</th><th>Invested value</th><th>Current value / balance</th><th>As of</th><th><span className="sr-only">Actions</span></th></tr></thead>
+        <tbody>{group.records.map((asset) => {
+          const currentValue = currentAssetValue(asset);
+          const valueDate = assetValueDate(asset);
+          return <tr key={asset.id}>
+            <td data-label="Asset"><strong>{asset.name}</strong></td>
+            <td data-label="Type / institution">{asset.type}{asset.institution ? <div className="table-secondary">{asset.institution}</div> : null}</td>
+            <td data-label="Invested value">{asset.investedValue == null ? "—" : formatAmount(asset.investedValue, asset.currency)}</td>
+            <td data-label="Current value / balance">{currentValue == null ? "Not recorded" : formatAmount(currentValue, asset.currency)}</td>
+            <td data-label="As of">{valueDate ? dateLabel(valueDate) : "—"}</td>
+            <td data-label="Actions"><div className="table-actions">
+              <button type="button" className="icon-button" aria-label={`Edit ${asset.name}`} onClick={() => setEditor(asset)}><Pencil size={14} /></button>
+              <button type="button" className="icon-button" aria-label={`Copy ${asset.name}`} onClick={() => { const { id, ...copy } = asset; void id; onSave({ ...copy, name: `${asset.name} (copy)` }); }}><Copy size={14} /></button>
+              <button type="button" className="icon-button" aria-label={`Archive ${asset.name}`} onClick={() => removeAsset(asset)}><Archive size={14} /></button>
+            </div></td>
+          </tr>;
+        })}</tbody>
+      </table></Card>
+    </section>)}
+    {view !== "table" && visibleGroups.map((group) => <section className="asset-list-group" key={group.key}>
+      {group.label && <h3 className="asset-list-group-title">{group.label}</h3>}
+      <div className={`asset-list ${view === "grid" ? "record-grid-layout" : "record-list-layout"}`}>{group.records.map((asset) => {
       const isLoan = asset.type === "Loan";
       const isHomeLoan = asset.type === "Home loan";
       const isFixedDeposit = asset.type === "Fixed deposit";
