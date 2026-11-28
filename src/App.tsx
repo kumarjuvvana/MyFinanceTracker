@@ -16928,6 +16928,9 @@ export default function App() {
   const [page, setPage] = useState<Page>(() => readAppRoute().page);
   const [reportHubSection, setReportHubSection] = useState<ReportHubSection>(() => readAppRoute().reportSection);
   const [reportsNavExpanded, setReportsNavExpanded] = useState(() => readAppRoute().page === "Reports & Analytics");
+  const [collapsedReportNavGroups, setCollapsedReportNavGroups] = useState<Set<ReportHubGroupId>>(
+    () => new Set(REPORT_HUB_GROUPS.map(({ id }) => id)),
+  );
   const [globalSearchQuery, setGlobalSearchQuery] = useState(() => readAppRoute().query);
   const [selectedSearchResultKey, setSelectedSearchResultKey] = useState<string | null>(() => readAppRoute().selectedKey);
   const [error, setError] = useState("");
@@ -17067,6 +17070,16 @@ export default function App() {
   useEffect(() => {
     if (page === "Reports & Analytics") setReportsNavExpanded(true);
   }, [page]);
+
+  useEffect(() => {
+    if (page !== "Reports & Analytics") return;
+    const activeGroup = REPORT_HUB_GROUPS.find((group) =>
+      group.sections.some((section) => section.id === reportHubSection));
+    if (!activeGroup) return;
+    setCollapsedReportNavGroups((current) => current.has(activeGroup.id)
+      ? new Set([...current].filter((groupId) => groupId !== activeGroup.id))
+      : current);
+  }, [page, reportHubSection]);
 
   useEffect(() => {
     if (!data || !authenticated || setupRequired) return;
@@ -18937,16 +18950,29 @@ export default function App() {
                 aria-current={page === name && reportHubSection === entry.id ? "page" : undefined}
                 onClick={() => changePage(name, entry.id)}
               >{entry.label}</button>)}
-              {REPORT_HUB_GROUPS.map((reportGroup) => <div className="nav-report-subgroup" key={reportGroup.id}>
-                <span className="nav-report-subheading">{reportGroup.label}</span>
-                {reportGroup.sections.map((entry) => <button
+              {REPORT_HUB_GROUPS.map((reportGroup) => {
+                const groupCollapsed = collapsedReportNavGroups.has(reportGroup.id);
+                return <div className="nav-report-subgroup" key={reportGroup.id}>
+                <button
+                  type="button"
+                  className="nav-report-subheading"
+                  aria-expanded={!groupCollapsed}
+                  onClick={() => setCollapsedReportNavGroups((current) => {
+                    const next = new Set(current);
+                    if (next.has(reportGroup.id)) next.delete(reportGroup.id);
+                    else next.add(reportGroup.id);
+                    return next;
+                  })}
+                ><ChevronRight size={12} className={groupCollapsed ? "" : "expanded"} /><span>{reportGroup.label}</span><small>{reportGroup.sections.length}</small></button>
+                {!groupCollapsed && reportGroup.sections.map((entry) => <button
                   type="button"
                   key={entry.id}
                   className={`nav-report-subitem${page === name && reportHubSection === entry.id ? " active" : ""}`}
                   aria-current={page === name && reportHubSection === entry.id ? "page" : undefined}
                   onClick={() => changePage(name, entry.id)}
                 >{entry.label}</button>)}
-              </div>)}
+              </div>;
+              })}
               {REPORT_HUB_STANDALONE_SECTIONS.slice(1).map((entry) => <button
                 type="button"
                 key={entry.id}
