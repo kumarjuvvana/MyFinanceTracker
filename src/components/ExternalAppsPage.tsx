@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from "react";
 import {
   AppWindow, Archive, ArchiveRestore, Banknote, BookOpen, Briefcase, CalendarDays, Car,
-  Code2, Database, Eye, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
+  Check, Code2, Copy, Database, Eye, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
   Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, Star, Trash2, X,
   type LucideIcon,
 } from "lucide-react";
@@ -96,6 +96,7 @@ function ExternalAppDetails({ app, onClose, onSave }: {
   const [label, setLabel] = useState("");
   const [value, setValue] = useState("");
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
+  const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const fields = app.fields ?? [];
 
@@ -103,7 +104,23 @@ function ExternalAppDetails({ app, onClose, onSave }: {
     setEditingFieldId(field.id);
     setLabel(field.label);
     setValue(field.value);
+    setCopiedFieldId(null);
     setError("");
+  }
+
+  async function copyFieldValue(field: ExternalAppField) {
+    setCopiedFieldId(null);
+    setError("");
+    if (!navigator.clipboard?.writeText) {
+      setError("Clipboard access is unavailable in this browser or page.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(field.value);
+      setCopiedFieldId(field.id);
+    } catch (caught) {
+      setError(caught instanceof Error ? `Could not copy this value: ${caught.message}` : "Could not copy this value.");
+    }
   }
 
   async function saveField(field: ExternalAppField) {
@@ -147,7 +164,10 @@ function ExternalAppDetails({ app, onClose, onSave }: {
         </> : <>
           <strong>{field.label}</strong>
           <span className="external-app-details-value"><LinkifiedText>{field.value}</LinkifiedText></span>
-          <button type="button" className="icon-button" disabled={Boolean(savingFieldId)} aria-label={`Edit ${field.label}`} title="Edit field" onClick={() => editField(field)}><Pencil size={14} /></button>
+          <div className="external-app-details-row-actions">
+            <button type="button" className="icon-button" disabled={Boolean(savingFieldId)} aria-label={copiedFieldId === field.id ? `${field.label} copied` : `Copy ${field.label}`} title={copiedFieldId === field.id ? "Copied" : "Copy value"} onClick={() => void copyFieldValue(field)}>{copiedFieldId === field.id ? <Check size={14} /> : <Copy size={14} />}</button>
+            <button type="button" className="icon-button" disabled={Boolean(savingFieldId)} aria-label={`Edit ${field.label}`} title="Edit field" onClick={() => editField(field)}><Pencil size={14} /></button>
+          </div>
         </>}
       </div>)}
       {error && <div className="alert alert-error" role="alert">{error}</div>}

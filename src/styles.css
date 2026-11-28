@@ -3405,6 +3405,7 @@ button.fleet-bar-row:disabled{cursor:default}
 .external-app-details-row>strong{color:#475569}
 .external-app-details-value{color:#64748b}
 .external-app-details-value a{color:#0d9488;text-decoration:underline;text-underline-offset:2px}
+.external-app-details-row-actions{display:flex;align-items:center;gap:4px}
 .external-app-details-editor{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.4fr);gap:8px;grid-column:1/-1}
 .external-app-details-actions{display:flex;justify-content:flex-end;gap:7px;grid-column:1/-1}
 .app-shell.dark .external-app-details-row{border-color:#2b3d4b;background:#192b3980}
