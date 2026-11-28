@@ -1279,6 +1279,7 @@ export interface ExternalAppLink {
   id: string;
   name: string;
   url: string;
+  fields?: ExternalAppField[];
   backgroundColor: string;
   titleFontSize?: number;
   titleColor?: string;
@@ -1291,10 +1292,16 @@ export interface ExternalAppLink {
   isArchived?: boolean;
   lastOpenedAt?: string;
 }
+export interface ExternalAppField {
+  id: string;
+  label: string;
+  value: string;
+}
 export type ExternalAppTitleFontFamily =
   | "system" | "dm-sans" | "serif" | "mono" | "rounded"
   | "arial" | "verdana" | "tahoma" | "trebuchet" | "times" | "consolas" | "impact";
 export const MAX_EXTERNAL_APPS = 50;
+export const MAX_EXTERNAL_APP_FIELDS = 20;
 export const DEFAULT_EXTERNAL_APP_CATEGORIES = [
   "Personal",
   "Finance",

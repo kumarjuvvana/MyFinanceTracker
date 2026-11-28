@@ -5,10 +5,10 @@ import {
   Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, Star, Trash2, X,
   type LucideIcon,
 } from "lucide-react";
-import { Button, Card, EmptyState, Field, Input, Modal } from "./ui";
+import { Button, Card, EmptyState, Field, Input, LinkifiedText, Modal } from "./ui";
 import { createId, isSafeHttpUrl } from "../lib/data";
 import {
-  DEFAULT_EXTERNAL_APP_CATEGORIES, MAX_EXTERNAL_APPS, type ExternalAppLink, type ExternalAppTitleFontFamily,
+  DEFAULT_EXTERNAL_APP_CATEGORIES, MAX_EXTERNAL_APP_FIELDS, MAX_EXTERNAL_APPS, type ExternalAppField, type ExternalAppLink, type ExternalAppTitleFontFamily,
 } from "../types";
 
 const DEFAULT_BACKGROUND = "#dcebdd";
@@ -105,6 +105,7 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
   const [titleColor, setTitleColor] = useState(initial?.titleColor ?? "");
   const [titleFontFamily, setTitleFontFamily] = useState(initial?.titleFontFamily ?? "system");
   const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
+  const [fields, setFields] = useState<ExternalAppField[]>(() => initial?.fields?.map((field) => ({ ...field })) ?? []);
   const [isFavorite, setIsFavorite] = useState(initial?.isFavorite ?? false);
   const [isArchived, setIsArchived] = useState(initial?.isArchived ?? false);
   const [error, setError] = useState("");
@@ -136,6 +137,14 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
       setError("Description must be at most 240 characters. Add up to 20 tags of at most 40 characters each.");
       return;
     }
+    const normalizedFields = fields
+      .map((field) => ({ ...field, label: field.label.trim(), value: field.value.trim() }))
+      .filter((field) => field.label || field.value);
+    if (normalizedFields.length > MAX_EXTERNAL_APP_FIELDS ||
+      normalizedFields.some((field) => !field.label || !field.value || field.label.length > 80 || field.value.length > 2048)) {
+      setError(`Complete each additional field with a label (up to 80 characters) and value (up to 2,048 characters). Add no more than ${MAX_EXTERNAL_APP_FIELDS} fields.`);
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -152,6 +161,7 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
         titleColor: titleColor || undefined,
         titleFontFamily,
         tags: normalizedTags,
+        fields: normalizedFields,
         isFavorite,
         isArchived,
         lastOpenedAt: initial?.lastOpenedAt,
@@ -178,6 +188,15 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
   }
 
   const IconPreview = ICONS[icon] ?? AppWindow;
+  function updateField(id: string, patch: Partial<Pick<ExternalAppField, "label" | "value">>) {
+    setFields((current) => current.map((field) => field.id === id ? { ...field, ...patch } : field));
+    setError("");
+  }
+  function addField() {
+    if (fields.length >= MAX_EXTERNAL_APP_FIELDS) return;
+    setFields((current) => [...current, { id: createId(), label: "", value: "" }]);
+    setError("");
+  }
   return <Modal title={initial ? "Edit application" : "Add application"} onClose={() => { if (!saving) onClose(); }} wide>
     <form className="external-app-form" onSubmit={(event) => void submit(event)}>
       <div className="external-app-form-grid">
@@ -221,6 +240,21 @@ function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelet
             {TITLE_FONT_FAMILIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
           </select>
         </Field>
+        <section className="external-app-fields-section" aria-label="Additional application fields">
+          <div className="external-app-fields-heading">
+            <div><h3>Additional fields</h3><p className="section-description">Add labeled details, such as an account name or a useful link.</p></div>
+            <Button type="button" size="sm" variant="outline" disabled={saving || fields.length >= MAX_EXTERNAL_APP_FIELDS} onClick={addField}><Plus size={13} />Add field</Button>
+          </div>
+          {fields.map((field, index) => <div className="external-app-field-row" key={field.id}>
+            <Field label={`Field ${index + 1} · Label`}>
+              <Input maxLength={80} aria-label={`Field ${index + 1} label`} value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} placeholder="e.g. Support portal" />
+            </Field>
+            <Field label={`Field ${index + 1} · Value`}>
+              <Input maxLength={2048} aria-label={`Field ${index + 1} value`} value={field.value} onChange={(event) => updateField(field.id, { value: event.target.value })} placeholder="Text or a link" />
+            </Field>
+            <button type="button" className="icon-button external-app-remove-field" disabled={saving} aria-label={`Remove field ${index + 1}`} title="Remove field" onClick={() => { setFields((current) => current.filter((entry) => entry.id !== field.id)); setError(""); }}><X size={14} /></button>
+          </div>)}
+        </section>
         <label className="external-app-favorite-check"><input type="checkbox" checked={isFavorite} onChange={(event) => setIsFavorite(event.target.checked)} /><Star size={15} /> Favorite application</label>
         {initial && <label className="external-app-favorite-check"><input type="checkbox" checked={isArchived} onChange={(event) => setIsArchived(event.target.checked)} />{isArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}{isArchived ? "Archived (restore on save)" : "Archive on save"}</label>}
       </div>
@@ -347,7 +381,8 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       if (filter === "recent" && !app.lastOpenedAt) return false;
       if (categoryFilter && getAppCategory(app) !== categoryFilter) return false;
       if (!query) return true;
-      return [app.name, app.description ?? "", getAppCategory(app), ...(app.tags ?? [])]
+      return [app.name, app.description ?? "", getAppCategory(app), ...(app.tags ?? []),
+        ...(app.fields?.flatMap((field) => [field.label, field.value]) ?? [])]
         .join(" ").toLocaleLowerCase().includes(query);
     });
     if (filter === "recent") matches = matches.sort((a, b) => (b.lastOpenedAt ?? "").localeCompare(a.lastOpenedAt ?? ""));
@@ -426,6 +461,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
   function renderAppCard(app: ExternalAppLink) {
     const appCategory = getAppCategory(app);
     const Icon = ICONS[app.icon ?? ""] ?? ICONS[CATEGORY_ICONS[appCategory]] ?? AppWindow;
+    const appFields = app.fields ?? [];
     const cardContent = <>
       <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
       <div className="external-app-card-content">
@@ -434,7 +470,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     </>;
     return <Card
       key={app.id}
-      className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
+      className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${appFields.length ? " has-custom-fields" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
       style={{
         "--external-app-color": app.backgroundColor,
         "--external-app-title-size": `${app.titleFontSize ?? 18}px`,
@@ -443,9 +479,15 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
       onDrop={(event) => dropOnCard(event, app.id)}
     >
-      {app.url && !app.isArchived
+      {appFields.length > 0 ? <>
+        {app.url && !app.isArchived && <a className="external-app-card-overlay-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name}`} onClick={() => void trackOpen(app.id)} />}
+        <div className={`external-app-card-visible-content${app.url && !app.isArchived ? " is-launchable" : ""}`}>{cardContent}</div>
+      </> : app.url && !app.isArchived
         ? <a className="external-app-card-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name}`} onClick={() => void trackOpen(app.id)}>{cardContent}</a>
         : <div className="external-app-card-static">{cardContent}</div>}
+      {appFields.length > 0 && <div className={`external-app-card-fields${app.url && !app.isArchived ? " has-overlay-link" : ""}`}>{appFields.map((field) => <div className="external-app-card-field" key={field.id}>
+        <strong>{field.label}</strong><span><LinkifiedText>{field.value}</LinkifiedText></span>
+      </div>)}</div>}
       <div className="external-app-card-actions">
         <button type="button" className="icon-button external-app-drag-handle" draggable={!saving} disabled={saving || filter === "recent"} aria-label={`Drag ${app.name} to reorder`} title="Drag to reorder" onDragStart={(event) => startDragging(event, app.id)} onDragEnd={() => setDraggedAppId(null)}><GripVertical size={13} /></button>
         <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title="Edit application" onClick={() => openEditor(app)}><Pencil size={13} /></button>

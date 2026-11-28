@@ -3388,3 +3388,39 @@ button.fleet-bar-row:disabled{cursor:default}
 .external-app-tabs{gap:3px;margin-bottom:8px;padding-bottom:6px}
 .external-app-tabs>button{min-height:27px;padding:0 8px}
 @media(max-width:560px){.external-app-hub-header>.button{min-height:32px;height:32px;padding:0 9px;font-size:10px}}
+
+.external-app-fields-section{grid-column:1/-1;display:grid;gap:8px;min-width:0}
+.external-app-fields-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.external-app-fields-heading h3{margin:0;color:#334155;font-size:12px}
+.external-app-fields-heading .section-description{margin:3px 0 0;font-size:10px}
+.external-app-field-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(180px,1.2fr) auto;align-items:end;gap:9px;padding:9px;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff80}
+.external-app-field-row .field-wrap{min-width:0}
+.external-app-remove-field{width:34px;height:34px;color:#64748b}
+.external-app-card.has-custom-fields.external-app-card{grid-template-rows:auto auto;align-content:start;align-items:stretch;min-height:124px;padding:50px 12px 12px}
+.external-app-card.has-custom-fields .external-app-card-overlay-link{position:absolute;inset:0;z-index:1}
+.external-app-card.has-custom-fields .external-app-card-visible-content .external-app-card-icon{top:-38px;left:0}
+.external-app-card.has-custom-fields .external-app-card-visible-content{position:relative;z-index:2;grid-column:1;min-height:26px}
+.external-app-card-overlay-link:focus-visible{outline:2px solid #0d9488;outline-offset:2px;border-radius:inherit}
+.external-app-card.has-custom-fields .external-app-card-visible-content.is-launchable{pointer-events:none}
+.external-app-card.has-custom-fields .external-app-card-content{display:block;width:100%;height:auto;padding:0 10px}
+.external-app-card.has-custom-fields .external-app-card-title{text-align:center}
+.external-app-card-fields{position:relative;z-index:2;display:grid;gap:5px;grid-column:1/-1;width:100%;min-width:0;margin-top:8px}
+.external-app-card-fields.has-overlay-link{pointer-events:none}
+.external-app-card-field{display:grid;grid-template-columns:minmax(65px,.65fr) minmax(0,1.35fr);align-items:start;gap:8px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:9px;line-height:1.4}
+.external-app-card-field>strong,.external-app-card-field>span{min-width:0;overflow-wrap:anywhere}
+.external-app-card-field>strong{color:#475569}
+.external-app-card-field>span{color:#64748b}
+.external-app-card-field a{position:relative;z-index:3;pointer-events:auto;color:var(--external-app-color,#0d9488);text-decoration:underline;text-underline-offset:2px}
+.app-shell.dark .external-app-fields-heading h3{color:#e2e8f0}
+.app-shell.dark .external-app-field-row{border-color:#2b3d4b;background:#192b3980}
+.app-shell.dark .external-app-remove-field{color:#cbd5e1}
+.app-shell.dark .external-app-card-field{border-color:#2b3d4b}
+.app-shell.dark .external-app-card-field>strong{color:#cbd5e1}
+.app-shell.dark .external-app-card-field>span{color:#94a3b8}
+@media(max-width:560px){
+  .external-app-field-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;padding:7px}
+}
+@media(max-width:430px){
+  .external-app-field-row{grid-template-columns:minmax(0,1fr)}
+  .external-app-remove-field{justify-self:end}
+}
