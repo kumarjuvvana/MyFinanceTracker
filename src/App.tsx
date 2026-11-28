@@ -333,6 +333,7 @@ function cookingPlanIngredientPrice(ingredient: CookingPlan["ingredients"][numbe
 }
 const marketStateLabel = (state: string) => {
   const normalized = state.trim().toUpperCase();
+  if (!normalized || normalized === "UNKNOWN" || normalized.includes("UNAVAILABLE")) return "";
   const labels: Record<string, string> = {
     REGULAR: "Open",
     PRE: "Pre-market",
@@ -342,10 +343,8 @@ const marketStateLabel = (state: string) => {
     CLOSED: "Closed",
     PROVIDER_QUOTE: "Provider quote",
     MANUAL: "Manual price",
-    UNKNOWN: "Status unavailable",
-    STATUS_UNAVAILABLE: "Status unavailable",
   };
-  return labels[normalized] ?? (normalized ? normalized.replace(/_/g, " ").toLocaleLowerCase().replace(/^./, (letter) => letter.toLocaleUpperCase()) : "Status unavailable");
+  return labels[normalized] ?? normalized.replace(/_/g, " ").toLocaleLowerCase().replace(/^./, (letter) => letter.toLocaleUpperCase());
 };
 const monthYearLabel = (date: string) => /^\d{4}-\d{2}$/.test(date)
   ? new Date(`${date}-01T12:00:00`).toLocaleDateString(undefined, { month: "short", year: "numeric" })
@@ -5003,7 +5002,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             <div className="stock-identity"><span className="stock-code">{stock.symbol}</span><span className="stock-exchange">{stock.exchange}</span><span className="stock-name">{stock.name}</span></div>
             <div className="stock-current">
               <strong className={performanceClass}>{latest ? formatQuote(latest.price, latest.currency) : "—"}</strong>
-              <small>{latest ? marketStateLabel(latest.marketState) : "No price"}</small>
+              {latest ? marketStateLabel(latest.marketState) && <small>{marketStateLabel(latest.marketState)}</small> : <small>No price</small>}
             </div>
             <div className="stock-position">
               {stock.quantity ? <strong>{stock.quantity}</strong> : <span>Watchlist</span>}
@@ -5027,7 +5026,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
           <div className="stock-row-expanded">
             <div className="stock-expanded-grid">
               <div className="stock-current">
-                <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()} · ${marketStateLabel(latest.marketState)}` : "No saved price yet"}</small>
+                <small>{latest ? `Updated ${new Date(latest.timestamp).toLocaleString()}${marketStateLabel(latest.marketState) ? ` · ${marketStateLabel(latest.marketState)}` : ""}` : "No saved price yet"}</small>
                 <button className="stock-manual-quote-trigger" type="button" onClick={() => { setManualQuoteDraft({ stockId: stock.id, price: "" }); setManualQuoteError(""); }}><Pencil size={11} />Enter price</button>
               </div>
               <div className="stock-metric"><span>Volume</span><strong>{stock.quantity ?? "—"}</strong></div>
@@ -5045,7 +5044,7 @@ function StockWorkspace({ stocks, brokers, quotes, onSaveStock, onDeleteStock, o
             </div>
           <details className="stock-history">
             <summary>Price history ({history.length} snapshots)</summary>
-            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong><span>{marketStateLabel(quote.marketState)}</span>{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">No manual stock snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track price history to record manual refreshes here.</p>}
+            {history.length ? history.map((quote) => <div className="stock-history-row" key={quote.id}><span>{new Date(quote.timestamp).toLocaleString()}</span><strong>{formatQuote(quote.price, quote.currency)}</strong>{marketStateLabel(quote.marketState) && <span>{marketStateLabel(quote.marketState)}</span>}{quote.previousClose !== null && <small>Previous close {formatQuote(quote.previousClose, quote.currency)}</small>}</div>) : <p className="section-description">No manual stock snapshots saved here. Scheduled history is in Asset manager → Price automation; enable Track price history to record manual refreshes here.</p>}
           </details>
           </div>
         </details>;
