@@ -2483,6 +2483,36 @@ button.fleet-bar-row:disabled{cursor:default}
 .compact-details-body{padding-top:10px}
 .cooking-card{padding:11px 13px}
 .cooking-card>.compact-summary{align-items:center}
+.modal.cooking-stock-item-modal{width:min(96vw,1100px);max-height:94vh;max-height:94dvh;padding:18px}
+.modal.cooking-stock-item-modal .modal-head{margin-bottom:14px}
+.cooking-stock-item-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.cooking-stock-item-form-grid>.cooking-inventory-measures{grid-column:1/-1}
+.cooking-stock-item-form-grid .cooking-stock-measure-row{grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) minmax(150px,1.1fr) minmax(150px,1.1fr) 28px;align-items:end;gap:8px;padding:8px}
+.cooking-stock-measure-row>.field-wrap{min-width:0;gap:4px}
+.cooking-stock-measure-row .field-label{font-size:9px;line-height:1.2}
+.cooking-stock-measure-row .field{height:34px;padding:0 8px;font-size:11px}
+.cooking-stock-measure-row .cooking-stock-measure-unit{grid-column:1}
+.cooking-stock-measure-row .cooking-stock-measure-quantity{grid-column:2}
+.cooking-stock-measure-row .cooking-stock-measure-price{grid-column:3}
+.cooking-stock-measure-row .cooking-stock-measure-conversion{grid-column:4}
+.cooking-stock-measure-row>.icon-button{grid-column:5;align-self:center}
+.cooking-stock-item-form .modal-actions{margin-top:14px}
+@media(max-width:900px){
+  .modal.cooking-stock-item-modal{width:min(98vw,850px)}
+  .cooking-stock-item-form-grid .cooking-stock-measure-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .cooking-stock-measure-row>.field-wrap,.cooking-stock-measure-row>.icon-button{grid-column:auto}
+  .cooking-stock-measure-row>.icon-button{justify-self:end}
+}
+@media(max-width:760px){
+  .modal.cooking-stock-item-modal{width:100%;max-height:96vh;max-height:96dvh;padding:14px}
+  .cooking-stock-item-form-grid{grid-template-columns:minmax(0,1fr)}
+  .cooking-stock-item-form-grid>.cooking-inventory-measures{grid-column:auto}
+}
+@media(max-width:430px){
+  .cooking-stock-item-form-grid .cooking-stock-measure-row{grid-template-columns:minmax(0,1fr)}
+  .cooking-stock-measure-row>.field-wrap,.cooking-stock-measure-row>.icon-button{grid-column:1}
+  .cooking-stock-measure-row>.icon-button{justify-self:end}
+}
 .cooking-card>.compact-summary>div:first-child{min-width:0}
 .cooking-card[open]>.cooking-log-summary .cooking-log-summary-cost{display:none}
 .cooking-log-summary-cost{flex:none}

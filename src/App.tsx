@@ -12566,8 +12566,8 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
       .finally(() => setSaving(false));
   }
 
-  return <Modal title={initial ? "Edit kitchen stock item" : "Add kitchen stock item"} onClose={onClose} wide>
-    <form onSubmit={submit}><div className="form-grid">
+  return <Modal title={initial ? "Edit kitchen stock item" : "Add kitchen stock item"} onClose={onClose} wide className="cooking-stock-item-modal">
+    <form className="cooking-stock-item-form" onSubmit={submit}><div className="form-grid cooking-stock-item-form-grid">
       <Field label="Item name"><Input autoFocus required maxLength={120} placeholder="e.g. Tomatoes, cumin seeds, curry leaves" value={name} onChange={(event) => setName(event.target.value)} /></Field>
       <Field label="Category (optional)"><Input maxLength={60} placeholder="Vegetables, spices, seeds..." value={category} onChange={(event) => setCategory(event.target.value)} /></Field>
       <div className="full cooking-inventory-measures">
@@ -12579,11 +12579,11 @@ function CookingInventoryModal({ initial, onClose, onSave }: {
             ? roundCookingPrice(Number(sourceWeight.unitPrice) / Number(measure.piecesPerKg))
             : null;
           const usesKgConversion = countBased && Boolean(sourceWeight);
-          return <div className="cooking-inventory-measure" key={measure.id}>
-          <Field label="Unit"><Input required maxLength={40} placeholder="kg, piece, no of vankayas..." value={measure.unit} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unit: event.target.value } : entry))} /></Field>
-          <Field label="Stock on hand"><Input type="number" step="any" value={measure.stockQuantity} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, stockQuantity: event.target.value } : entry))} /></Field>
-          <Field label={usesKgConversion ? "Calculated price / piece" : "Price per unit"}><Input type="number" min="0" step="any" readOnly={usesKgConversion} value={usesKgConversion ? derivedPrice ?? "" : measure.unitPrice} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unitPrice: event.target.value } : entry))} /></Field>
-          {countBased && sourceWeight && <Field label="Pieces per kg"><Input type="number" min="0.001" step="any" required value={measure.piecesPerKg} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, piecesPerKg: event.target.value } : entry))} /><span className="field-hint">Used to calculate one-piece price from the kg price.</span></Field>}
+          return <div className="cooking-inventory-measure cooking-stock-measure-row" key={measure.id}>
+          <Field className="cooking-stock-measure-unit" label="Unit"><Input required maxLength={40} placeholder="kg, piece, no of vankayas..." value={measure.unit} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unit: event.target.value } : entry))} /></Field>
+          <Field className="cooking-stock-measure-quantity" label="Stock on hand"><Input type="number" step="any" value={measure.stockQuantity} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, stockQuantity: event.target.value } : entry))} /></Field>
+          <Field className="cooking-stock-measure-price" label={usesKgConversion ? "Calculated price / piece" : "Price per unit"}><Input type="number" min="0" step="any" readOnly={usesKgConversion} value={usesKgConversion ? derivedPrice ?? "" : measure.unitPrice} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, unitPrice: event.target.value } : entry))} /></Field>
+          {countBased && sourceWeight && <Field className="cooking-stock-measure-conversion" label="Pieces per kg"><Input type="number" min="0.001" step="any" required value={measure.piecesPerKg} onChange={(event) => setMeasures((current) => current.map((entry) => entry.id === measure.id ? { ...entry, piecesPerKg: event.target.value } : entry))} /><span className="field-hint">Used to calculate one-piece price from the kg price.</span></Field>}
           <button type="button" className="icon-button" aria-label={`Remove stock measure ${index + 1}`} onClick={() => setMeasures((current) => current.filter((entry) => entry.id !== measure.id))}><X size={14} /></button>
         </div>;
         })}
