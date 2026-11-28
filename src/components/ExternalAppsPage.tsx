@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from "react";
 import {
   AppWindow, Archive, ArchiveRestore, Banknote, BookOpen, Briefcase, CalendarDays, Car,
-  Code2, Database, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
+  Code2, Database, Eye, FileText, GraduationCap, Grid2X2, GripVertical, Heart, LayoutDashboard, Link2, List, Mail, Monitor,
   Pencil, Plus, Search, Settings2, ShoppingBag, Sparkles, Star, Trash2, X,
   type LucideIcon,
 } from "lucide-react";
@@ -85,6 +85,74 @@ function normalizedUrl(url: string) {
   } catch {
     return url.trim().toLocaleLowerCase();
   }
+}
+
+function ExternalAppDetails({ app, onClose, onSave }: {
+  app: ExternalAppLink;
+  onClose: () => void;
+  onSave: (app: ExternalAppLink) => Promise<void>;
+}) {
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [label, setLabel] = useState("");
+  const [value, setValue] = useState("");
+  const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const fields = app.fields ?? [];
+
+  function editField(field: ExternalAppField) {
+    setEditingFieldId(field.id);
+    setLabel(field.label);
+    setValue(field.value);
+    setError("");
+  }
+
+  async function saveField(field: ExternalAppField) {
+    const nextLabel = label.trim();
+    const nextValue = value.trim();
+    if (!nextLabel || nextLabel.length > 80 || !nextValue || nextValue.length > 2048) {
+      setError("Enter a label (up to 80 characters) and value (up to 2,048 characters).");
+      return;
+    }
+
+    const updatedApp = {
+      ...app,
+      fields: fields.map((entry) => entry.id === field.id
+        ? { ...entry, label: nextLabel, value: nextValue }
+        : entry),
+    };
+    setSavingFieldId(field.id);
+    setError("");
+    try {
+      await onSave(updatedApp);
+      setEditingFieldId(null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save this field.");
+    } finally {
+      setSavingFieldId(null);
+    }
+  }
+
+  return <Modal title={app.name} onClose={() => { if (!savingFieldId) onClose(); }} wide className="external-app-details-modal">
+    <div className="external-app-details-list">
+      {fields.map((field) => <div className="external-app-details-row" key={field.id}>
+        {editingFieldId === field.id ? <>
+          <div className="external-app-details-editor">
+            <Input autoFocus maxLength={80} aria-label={`${field.label} label`} value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Field label" />
+            <Input maxLength={2048} aria-label={`${field.label} value`} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Text or a link" />
+          </div>
+          <div className="external-app-details-actions">
+            <Button type="button" size="sm" disabled={Boolean(savingFieldId)} onClick={() => void saveField(field)}>{savingFieldId === field.id ? "Saving…" : "Save"}</Button>
+            <Button type="button" size="sm" variant="outline" disabled={Boolean(savingFieldId)} onClick={() => { setEditingFieldId(null); setError(""); }}>Cancel</Button>
+          </div>
+        </> : <>
+          <strong>{field.label}</strong>
+          <span className="external-app-details-value"><LinkifiedText>{field.value}</LinkifiedText></span>
+          <button type="button" className="icon-button" disabled={Boolean(savingFieldId)} aria-label={`Edit ${field.label}`} title="Edit field" onClick={() => editField(field)}><Pencil size={14} /></button>
+        </>}
+      </div>)}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
+    </div>
+  </Modal>;
 }
 
 function ExternalAppEditor({ initial, apps, categories, onClose, onSave, onDelete }: {
@@ -352,6 +420,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
   const [editorOpen, setEditorOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [editing, setEditing] = useState<ExternalAppLink | undefined>();
+  const [detailsApp, setDetailsApp] = useState<ExternalAppLink | undefined>();
   const [actionError, setActionError] = useState("");
   const [filter, setFilter] = useState<HubFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -408,6 +477,11 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     setEditing(undefined);
   }
 
+  async function saveDetails(app: ExternalAppLink) {
+    await onSave(app);
+    setDetailsApp(app);
+  }
+
   async function reorderApp(sourceId: string, targetId: string) {
     if (sourceId === targetId || saving) return;
     const visible = [...filteredApps];
@@ -457,7 +531,6 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
   function renderAppCard(app: ExternalAppLink) {
     const appCategory = getAppCategory(app);
     const Icon = ICONS[app.icon ?? ""] ?? ICONS[CATEGORY_ICONS[appCategory]] ?? AppWindow;
-    const appFields = app.fields ?? [];
     const cardContent = <>
       <div className="external-app-card-icon" style={{ backgroundColor: `${app.backgroundColor}30`, color: app.backgroundColor }}><Icon size={20} /></div>
       <div className="external-app-card-content">
@@ -466,7 +539,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     </>;
     return <Card
       key={app.id}
-      className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${appFields.length ? " has-custom-fields" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
+      className={`external-app-card external-app-${view}${app.url && !app.isArchived ? " is-launchable" : ""}${draggedAppId === app.id ? " is-dragging" : ""}`}
       style={{
         "--external-app-color": app.backgroundColor,
         "--external-app-title-size": `${app.titleFontSize ?? 18}px`,
@@ -475,17 +548,12 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
       onDragOver={(event) => { if (draggedAppId) event.preventDefault(); }}
       onDrop={(event) => dropOnCard(event, app.id)}
     >
-      {appFields.length > 0 ? <>
-        {app.url && !app.isArchived && <a className="external-app-card-overlay-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name}`} onClick={() => void trackOpen(app.id)} />}
-        <div className={`external-app-card-visible-content${app.url && !app.isArchived ? " is-launchable" : ""}`}>{cardContent}</div>
-      </> : app.url && !app.isArchived
+      {app.url && !app.isArchived
         ? <a className="external-app-card-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name}`} onClick={() => void trackOpen(app.id)}>{cardContent}</a>
         : <div className="external-app-card-static">{cardContent}</div>}
-      {appFields.length > 0 && <div className={`external-app-card-fields${app.url && !app.isArchived ? " has-overlay-link" : ""}`}>{appFields.map((field) => <div className="external-app-card-field" key={field.id}>
-        <strong>{field.label}</strong><span><LinkifiedText>{field.value}</LinkifiedText></span>
-      </div>)}</div>}
       <div className="external-app-card-actions">
         <button type="button" className="icon-button external-app-drag-handle" draggable={!saving} disabled={saving || filter === "recent"} aria-label={`Drag ${app.name} to reorder`} title="Drag to reorder" onDragStart={(event) => startDragging(event, app.id)} onDragEnd={() => setDraggedAppId(null)}><GripVertical size={13} /></button>
+        {app.fields?.length ? <button type="button" className="icon-button" disabled={saving} aria-label={`View ${app.name} details`} title="View details" onClick={() => setDetailsApp(app)}><Eye size={14} /></button> : null}
         <button type="button" className="icon-button" disabled={saving} aria-label={`Edit ${app.name}`} title="Edit application" onClick={() => openEditor(app)}><Pencil size={13} /></button>
       </div>
     </Card>;
@@ -529,6 +597,7 @@ export function ExternalAppsPage({ apps, categories: savedCategories, saving, on
     /></Card>}
     {pageCount > 1 && <div className="external-app-pagination"><span>Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredApps.length)} of {filteredApps.length}</span><div><Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>Previous</Button><span>Page {page + 1} of {pageCount}</span><Button size="sm" variant="outline" disabled={page >= pageCount - 1} onClick={() => setPage((current) => current + 1)}>Next</Button></div></div>}
     {editorOpen && <ExternalAppEditor key={editing?.id ?? "new"} initial={editing} apps={apps} categories={categories} onClose={() => setEditorOpen(false)} onSave={saveApp} onDelete={onDelete} />}
+    {detailsApp && <ExternalAppDetails app={detailsApp} onClose={() => setDetailsApp(undefined)} onSave={saveDetails} />}
     {categoryManagerOpen && <CategoryManager categories={categories} apps={apps} onClose={() => setCategoryManagerOpen(false)} onSave={onSaveCategories} />}
   </>;
 }
